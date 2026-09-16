@@ -255,15 +255,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      // Check if click is inside the calendar popover (rendered via portal)
+      // Check if click is inside the calendar popover
       const popoverElement = document.querySelector('.booking-calendar-popover');
       const isInsidePopover = popoverElement && (popoverElement.contains(target) || popoverElement === target);
       
       if (
         calendarWrapperRef.current &&
         !calendarWrapperRef.current.contains(target) &&
-        toggleButtonRef.current &&
-        !toggleButtonRef.current.contains(target) &&
         !isInsidePopover
       ) {
         setIsCalendarOpen(false);
@@ -290,21 +288,20 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     };
   }, [isCalendarOpen]);
 
-  // Calendar is always ready - no async loading needed since dates are generated client-side
-  // Keeping this useEffect commented out for reference, but calendarReady starts as true
-  // React.useEffect(() => {
-  //   // Calendar component renders immediately, no loading state needed
-  // }, [isCalendarOpen]);
-
   React.useEffect(() => {
     hasInteractedRef.current = hasInteracted;
   }, [hasInteracted]);
 
   const toggleCalendar = (field: 'checkin' | 'checkout' = 'checkin') => {
     lastFocusedTriggerRef.current = document.activeElement as HTMLElement | null;
-    setActiveField(field);
     setIsGuestsOpen(false);
-    setIsCalendarOpen((open) => !open);
+    if (isCalendarOpen && activeField === field) {
+      setIsCalendarOpen(false);
+      setActiveField(null);
+    } else {
+      setActiveField(field);
+      setIsCalendarOpen(true);
+    }
   };
 
   const wasOpenRef = React.useRef(isCalendarOpen);
@@ -552,7 +549,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       <div className="sr-only" role="status" aria-live="polite">
         {statusMessage || error || 'Hero form ready.'}
       </div>
-      <div className={formGridClass} ref={calendarWrapperRef}>
+      <div className={formGridClass}>
+        <div
+          ref={calendarWrapperRef}
+          className={`relative col-span-1 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-2 min-w-0 ${
+            isCalendarOpen ? 'z-[70]' : 'z-[1]'
+          }`}
+        >
         <div className="relative min-w-0">
           <button
             type="button"
@@ -714,6 +717,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
             );
           }}
         />
+        </div>
 
         <GuestTypeSelector
           value={guestCounts}

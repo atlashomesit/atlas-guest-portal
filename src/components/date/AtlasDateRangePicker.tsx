@@ -87,7 +87,6 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   value,
   activeField,
 }) => {
-  void activeField; // reserved for future focus management
   const fallbackLabelId = useId();
   const fallbackContentId = useId();
   const fallbackCalendarRef = useRef<HTMLDivElement | null>(null);
@@ -429,6 +428,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       onClose={onClose}
       open={open}
       popoverClassName={popoverClassName}
+      activeField={activeField}
     >
       <div className={`mx-3 mt-2 mb-1.5 rounded-md px-3 py-1.5 text-xs font-semibold ${statusConfig.bg} ${statusConfig.color}`} aria-live="polite">
         <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${statusConfig.dot}`} aria-hidden />
