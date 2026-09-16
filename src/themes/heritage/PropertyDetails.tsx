@@ -325,8 +325,8 @@ interface Property {
     maxGuests?: number;
     maxCapacity?: number;
     /** G3-002: from API listing when available */
-    checkInTime?: string;
-    checkOutTime?: string;
+    checkInTime?: string | null;
+    checkOutTime?: string | null;
     /** TASK-1676: nested policy times from listing DTO when present */
     unitPolicy?: { checkInTime?: string | null; checkOutTime?: string | null };
     /** AMN-001: amenity codes from API (e.g. ["wifi","ac","parking"]) */
