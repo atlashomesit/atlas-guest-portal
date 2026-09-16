@@ -1095,8 +1095,8 @@ const PropertyDetails = () => {
                         property_price: Number(apiListing.baseNightlyRate ?? (apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
-                        checkInTime: pub.checkInTime?.trim() || undefined,
-                        checkOutTime: pub.checkOutTime?.trim() || undefined,
+                        checkInTime: pub.checkInTime?.trim() || (typeof (apiListing as Record<string, unknown>).checkInTime === 'string' ? ((apiListing as Record<string, unknown>).checkInTime as string).trim() : undefined) || (typeof (apiListing as Record<string, unknown>).CheckInTime === 'string' ? ((apiListing as Record<string, unknown>).CheckInTime as string).trim() : undefined) || undefined,
+                        checkOutTime: pub.checkOutTime?.trim() || (typeof (apiListing as Record<string, unknown>).checkOutTime === 'string' ? ((apiListing as Record<string, unknown>).checkOutTime as string).trim() : undefined) || (typeof (apiListing as Record<string, unknown>).CheckOutTime === 'string' ? ((apiListing as Record<string, unknown>).CheckOutTime as string).trim() : undefined) || undefined,
                         unitPolicy: (() => {
                           const raw = (apiListing as Record<string, unknown>).unitPolicy;
                           if (!raw || typeof raw !== "object") return undefined;
@@ -1445,9 +1445,15 @@ useEffect(() => {
     const property = data;
 
     const resolvedCheckInTime =
-      property.checkInTime?.trim() || property.unitPolicy?.checkInTime?.trim() || null;
+      property.checkInTime?.trim() ||
+      property.unitPolicy?.checkInTime?.trim() ||
+      ((property as unknown as Record<string, unknown>).listing as Record<string, unknown> | undefined)?.checkInTime?.toString()?.trim() ||
+      null;
     const resolvedCheckOutTime =
-      data?.checkOutTime?.trim() || data?.unitPolicy?.checkOutTime?.trim() || null;
+      data?.checkOutTime?.trim() ||
+      data?.unitPolicy?.checkOutTime?.trim() ||
+      ((data as unknown as Record<string, unknown>).listing as Record<string, unknown> | undefined)?.checkOutTime?.toString()?.trim() ||
+      null;
     const cancellationPolicyText = (() => {
         const policies = data?.property_policy_details ?? [];
         const fromListingPolicy = policies.find((p) =>

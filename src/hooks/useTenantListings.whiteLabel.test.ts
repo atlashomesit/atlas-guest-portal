@@ -35,4 +35,21 @@ describe("useTenantListings mapDtoToProperty (TASK-7194)", () => {
     expect(property.property_location).toBe("");
     expect(property.property_location).not.toMatch(/hyderabad/i);
   });
+
+  it("TASK-102020: preserves checkInTime and checkOutTime from PublicListing DTO", () => {
+    const dto: PublicListing = {
+      id: 637,
+      name: "Villa Azure - 101",
+      propertyName: "Villa Azure",
+      maxGuests: 4,
+      photoUrls: [],
+      propertyAddress: null,
+      checkInTime: "14:00",
+      checkOutTime: "11:00",
+    };
+
+    const property = mapDtoToProperty(dto) as TenantPropertyRecord;
+    expect(property.checkInTime).toBe("14:00");
+    expect(property.checkOutTime).toBe("11:00");
+  });
 });
