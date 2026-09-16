@@ -410,7 +410,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       : {
           label: nights ? `Range selected: ${nights} night${nights === 1 ? '' : 's'}` : 'Range selected',
           bg: 'bg-[#ffe8d6]',
-          color: 'text-[#c2410c]',
+          color: 'text-[#9a3412]',
           dot: 'bg-[#c2410c]',
         };
 
