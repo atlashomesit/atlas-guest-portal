@@ -2217,7 +2217,9 @@ const GuestDetailsPage: React.FC = () => {
             <span className="label">Total</span>
             <div style={{ textAlign: 'right' }}>
               <div className="num">{displayPrice(displayTotal)}</div>
-              <small className="num-sub">Includes GST · INR</small>
+              <small className="num-sub" data-testid="checkout-total-gst-note">
+                {gstLineAmount > 0 ? 'Includes GST · INR' : 'INR'}
+              </small>
             </div>
           </div>
 
