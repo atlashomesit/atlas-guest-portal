@@ -133,5 +133,62 @@ describe('AtlasBookingCalendar — Month Visibility & Layout', () => {
     // Anchor bottom is 650, MARGIN is 8 -> top should be 658px (never flips above to 600 - 350 - 8 = 242px)
     expect(popover.style.top).toBe('658px');
   });
+
+  it('removes z-index while scrolling so it goes under the sticky navbar', () => {
+    render(<AtlasBookingCalendar {...defaultProps} />);
+    const popover = document.querySelector('.bc-popover') as HTMLElement;
+    expect(popover).toBeDefined();
+
+    // Trigger scroll event
+    fireEvent.scroll(window);
+
+    expect(popover.classList.contains('bc-is-scrolling')).toBe(true);
+    expect(popover.style.zIndex).toBe('auto');
+  });
+
+  it('sets z-index to auto when positioned under sticky navbar', () => {
+    const nav = document.createElement('div');
+    nav.id = 'navbar_container';
+    nav.getBoundingClientRect = () => ({
+      top: 0,
+      bottom: 80,
+      left: 0,
+      right: 1200,
+      width: 1200,
+      height: 80,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+    document.body.appendChild(nav);
+
+    // Anchor positioned very high up so finalTop (50 + 8 = 58) < navBottom (80)
+    const topAnchor = {
+      current: (() => {
+        const btn = document.createElement('button');
+        btn.getBoundingClientRect = () => ({
+          top: 20,
+          bottom: 50,
+          left: 600,
+          right: 750,
+          width: 150,
+          height: 30,
+          x: 600,
+          y: 20,
+          toJSON: () => {},
+        });
+        document.body.appendChild(btn);
+        return btn;
+      })(),
+    };
+
+    render(<AtlasBookingCalendar {...defaultProps} anchorRef={topAnchor} />);
+    const popover = document.querySelector('.bc-popover') as HTMLElement;
+    expect(popover).toBeDefined();
+    expect(popover.style.zIndex).toBe('auto');
+
+    document.body.removeChild(nav);
+  });
 });
+
 

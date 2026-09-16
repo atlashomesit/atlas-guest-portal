@@ -339,6 +339,9 @@
   max-height: calc(100vh - 130px);
   overflow-y: auto;
 }
+.bc-popover.bc-is-scrolling {
+  z-index: auto !important;
+}
 
 /* On narrow viewports collapse to 1 month and anchor as bottom sheet */
 @media (max-width: 620px) {
