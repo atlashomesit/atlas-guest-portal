@@ -324,7 +324,10 @@
   z-index: 40;
 }
 .bc-popover {
-  /* JS sets position:fixed + top/left via inline style; these are fallbacks */
+  /* JS sets position:fixed + top/left via inline style; these are fallbacks. JS also owns the
+     z-index (BOOKING_CALENDAR_Z_INDEX: above the navbar, chat buttons and mobile Reserve bar,
+     which otherwise swallow clicks on day cells), the short-viewport max-height, and the
+     clip-path that slides the calendar under the navbar while scrolling. */
   position: fixed;
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #f0ddd0);
