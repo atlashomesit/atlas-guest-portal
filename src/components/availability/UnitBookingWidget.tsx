@@ -219,9 +219,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const lastSettledHeadlineRef = useRef(0);
   const calendarOpenFetchGenRef = useRef(0);
   const openPricingInflightRef = useRef(0);
-  // TASK-4303: pricing fetch terminally failed (network/API error, not an abort). Only then do
-  // we degrade to the base-rate fallback estimate instead of holding the loading skeleton.
-  const [calendarPricingFailed, setCalendarPricingFailed] = useState(false);
+  // TASK-4303 / TASK-102023: pricing fetch terminally failed (network/API error, not an abort).
+  // Split into shown-month and selected-range states so a success on one does not overwrite
+  // a genuine failure on the other.
+  const [shownMonthPricingFailed, setShownMonthPricingFailed] = useState(false);
+  const [selectedRangePricingFailed, setSelectedRangePricingFailed] = useState(false);
   // TASK-4331 / TASK-7016: authoritative server quote (charge engine, not calendar display engine).
   const [serverPriceBreakdown, setServerPriceBreakdown] = useState<GuestPriceBreakdown | null>(null);
   const [guests, setGuests] = useState(2);
@@ -760,12 +762,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setCalendarPricingLoading(true);
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
-    setCalendarPricingFailed(false);
+    setShownMonthPricingFailed(false);
     fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
-        setCalendarPricingFailed(false);
+        setShownMonthPricingFailed(false);
       })
       .catch((error: unknown) => {
         // Fetch failure: leave any already-merged prices in place rather than clearing the
@@ -774,7 +776,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // TASK-4303: flag a genuine failure (not an unmount/StrictMode abort) so the
         // pricing-pending gate below can degrade to the fallback estimate instead of
         // holding the skeleton forever.
-        if ((error as Error)?.name !== 'AbortError') setCalendarPricingFailed(true);
+        if ((error as Error)?.name !== 'AbortError') setShownMonthPricingFailed(true);
       })
       .finally(() => {
         setCalendarPricingLoading(false);
@@ -846,15 +848,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const controller = new AbortController();
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
-    setCalendarPricingFailed(false);
+    setSelectedRangePricingFailed(false);
     fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
-        setCalendarPricingFailed(false);
+        setSelectedRangePricingFailed(false);
       })
       .catch((error: unknown) => {
-        if ((error as Error)?.name !== 'AbortError') setCalendarPricingFailed(true);
+        if ((error as Error)?.name !== 'AbortError') setSelectedRangePricingFailed(true);
       });
     return () => controller.abort();
   }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso]);
@@ -1246,6 +1248,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // taken, and must leave Reserve clickable so handleReserve can keep surfacing it.
   const datesUnavailable =
     availabilityConflict || checkinUnavailable || availabilityFailed;
+
+  // TASK-102023: gate range pricing pending, fallback estimate, and Reserve on the failure state
+  // covering the selected range. If the selected range falls within the shown month, use that
+  // fetch's failure state; otherwise use the selected-range fetch's failure state.
+  const isSelectedRangeCoveredByShownMonth =
+    !selectedStartMonthIso || selectedStartMonthIso === shownMonthIso;
+  const calendarPricingFailed = isSelectedRangeCoveredByShownMonth
+    ? shownMonthPricingFailed
+    : selectedRangePricingFailed;
 
   // TASK-4303: per-date pricing + fee percent for the selected range are still resolving.
   // While pending, the headline total and price breakdown render a loading skeleton instead
