@@ -1,4 +1,5 @@
 import { isRewriteEligibleHost, buildMetaRewriteValues, type TenantSiteMeta } from "./_lib/tenantSiteMeta";
+import { buildAtlasHostCanonical, isAtlasSelfCanonicalHost } from "./_lib/atlasHostCanonical";
 import { TtlCache } from "./_lib/ttlCache";
 
 /**
@@ -25,6 +26,8 @@ interface Env {
   ATLAS_API_BASE_URL?: string;
   /** TASK-7207 / ADR-0096: shared secret the Worker sends as X-Atlas-Worker-Proxy. */
   ATLAS_WORKER_PROXY_SECRET?: string;
+  /** Same Pages variable the SPA inlines into getPublicSiteOrigin(); read for the Atlas home canonical. */
+  VITE_PUBLIC_SITE_ORIGIN?: string;
 }
 
 // Minimal local typing for the Cloudflare Workers runtime's HTMLRewriter global — deliberately
@@ -120,6 +123,42 @@ async function fetchTenantSiteMeta(host: string, apiBase: string): Promise<Tenan
   return meta;
 }
 
+/**
+ * TASK-101940: an Atlas direct-booking host's static shell carries an empty canonical/og:url, which
+ * every JS-blind client reads as "no canonical". Set both to the value SEO.tsx sets after hydration
+ * (`_lib/atlasHostCanonical.ts`); every host or route that has no such value is returned untouched.
+ * Runs inside onRequest's try/catch, so any throw here fails open exactly like the tenant rewrite.
+ */
+function rewriteAtlasHostCanonical(
+  request: Request,
+  env: Env,
+  framed: Response,
+  url: URL,
+  host: string,
+  forwardedHost: string,
+): Response {
+  // Direct traffic only: behind the router Worker `url` is the Pages origin, so a canonical built
+  // from it would name *.pages.dev instead of the public host.
+  if (forwardedHost || !isAtlasSelfCanonicalHost(host)) return framed;
+
+  const canonical = buildAtlasHostCanonical(url.toString(), env.VITE_PUBLIC_SITE_ORIGIN);
+  if (!canonical) return framed;
+
+  const rewriter = new HTMLRewriter()
+    .on('link[rel="canonical"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("href", canonical);
+      },
+    })
+    .on('meta[property="og:url"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("content", canonical);
+      },
+    });
+
+  return applyFrameProtection(request, rewriter.transform(framed));
+}
+
 export const onRequest = async (context: {
   request: Request;
   env: Env;
@@ -155,8 +194,11 @@ export const onRequest = async (context: {
     const host = forwardedHost || url.hostname.toLowerCase();
 
     // Atlas first-party hosts (marketplace apex + Atlas direct-booking domains) keep their
-    // existing static/runtime OG tags — no API call, no rewrite.
-    if (!isRewriteEligibleHost(host)) return framed;
+    // existing static/runtime OG tags — no API call, no tenant rewrite. The one exception is the
+    // canonical/og:url pair on Atlas direct-booking hosts (TASK-101940), which mirrors SEO.tsx.
+    if (!isRewriteEligibleHost(host)) {
+      return rewriteAtlasHostCanonical(context.request, context.env, framed, url, host, forwardedHost);
+    }
 
     const apiBase = (context.env.ATLAS_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
     if (!apiBase) return framed; // misconfigured Pages env — fail open, not a 500
