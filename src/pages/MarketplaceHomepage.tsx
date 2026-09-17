@@ -53,6 +53,11 @@ type MarketplaceItem = {
   // render "verified"); externalReviewCount = imported feedback (Google etc.).
   verifiedStayCount?: number | null;
   externalReviewCount?: number | null;
+  // MKT-001: server-derived per-tenant payment routing (TenantsController/IPaymentRoutingService).
+  // Not yet deployed on GET /marketplace/listings — undefined falls back to today's behaviour
+  // (see the `?? 3` fallback below) until the API half ships.
+  chargesOnlinePaymentFee?: boolean;
+  convenienceFeePercent?: number;
 };
 
 function marketplaceListingPath(item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>): string {
@@ -285,9 +290,11 @@ export default function MarketplaceHomepage() {
           TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
           shipped brand baseline (MARKETPLACE_BRAND_BASELINE), mirroring Home.tsx's
           getPublicSiteOrigin() canonical pattern. */}
+      {/* MKT-002: `Listings.PhotosVerifiedAt` is unset on 0 of 136 prod listings — "Verified"
+          copy here asserted a verification that has never happened. */}
       <SEO
-        title="Atlastays Marketplace — Verified homes & rooms across India"
-        description="Discover homes and rooms across verified hosts on Atlastays. Direct booking from the owner."
+        title="Atlastays Marketplace — Homes & rooms across India, book direct"
+        description="Discover homes and rooms across India on Atlastays. Direct booking from the owner."
         url={`${getPublicSiteOrigin()}/`}
         siteName={MARKETPLACE_BRAND_BASELINE}
       />
@@ -300,8 +307,15 @@ export default function MarketplaceHomepage() {
           data-testid="marketplace-trust-strip"
           className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted"
         >
-          <span>{verifiedHomesCount} Verified homes</span>
-          <span aria-hidden>·</span>
+          {/* MKT-002: `Listings.PhotosVerifiedAt` is unset on 0 of 136 prod listings today, so
+              this item would always read "0 Verified homes" — an unearned trust claim. Omit it
+              entirely rather than show a zero; it reappears the moment any listing is verified. */}
+          {verifiedHomesCount > 0 && (
+            <>
+              <span>{verifiedHomesCount} Verified homes</span>
+              <span aria-hidden>·</span>
+            </>
+          )}
           {/* TASK-101491: the server's total, not the number loaded so far - this read "20
               listings" while the API reported 27. `verifiedHomesCount` above stays a count of
               LOADED items on purpose: it is a trust signal, and undercounting it is the safe
@@ -517,7 +531,11 @@ export default function MarketplaceHomepage() {
                       item.pricePerNight,
                       2,
                       (amount) => formatCurrency(amount, { maximumFractionDigits: 0 }),
-                      3,
+                      // MKT-001 / TASK-7428 "no processor, no fee": a WHATSAPP-tenant listing
+                      // takes no online payment and must not be quoted a processing fee. The
+                      // fields are not deployed on the API yet, so `chargesOnlinePaymentFee`
+                      // undefined preserves today's flat-3% behaviour via the `?? 3` fallback.
+                      item.chargesOnlinePaymentFee === false ? 0 : (item.convenienceFeePercent ?? 3),
                       item.isGstRegistered,
                       item.pricePerNight,
                     )}
