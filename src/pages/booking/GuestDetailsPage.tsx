@@ -58,6 +58,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 function abandonPaymentPendingCheckout(
   bookingId: number | null | undefined,
   token: string | null | undefined,
+  tenantSlug?: string | null,
 ): void {
   if (!bookingId || bookingId <= 0) return;
   const t = typeof token === 'string' ? token.trim() : '';
@@ -68,7 +69,7 @@ function abandonPaymentPendingCheckout(
   try {
     void fetch(url, {
       method: 'POST',
-      headers: getApiHeaders(),
+      headers: getApiHeaders(tenantSlug),
       keepalive: true,
     });
   } catch {
@@ -170,6 +171,7 @@ type CheckoutHoldCache = {
   holdListingId?: number | null;
   holdPropertySlug?: string | null;
   holdUnitSlug?: string | null;
+  holdTenantSlug?: string | null;
   holdListingName?: string | null;
   holdPriceBreakdown?: BookingPriceBreakdown | null;
   holdCancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
@@ -294,6 +296,7 @@ const GuestDetailsPage: React.FC = () => {
           holdListingId: cached.holdListingId ?? null,
           holdPropertySlug: cached.holdPropertySlug ?? null,
           holdUnitSlug: cached.holdUnitSlug ?? null,
+          holdTenantSlug: cached.holdTenantSlug ?? null,
           holdListingName: cached.holdListingName ?? null,
           holdPriceBreakdown: cached.holdPriceBreakdown ?? null,
           holdCancellationTier: cached.holdCancellationTier ?? null,
@@ -315,19 +318,41 @@ const GuestDetailsPage: React.FC = () => {
   const holdListingId = booking.holdListingId;
   const priceBreakdown = booking.holdPriceBreakdown;
 
+  // TASK-102017: derive effective tenant slug from BookingContext hold state or URL search params
+  const effectiveTenantSlug = booking.holdTenantSlug || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tenant') : null);
+
+  // Synchronize BookingContext and window.location query string if one was populated and the other missing
+  useEffect(() => {
+    if (booking?.holdTenantSlug && typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (!sp.get('tenant')) {
+        sp.set('tenant', booking.holdTenantSlug);
+        const newUrl = `${window.location.pathname}?${sp.toString()}`;
+        window.history.replaceState(null, '', newUrl);
+      }
+    } else if (!booking?.holdTenantSlug && typeof window !== 'undefined') {
+      const urlTenant = new URLSearchParams(window.location.search).get('tenant');
+      if (urlTenant) {
+        updateBooking({ holdTenantSlug: urlTenant });
+      }
+    }
+  }, [booking?.holdTenantSlug, updateBooking]);
+
   // TASK-8219: mirror the current hold identity into a ref so the pagehide/unmount abandon
   // guard (registered once, empty deps) always reads the latest holdId/holdToken without
   // needing to re-subscribe its event listeners on every hold change.
-  const latestHoldRef = useRef<{ holdId: number | null; holdToken: string | null }>({
+  const latestHoldRef = useRef<{ holdId: number | null; holdToken: string | null; holdTenantSlug: string | null }>({
     holdId: null,
     holdToken: null,
+    holdTenantSlug: null,
   });
   useEffect(() => {
     latestHoldRef.current = {
       holdId: holdId ? Number(holdId) : null,
       holdToken: holdToken ?? null,
+      holdTenantSlug: effectiveTenantSlug ?? null,
     };
-  }, [holdId, holdToken]);
+  }, [holdId, holdToken, effectiveTenantSlug]);
 
   // No hold state (direct navigation or hard reload): instead of a silent redirect,
   // we render a "pick your dates again" card (see early return in Render) and keep the
@@ -420,6 +445,7 @@ const GuestDetailsPage: React.FC = () => {
       holdListingId: holdListingId ?? null,
       holdPropertySlug: booking.holdPropertySlug ?? propertySlug ?? null,
       holdUnitSlug: booking.holdUnitSlug ?? unitSlug ?? null,
+      holdTenantSlug: booking.holdTenantSlug ?? effectiveTenantSlug ?? null,
       holdListingName: booking.holdListingName ?? null,
       holdPriceBreakdown: priceBreakdown ?? null,
       holdCancellationTier: booking.holdCancellationTier ?? null,
@@ -434,9 +460,9 @@ const GuestDetailsPage: React.FC = () => {
     } catch { /* ignore */ }
   }, [
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
-    booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdListingName,
-    booking.holdCancellationTier, booking.holdCancellationWindowHours, booking.holdGraceHours,
-    propertySlug, unitSlug,
+    booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
+    booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
+    booking.holdGraceHours, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
@@ -474,14 +500,14 @@ const GuestDetailsPage: React.FC = () => {
     void (async () => {
       try {
         const url = buildApiUrl(`/listings/${id}/add-ons`);
-        const res = await fetch(url, { headers: getApiHeaders() });
+        const res = await fetch(url, { headers: getApiHeaders(effectiveTenantSlug) });
         if (res.ok) {
           const data = (await res.json()) as AddOnService[];
           setAvailableAddOns(Array.isArray(data) ? data : []);
         }
       } catch { /* non-critical */ }
     })();
-  }, [holdListingId]);
+  }, [holdListingId, effectiveTenantSlug]);
 
   const stayGuestCount = booking.guests ?? 1;
 
@@ -704,7 +730,7 @@ const GuestDetailsPage: React.FC = () => {
     try {
       const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getApiHeaders() },
+        headers: { 'Content-Type': 'application/json', ...getApiHeaders(effectiveTenantSlug) },
         body: JSON.stringify({ code, listingId: Number(holdListingId), subtotal: baseAmount }),
       });
       if (!res.ok) { setPromoMessage('Could not validate code — try again.'); return; }
@@ -722,7 +748,7 @@ const GuestDetailsPage: React.FC = () => {
     } finally {
       setPromoValidating(false);
     }
-  }, [promoCode, holdListingId, baseAmount]);
+  }, [promoCode, holdListingId, baseAmount, effectiveTenantSlug]);
 
   const handleReferralBlur = useCallback(() => {
     const code = referralCode.trim();
@@ -833,7 +859,7 @@ const GuestDetailsPage: React.FC = () => {
           track('start_checkout', numericListingId);
 
           const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
-            headers: getOrderRequestHeaders(idempotencyKey),
+            headers: getOrderRequestHeaders(idempotencyKey, effectiveTenantSlug),
             timeout: 20000,
           });
           const responseData = response.data;
@@ -959,7 +985,7 @@ const GuestDetailsPage: React.FC = () => {
                 // TASK-8219: mark the checkout settled so a pagehide/unmount that follows this
                 // explicit dismiss doesn't fire a second abandon-checkout call for the same hold.
                 checkoutSettledRef.current = true;
-                abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
+                abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
                 // TASK-10087: terminal outcome — anonymous session/listing identifiers only, no PII.
                 track(TerminalCheckoutOutcomeEvents.PaymentModalDismissed, holdListingId ? Number(holdListingId) : 0);
                 setIsSubmitting(false);
@@ -1012,7 +1038,7 @@ const GuestDetailsPage: React.FC = () => {
                         verifyRes = await axios.post(
                           buildApiUrl('/api/Razorpay/verify'),
                           verifyBody,
-                          { headers: { ...getApiHeaders(), 'Content-Type': 'application/json' }, timeout: 15000 },
+                          { headers: { ...getApiHeaders(effectiveTenantSlug), 'Content-Type': 'application/json' }, timeout: 15000 },
                         );
                         if (verifyRes?.data?.success) break;
                       } catch (verifyErr) {
@@ -1038,7 +1064,7 @@ const GuestDetailsPage: React.FC = () => {
                       track(TerminalCheckoutOutcomeEvents.PaymentConfirmed, holdListingId ? Number(holdListingId) : 0);
                       updateBooking({
                         holdId: null, holdExpiresAt: null, holdPropertySlug: null,
-                        holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null,
+                        holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
                         holdListingName: null, holdCancellationTier: null,
                         holdCancellationWindowHours: null, holdGraceHours: null,
                         paymentHoldBookingId: null, paymentHoldToken: null,
@@ -1077,7 +1103,7 @@ const GuestDetailsPage: React.FC = () => {
                       try {
                         const r = await fetch(
                           buildApiUrl(`/api/guest/bookings/${bookingId}/summary?t=${encodeURIComponent(pollToken ?? '')}`),
-                          { headers: { Accept: 'application/json', ...getApiHeaders() } },
+                          { headers: { Accept: 'application/json', ...getApiHeaders(effectiveTenantSlug) } },
                         );
                         if (r.ok) {
                           const d: { status?: string } = await r.json();
@@ -1140,7 +1166,7 @@ const GuestDetailsPage: React.FC = () => {
                     paymentCompleted = true;
                     checkoutSettledRef.current = true;
                     try { rzp.close(); } catch { /* ignore */ }
-                    abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
+                    abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
                     // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
                     track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
                     setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
@@ -1154,7 +1180,7 @@ const GuestDetailsPage: React.FC = () => {
                   paymentCompleted = true;
                   checkoutSettledRef.current = true;
                   try { rzp.close(); } catch { /* ignore */ }
-                  abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current);
+                  abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
                   // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
                   track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
                   setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
@@ -1254,7 +1280,7 @@ const GuestDetailsPage: React.FC = () => {
       isSubmitting, holdExpired, validateForm, holdId, holdToken, phoneDialCode, formData,
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
-      checkInDisplay, checkOutDisplay, brandName,
+      checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
     ],
   );
 
@@ -1273,7 +1299,7 @@ const GuestDetailsPage: React.FC = () => {
     try {
       const r = await fetch(
         buildApiUrl(`/api/guest/bookings/${ctx.bookingId}/summary?t=${encodeURIComponent(ctx.pollToken ?? '')}`),
-        { headers: { Accept: 'application/json', ...getApiHeaders() } },
+        { headers: { Accept: 'application/json', ...getApiHeaders(effectiveTenantSlug) } },
       );
       if (r.ok) {
         const d: { status?: string } = await r.json();
@@ -1295,7 +1321,7 @@ const GuestDetailsPage: React.FC = () => {
     } finally {
       setChargedUnconfirmedChecking(false);
     }
-  }, [chargedUnconfirmedChecking, navigate]);
+  }, [chargedUnconfirmedChecking, navigate, effectiveTenantSlug]);
 
   // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
   // it while consent is unchecked scrolls the consent box into view and flashes it.
@@ -1315,15 +1341,15 @@ const GuestDetailsPage: React.FC = () => {
     // TASK-8219: mark settled first so the pagehide/unmount guard (this click triggers an
     // in-SPA navigate() below, which unmounts the page) doesn't send a second abandon call.
     checkoutSettledRef.current = true;
-    abandonPaymentPendingCheckout(holdId, holdToken ?? pendingBookingTokenRef.current);
+    abandonPaymentPendingCheckout(holdId, holdToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
     try { window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY); } catch { /* ignore */ }
     updateBooking({
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
-      holdUnitSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
+      holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
       holdCancellationTier: null, holdCancellationWindowHours: null, holdGraceHours: null,
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
-  }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken]);
+  }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken, effectiveTenantSlug]);
 
   // TASK-8219: a guest who leaves /details via browser Back, mobile swipe-back, or tab-close
   // never routed through handleClose or handleBackToProperty, so abandonPaymentPendingCheckout
@@ -1357,7 +1383,7 @@ const GuestDetailsPage: React.FC = () => {
       checkoutSettledRef.current = true;
       const id = pendingBookingIdRef.current ?? latestHoldRef.current.holdId;
       const token = pendingBookingTokenRef.current ?? latestHoldRef.current.holdToken;
-      abandonPaymentPendingCheckout(id, token);
+      abandonPaymentPendingCheckout(id, token, latestHoldRef.current.holdTenantSlug);
     };
 
     const handlePageHide = () => {
@@ -2191,7 +2217,9 @@ const GuestDetailsPage: React.FC = () => {
             <span className="label">Total</span>
             <div style={{ textAlign: 'right' }}>
               <div className="num">{displayPrice(displayTotal)}</div>
-              <small className="num-sub">Includes GST · INR</small>
+              <small className="num-sub" data-testid="checkout-total-gst-note">
+                {gstLineAmount > 0 ? 'Includes GST · INR' : 'INR'}
+              </small>
             </div>
           </div>
 

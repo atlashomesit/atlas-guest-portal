@@ -32,13 +32,12 @@ export const ACCOMMODATION_GST_EXEMPT_THRESHOLD_INR = 1000;
  * does not exist for that stay. It has been deleted rather than fixed-in-place, specifically
  * because two near-identically-named helpers where only one is correct is itself the hazard — do
  * not reintroduce a second slab helper; add new bands to this one.
- *
- * KEEP THIS IN SYNC with `GstInvoiceConstants.cs` if that table ever changes — nothing enforces
- * the two stay aligned automatically; this comment is the enforcement.
+ * KEEP THIS IN SYNC with `GstInvoiceCalculation.ResolveAccommodationGstRate` (TASK-101988) —
+ * exempt band is strictly below ₹1,000 (< 1000). Exactly ₹1,000 is 5%.
  */
 export function accommodationGstSlabPercentForChargedRate(chargedPerNight: number): number | null {
   if (chargedPerNight <= 0) return null;
-  if (chargedPerNight <= ACCOMMODATION_GST_EXEMPT_THRESHOLD_INR) return 0;
+  if (chargedPerNight < ACCOMMODATION_GST_EXEMPT_THRESHOLD_INR) return 0;
   return chargedPerNight <= ACCOMMODATION_GST_THRESHOLD_INR ? 5 : 18;
 }
 

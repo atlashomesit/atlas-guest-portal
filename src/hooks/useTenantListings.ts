@@ -7,7 +7,12 @@ import {
 import { LISTINGS, type Listing } from "@/data/listings";
 import { propertyData } from "@/data/propertyData";
 import { getTenantContext } from "@/tenant/tenantContext";
-import { getTenantOverrides, getTenantPublicListingIdAllowlist } from "@/tenant/tenantOverrides";
+import {
+  getTenantListingAddress,
+  getTenantOverrides,
+  getTenantPublicListingIdAllowlist,
+} from "@/tenant/tenantOverrides";
+import { resolveEffectiveListingAddress } from "@/utils/listingAddress";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -28,6 +33,7 @@ export type TenantPropertyRecord = {
   property_name?: string;
   property_description?: string;
   property_location?: string;
+  propertyAddress?: string | null;
   property_neighborhoods?: string[];
   property_reviews?: number;
   property_rating?: number;
@@ -49,6 +55,9 @@ export type TenantPropertyRecord = {
   longitude?: number | null;
   /** DESIGN-028: listing cancellation tier for card trust chips. */
   cancellationTier?: "Flexible" | "Moderate" | "Strict" | null;
+  /** TASK-102020: listing check-in/out times for property page display. */
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -117,7 +126,20 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
       dto.metaDescription?.trim() ||
       "",
     // TASK-7194 / DESIGN-031: never invent a city and never borrow demo catalog location.
-    property_location: (dto.propertyAddress ?? "").trim(),
+    property_location: (() => {
+      const tenantCtx = getTenantContext();
+      const overrides = getTenantOverrides(tenantCtx?.slug);
+      const overrideAddr = getTenantListingAddress(overrides, dto.id);
+      const resolved = resolveEffectiveListingAddress(dto, overrideAddr);
+      return (resolved ?? "").trim();
+    })(),
+    propertyAddress: (() => {
+      const tenantCtx = getTenantContext();
+      const overrides = getTenantOverrides(tenantCtx?.slug);
+      const overrideAddr = getTenantListingAddress(overrides, dto.id);
+      const resolved = resolveEffectiveListingAddress(dto, overrideAddr);
+      return resolved ? resolved.trim() : null;
+    })(),
     property_neighborhoods: [],
     property_reviews: dto.reviewCount ?? local?.property_reviews ?? 0,
     property_rating: dto.propertyRating ?? local?.property_rating ?? 0,
@@ -138,6 +160,8 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     latitude: dto.latitude ?? null,
     longitude: dto.longitude ?? null,
     cancellationTier: dto.cancellationTier ?? null,
+    checkInTime: dto.checkInTime?.trim() || null,
+    checkOutTime: dto.checkOutTime?.trim() || null,
   };
 };
 

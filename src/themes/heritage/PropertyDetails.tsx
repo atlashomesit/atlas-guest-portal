@@ -49,6 +49,7 @@ import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
+import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
 import { buildGuestImageSrcSet, filterGuestImageUrls, GUEST_IMAGE_SRCSET_WIDTHS, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '@/utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '@/api/listingClient';
 import {
@@ -324,8 +325,8 @@ interface Property {
     maxGuests?: number;
     maxCapacity?: number;
     /** G3-002: from API listing when available */
-    checkInTime?: string;
-    checkOutTime?: string;
+    checkInTime?: string | null;
+    checkOutTime?: string | null;
     /** TASK-1676: nested policy times from listing DTO when present */
     unitPolicy?: { checkInTime?: string | null; checkOutTime?: string | null };
     /** AMN-001: amenity codes from API (e.g. ["wifi","ac","parking"]) */
@@ -1072,18 +1073,16 @@ const PropertyDetails = () => {
                         const psFallback = (apiListing as Record<string, unknown>).publishStatus;
                         if (typeof psFallback === 'string') setPublishStatus(psFallback);
                     }
-                    const rawAddr =
-                        (apiListing as Record<string, unknown>).propertyAddress ??
-                        (apiListing as Record<string, unknown>).property_address;
-                    const streetFromApi =
-                        typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
                     const listingNumericId = Number(apiListing.id) || listingId;
+                    const resolvedListingAddress = resolveEffectiveListingAddress(
+                        apiListing as Record<string, unknown>,
+                    );
                     const mapped: Property = {
                         id: listingNumericId,
                         listingId: listingNumericId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
                         property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
-                        property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
+                        property_location: resolvedListingAddress ?? ((apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified'),
                         property_neighborhoods: Array.isArray((apiListing as Record<string, unknown>).property_neighborhoods) ? (apiListing as Record<string, unknown>).property_neighborhoods as string[] : [],
                         property_amenities: Array.isArray((apiListing as Record<string, unknown>).property_amenities) ? (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] : [],
                         property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
@@ -1096,8 +1095,8 @@ const PropertyDetails = () => {
                         property_price: Number(apiListing.baseNightlyRate ?? (apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
-                        checkInTime: pub.checkInTime?.trim() || undefined,
-                        checkOutTime: pub.checkOutTime?.trim() || undefined,
+                        checkInTime: pub.checkInTime?.trim() || (typeof (apiListing as Record<string, unknown>).checkInTime === 'string' ? ((apiListing as Record<string, unknown>).checkInTime as string).trim() : undefined) || (typeof (apiListing as Record<string, unknown>).CheckInTime === 'string' ? ((apiListing as Record<string, unknown>).CheckInTime as string).trim() : undefined) || undefined,
+                        checkOutTime: pub.checkOutTime?.trim() || (typeof (apiListing as Record<string, unknown>).checkOutTime === 'string' ? ((apiListing as Record<string, unknown>).checkOutTime as string).trim() : undefined) || (typeof (apiListing as Record<string, unknown>).CheckOutTime === 'string' ? ((apiListing as Record<string, unknown>).CheckOutTime as string).trim() : undefined) || undefined,
                         unitPolicy: (() => {
                           const raw = (apiListing as Record<string, unknown>).unitPolicy;
                           if (!raw || typeof raw !== "object") return undefined;
@@ -1129,11 +1128,7 @@ const PropertyDetails = () => {
                             }
                             return undefined;
                         })(),
-                        propertyAddress:
-                            streetFromApi ??
-                            (typeof pub.propertyAddress === 'string' && pub.propertyAddress.trim()
-                                ? pub.propertyAddress.trim()
-                                : null),
+                        propertyAddress: resolvedListingAddress,
                         virtualTourUrl: (() => {
                             const raw = (apiListing as Record<string, unknown>).virtualTourUrl;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
@@ -1450,9 +1445,15 @@ useEffect(() => {
     const property = data;
 
     const resolvedCheckInTime =
-      property.checkInTime?.trim() || property.unitPolicy?.checkInTime?.trim() || null;
+      property.checkInTime?.trim() ||
+      property.unitPolicy?.checkInTime?.trim() ||
+      ((property as unknown as Record<string, unknown>).listing as Record<string, unknown> | undefined)?.checkInTime?.toString()?.trim() ||
+      null;
     const resolvedCheckOutTime =
-      data?.checkOutTime?.trim() || data?.unitPolicy?.checkOutTime?.trim() || null;
+      data?.checkOutTime?.trim() ||
+      data?.unitPolicy?.checkOutTime?.trim() ||
+      ((data as unknown as Record<string, unknown>).listing as Record<string, unknown> | undefined)?.checkOutTime?.toString()?.trim() ||
+      null;
     const cancellationPolicyText = (() => {
         const policies = data?.property_policy_details ?? [];
         const fromListingPolicy = policies.find((p) =>

@@ -45,6 +45,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
+import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
@@ -218,9 +219,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const lastSettledHeadlineRef = useRef(0);
   const calendarOpenFetchGenRef = useRef(0);
   const openPricingInflightRef = useRef(0);
-  // TASK-4303: pricing fetch terminally failed (network/API error, not an abort). Only then do
-  // we degrade to the base-rate fallback estimate instead of holding the loading skeleton.
-  const [calendarPricingFailed, setCalendarPricingFailed] = useState(false);
+  // TASK-4303 / TASK-102023: pricing fetch terminally failed (network/API error, not an abort).
+  // Split into shown-month and selected-range states so a success on one does not overwrite
+  // a genuine failure on the other.
+  const [shownMonthPricingFailed, setShownMonthPricingFailed] = useState(false);
+  const [selectedRangePricingFailed, setSelectedRangePricingFailed] = useState(false);
   // TASK-4331 / TASK-7016: authoritative server quote (charge engine, not calendar display engine).
   const [serverPriceBreakdown, setServerPriceBreakdown] = useState<GuestPriceBreakdown | null>(null);
   const [guests, setGuests] = useState(2);
@@ -759,12 +762,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setCalendarPricingLoading(true);
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
-    setCalendarPricingFailed(false);
+    setShownMonthPricingFailed(false);
     fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
-        setCalendarPricingFailed(false);
+        setShownMonthPricingFailed(false);
       })
       .catch((error: unknown) => {
         // Fetch failure: leave any already-merged prices in place rather than clearing the
@@ -773,7 +776,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // TASK-4303: flag a genuine failure (not an unmount/StrictMode abort) so the
         // pricing-pending gate below can degrade to the fallback estimate instead of
         // holding the skeleton forever.
-        if ((error as Error)?.name !== 'AbortError') setCalendarPricingFailed(true);
+        if ((error as Error)?.name !== 'AbortError') setShownMonthPricingFailed(true);
       })
       .finally(() => {
         setCalendarPricingLoading(false);
@@ -845,15 +848,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const controller = new AbortController();
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
-    setCalendarPricingFailed(false);
+    setSelectedRangePricingFailed(false);
     fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
-        setCalendarPricingFailed(false);
+        setSelectedRangePricingFailed(false);
       })
       .catch((error: unknown) => {
-        if ((error as Error)?.name !== 'AbortError') setCalendarPricingFailed(true);
+        if ((error as Error)?.name !== 'AbortError') setSelectedRangePricingFailed(true);
       });
     return () => controller.abort();
   }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso]);
@@ -1246,6 +1249,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const datesUnavailable =
     availabilityConflict || checkinUnavailable || availabilityFailed;
 
+  // TASK-102023: gate range pricing pending, fallback estimate, and Reserve on the failure state
+  // covering the selected range. If the selected range falls within the shown month, use that
+  // fetch's failure state; otherwise use the selected-range fetch's failure state.
+  const isSelectedRangeCoveredByShownMonth =
+    !selectedStartMonthIso || selectedStartMonthIso === shownMonthIso;
+  const calendarPricingFailed = isSelectedRangeCoveredByShownMonth
+    ? shownMonthPricingFailed
+    : selectedRangePricingFailed;
+
   // TASK-4303: per-date pricing + fee percent for the selected range are still resolving.
   // While pending, the headline total and price breakdown render a loading skeleton instead
   // of the provisional base-rate/₹0-fee number that would otherwise silently jump ~12% once
@@ -1582,8 +1594,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         idempotencyKey = crypto.randomUUID();
         reserveIdempotencyKeyRef.current = idempotencyKey;
       }
+      const initialHoldHeaders = getOrderRequestHeaders(idempotencyKey);
       const response = await axios.post(orderUrl, orderPayload, {
-        headers: getOrderRequestHeaders(idempotencyKey),
+        headers: initialHoldHeaders,
         timeout: 15000,
       });
 
@@ -1610,6 +1623,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? serverTouristTaxPascal
             : 0;
 
+      // TASK-102017: derive the tenant slug owning this hold so the details route and final-charge
+      // calls send the identical X-Tenant-Slug header instead of 422ing against the apex tenant.
+      const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+      const tenantFromUrl = typeof window !== 'undefined'
+        ? new URLSearchParams(currentSearch).get('tenant')
+        : null;
+      const holdTenantSlug = tenantFromUrl || initialHoldHeaders['X-Tenant-Slug'] || null;
+
       // Store hold state in context and navigate to details page
       updateBooking({
         holdId: Number(holdId),
@@ -1618,6 +1639,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdExpiresAt: typeof holdExpiresAt === 'string' ? holdExpiresAt : new Date(holdExpiresAt).toISOString(),
         holdPropertySlug: propertySlug ?? null,
         holdUnitSlug: unitSlug ?? null,
+        holdTenantSlug,
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
         holdPriceBreakdown: {
@@ -1650,7 +1672,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // the reserve key so a LATER, unrelated Reserve click (after navigating back) never reuses
       // a key that already has a completed hold behind it.
       reserveIdempotencyKeyRef.current = null;
-      navigate(`/book/${targetSlug}/${targetUnit}/details`);
+
+      // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
+      // getApiHeaders() resolves the same tenant on final charge and page refreshes.
+      let navSearch = currentSearch;
+      if (!tenantFromUrl && holdTenantSlug && isMarketplaceMode() && holdTenantSlug !== 'atlas') {
+        const sp = new URLSearchParams(currentSearch);
+        sp.set('tenant', holdTenantSlug);
+        navSearch = `?${sp.toString()}`;
+      }
+      navigate(`/book/${targetSlug}/${targetUnit}/details${navSearch}`);
     } catch (error: unknown) {
       console.error('[UnitBookingWidget] Reserve error:', error);
       const data = (error as { response?: { data?: { code?: string; Code?: string } } })?.response?.data;

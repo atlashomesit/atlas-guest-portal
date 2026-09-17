@@ -12,7 +12,8 @@ import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
-import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding } from "../tenant/tenantOverrides";
+import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding, getTenantListingAddress } from "../tenant/tenantOverrides";
+import { resolveEffectiveListingAddress } from "../utils/listingAddress";
 import { LoadingState } from "../components/LoadingState";
 import ErrorBanner from "../components/ErrorBanner"; // TASK-7195
 import SEO from "../components/SEO"; // TASK-4290
@@ -155,11 +156,14 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
           : (l.amenityCodes ?? []),
       );
 
+      const overrides = getTenantOverrides(getTenantContext()?.slug);
+      const unitAddress = resolveEffectiveListingAddress(l, getTenantListingAddress(overrides, l.id)) ?? "";
+
       return {
         id: `api-${l.id}`,
         numericId: l.id,
         title: getListingDisplayName(l.id, l.name || l.propertyName, l.displayName),
-        location: l.propertyAddress ?? "",
+        location: unitAddress,
         pricePerNight: l.baseNightlyRate ?? 0,
         maxGuests: l.maxGuests,
         imageUrl:

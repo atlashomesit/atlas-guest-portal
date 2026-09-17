@@ -10,6 +10,7 @@ vi.mock('../tenant/tenantContext', () => ({
 vi.mock('../tenant/tenantOverrides', () => ({
   getTenantOverrides: vi.fn(() => ({})),
   shouldHideAtlasBranding: vi.fn(),
+  getTenantListingAddress: vi.fn(),
 }));
 
 import { getTenantContext } from '../tenant/tenantContext';

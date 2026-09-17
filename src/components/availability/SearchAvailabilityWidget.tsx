@@ -66,6 +66,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [isGuestsOpen, setIsGuestsOpen] = React.useState(false);
   const [activeField, setActiveField] = React.useState<'checkin' | 'checkout' | null>(null);
+  const [hoverDate, setHoverDate] = React.useState<Date | null>(null);
   const [isSubmitting, _setIsSubmitting] = React.useState(false);
   const [statusMessage, setStatusMessage] = React.useState<string>('');
   const [hasInteracted, setHasInteracted] = React.useState(false);
@@ -87,10 +88,17 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const calendarLabelId = React.useId();
   const dateErrorId = React.useId();
   const { booking, updateBooking } = useBooking();
-  const monthsToShow = React.useMemo(
-    () => (typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2),
-    [],
+  const [monthsToShow, setMonthsToShow] = React.useState(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 768 ? 2 : 1
   );
+  React.useEffect(() => {
+    const updateMonths = () => {
+      setMonthsToShow(typeof window !== 'undefined' && window.innerWidth >= 768 ? 2 : 1);
+    };
+    updateMonths();
+    window.addEventListener('resize', updateMonths);
+    return () => window.removeEventListener('resize', updateMonths);
+  }, []);
 
   // BOUNDARY: both sources here are INSTANTS — BookingContext's wire value is an IST-midnight
   // ISO instant, and a `?checkIn=YYYY-MM-DD` param parses as UTC midnight. `startOfDay` read
@@ -249,15 +257,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      // Check if click is inside the calendar popover (rendered via portal)
+      // Check if click is inside the calendar popover
       const popoverElement = document.querySelector('.booking-calendar-popover');
       const isInsidePopover = popoverElement && (popoverElement.contains(target) || popoverElement === target);
       
       if (
         calendarWrapperRef.current &&
         !calendarWrapperRef.current.contains(target) &&
-        toggleButtonRef.current &&
-        !toggleButtonRef.current.contains(target) &&
         !isInsidePopover
       ) {
         setIsCalendarOpen(false);
@@ -284,21 +290,20 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     };
   }, [isCalendarOpen]);
 
-  // Calendar is always ready - no async loading needed since dates are generated client-side
-  // Keeping this useEffect commented out for reference, but calendarReady starts as true
-  // React.useEffect(() => {
-  //   // Calendar component renders immediately, no loading state needed
-  // }, [isCalendarOpen]);
-
   React.useEffect(() => {
     hasInteractedRef.current = hasInteracted;
   }, [hasInteracted]);
 
   const toggleCalendar = (field: 'checkin' | 'checkout' = 'checkin') => {
     lastFocusedTriggerRef.current = document.activeElement as HTMLElement | null;
-    setActiveField(field);
     setIsGuestsOpen(false);
-    setIsCalendarOpen((open) => !open);
+    if (isCalendarOpen && activeField === field) {
+      setIsCalendarOpen(false);
+      setActiveField(null);
+    } else {
+      setActiveField(field);
+      setIsCalendarOpen(true);
+    }
   };
 
   const wasOpenRef = React.useRef(isCalendarOpen);
@@ -483,6 +488,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     });
     if (selection.startDate && selection.endDate && normalizedEnd && normalizedStart && normalizedEnd > normalizedStart) {
       setIsCalendarOpen(false);
+      setHoverDate(null);
     }
   };
 
@@ -495,6 +501,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     setStatusMessage('');
     setIsCalendarOpen(false);
     setActiveField(null);
+    setHoverDate(null);
     setShownDate(defaultRange.startDate ?? today);
   };
 
@@ -544,7 +551,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       <div className="sr-only" role="status" aria-live="polite">
         {statusMessage || error || 'Hero form ready.'}
       </div>
-      <div className={formGridClass} ref={calendarWrapperRef}>
+      <div className={formGridClass}>
+        <div
+          ref={calendarWrapperRef}
+          className={`relative col-span-1 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-2 min-w-0 ${
+            isCalendarOpen ? 'z-[70]' : 'z-[1]'
+          }`}
+        >
         <div className="relative min-w-0">
           <button
             type="button"
@@ -615,6 +628,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           onClose={() => {
             setIsCalendarOpen(false);
             setActiveField(null);
+            setHoverDate(null);
           }}
           value={dateRange}
           onChange={handleRangeChange}
@@ -629,34 +643,83 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           loading={!calendarReady}
           activeField={activeField}
           dayContentRenderer={(day) => {
-            const dayStart = startOfCalendarDay(day);
-            const selectionStart = dateRange.startDate ? startOfCalendarDay(dateRange.startDate).getTime() : null;
-            const selectionEnd = dateRange.endDate ? startOfCalendarDay(dateRange.endDate).getTime() : null;
-            const isRangeStart = selectionStart !== null && dayStart.getTime() === selectionStart;
-            const isRangeEnd = selectionEnd !== null && dayStart.getTime() === selectionEnd;
-            const isDisabled = dayStart < today;
+            const checkIn = dateRange.startDate ? startOfCalendarDay(dateRange.startDate) : null;
+            const checkOut = dateRange.endDate ? startOfCalendarDay(dateRange.endDate) : null;
+            const endProbe = checkOut ?? (hoverDate && checkIn && hoverDate > checkIn ? hoverDate : null);
 
-         return (
-  <div className="relative flex h-full w-full items-center justify-center">
-    <span
-      data-testid={`hero-date-${toCalendarISO(day)}`}
-      className={`relative z-10 flex items-center justify-center text-sm font-medium transition ${
-        isRangeStart || isRangeEnd
-          ? 'bg-[var(--cta-primary)] text-[var(--text-on-cta)] rounded-xl px-3 py-3 shadow-sm'
-          : isDisabled
-          ? 'text-[var(--border-strong)] cursor-not-allowed opacity-50'
-          : 'text-[var(--brand)]'
-      }`}
-      style={{ minHeight: 40, minWidth: 40 }}
-    >
-      {format(day, 'd')}
-    </span>
-  </div>
-);
+            const dayDate = startOfCalendarDay(day);
+            const dayTime = dayDate.getTime();
+            const dowIndex = dayDate.getDay(); // 0 = Sunday ... 6 = Saturday
 
+            const isStart = checkIn != null && dayTime === checkIn.getTime();
+            const isEnd = checkOut != null && dayTime === checkOut.getTime();
+            const hoverEnd = !isStart && hoverDate != null && checkIn != null && hoverDate > checkIn && dayTime === startOfCalendarDay(hoverDate).getTime();
+            const inRange = checkIn != null && endProbe != null && dayDate > checkIn && dayDate < endProbe;
+            const isEndpoint = isStart || isEnd || hoverEnd;
+            const isDisabled = dayDate < today;
 
+            const nextDate = addDays(dayDate, 1);
+            const prevDate = addDays(dayDate, -1);
+
+            const nextInRange =
+              checkIn != null && endProbe != null
+                ? nextDate > checkIn && nextDate <= endProbe
+                : false;
+            const prevInRange =
+              checkIn != null && endProbe != null
+                ? prevDate >= checkIn && prevDate < endProbe
+                : false;
+
+            const showBandLeft = (inRange || isEnd || hoverEnd) && prevInRange;
+            const showBandRight = (inRange || isStart) && nextInRange;
+            const isFirstOfWeek = dowIndex === 0;
+            const isLastOfWeek = dowIndex === 6;
+
+            let textClass = 'hero-date-idle';
+            if (isEndpoint) {
+              textClass = 'hero-date-endpoint hero-date-selected';
+            } else if (inRange) {
+              textClass = 'hero-date-inrange';
+            } else if (isDisabled) {
+              textClass = 'hero-date-disabled';
+            }
+
+            return (
+              <div
+                className="hero-cell-wrap"
+                onMouseEnter={() => {
+                  if (checkIn && !checkOut && !isDisabled) {
+                    setHoverDate(dayDate);
+                  }
+                }}
+              >
+                {/* Range band underlay */}
+                {showBandLeft && (
+                  <div
+                    className={`hero-band hero-band-l${isFirstOfWeek ? ' hero-band-edge-l' : ''}`}
+                    aria-hidden="true"
+                  />
+                )}
+                {showBandRight && (
+                  <div
+                    className={`hero-band hero-band-r${isLastOfWeek ? ' hero-band-edge-r' : ''}`}
+                    aria-hidden="true"
+                  />
+                )}
+                {/* Endpoint coral pill */}
+                {isEndpoint && <div className="hero-endpoint-pill" aria-hidden="true" />}
+                {/* Day number */}
+                <span
+                  data-testid={`hero-date-${toCalendarISO(day)}`}
+                  className={`hero-date-text ${textClass}`}
+                >
+                  {format(day, 'd')}
+                </span>
+              </div>
+            );
           }}
         />
+        </div>
 
         <GuestTypeSelector
           value={guestCounts}

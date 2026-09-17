@@ -7,7 +7,7 @@
  */
 
 import { getApiHeaders, buildApiUrl } from '@/api/client';
-import { hasRuntimeConfig, getRuntimeConfig } from '@/runtime-config';
+import { hasRuntimeConfig, getRuntimeConfig, isProductionEnvironment } from '@/runtime-config';
 import { setDomainResolvedSlug, setMarketplaceMode, isAtlastaysMarketplaceSurface } from '@/tenant/tenantResolver';
 import { normalizeHostForDomainLookup } from '@/tenant/normalizeHostForDomainLookup';
 
@@ -158,6 +158,11 @@ export function _resetTenantContextForTests(): void {
   tenantInfo = null;
 }
 
+/** Test-only: set resolved tenant info. */
+export function _setTenantContextForTests(info: TenantInfo | null): void {
+  tenantInfo = info;
+}
+
 export function getTenantContext(): TenantInfo | null {
   return tenantInfo;
 }
@@ -165,6 +170,10 @@ export function getTenantContext(): TenantInfo | null {
 /** TASK-4386: site-wide robots directive for internal tenants (ADR-0068).
  *  TASK-7866: also noindex non-production environments (qa, dev) to prevent
  *  Google from indexing duplicate listing content that competes with production.
+ *  TASK-7866 fix (prod-environment-indexing, 2026-09-17): "is production" is decided by
+ *  isProductionEnvironment() (@/runtime-config) — every real prod host reports environment
+ *  "prod", not "production", and the old `env !== 'production'` check missed it, injecting
+ *  noindex on every production tenant page. See that helper's header for the full root cause.
  */
 export function getInternalTenantRobots(): string | undefined {
   if (tenantInfo?.isInternal) return 'noindex, nofollow';
@@ -172,7 +181,7 @@ export function getInternalTenantRobots(): string | undefined {
   // URLs of real listing data with self-canonical, which would compete with production.
   if (hasRuntimeConfig()) {
     const env = getRuntimeConfig().environment;
-    if (env && env !== 'production') return 'noindex, nofollow';
+    if (!isProductionEnvironment(env)) return 'noindex, nofollow';
   }
   return undefined;
 }
