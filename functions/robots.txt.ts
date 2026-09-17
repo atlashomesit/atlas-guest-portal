@@ -5,9 +5,14 @@
  * TASK-7866: non-production environments (qa, dev) serve Disallow: / to prevent Google
  * from indexing duplicate listing content that competes with the production booking funnel.
  * The environment is read from ATLAS_ENVIRONMENT (same env var as atlas-runtime-config.json).
+ *
+ * TASK-7866 fix (prod-environment-indexing, 2026-09-17): "is production" is decided by
+ * isProductionEnvironment() (./_lib/environment) — every real prod host sets ATLAS_ENVIRONMENT
+ * to "prod", not "production", and the old inline check here missed it. See that file's header.
  */
 
 import { isNoindexHost } from "./_lib/noindexHosts";
+import { isProductionEnvironment } from "./_lib/environment";
 
 interface Env {
   ATLAS_ENVIRONMENT?: string;
@@ -45,8 +50,7 @@ Disallow: /
 `;
 
 export const onRequestGet = async ({ request, env }: { request: Request; env: Env }) => {
-  const environment = (env.ATLAS_ENVIRONMENT ?? "").trim().toLowerCase();
-  const isProduction = !environment || environment === "production";
+  const isProduction = isProductionEnvironment(env.ATLAS_ENVIRONMENT);
 
   const url = new URL(request.url);
   const origin = url.origin.replace(/\/+$/, "");

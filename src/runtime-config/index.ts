@@ -36,3 +36,4 @@ export function getGoogleMapsApiKey(): string | undefined {
 
 export { loadRuntimeConfig } from "./loader";
 export type { AtlasRuntimeConfig } from "./types";
+export { isProductionEnvironment } from "./environment";
