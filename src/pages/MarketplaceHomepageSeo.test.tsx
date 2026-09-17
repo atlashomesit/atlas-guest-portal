@@ -10,6 +10,9 @@
 //
 // RED before the fix: canonical stays "" (SEO's no-`url` fallback) and no
 // meta[property='og:site_name'] exists in <head> at all.
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -103,5 +106,33 @@ describe('TASK-101960 marketplace homepage canonical + og:site_name', () => {
     ) as HTMLMetaElement | null;
     expect(siteName!.content).toBe(MARKETPLACE_BRAND_BASELINE);
     expect(siteName!.content).toBe('Atlastays');
+  });
+});
+
+// Follow-up to TASK-101960: the two tests above render the REAL <SEO> component, which only
+// proves the CLIENT-SIDE (post-hydration, post-`useEffect`) canonical is correct. A real OG/
+// Twitter/Slack/WhatsApp crawler — and tests/og-seo-brand-isolation.e2e.spec.ts:367's
+// `facebookexternalhit`-UA fetch, by design — never executes JS, so it only ever sees this raw
+// static document. TASK-101960 pinned a static og:site_name fallback here but left the static
+// canonical href empty, which is exactly what left the e2e sanity-counterpart arm red on QA
+// (measured 2026-09-17: byte-identical empty `<link rel="canonical" href="">` on both
+// qa.atlashomestays.com and atlashomestays.com). Mirrors the readFileSync pattern in
+// `src/pages/home/bootShell.test.ts`.
+describe('static index.html canonical fallback (JS-blind crawlers)', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+  const html = readFileSync(join(root, 'index.html'), 'utf8');
+
+  it('ships a non-empty rel=canonical so a crawler that never runs JS still sees one', () => {
+    const match = html.match(/<link\s+rel="canonical"\s+href="([^"]*)"\s*\/?>/);
+    expect(match, 'no <link rel="canonical"> tag found in index.html').not.toBeNull();
+    expect(match![1]).not.toEqual('');
+  });
+
+  it('uses a root-relative href so the single static file stays correct on dev/qa/prod alike', () => {
+    // Deliberately NOT a hardcoded absolute URL (e.g. the prod apex): this file is served
+    // byte-identical on every environment, and a relative href resolves against whichever host
+    // actually served it — dev.atlashomestays.com, qa.atlashomestays.com, or atlashomestays.com.
+    const match = html.match(/<link\s+rel="canonical"\s+href="([^"]*)"\s*\/?>/);
+    expect(match![1]).toBe('/');
   });
 });

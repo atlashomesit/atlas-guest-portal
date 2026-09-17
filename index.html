@@ -17,7 +17,17 @@
   <meta name="apple-mobile-web-app-title" content="Atlastays" />
   <!-- TASK-7755: icons lived under /be/ until that orphaned CRA tree was deleted; keep them under /icons. -->
   <link rel="apple-touch-icon" href="/icons/logo192.png" />
-  <link rel="canonical" href="" />
+  <!-- TASK-101960 follow-up: root-relative static fallback so JS-blind crawlers (WhatsApp/Slack/
+       FB/Twitter — none execute JS, see ADR-0018) see a non-empty, environment-correct canonical
+       on Atlas's own first-party hosts. TASK-101960 pinned og:site_name here (line below) but only
+       fixed canonical via SEO.tsx's runtime `useEffect`, which never runs for a plain HTML fetch;
+       relative "/" resolves against whatever host actually served the document (dev/qa/prod all
+       share this one static file), unlike a hardcoded absolute URL. SEO.tsx still overrides this
+       per-route at runtime for JS-executing clients. The `_middleware.ts` edge rewrite (ADR-0018)
+       deliberately does NOT cover this: isAtlasDirectBookingHost()/isMarketplaceHost() short-circuit
+       Atlas's own hosts out of that rewrite by design, so this static fallback is the only layer
+       left to close the gap. -->
+  <link rel="canonical" href="/" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- TASK-7822: display=optional so desktop heading swap cannot contribute CLS.
