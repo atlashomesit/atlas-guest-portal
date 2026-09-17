@@ -96,7 +96,7 @@ jobs:
             // docs/governance/COMMIT-IDENTITY.md and .githooks/pre-commit exactly. Her
             // noreply id is pinned (not \d+) because the account id is known — pinning
             // stops a same-username different-account address from passing.
-            const ALLOW = /^(sreekaratla81|sreekar\.atla|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi|sidharthyennawar|ragameghanagongati1905|234134092\+ragameghanagongati|\d+\+atlashomesit)@.*$/;
+            const ALLOW = /^(sreekaratla81|sreekar\.atla|noreply|150553417\+sreekaratla81|udaykumar\.ragipindi|sidharthyennawar|ragameghanagongati1905|ragameghanagongati|234134092\+ragameghanagongati|\d+\+atlashomesit)@.*$/;
             const SHARED_OWNER = /^atlashomesit@/;
             // Platform automation. Bot commits are made through the GitHub API and never touch
             // local hooks, so COMMIT-IDENTITY.md declares these three unaffected — but that
