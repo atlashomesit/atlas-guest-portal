@@ -221,6 +221,11 @@ export function formatEstTotalInclGst(
   const gstPct = isGstRegistered ? (accommodationGstSlabPercentForChargedRate(chargedPerNight) ?? 5) : 0;
   const total = estTotalInclGst(perNight, stayNights, convenienceFeePercent, isGstRegistered, chargedPerNight);
   const nightLabel = stayNights === 1 ? '1 night' : `${stayNights} nights`;
-  const gstLabel = gstPct > 0 ? `incl. ${gstPct}% GST + ` : '';
-  return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${gstLabel}3% payment processing (${nightLabel})`;
+  // MKT-001: a listing whose host takes no online payment is passed convenienceFeePercent=0
+  // (WHATSAPP bookingMode, TASK-7428 "no processor, no fee"). No processor runs, so the line
+  // must not claim one — omit the "payment processing" fragment entirely rather than showing
+  // "0% payment processing", and drop the "+" connector along with it.
+  const gstLabel = gstPct > 0 ? `incl. ${gstPct}% GST ${convenienceFeePercent > 0 ? '+ ' : ''}` : '';
+  const feeLabel = convenienceFeePercent > 0 ? `${gstLabel}${convenienceFeePercent}% payment processing ` : gstLabel;
+  return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${feeLabel}(${nightLabel})`.trim();
 }

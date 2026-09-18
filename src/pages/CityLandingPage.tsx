@@ -4,12 +4,14 @@ import { useNavigate } from "react-router-dom";
 import ListingCard from "@/components/apartments/ListingCard";
 import SEO from "@/components/SEO";
 import { fetchPublicListings, type PublicListing } from "@/api/listingClient";
+import { buildApiUrl } from "@/api/client";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "@/utils/guestImageUrl";
 import { buildHomeUnitPath, getPropertySlug } from "@/utils/navigation";
-import { listingMatchesCityKeywords } from "@/utils/cityListingFilter";
+import { listingMatchesCityKeywords, marketplaceListingMatchesCityKeywords } from "@/utils/cityListingFilter";
 import { withTenantBrandInCopy } from "@/tenant/displayBrand";
 import { getTenantContext } from "@/tenant/tenantContext";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist } from "@/tenant/tenantOverrides";
+import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "@/tenant/tenantResolver";
 
 import coorgContent from "@/content/cities/coorg.json";
 import goaContent from "@/content/cities/goa.json";
@@ -77,6 +79,91 @@ function toListingCardModel(listing: PublicListing) {
     losDiscount2MinNights: listing.losDiscount2MinNights ?? undefined,
     losDiscount2Percent: listing.losDiscount2Percent ?? undefined,
     cancellationTier: listing.cancellationTier ?? null,
+    // MKT-004: undefined on tenant-scoped sites — same-tenant navigation needs no ?tenant= hint.
+    tenantSlug: undefined as string | undefined,
+  };
+}
+
+type CityLandingCard = ReturnType<typeof toListingCardModel>;
+
+/** MKT-004: subset of `MarketplaceListingDto` (`GET /marketplace/listings`) this page needs. */
+type MarketplaceCityListingRow = {
+  id: number;
+  tenantSlug: string;
+  title: string;
+  city?: string | null;
+  pricePerNight: number;
+  maxGuests: number;
+  coverImageUrl?: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+};
+
+type MarketplaceListingsResponse = {
+  items: MarketplaceCityListingRow[];
+  total: number;
+};
+
+const MARKETPLACE_PAGE_SIZE = 50;
+
+/**
+ * MKT-004: on the marketplace host, city landing pages must see EVERY tenant's inventory, not
+ * just tenant 1's (see `CityLandingPage.tsx:122`/`client.ts:42` history in the backlog item) — so
+ * this pages `GET /marketplace/listings` to the end rather than calling the tenant-scoped
+ * `/listings/public`.
+ */
+async function fetchAllMarketplaceListings(signal: AbortSignal): Promise<MarketplaceCityListingRow[]> {
+  const out: MarketplaceCityListingRow[] = [];
+  let page = 1;
+  let total = Infinity;
+  while (out.length < total) {
+    const params = new URLSearchParams({ page: String(page), pageSize: String(MARKETPLACE_PAGE_SIZE) });
+    const res = await fetch(buildApiUrl(`/marketplace/listings?${params.toString()}`), { signal });
+    if (!res.ok) break;
+    const data = (await res.json()) as MarketplaceListingsResponse;
+    const items = Array.isArray(data.items) ? data.items : [];
+    out.push(...items);
+    total = typeof data.total === "number" ? data.total : out.length;
+    if (items.length === 0) break;
+    page += 1;
+  }
+  return out;
+}
+
+function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCard {
+  const propertySlug = getPropertySlug({ name: item.title });
+  const image = sanitizeGuestImageUrl(item.coverImageUrl) ?? "";
+  const rating = item.rating ?? 0;
+  const reviews = item.reviewCount ?? 0;
+  const hasVerifiedReviews = reviews > 0 && rating > 0;
+  return {
+    propertySlug,
+    listingId: item.id,
+    id: String(item.id),
+    name: item.title || "Homestay",
+    location: item.city || item.title || "",
+    neighborhoods: [],
+    image,
+    price: item.pricePerNight ?? 0,
+    pricingBreakdown: null,
+    rating: hasVerifiedReviews ? rating : 0,
+    reviews: hasVerifiedReviews ? reviews : 0,
+    propertyType: "Homestay",
+    guests: item.maxGuests > 0 ? item.maxGuests : 2,
+    bedrooms: null,
+    hasWifi: false,
+    hasParking: false,
+    petFriendly: false,
+    amenityCodes: [],
+    lastBookedAt: undefined,
+    losDiscountMinNights: undefined,
+    losDiscountPercent: undefined,
+    losDiscount2MinNights: undefined,
+    losDiscount2Percent: undefined,
+    cancellationTier: null,
+    // MKT-004: cross-tenant card — navigation must carry the owning tenant so the detail page
+    // resolves the right listing instead of defaulting to the marketplace host's own tenant.
+    tenantSlug: item.tenantSlug,
   };
 }
 
@@ -96,7 +183,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
     }),
     [content],
   );
-  const [listings, setListings] = useState<PublicListing[] | null>(null);
+  const [cards, setCards] = useState<CityLandingCard[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -119,16 +206,25 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
       setLoading(true);
       setLoadError(null);
       try {
-        const data = await fetchPublicListings(signal);
-        const tenantOverrides = getTenantOverrides(getTenantContext()?.slug);
-        const allow = getTenantPublicListingIdAllowlist(tenantOverrides);
-        let rows = data.filter((row) => listingMatchesCityKeywords(row, content.listingKeywords));
-        if (allow.size > 0) {
-          rows = rows.filter((u) => allow.has(u.id));
+        // MKT-004: the marketplace apex (atlastays.com) must see cross-tenant inventory, not the
+        // one tenant `X-Tenant-Slug` defaults to there — per-tenant white-label sites keep the
+        // tenant-scoped `/listings/public` path below unchanged.
+        if (isMarketplaceMode() && isAtlastaysMarketplaceSurface()) {
+          const rows = await fetchAllMarketplaceListings(signal);
+          const matched = rows.filter((row) => marketplaceListingMatchesCityKeywords(row, content.listingKeywords));
+          setCards(matched.map(toMarketplaceCardModel));
+        } else {
+          const data = await fetchPublicListings(signal);
+          const tenantOverrides = getTenantOverrides(getTenantContext()?.slug);
+          const allow = getTenantPublicListingIdAllowlist(tenantOverrides);
+          let rows = data.filter((row) => listingMatchesCityKeywords(row, content.listingKeywords));
+          if (allow.size > 0) {
+            rows = rows.filter((u) => allow.has(u.id));
+          }
+          setCards(rows.map(toListingCardModel));
         }
-        setListings(rows);
       } catch (e) {
-        setListings([]);
+        setCards([]);
         console.error("City landing listings load failed:", e);
         setLoadError("We couldn't load homestays for this destination right now. Please try search or refresh.");
       } finally {
@@ -144,10 +240,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
     return () => ac.abort();
   }, [load]);
 
-  const cards = useMemo(() => {
-    if (!listings) return [];
-    return listings.map(toListingCardModel);
-  }, [listings]);
+  const cardList = cards ?? [];
 
   const pagePath = `/homestays-in-${citySlug}`;
 
@@ -204,7 +297,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
             {loadError}
           </p>
         )}
-        {!loading && !loadError && cards.length === 0 && (
+        {!loading && !loadError && cardList.length === 0 && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 not-prose">
             <p className="text-text-muted">
               No published listings matched our {content.cityName} keywords yet. Try the main search to browse all
@@ -219,13 +312,13 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
             </button>
           </div>
         )}
-        {!loading && cards.length > 0 && (
+        {!loading && cardList.length > 0 && (
           <section
             className="grid grid-cols-1 gap-6 md:grid-cols-2 not-prose"
             aria-label={`Homestays in ${content.cityName}`}
             data-testid="city-landing-listings"
           >
-            {cards.map((c) => (
+            {cardList.map((c) => (
               <ListingCard
                 key={c.id}
                 id={c.id}
@@ -251,7 +344,16 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
                 losDiscount2Percent={c.losDiscount2Percent ?? null}
                 cancellationTier={c.cancellationTier ?? null}
                 estimateNights={1}
-                onClick={() => navigate(buildHomeUnitPath(c.propertySlug, c.listingId))}
+                onClick={() =>
+                  navigate(
+                    // MKT-004: a cross-tenant marketplace card must carry ?tenant= so the detail
+                    // page resolves the owning tenant's listing (mirrors MarketplaceHomepage.tsx's
+                    // marketplaceListingPath) instead of defaulting to the marketplace host tenant.
+                    c.tenantSlug
+                      ? `${buildHomeUnitPath(c.propertySlug, c.listingId)}?tenant=${encodeURIComponent(c.tenantSlug)}`
+                      : buildHomeUnitPath(c.propertySlug, c.listingId),
+                  )
+                }
               />
             ))}
           </section>
