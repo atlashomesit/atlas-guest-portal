@@ -336,7 +336,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                       onClick={() => setShowTotal(true)}
                       className="text-xs text-cta-primary hover:underline font-semibold self-start"
                     >
-                      See total with taxes ↓
+                      See total ↓
                     </button>
                   </div>
                 )}

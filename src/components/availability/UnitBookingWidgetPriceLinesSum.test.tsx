@@ -170,7 +170,7 @@ afterEach(() => {
 
 describe('UnitBookingWidget — TASK-8293: rendered line items sum to the rendered Total', () => {
   it('no discounts: 7 × ₹3,000', async () => {
-    // base 21,000 → GST 5% 1,050 → fee 3% 630 → final 22,680.
+    // base 21,000 → GST 0% (ADR-0107) 0 → fee 3% 630 → final 21,630.
     const { total, lineTotal, accommodation } = await renderBreakdown({
       nights: 7,
       calendarPerNight: 3000,
@@ -183,23 +183,23 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
         longStayDiscountAmount: 0,
         convenienceFeeAmount: 630,
         touristTaxAmount: 0,
-        gstPercent: 5,
-        gstAmount: 1050,
-        finalAmount: 22680,
+        gstPercent: 0,
+        gstAmount: 0,
+        finalAmount: 21630,
       },
     });
 
     expect(accommodation).toBe(21000);
     expect(lineTotal).toBe(total);
-    expect(total).toBe(22680);
+    expect(total).toBe(21630);
   });
 
   it('long-stay 7 nights at the DEFAULT 10% (no host configuration): the ₹2,100 gap case', async () => {
     // LongStayDiscounts.Default gives 10% at 7+ nights on EVERY unconfigured listing, so this is
     // the ordinary path, not an edge case. Gross 21,000 → server BaseAmount 18,900 (already net);
-    // longStayDiscountAmount 2,100 is REPORTING METADATA. GST 5% 945, fee 3% 567, final 20,412.
+    // longStayDiscountAmount 2,100 is REPORTING METADATA. GST 0% 0, fee 3% 567, final 19,467.
     // Pre-fix the accommodation line rendered 16,800 and the lines summed to 18,312 against a
-    // Total of 20,412 — the exact ₹2,100 gap TASK-8293 was raised on.
+    // Total of 19,467 — the exact ₹2,100 gap TASK-8293 was raised on.
     const { total, lineTotal, accommodation } = await renderBreakdown({
       nights: 7,
       calendarPerNight: 3000, // the calendar endpoint knows nothing about long-stay
@@ -212,9 +212,9 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
         longStayDiscountAmount: 2100,
         convenienceFeeAmount: 567,
         touristTaxAmount: 0,
-        gstPercent: 5,
-        gstAmount: 945,
-        finalAmount: 20412,
+        gstPercent: 0,
+        gstAmount: 0,
+        finalAmount: 19467,
       },
     });
 
@@ -222,12 +222,12 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
     // never silently absorbed — done-when 4.
     expect(accommodation).toBe(18900);
     expect(lineTotal).toBe(total);
-    expect(total).toBe(20412);
+    expect(total).toBe(19467);
   });
 
   it('last-minute discount: 2 × ₹5,000 with 15% off already netted into BaseAmount', async () => {
     // Gross 10,000 → BaseAmount 8,500; lastMinuteDiscountAmount 1,500 is metadata.
-    // GST 5% 425, fee 3% 255, final 9,180.
+    // GST 0% 0, fee 3% 255, final 8,755.
     const { total, lineTotal, accommodation } = await renderBreakdown({
       nights: 2,
       calendarPerNight: 5000,
@@ -240,15 +240,15 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
         longStayDiscountAmount: 0,
         convenienceFeeAmount: 255,
         touristTaxAmount: 0,
-        gstPercent: 5,
-        gstAmount: 425,
-        finalAmount: 9180,
+        gstPercent: 0,
+        gstAmount: 0,
+        finalAmount: 8755,
       },
     });
 
     expect(accommodation).toBe(8500);
     expect(lineTotal).toBe(total);
-    expect(total).toBe(9180);
+    expect(total).toBe(8755);
   });
 
   it('floored listing: the min-price floor clamps BaseAmount, so the reported rule discount was only PARTLY realised', async () => {
@@ -269,20 +269,20 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
         longStayDiscountAmount: 1200,
         convenienceFeeAmount: 108,
         touristTaxAmount: 0,
-        gstPercent: 5,
-        gstAmount: 180,
-        finalAmount: 3888,
+        gstPercent: 0,
+        gstAmount: 0,
+        finalAmount: 3708,
       },
     });
 
     expect(accommodation).toBe(3600);
     expect(lineTotal).toBe(total);
-    expect(total).toBe(3888);
+    expect(total).toBe(3708);
   });
 
   it('tenant GLOBAL discount is applied AFTER BaseAmount, so it MUST still be subtracted here', async () => {
     // The other half of the asymmetry, guarding the over-correction: a fix that simply returned
-    // `baseAmount` would render 21,000 against a Total of 20,412 and break this case.
+    // `baseAmount` would render 21,000 against a Total of 19,467 and break this case.
     // BaseAmount 21,000 gross of the global discount; discountAmount 2,100 → net 18,900.
     const { total, lineTotal, accommodation } = await renderBreakdown({
       nights: 7,
@@ -296,21 +296,21 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
         longStayDiscountAmount: 0,
         convenienceFeeAmount: 567,
         touristTaxAmount: 0,
-        gstPercent: 5,
-        gstAmount: 945,
-        finalAmount: 20412,
+        gstPercent: 0,
+        gstAmount: 0,
+        finalAmount: 19467,
       },
     });
 
     expect(accommodation).toBe(18900);
     expect(lineTotal).toBe(total);
-    expect(total).toBe(20412);
+    expect(total).toBe(19467);
   });
 
   it('tourist tax is inside the server finalAmount, so it gets its own line', async () => {
-    // Goa-style 5% GST + 5% tourist tax. Before TASK-8293 the widget rendered no tourist-tax row
+    // 0% GST + 5% tourist tax per ADR-0107. Before TASK-8293 the widget rendered no tourist-tax row
     // at all while the Total still preferred a finalAmount that included it — a second, identical
-    // "lines do not add up to the total" gap (₹500 here).
+    // "lines do not add up to the total" gap.
     const { total, lineTotal, accommodation } = await renderBreakdown({
       nights: 2,
       calendarPerNight: 5000,
@@ -323,15 +323,15 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
         longStayDiscountAmount: 0,
         convenienceFeeAmount: 300,
         touristTaxAmount: 500,
-        gstPercent: 5,
-        gstAmount: 500,
-        finalAmount: 11300,
+        gstPercent: 0,
+        gstAmount: 0,
+        finalAmount: 10800,
       },
     });
 
     expect(accommodation).toBe(10000);
     expect(screen.getByTestId('bw-bd-tourist-tax-row')).toBeInTheDocument();
     expect(lineTotal).toBe(total);
-    expect(total).toBe(11300);
+    expect(total).toBe(10800);
   });
 });

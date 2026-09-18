@@ -49,10 +49,6 @@ import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
-import {
-  accommodationGstLineAmount,
-  accommodationGstSlabPercentForChargedRate,
-} from '@/utils/guestPriceEstimate';
 
 declare global {
   interface Window {
@@ -1327,33 +1323,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
    * client-derived slab only while that fetch is in flight or has failed (loading/offline UX),
    * consistent with the widget's existing graceful-degradation pattern.
    */
-  const gstSlabPercent =
-    serverGstMatchesSelection && serverGstPercent != null
-      ? serverGstPercent
-      : hasSelectedRange && perNightForDisplay > 0
-        ? accommodationGstSlabPercentForChargedRate(perNightForDisplay)
-        : null;
-
-  /**
-   * GST component of room fare (ADDITIVE — CPO formula per 2026-05-21).
-   * TASK-4322: `breakdownPrice` (from selectedRangeTotalFromCalendar / effectiveDailyPricing.actualPrice)
-   * is ALREADY discount-net — the tenant global discount is netted in server-side per-day
-   * `actualPrice = base - discount` (src/api/pricingClient.ts). A second subtraction here
-   * (previously via a mislabeled "LOS discount") double-counted the same discount and
-   * understated the total vs. what the server actually charges. taxableBase == breakdownPrice.
-   * Real TASK-571 LOS discounts are not exposed by the calendar pricing DTO today, so there
-   * is nothing genuine left to subtract; when that DTO gains a real per-day LOS field, apply
-   * it here (once) instead of re-deriving it from the discount already netted into the price.
-   */
+  // TASK-102037 (ADR-0107): Zero GST added on top at guest checkout time.
+  const gstSlabPercent = null;
   const taxableBase = Math.max(0, breakdownPrice);
-  // TASK-4331: prefer the server's own computed GST amount (already rounded server-side on
-  // its own post-adjustment base) over recomputing from the (possibly divergent) taxableBase.
-  const gstLineAmount =
-    serverGstMatchesSelection && serverGstAmount != null
-      ? serverGstAmount
-      : gstSlabPercent != null && taxableBase > 0
-        ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
-        : 0;
+  const gstLineAmount = 0;
+  void serverGstPercent;
+  void serverGstAmount;
+  void gstSlabPercent;
+  void gstLineAmount;
 
   // TASK-4913 (founder-ruled 2026-07-17, option c): the 3% "Payment processing" fee is charged
   // on the BASE accommodation amount only — NOT on base+GST. Supersedes the prior base+GST rule
@@ -1375,14 +1352,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? Math.round(serverPriceBreakdown.touristTaxAmount)
       : 0;
 
-  // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
+  // TASK-4322 / TASK-102037: Total = discount-net base + Service Fee + tourist tax (zero GST on top).
   // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
   // TASK-7428: when online payment is off, never fold a server FinalAmount that still includes the gateway fee.
-  // TASK-8293: the fallback must carry tourist tax too, or the no-online-rail branch (which
-  // always lands here) renders a Tourist tax row that the Total does not account for.
   const breakdownFinalTotal = Math.max(
     1,
-    taxableBase + gstLineAmount + breakdownConvenienceFee + touristTaxLineAmount,
+    taxableBase + breakdownConvenienceFee + touristTaxLineAmount,
   );
 
   const finalTotal =
@@ -2092,14 +2067,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             }
           })()}
 
-          {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
-            <div className="lv-price-row" data-testid="bw-bd-gst-row">
-              <span>
-                GST ({gstSlabPercent}%)
-              </span>
-              <span className="lv-num">{displayPrice(gstLineAmount)}</span>
-            </div>
-          )}
+
 
           {/* TASK-8293: tourist tax is inside the server FinalAmount the Total prefers, so it
               must appear as its own line or the breakdown does not sum to its own Total. */}

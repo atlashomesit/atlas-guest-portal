@@ -549,7 +549,7 @@ const GuestDetailsPage: React.FC = () => {
   // `/api/Razorpay/order` echoes the authoritative discount (`serverPromoLocked`).
   const confirmedPromoDiscount = serverPromoLocked ? promoDiscountAmount : 0;
 
-  const { perNight, gstSlabPercent, gstLineAmount, displayTotal } =
+  const { perNight, displayTotal } =
     computeCheckoutTotal({
       baseAmount,
       globalDiscountAmount,
@@ -2191,14 +2191,6 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="num">−{displayPrice(referralDiscountAmount)}</span>
               </div>
             )}
-            {gstSlabPercent != null && gstLineAmount > 0 && (
-              <div className="gd-price-row gst">
-                <div className="desc">
-                  <span>GST {gstSlabPercent}%</span>
-                </div>
-                <span className="num">{displayPrice(gstLineAmount)}</span>
-              </div>
-            )}
             {touristTaxAmount > 0 && (
               <div className="gd-price-row" data-testid="tourist-tax-row">
                 <span>Tourist tax</span>
@@ -2218,7 +2210,7 @@ const GuestDetailsPage: React.FC = () => {
             <div style={{ textAlign: 'right' }}>
               <div className="num">{displayPrice(displayTotal)}</div>
               <small className="num-sub" data-testid="checkout-total-gst-note">
-                {gstLineAmount > 0 ? 'Includes GST · INR' : 'INR'}
+                INR
               </small>
             </div>
           </div>
