@@ -21,7 +21,7 @@ describe("TASK-102021: Guest checkout GST statement", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders 'Includes GST · INR' when the order carries GST", async () => {
+  it("renders 'INR' without GST claim under ADR-0107 (zero GST on top at guest checkout)", async () => {
     window.sessionStorage.setItem(
       CHECKOUT_HOLD_KEY,
       JSON.stringify({
@@ -36,10 +36,10 @@ describe("TASK-102021: Guest checkout GST statement", () => {
         holdPriceBreakdown: {
           baseAmount: 7000,
           discountAmount: 0,
-          gstAmount: 840,
+          gstAmount: 0,
           convenienceFeeAmount: 210,
           touristTaxAmount: 0,
-          finalAmount: 8050,
+          finalAmount: 7210,
           nights: 2,
         },
       }),
@@ -56,7 +56,8 @@ describe("TASK-102021: Guest checkout GST statement", () => {
     await waitFor(() => {
       const gstNote = screen.getByTestId("checkout-total-gst-note");
       expect(gstNote).toBeInTheDocument();
-      expect(gstNote.textContent).toBe("Includes GST · INR");
+      expect(gstNote.textContent).toBe("INR");
+      expect(gstNote.textContent).not.toContain("Includes GST");
     });
   });
 

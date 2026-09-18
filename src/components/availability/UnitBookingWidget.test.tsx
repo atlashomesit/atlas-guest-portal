@@ -157,11 +157,9 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).not.toContain('>Room fare<');
   });
 
-  it('GST row is standardized to "GST (N%)" with no redundant "on accommodation" sublabel (TASK-4097)', () => {
+  it('GST row is removed under ADR-0107 zero GST ruling (TASK-102037)', () => {
     content = readFileSync(filePath, 'utf-8');
-    // TASK-4097 (PR #242, commit 54200ec3) deliberately dropped the redundant
-    // "on accommodation" sublabel and standardized the GST row to "GST (N%)".
-    expect(content).toContain('GST ({gstSlabPercent}%)');
+    expect(content).not.toContain('bw-bd-gst-row');
     expect(content).not.toContain('on accommodation');
   });
 
@@ -277,13 +275,11 @@ describe('UnitBookingWidget - TASK-4285: past-dated check-in from URL params is 
   });
 });
 
-describe('UnitBookingWidget - TASK-2870: accommodation GST uses 18% slab above ₹7,500', () => {
+describe('UnitBookingWidget - TASK-2870 / TASK-102037: accommodation GST removed under ADR-0107', () => {
   const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
 
-  it('uses shared guestPriceEstimate GST helpers (not retired 12% slab)', () => {
+  it('does not use retired 12% slab and zero GST is added on top under ADR-0107', () => {
     const content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('accommodationGstSlabPercentForChargedRate');
-    expect(content).toContain('accommodationGstLineAmount');
     expect(content).not.toMatch(/<= 7500 \? 5 : 12/);
     expect(content).not.toContain('else 12%');
   });
@@ -330,24 +326,10 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
     expect(content).toContain('serverFinalAmount');
   });
 
-  it('gstSlabPercent prefers the server value when it matches the current selection', () => {
+  it('gstSlabPercent and gstLineAmount are null/0 under ADR-0107 zero GST ruling (TASK-102037)', () => {
     const content = readFileSync(filePath, 'utf-8');
-    // Must check serverGstMatchesSelection && serverGstPercent != null BEFORE falling back
-    // to the client-derived accommodationGstSlabPercentForChargedRate(perNightForDisplay).
-    expect(content).toMatch(
-      /const gstSlabPercent =\s*\n\s*serverGstMatchesSelection && serverGstPercent != null/,
-    );
-    // Client-derived slab must remain as the fallback path (loading/offline UX), not removed —
-    // and TASK-8294: it must be the exempt-aware three-band function, not the retired two-band
-    // accommodationGstSlabPercent (which had no 0% tier and misquoted sub-₹1,000/night stays).
-    expect(content).toContain('accommodationGstSlabPercentForChargedRate(perNightForDisplay)');
-  });
-
-  it('gstLineAmount prefers the server-computed amount over recomputing from taxableBase', () => {
-    const content = readFileSync(filePath, 'utf-8');
-    expect(content).toMatch(
-      /const gstLineAmount =\s*\n\s*serverGstMatchesSelection && serverGstAmount != null/,
-    );
+    expect(content).toContain('const gstSlabPercent = null;');
+    expect(content).toContain('const gstLineAmount = 0;');
   });
 
   it('finalTotal prefers server FinalAmount when it matches the current selection (TASK-5184)', () => {
@@ -613,14 +595,14 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
       await pricingPromise;
     });
 
-    // Settled: base ₹6,500 × 2 = ₹13,000; GST 5% = ₹650; fee 3% × ₹13,000 = ₹390 (base only,
-    // TASK-4913 founder-ruled 2026-07-17 option c); Total ₹14,040.
+    // Settled: base ₹6,500 × 2 = ₹13,000; GST = ₹0 (ADR-0107); fee 3% × ₹13,000 = ₹390 (base only,
+    // TASK-4913 founder-ruled 2026-07-17 option c); Total ₹13,390.
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('14040');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('13390');
     // Headline total matches the breakdown total — the FIRST total ever rendered IS the settled one
     // (the queryByText('Total') assertion above proved nothing rendered earlier).
-    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('14040');
+    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('13390');
     // Processing fee shows the real 3% amount, never a ₹0 placeholder.
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
     expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('390');
@@ -1091,10 +1073,8 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
     expect(screen.queryByTestId('bw-price-pending')).toBeNull();
   });
 
-  it('a complete date range still renders the full breakdown, including the GST line, once selection is valid', async () => {
-    // 1 night ₹6,000 → GST 5% = ₹300; processing fee 3% × 6,000 = ₹180 (base only, TASK-4913
-    // founder-ruled 2026-07-17 option c); Total ₹6,480 — matches the TASK-4910 repro example
-    // (30 Jun→01 Jul) updated to the base-only fee ruling.
+  it('a complete date range renders the breakdown with zero GST added on top once selection is valid (TASK-102037)', async () => {
+    // 1 night ₹6,000; processing fee 3% × 6,000 = ₹180; Total ₹6,180 (zero GST on top per TASK-102030 / TASK-102037).
     const checkin = addDays(getIstStartOfDay(new Date()), 5);
     const checkout = addDays(checkin, 1);
     const nightIso = toISODate(checkin);
@@ -1104,17 +1084,15 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
       dateToPrice: new Map([[nightIso, 6000]]),
       convenienceFeePercent: 3,
     });
-    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6480 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 0, gstAmount: 0, finalAmount: 6180 });
 
     await renderWidget();
 
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6480');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6180');
 
-    const gstRow = screen.getByTestId('bw-bd-gst-row');
-    expect(gstRow.textContent).toContain('GST (5%)');
-    expect(gstRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('300');
+    expect(screen.queryByTestId('bw-bd-gst-row')).toBeNull();
 
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
     expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('180');
@@ -1172,8 +1150,8 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
 
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    // Base ₹6,000 + GST ₹300 = ₹6,300 — no 3% processing fee.
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6300');
+    // Base ₹6,000 + GST ₹0 = ₹6,000 — no 3% processing fee.
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
     expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
     expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
     expect(screen.queryByText(/Secured by Razorpay/i)).toBeNull();
@@ -1214,7 +1192,7 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
 
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6300');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
     expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
     expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
   });
