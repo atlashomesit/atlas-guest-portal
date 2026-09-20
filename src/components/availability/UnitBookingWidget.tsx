@@ -1466,6 +1466,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? 'Add a check-in date to continue.'
         : 'Add a check-out date to continue.';
       setDateError(message);
+      setOpenCalendar(true);
       if (!dateRange.startDate) {
         calendarButtonRef.current?.focus();
       } else {

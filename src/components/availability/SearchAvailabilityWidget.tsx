@@ -367,18 +367,22 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       // TASK-4911: distinguish which field is actually missing so the guest doesn't have to
       // guess, and move focus there — mirrors the UnitBookingWidget Reserve CTA pattern
       // (TASK-4277) instead of silently no-op'ing on a disabled button.
-      const message = !startDate
-        ? 'Add a check-in date to continue.'
-        : 'Add a check-out date to continue.';
-      setError(message);
-      setDateError(message);
-      setStatusMessage(message);
-      if (!startDate) {
-        toggleButtonRef.current?.focus();
-      } else {
-        checkoutToggleButtonRef.current?.focus();
-      }
-      return { isValid: false };
+        const message = !startDate
+          ? 'Add a check-in date to continue.'
+          : 'Add a check-out date to continue.';
+        setError(message);
+        setDateError(message);
+        setStatusMessage(message);
+        if (!startDate) {
+          setActiveField('checkin');
+          setIsCalendarOpen(true);
+          toggleButtonRef.current?.focus();
+        } else {
+          setActiveField('checkout');
+          setIsCalendarOpen(true);
+          checkoutToggleButtonRef.current?.focus();
+        }
+        return { isValid: false };
     }
 
     if (rangeError) {
