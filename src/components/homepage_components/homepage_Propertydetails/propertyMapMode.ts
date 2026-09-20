@@ -12,6 +12,7 @@ export type PropertyMapSelection =
   | { kind: "coords"; lat: number; lng: number }
   | { kind: "iframe" }
   | { kind: "multipin" }
+  | { kind: "address"; address: string }
   | { kind: "tenant"; lat: number; lng: number }
   | { kind: "none" };
 
@@ -25,8 +26,9 @@ export function selectPropertyMapMode(args: {
   mapSrc?: string | null;
   useMultiPin?: boolean;
   mapLocation?: { lat?: unknown; lng?: unknown } | null;
+  address?: string | null;
 }): PropertyMapSelection {
-  const { latitude, longitude, mapSrc, useMultiPin, mapLocation } = args;
+  const { latitude, longitude, mapSrc, useMultiPin, mapLocation, address } = args;
 
   // 1. Property's own coordinates — the source of truth for its own detail page.
   if (isFiniteNum(latitude) && isFiniteNum(longitude)) {
@@ -40,7 +42,11 @@ export function selectPropertyMapMode(args: {
   if (useMultiPin) {
     return { kind: "multipin" };
   }
-  // 4. Tenant-level default location (last resort).
+  // 4. Precise property address, geocoded automatically via Embed API.
+  if (typeof address === "string" && address.trim().length > 0) {
+    return { kind: "address", address: address.trim() };
+  }
+  // 5. Tenant-level default location (last resort).
   if (mapLocation && isFiniteNum(mapLocation.lat) && isFiniteNum(mapLocation.lng)) {
     return { kind: "tenant", lat: mapLocation.lat, lng: mapLocation.lng };
   }

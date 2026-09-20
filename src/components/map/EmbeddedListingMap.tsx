@@ -9,8 +9,8 @@ import { isMapsAuthFailed, MAPS_AUTH_FAILURE_EVENT } from "./googleMapsJsLoader"
 // (BillingNotEnabledMapError).
 
 export interface EmbeddedListingMapProps {
-  latitude: number;
-  longitude: number;
+  latitude?: number | null;
+  longitude?: number | null;
   /** Title of the property/listing — shown in fallback link copy. */
   label?: string;
   /** Human-readable address shown in the graceful fallback. */
@@ -43,9 +43,11 @@ export default function EmbeddedListingMap({
 
   const embedUrl = useMemo(() => {
     if (!GOOGLE_MAPS_API_KEY || authFailed) return null;
-    const q = encodeURIComponent(`${latitude},${longitude}`);
+    const query = address ? address : (latitude != null && longitude != null ? `${latitude},${longitude}` : '');
+    if (!query) return null;
+    const q = encodeURIComponent(query);
     return `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${q}&zoom=${zoom}`;
-  }, [latitude, longitude, zoom, authFailed]);
+  }, [latitude, longitude, address, zoom, authFailed]);
 
   const directionsUrl = address
     ? `https://maps.google.com/?q=${encodeURIComponent(address)}`
@@ -62,11 +64,11 @@ export default function EmbeddedListingMap({
         </p>
         {address ? (
           <p className="text-text-muted mt-1 text-sm">{address}</p>
-        ) : (
+        ) : (latitude != null && longitude != null) ? (
           <p className="text-text-muted mt-1 text-sm">
             {latitude.toFixed(5)}, {longitude.toFixed(5)}
           </p>
-        )}
+        ) : null}
         <a
           href={directionsUrl}
           target="_blank"
