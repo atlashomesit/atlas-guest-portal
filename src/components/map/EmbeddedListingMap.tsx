@@ -51,7 +51,9 @@ export default function EmbeddedListingMap({
 
   const directionsUrl = address
     ? `https://maps.google.com/?q=${encodeURIComponent(address)}`
-    : `https://maps.google.com/?q=${latitude},${longitude}`;
+    : (latitude != null && longitude != null)
+    ? `https://maps.google.com/?q=${latitude},${longitude}`
+    : `https://maps.google.com/`;
 
   if (!embedUrl) {
     return (

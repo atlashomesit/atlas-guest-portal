@@ -38,13 +38,13 @@ export function selectPropertyMapMode(args: {
   if (typeof mapSrc === "string" && mapSrc.trim().length > 0) {
     return { kind: "iframe" };
   }
-  // 3. All-properties multi-pin map (tenant has >=2 geocoded properties).
-  if (useMultiPin) {
-    return { kind: "multipin" };
-  }
-  // 4. Precise property address, geocoded automatically via Embed API.
+  // 3. Precise property address, geocoded automatically via Embed API.
   if (typeof address === "string" && address.trim().length > 0) {
     return { kind: "address", address: address.trim() };
+  }
+  // 4. All-properties multi-pin map (tenant has >=2 geocoded properties).
+  if (useMultiPin) {
+    return { kind: "multipin" };
   }
   // 5. Tenant-level default location (last resort).
   if (mapLocation && isFiniteNum(mapLocation.lat) && isFiniteNum(mapLocation.lng)) {
