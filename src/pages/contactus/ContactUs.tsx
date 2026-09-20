@@ -13,6 +13,7 @@ import { toast } from "react-toastify";
 import { logUserAction, reportError } from "../../lib/monitoring";
 import { messageFromApiResponse } from "../../utils/serverErrorFromResponse";
 import { getTenantBrandName } from "../../tenant/displayBrand";
+import { useTenantListings } from "../../hooks/useTenantListings";
 
 type StatusMessage = {
     type: "info" | "success" | "error";
@@ -22,6 +23,18 @@ type StatusMessage = {
 const ContactUs = () => {
     const contactEmail = getContactEmail();
     const tenantLabel = getTenantBrandName();
+    const { properties } = useTenantListings();
+
+    const activeDestinations = React.useMemo(() => {
+        const locations = properties
+            .map(p => {
+                const loc = p.property_location;
+                if (!loc) return null;
+                return loc.split(',')[0].trim();
+            })
+            .filter((loc): loc is string => Boolean(loc));
+        return Array.from(new Set(locations)).sort();
+    }, [properties]);
 
     const [formData, setFormData] = useState({
         name: "",
@@ -250,9 +263,11 @@ const ContactUs = () => {
                                     required
                                 >
                                     <option value="">Select Destination</option>
-                                    <option value="Hyderabad">Hyderabad</option>
-                                    <option value="Lonavala">Lonavala</option>
-                                    <option value="Dapoli">Dapoli</option>
+                                    {activeDestinations.map((dest) => (
+                                        <option key={dest} value={dest}>
+                                            {dest}
+                                        </option>
+                                    ))}
                                 </Input>
                             </div>
                             <div className="space-y-2">
