@@ -43,16 +43,16 @@ export default function EmbeddedListingMap({
 
   const embedUrl = useMemo(() => {
     if (!GOOGLE_MAPS_API_KEY || authFailed) return null;
-    const query = address ? address : (latitude != null && longitude != null ? `${latitude},${longitude}` : '');
+    const query = (latitude != null && longitude != null) ? `${latitude},${longitude}` : address ? address : '';
     if (!query) return null;
     const q = encodeURIComponent(query);
     return `https://www.google.com/maps/embed/v1/place?key=${GOOGLE_MAPS_API_KEY}&q=${q}&zoom=${zoom}`;
   }, [latitude, longitude, address, zoom, authFailed]);
 
-  const directionsUrl = address
-    ? `https://maps.google.com/?q=${encodeURIComponent(address)}`
-    : (latitude != null && longitude != null)
+  const directionsUrl = (latitude != null && longitude != null)
     ? `https://maps.google.com/?q=${latitude},${longitude}`
+    : address
+    ? `https://maps.google.com/?q=${encodeURIComponent(address)}`
     : `https://maps.google.com/`;
 
   if (!embedUrl) {
