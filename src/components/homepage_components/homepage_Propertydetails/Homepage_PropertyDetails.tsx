@@ -53,6 +53,7 @@ import SEO from '../../SEO';
 import StateMessage from '../../StateMessage';
 import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
+import EmbeddedListingMap from '../../map/EmbeddedListingMap';
 import { selectPropertyMapMode } from './propertyMapMode';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
@@ -1865,12 +1866,17 @@ useEffect(() => {
                 <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0ddd0' }}>
                   {(() => {
                     // Task 3: property's own coords win over custom embed / multi-pin / tenant default.
+                    const propertyAddressStr = typeof data.propertyAddress === 'string' ? data.propertyAddress :
+                      typeof data.property_address === 'string' ? data.property_address :
+                      typeof data.property_location === 'string' ? data.property_location : null;
+
                     const mapSelection = selectPropertyMapMode({
                       latitude: data.latitude,
                       longitude: data.longitude,
                       mapSrc: mapSrcTrimmed,
                       useMultiPin,
                       mapLocation,
+                      address: propertyAddressStr,
                     });
                     switch (mapSelection.kind) {
                       case 'coords':
@@ -1880,6 +1886,15 @@ useEffect(() => {
                             lng={mapSelection.lng}
                             zoom={15}
                             markerTitle={data.property_name}
+                          />
+                        );
+                      case 'address':
+                        return (
+                          <EmbeddedListingMap
+                            address={mapSelection.address}
+                            label={data.property_name}
+                            zoom={15}
+                            height={300}
                           />
                         );
                       case 'iframe':
