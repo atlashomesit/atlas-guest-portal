@@ -1040,6 +1040,26 @@ const SearchPage = () => {
         <div className="search-filters">
           <div className="search-filters__row search-filters__row--fields">
             <div className="search-filters__field">
+              <label htmlFor="filter-checkin">Check-in</label>
+              <input
+                id="filter-checkin"
+                type="date"
+                min={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date())}
+                value={checkInParam ?? ""}
+                onChange={(e) => updateParam("checkIn", e.target.value)}
+              />
+            </div>
+            <div className="search-filters__field">
+              <label htmlFor="filter-checkout">Check-out</label>
+              <input
+                id="filter-checkout"
+                type="date"
+                min={checkInParam || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date())}
+                value={checkOutParam ?? ""}
+                onChange={(e) => updateParam("checkOut", e.target.value)}
+              />
+            </div>
+            <div className="search-filters__field">
               <label htmlFor="filter-min-price">Min price / night</label>
               <input
                 id="filter-min-price"
