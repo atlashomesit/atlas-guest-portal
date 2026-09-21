@@ -156,4 +156,71 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     fireEvent.click(screen.getByRole("button", { name: /continue →/i }));
     await waitFor(() => expect(screen.getByRole("heading", { name: /house rules/i })).toBeInTheDocument());
   });
+
+  test("supports pasting 6-digit OTP and automatically advances to next step on verification", async () => {
+    (global.fetch as Mock).mockResolvedValueOnce(
+      new Response(JSON.stringify({ ...details, guestCount: 1 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    renderPage();
+
+    // Authenticate
+    fireEvent.change(screen.getByLabelText("Booking reference"), {
+      target: { value: "ATL2026-001234" },
+    });
+    fireEvent.change(screen.getByLabelText("Last name"), {
+      target: { value: "Smith" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+    await waitFor(() => expect(screen.getByText("Atlas Stay")).toBeInTheDocument());
+
+    // Continue from summary step
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+    // On ID step
+    await waitFor(() => expect(screen.getByText(/government id verification/i)).toBeInTheDocument());
+    fireEvent.change(screen.getByLabelText("Full name (as on ID) *"), {
+      target: { value: "Alice Smith" },
+    });
+    fireEvent.change(screen.getByLabelText("ID type"), {
+      target: { value: "Aadhaar" },
+    });
+    fireEvent.change(screen.getByLabelText("ID number"), {
+      target: { value: "123456789012" },
+    });
+
+    // Select Phone OTP
+    const phoneOtpTab = screen.getByRole("button", { name: /phone otp/i });
+    fireEvent.click(phoneOtpTab);
+
+    // Enter phone and send OTP
+    const phoneInput = screen.getByLabelText(/phone number connected to id/i);
+    fireEvent.change(phoneInput, { target: { value: "9876543210" } });
+    fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
+
+    expect(await screen.findByText(/otp sent to 9876543210/i)).toBeInTheDocument();
+
+    // Paste 6-digit OTP
+    const otpInput = screen.getByLabelText(/enter or paste 6-digit otp/i);
+    fireEvent.paste(otpInput, {
+      clipboardData: {
+        getData: (format: string) => (format === "text" ? "998877" : ""),
+      },
+    });
+    expect((otpInput as HTMLInputElement).value).toBe("998877");
+
+    // Click verify OTP
+    fireEvent.click(screen.getByRole("button", { name: /verify otp/i }));
+
+    // Auto-advances to house rules
+    await waitFor(
+      () => expect(screen.getByRole("heading", { name: /house rules/i })).toBeInTheDocument(),
+      { timeout: 2000 },
+    );
+  });
 });
+

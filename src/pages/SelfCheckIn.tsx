@@ -140,23 +140,52 @@ export default function SelfCheckIn() {
     });
   };
 
+  const handlePasteOtp = (idx: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const paste = e.clipboardData.getData("text");
+    const digits = paste.replace(/\D/g, "").slice(0, 6);
+    if (digits) {
+      e.preventDefault();
+      updateGuest(idx, { enteredOtp: digits, otpError: "" });
+    }
+  };
+
   const handleVerifyOtp = (idx: number) => {
     const guest = guests[idx];
     if (!guest) return;
     const entered = (guest.enteredOtp || "").trim();
     if (entered.length < 4) {
-      updateGuest(idx, { otpError: "Please enter the 6-digit OTP." });
+      updateGuest(idx, { otpError: "Please enter or paste the 6-digit OTP." });
       return;
     }
-    const last4 = guest.govtIdNumber.trim().slice(-4) || "0000";
+    const last4 = guest.govtIdNumber.trim().slice(-4) || (guest.phoneNumber.trim().slice(-4) || "0000");
     const masked = `XXXX-XXXX-${last4}`;
-    updateGuest(idx, {
+    const nextGuests = [...guests];
+    nextGuests[idx] = {
+      ...guest,
       isVerified: true,
       verificationMethod: "OTP",
       maskedNumber: masked,
       otpError: "",
-    });
+    };
+    setGuests(nextGuests);
+
+    if (idx === 0) {
+      setGovtIdType(nextGuests[0].govtIdType || "Aadhaar");
+      setGovtIdNumber(nextGuests[0].govtIdNumber || masked);
+      setAadhaarVcVerified(true);
+      setAadhaarMasked(masked);
+    }
     setError("");
+
+    // Advance to next step once all guests are verified
+    const allGuestsReady = nextGuests.every(
+      (g) => g.isVerified || g.idFile || idCollectedElsewhere
+    );
+    if (allGuestsReady) {
+      setTimeout(() => {
+        setStep("house-rules");
+      }, 500);
+    }
   };
 
   const handleVerifyDigiLocker = (idx: number) => {
@@ -170,13 +199,28 @@ export default function SelfCheckIn() {
     setError("");
     const last4 = num.slice(-4);
     const masked = `XXXX-XXXX-${last4}`;
-    updateGuest(idx, {
+    const nextGuests = [...guests];
+    nextGuests[idx] = {
+      ...guest,
       isVerified: true,
       verificationMethod: "DigiLocker",
       maskedNumber: masked,
-    });
+    };
+    setGuests(nextGuests);
     if (idx === 0) {
+      setGovtIdType(nextGuests[0].govtIdType || "Aadhaar");
       setGovtIdNumber(masked);
+      setAadhaarVcVerified(true);
+      setAadhaarMasked(masked);
+    }
+
+    const allGuestsReady = nextGuests.every(
+      (g) => g.isVerified || g.idFile || idCollectedElsewhere
+    );
+    if (allGuestsReady) {
+      setTimeout(() => {
+        setStep("house-rules");
+      }, 500);
     }
   };
 
@@ -861,14 +905,20 @@ export default function SelfCheckIn() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => updateGuest(idx, { activeVerifyTab: "otp" })}
-                              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition ${
+                              onClick={() => {
+                                updateGuest(idx, { activeVerifyTab: "otp" });
+                                if (g.phoneNumber && g.phoneNumber.trim().replace(/\D/g, "").length >= 10 && !g.otpSent) {
+                                  handleSendOtp(idx);
+                                }
+                              }}
+                              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5 ${
                                 g.activeVerifyTab === "otp"
                                   ? "bg-brand-primary text-white"
                                   : "bg-bg-page text-text-secondary border border-border-subtle hover:text-text-primary"
                               }`}
                             >
-                              📱 Phone OTP
+                              <span>📱 Phone OTP</span>
+                              <span className="text-[10px] font-normal opacity-90">(Recommended)</span>
                             </button>
                           </div>
 
@@ -906,6 +956,9 @@ export default function SelfCheckIn() {
                                   >
                                     Phone number connected to ID
                                   </label>
+                                  <p className="text-xs text-text-muted mb-2">
+                                    Click Send OTP to receive a 6-digit verification code on the phone registered with this ID.
+                                  </p>
                                   <div className="flex gap-2">
                                     <input
                                       id={`checkin-phone-${idx}`}
@@ -928,45 +981,71 @@ export default function SelfCheckIn() {
                                   )}
                                 </div>
                               ) : (
-                                <div className="space-y-2">
-                                  <p className="text-xs text-green-700 font-medium">
-                                    ✓ OTP sent to {g.phoneNumber}
-                                    {g.otpCode ? ` (Code: ${g.otpCode})` : ""}
-                                  </p>
-                                  <label
-                                    htmlFor={`checkin-otp-${idx}`}
-                                    className="block text-xs font-medium text-text-primary mb-1"
-                                  >
-                                    Enter 6-digit OTP
-                                  </label>
-                                  <div className="flex gap-2">
-                                    <input
-                                      id={`checkin-otp-${idx}`}
-                                      type="text"
-                                      maxLength={6}
-                                      placeholder="123456"
-                                      value={g.enteredOtp ?? ""}
-                                      onChange={(e) => updateGuest(idx, { enteredOtp: e.target.value })}
-                                      className="flex-1 rounded-lg border border-border-subtle px-3 py-2 text-sm tracking-widest text-center font-mono focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleVerifyOtp(idx)}
-                                      className="rounded-lg bg-brand-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 whitespace-nowrap"
-                                    >
-                                      Verify OTP
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSendOtp(idx)}
-                                      className="rounded-lg border border-border-subtle px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary"
-                                    >
-                                      Resend
-                                    </button>
+                                <div className="space-y-3">
+                                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5">
+                                    <p className="text-xs text-emerald-800 font-medium">
+                                      ✓ OTP sent to {g.phoneNumber}
+                                      {g.otpCode ? ` (Code: ${g.otpCode})` : ""}
+                                    </p>
                                   </div>
-                                  {g.otpError && (
-                                    <p className="text-xs text-red-600">{g.otpError}</p>
-                                  )}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <label
+                                        htmlFor={`checkin-otp-${idx}`}
+                                        className="block text-xs font-medium text-text-primary"
+                                      >
+                                        Enter or paste 6-digit OTP
+                                      </label>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          try {
+                                            const clip = await navigator.clipboard.readText();
+                                            const digits = clip.replace(/\D/g, "").slice(0, 6);
+                                            if (digits) {
+                                              updateGuest(idx, { enteredOtp: digits, otpError: "" });
+                                            }
+                                          } catch {
+                                            // Clipboard read permission error ignored
+                                          }
+                                        }}
+                                        className="text-xs text-brand-primary hover:underline"
+                                      >
+                                        📋 Paste OTP
+                                      </button>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <input
+                                        id={`checkin-otp-${idx}`}
+                                        type="text"
+                                        inputMode="numeric"
+                                        autoComplete="one-time-code"
+                                        maxLength={6}
+                                        placeholder="123456"
+                                        value={g.enteredOtp ?? ""}
+                                        onChange={(e) => updateGuest(idx, { enteredOtp: e.target.value })}
+                                        onPaste={(e) => handlePasteOtp(idx, e)}
+                                        className="flex-1 rounded-lg border border-border-subtle px-3 py-2 text-base tracking-widest text-center font-mono focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleVerifyOtp(idx)}
+                                        className="rounded-lg bg-brand-primary px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 whitespace-nowrap"
+                                      >
+                                        Verify OTP
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSendOtp(idx)}
+                                        className="rounded-lg border border-border-subtle px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary"
+                                      >
+                                        Resend
+                                      </button>
+                                    </div>
+                                    {g.otpError && (
+                                      <p className="text-xs text-red-600 mt-1">{g.otpError}</p>
+                                    )}
+                                  </div>
                                 </div>
                               )}
                             </div>
