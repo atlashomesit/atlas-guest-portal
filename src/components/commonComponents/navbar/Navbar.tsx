@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router
 import './navbar.css';
 import './mobile-search.css';
 import MobileSearchPill from './MobileSearchPill';
+import { DesktopSearchPillGroup } from './DesktopSearchPillGroup';
 
 import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
 import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
@@ -285,10 +286,14 @@ const Navbar = () => {
 
         {/* CENTER - Desktop Navigation: Stays | Hyderabad | Trips | Help */}
         <div className="hidden lg:flex items-center flex-1 justify-center">
-          <Link to="/search" className="navbar-search-pill" data-testid="navbar-search-pill">
-            <span className="navbar-search-pill__label">Where to?</span>
-            <span className="navbar-search-pill__hint">Search stays</span>
-          </Link>
+          {location.pathname === '/search' ? (
+            <DesktopSearchPillGroup />
+          ) : (
+            <Link to="/search" className="navbar-search-pill" data-testid="navbar-search-pill">
+              <span className="navbar-search-pill__label">Where to?</span>
+              <span className="navbar-search-pill__hint">Search stays</span>
+            </Link>
+          )}
         </div>
 
         <div className="hidden lg:flex items-center">
