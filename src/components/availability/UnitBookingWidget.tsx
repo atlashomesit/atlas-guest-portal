@@ -30,7 +30,7 @@ import {
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
-import { HelpCircle } from 'lucide-react';
+import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import {
   fetchCalendarPricing,
@@ -2099,7 +2099,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               must appear as its own line or the breakdown does not sum to its own Total. */}
           {touristTaxLineAmount > 0 && (
             <div className="lv-price-row" data-testid="bw-bd-tourist-tax-row">
-              <span>Tourist tax</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                Tourist tax
+                {/* TASK-102113: (?) tooltip explaining the levy — hover on desktop, tap popover on mobile. */}
+                <FeeInfoTip fee="touristTax" label="Tourist tax" testId="fee-info-tourist-tax" />
+              </span>
               <span className="lv-num">{displayPrice(touristTaxLineAmount)}</span>
             </div>
           )}
@@ -2122,10 +2126,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <div className="lv-price-row" data-testid="bw-bd-service-fee-row">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               Payment processing{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
-              <HelpCircle
-                className="h-3 w-3 cursor-help text-text-muted"
-                aria-label="Razorpay payment gateway fee — passed through, not a platform markup."
-              />
+              {/* TASK-102113: (?) tooltip — hover on desktop, tap popover on mobile.
+                  Replaces the bare HelpCircle icon (aria-label only, undiscoverable on touch). */}
+              <FeeInfoTip fee="paymentProcessing" label="Payment processing" testId="fee-info-payment-processing" />
             </span>
             <span className="lv-num">{displayPrice(breakdownConvenienceFee)}</span>
           </div>

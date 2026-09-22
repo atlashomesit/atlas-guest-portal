@@ -54,6 +54,7 @@ import {
   type FreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
 function abandonPaymentPendingCheckout(
@@ -2173,14 +2174,22 @@ const GuestDetailsPage: React.FC = () => {
               <span className="num">{displayPrice(baseAmount)}</span>
             </div>
             {cleaningFeeAmount > 0 && (
-              <div className="gd-price-row">
-                <span>Cleaning fee</span>
+              <div className="gd-price-row" data-testid="cleaning-fee-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Cleaning fee
+                  {/* TASK-102113: (?) tooltip with the generic host-policy explanation — hover on desktop, tap popover on mobile. */}
+                  <FeeInfoTip fee="cleaning" label="Cleaning fee" testId="fee-info-cleaning" />
+                </span>
                 <span className="num">{displayPrice(cleaningFeeAmount)}</span>
               </div>
             )}
             {addOnsTotal > 0 && (
               <div className="gd-price-row">
-                <span>Add-on services</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Add-on services
+                  {/* TASK-102113: (?) tooltip — hover on desktop, tap popover on mobile. */}
+                  <FeeInfoTip fee="addOns" label="Add-on services" testId="fee-info-addons" />
+                </span>
                 <span className="num">{displayPrice(addOnsTotal)}</span>
               </div>
             )}
@@ -2198,13 +2207,22 @@ const GuestDetailsPage: React.FC = () => {
             )}
             {touristTaxAmount > 0 && (
               <div className="gd-price-row" data-testid="tourist-tax-row">
-                <span>Tourist tax</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Tourist tax
+                  {/* TASK-102113: (?) tooltip — hover on desktop, tap popover on mobile. */}
+                  <FeeInfoTip fee="touristTax" label="Tourist tax" testId="fee-info-tourist-tax" />
+                </span>
                 <span className="num">{displayPrice(touristTaxAmount)}</span>
               </div>
             )}
             {convenienceFeeAmount > 0 && (
               <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not a platform markup.">
-                <span>Payment processing</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Payment processing
+                  {/* TASK-102113: (?) tooltip — hover on desktop, tap popover on mobile.
+                      The row `title` is kept as a native-hover fallback. */}
+                  <FeeInfoTip fee="paymentProcessing" label="Payment processing" testId="fee-info-payment-processing" />
+                </span>
                 <span className="num">{displayPrice(convenienceFeeAmount)}</span>
               </div>
             )}
