@@ -512,6 +512,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // Update the date range: set check-in to the selected date, clear check-out
         // This prompts the user to select a check-out date
         setDateRange({ startDate: selectedDate, endDate: null });
+        // The availability grid lives below the booking form. Keep the conversion flow
+        // continuous by opening the range picker so the guest can choose check-out immediately
+        // after selecting a check-in there.
+        setOpenCalendar(true);
 
         // Optionally scroll to the date picker to make it visible
         if (calendarButtonRef.current) {

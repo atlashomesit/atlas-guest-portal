@@ -79,7 +79,10 @@ vi.mock('@/hooks/useDailyPricingSummary', () => ({
 }));
 vi.mock('@/components/FomoBar', () => ({ default: () => null }));
 vi.mock('@/lib/events', () => ({ track: vi.fn() }));
-vi.mock('./AtlasBookingCalendar', () => ({ AtlasBookingCalendar: () => null }));
+vi.mock('./AtlasBookingCalendar', () => ({
+  AtlasBookingCalendar: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="atlas-booking-calendar-open" /> : null,
+}));
 
 describe('UnitBookingWidget - TASK-2460: order API errors surface body.message', () => {
   it('422 PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT includes API message and WhatsApp hint', () => {
@@ -1004,6 +1007,20 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
     expect(document.activeElement).toBe(screen.getByTestId('unit-booking-checkout-cell'));
   });
 
+  it('opens the range picker when a check-in is selected from the property availability grid', async () => {
+    await renderWidget();
+
+    expect(screen.queryByTestId('atlas-booking-calendar-open')).toBeNull();
+
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('atlas:set-checkin', { detail: toISODate(checkin) }));
+    });
+
+    expect(screen.getByTestId('atlas-booking-calendar-open')).toBeInTheDocument();
+    expect(screen.getByTestId('unit-booking-checkout-cell')).toHaveTextContent('Add date');
+  });
+
   it('the check-in and check-out date cells are aria-described-by the inline error once shown', async () => {
     await renderWidget();
 
@@ -1433,4 +1450,3 @@ describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-clo
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });
-
