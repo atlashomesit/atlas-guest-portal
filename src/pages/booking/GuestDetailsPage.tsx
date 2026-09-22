@@ -752,6 +752,22 @@ const GuestDetailsPage: React.FC = () => {
     }
   }, [promoCode, holdListingId, baseAmount, effectiveTenantSlug]);
 
+  // ── Promo remove (TASK-102118) ──────────────────────────────────────────
+  // 1-click remove behind the savings chip's (x) button. No dedicated
+  // coupon-remove path exists — the input's onChange clearing IS the remove
+  // path — so this replays exactly those state transitions, plus releases
+  // the server-promo lock and drops the persisted seed so a reload cannot
+  // reseed a deliberately-removed code. Pricing math untouched:
+  // confirmedPromoDiscount derives from this same state.
+  const handlePromoRemove = useCallback(() => {
+    setPromoCode('');
+    setPromoMessage(null);
+    setAppliedPromoCode(null);
+    setPromoDiscountAmount(0);
+    setServerPromoLocked(false);
+    try { window.localStorage.removeItem('atlas_guest_promo_code'); } catch { /* ignore */ }
+  }, []);
+
   const handleReferralBlur = useCallback(() => {
     const code = referralCode.trim();
     if (!code) {
@@ -1748,6 +1764,24 @@ const GuestDetailsPage: React.FC = () => {
                         {appliedPromoCode ? 'Applied' : 'Apply'}
                       </button>
                     </div>
+                    {/* TASK-102118: celebratory green savings chip. Displays the
+                        already-computed discount figure (promoDiscountAmount) —
+                        never recomputed here. Remove reuses the existing
+                        coupon-clear path (handlePromoRemove). */}
+                    {!promoValidating && appliedPromoCode && promoDiscountAmount > 0 && (
+                      <div data-testid="promo-savings-chip" role="status" className="gd-promo-chip">
+                        <span>{appliedPromoCode} applied · You saved {displayPrice(promoDiscountAmount)}!</span>
+                        <button
+                          type="button"
+                          onClick={handlePromoRemove}
+                          aria-label={`Remove promo code ${appliedPromoCode}`}
+                          data-testid="promo-savings-remove"
+                          className="gd-promo-chip-x"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                     {promoValidating && <div className="gd-input-help">Checking code…</div>}
                     {!promoValidating && promoMessage && (
                       <div id="gd-promo-message" className={`gd-input-help${appliedPromoCode ? ' success' : ' error'}`} role={appliedPromoCode ? undefined : 'alert'}>
@@ -2958,6 +2992,45 @@ const gdStyles = `
   padding: 3px 8px;
   border-radius: 999px;
   letter-spacing: 0.04em;
+}
+
+/* TASK-102118: celebratory green savings chip after a coupon applies */
+.gd-promo-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px 10px 14px;
+  background: var(--gd-success-bg);
+  border: 1px solid var(--gd-success-border);
+  border-radius: 12px;
+  color: var(--gd-success);
+  font-size: 13.5px;
+  font-weight: 700;
+  animation: gd-chip-pop .25s ease-out;
+}
+.gd-promo-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid var(--gd-success-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--gd-success);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+@keyframes gd-chip-pop {
+  from { opacity: 0; transform: scale(.96) translateY(-2px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gd-promo-chip { animation: none; }
 }
 
 /* Inline input (promo/referral) */
