@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { addDays, format } from 'date-fns';
+import { Check, Lock, ShieldCheck } from 'lucide-react';
 import { getApiBaseUrl } from '@/runtime-config';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { fetchGuestPriceBreakdown, netChargeableRoomFare, type GuestPriceBreakdown } from '@/api/pricingClient';
@@ -715,6 +716,20 @@ function GuestDetailsForm({
       >
         {submitting ? 'Processing...' : 'Pay & book'}
       </button>
+
+      {/* TASK-102074: security/encryption trust badges below the pay CTA. The embed always
+          pays through the Razorpay gateway, so the claims hold unconditionally. */}
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5" data-testid="embed-trust-badges">
+        <span className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-muted px-2 py-1 text-[10px] font-medium leading-none text-text-secondary">
+          <Lock size={11} className="shrink-0" /> 256-Bit SSL Encrypted
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-muted px-2 py-1 text-[10px] font-medium leading-none text-text-secondary">
+          <ShieldCheck size={11} className="shrink-0" /> RBI-Regulated Gateway
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border-subtle bg-bg-muted px-2 py-1 text-[10px] font-medium leading-none text-text-secondary">
+          <Check size={11} className="shrink-0" /> Instant Booking Confirmation
+        </span>
+      </div>
     </div>
   );
 }

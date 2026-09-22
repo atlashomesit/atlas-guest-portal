@@ -20,6 +20,7 @@ import React, {
 } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { Lock, ShieldCheck } from 'lucide-react';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
@@ -2122,6 +2123,10 @@ const GuestDetailsPage: React.FC = () => {
             <span className="gd-pay-mark razorpay">Razorpay</span>
           </div>
 
+          {/* Security badges (mobile only — desktop in aside). Gated on the online rail:
+              never on the TASK-8048 WhatsApp-handoff branch. */}
+          {hasOnlineRail && <SecurityBadges className="gd-sec--mobile" />}
+
           {/* Trust band (mobile only — desktop in aside) */}
           <TrustBand
             freeCancellationCopy={freeCancellationCopy}
@@ -2279,6 +2284,10 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="gd-pay-mark">Net banking</span>
                 <span className="gd-pay-mark razorpay">Razorpay</span>
               </div>
+
+              {/* Security badges — gated on the online rail: never rendered on the
+                  TASK-8048 WhatsApp-handoff branch where there is no gateway to claim. */}
+              <SecurityBadges />
             </>
           ) : (
             <>
@@ -2418,6 +2427,24 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
         </span>
       </div>
     )}
+  </div>
+);
+
+// ── SecurityBadges atom (TASK-102074) ──────────────────────────────────────
+// Rendered ONLY while an online payment rail exists (caller gates on hasOnlineRail).
+// Claims are tied to the Razorpay gateway (privacy.ts:91 "RBI-regulated"), so rendering
+// on the TASK-8048 WhatsApp-handoff branch would be a false security claim.
+interface SecurityBadgesProps {
+  className?: string;
+}
+const SecurityBadges: React.FC<SecurityBadgesProps> = ({ className }) => (
+  <div className={`gd-sec${className ? ` ${className}` : ''}`} data-testid="guest-checkout-security-badges">
+    <span className="gd-sec-label">Secure checkout</span>
+    <div className="gd-sec-row">
+      <span className="gd-sec-pill"><Lock size={12}/> 256-Bit SSL Encrypted</span>
+      <span className="gd-sec-pill"><ShieldCheck size={12}/> RBI-Regulated Gateway</span>
+      <span className="gd-sec-pill"><IconCheck size={12}/> Instant Booking Confirmation</span>
+    </div>
   </div>
 );
 
@@ -3207,6 +3234,45 @@ const gdStyles = `
 .gd-trust-row a { color: var(--gd-coral); font-weight: 600; text-decoration: none; }
 .gd-trust--mobile { display: none; }
 @media (max-width: 1023px) { .gd-trust--mobile { display: grid; } }
+
+/* Security badges (TASK-102074) */
+.gd-sec {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.gd-sec-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94755b;
+}
+.gd-sec-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.gd-sec-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: var(--gd-ivory);
+  border: 1px solid var(--gd-line);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gd-ink-soft);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.gd-sec-pill svg { color: var(--gd-success); flex-shrink: 0; }
+.gd-sec--mobile { display: none; }
+@media (max-width: 1023px) { .gd-sec--mobile { display: flex; } }
 
 /* Pay rail */
 .gd-pay-rail {
