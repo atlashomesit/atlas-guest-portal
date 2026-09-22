@@ -198,6 +198,10 @@ const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
   'goan-hideaway': {
     logoUrl: '/images/goan-hideaway-logo.png',
     faviconUrl: '/images/goan-hideaway-logo.png',
+    contact: {
+      // Secondary owner/escalation contact; keep the primary API business/WhatsApp number unchanged.
+      ownerPhone: '9899150204',
+    },
     listingAddresses: {
       399: 'Apartment 001, Mint Arcadia, Baman Waddo, Near Shri Laxmi Narayan Temple, Siolim, Goa 403517',
       532: 'C-201, Second Floor, Areia De Goa, Opposite Riviera Palms, Bardez, Arpora, Goa 403516',
@@ -354,4 +358,3 @@ export function getTenantListingAddress(
   if (listingId == null || !overrides.listingAddresses) return undefined;
   return overrides.listingAddresses[listingId];
 }
-
