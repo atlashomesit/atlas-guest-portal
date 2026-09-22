@@ -87,6 +87,14 @@ interface UnitBookingWidgetProps {
   graceHours?: number | null;
   /** DESIGN-003: live total + free-cancel deadline for the mobile sticky bar. */
   onStickySummaryChange?: (summary: BookingStickySummary) => void;
+  /**
+   * TASK-102485: true when the parent property-details listing lookup FAILED (settled with an
+   * error and no resolved id) — as opposed to still resolving. With `listingId` undefined the
+   * availability GET early-returns without ever setting `availabilityFailed`, which left the
+   * empty maps reading as all-available with Reserve enabled (fail-OPEN). This prop lets the
+   * widget distinguish "resolving" (pending — keep interactive) from "failed" (fail closed).
+   */
+  lookupFailed?: boolean;
 }
 
 export type BookingStickySummary = {
@@ -166,6 +174,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   cancellationWindowHours: cancellationWindowHoursProp,
   graceHours: graceHoursProp,
   onStickySummaryChange,
+  lookupFailed = false,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -245,6 +254,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // flag lets the UI fail *closed* on failure (disable Reserve + offer retry) while STILL not
   // gating on the loading/latency window (that stays TASK-4277-compliant — see the fetch effect).
   const [availabilityFailed, setAvailabilityFailed] = useState(false);
+  // TASK-102485: the parent property-details listing lookup FAILED after settling (not still
+  // resolving) and no listingId was resolved. The availability fetch effect below early-returns
+  // on a falsy listingId without ever setting `availabilityFailed`, so without this the empty
+  // dateStatusMap/blockedSet would read as "every night is free" with Reserve enabled
+  // (fail-OPEN). Fold it into the same fail-closed posture as a terminal fetch failure.
+  const listingLookupFailed = lookupFailed && listingId == null;
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   // TASK-8218: stable idempotency key for the CURRENT reserve attempt (listingId, checkIn,
@@ -1243,7 +1258,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // message (blank date, inverted range, min-stay, advance notice) is not evidence the nights are
   // taken, and must leave Reserve clickable so handleReserve can keep surfacing it.
   const datesUnavailable =
-    availabilityConflict || checkinUnavailable || availabilityFailed;
+    availabilityConflict || checkinUnavailable || availabilityFailed || listingLookupFailed;
 
   // TASK-102023: gate range pricing pending, fallback estimate, and Reserve on the failure state
   // covering the selected range. If the selected range falls within the shown month, use that
@@ -1451,6 +1466,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     // but a form submit (e.g. Enter key) could still invoke this. Refuse to create a hold when
     // we could not confirm availability, since dateStatusMap/blockedSet are empty (fail-closed).
     if (availabilityFailed) {
+      setFormError('We couldn’t confirm availability for these dates. Please retry checking availability before reserving.');
+      return;
+    }
+    // TASK-102485: same defense-in-depth for a failed parent listing lookup — without a
+    // listingId there was never any availability data, so never create a hold for it.
+    if (listingLookupFailed) {
       setFormError('We couldn’t confirm availability for these dates. Please retry checking availability before reserving.');
       return;
     }
@@ -2165,8 +2186,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
-      {/* TASK-4830: availability fetch failed — keep retry; DESIGN-030: this is the sole alert when fetch fails. */}
-      {availabilityFailed && (
+      {/* TASK-4830: availability fetch failed — keep retry; DESIGN-030: this is the sole alert when fetch fails.
+          TASK-102485: also covers a failed parent listing lookup (no listingId) — same error +
+          retry UI instead of an interactive all-available calendar. Retry reloads the page in
+          that case because there is no availability GET to re-issue without a listing id. */}
+      {(availabilityFailed || listingLookupFailed) && (
         <div
           className="text-sm text-support-error"
           role="alert"
@@ -2176,7 +2200,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <span>We couldn’t check availability for these dates. Please retry before reserving.</span>
           <button
             type="button"
-            onClick={handleAvailabilityRetry}
+            onClick={listingLookupFailed ? () => window.location.reload() : handleAvailabilityRetry}
             data-testid="guest-booking-availability-retry"
             style={{ background: 'transparent', color: '#c2410c', border: '1px solid #c2410c', borderRadius: 8, padding: '4px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
           >

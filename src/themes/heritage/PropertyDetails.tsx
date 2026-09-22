@@ -535,7 +535,7 @@ const PropertyDetails = () => {
     const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
     // TASK-2739-v1: "Draft" | "Published" (undefined on legacy payloads = treated as live).
     const [publishStatus, setPublishStatus] = useState<string | undefined>(undefined);
-    const [, setListingLookupError] = useState<string | null>(null);
+    const [listingLookupError, setListingLookupError] = useState<string | null>(null);
     const [isListingLookupPending, setIsListingLookupPending] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const amenitiesModalRef = useFocusTrap<HTMLDivElement>(showAmenitiesModal);
@@ -561,7 +561,15 @@ const PropertyDetails = () => {
         if (!hasSearchParams) return null;
         return `/search?${searchParams.toString()}`;
     }, [searchParams]);
-    const showAvailabilityPlaceholder = false;
+    // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
+    // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
+    // never render, silently masking the degraded-state UI for a failed listing lookup (the
+    // lookup error string was set via setListingLookupError but destructured away and never
+    // rendered, while resolvedListingId stayed null so the AvailabilityCalendar never mounted
+    // and the UnitBookingWidget fail-OPENED an all-available calendar). Wire the panel to the
+    // real lookup-failure state instead: no resolved id, lookup settled, and an error recorded.
+    const showAvailabilityPlaceholder =
+      !resolvedListingId && !isListingLookupPending && listingLookupError != null;
     const [fav, setFav] = useState(false);
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
     /** TASK-1726: host response time badge text (e.g. "Replies in <1h"). */
@@ -2489,6 +2497,10 @@ useEffect(() => {
                         maxGuests={data.maxGuests}
                         propertySlug={propertySlugParam}
                         unitSlug={unitSlugParam}
+                        // TASK-102485: tell the widget the listing lookup FAILED (vs still
+                        // resolving) so that with listingId undefined it fail-closes with the
+                        // availability error + retry UI instead of an all-available calendar.
+                        lookupFailed={!resolvedListingId && !isListingLookupPending && listingLookupError != null}
                         reviewRating={ppHasApiReviews ? ppCombinedAverageRating : undefined}
                         reviewCount={ppHasApiReviews ? ppCombinedReviewCount : undefined}
                         minStayNights={
@@ -2611,7 +2623,7 @@ useEffect(() => {
                 )}
 
                 {showAvailabilityPlaceholder && (
-                  <div style={{ borderRadius: 18, border: '1px solid #f0e6dc', background: '#fff', padding: 24, marginTop: 16 }}>
+                  <div data-testid="availability-lookup-fallback" style={{ borderRadius: 18, border: '1px solid #f0e6dc', background: '#fff', padding: 24, marginTop: 16 }}>
                     <h3 style={{ fontSize: 18, fontWeight: 600, color: '#1a1a2e', marginBottom: 8 }}>Check Availability</h3>
                     <p style={{ fontSize: 14, color: '#64748b', marginBottom: 16 }}>
                       Availability check is currently unavailable. Please try again later.
