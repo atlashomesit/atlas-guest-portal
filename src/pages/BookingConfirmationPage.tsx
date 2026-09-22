@@ -21,6 +21,12 @@ import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
+import {
+  buildReceiptHtml,
+  buildStayGuideHtml,
+  openPrintableHtml,
+  type StayGuidePrintArgs,
+} from "../components/booking/StayGuidePrint"; // TASK-102057
 
 const GuestAssistant = lazy(() => import("../components/GuestAssistant")); // TASK-4415
 
@@ -724,6 +730,61 @@ export default function BookingConfirmationPage() {
     URL.revokeObjectURL(url);
   }
 
+  // TASK-102057: open a printable Stay Receipt in a new window.
+  // Renders from booking data already on screen — no second source of truth.
+  function openStayReceipt() {
+    if (!booking) return;
+    const args: StayGuidePrintArgs = {
+      bookingId: booking.bookingId,
+      guestName: booking.guestName,
+      propertyName: booking.propertyName,
+      listingName: booking.listingName,
+      checkinDate: booking.checkinDate,
+      checkoutDate: booking.checkoutDate,
+      nights: booking.nights,
+      propertyAddress: booking.propertyAddress,
+      propertyPhone: booking.propertyPhone,
+      checkInTime: booking.checkInTime,
+      checkOutTime: booking.checkOutTime,
+      brandName,
+      fallbackPhone: resolvedFallbackPhone,
+      fallbackEmail: supportEmail,
+      currency: booking.currency,
+      totalAmount: booking.totalAmount,
+      gstInvoiceNumber: booking.gstInvoiceNumber ?? null,
+    };
+    openPrintableHtml(buildReceiptHtml(args));
+  }
+
+  // TASK-102057: open a printable Stay Guide (check-in, WiFi, directions, host contacts).
+  function openStayGuide() {
+    if (!booking) return;
+    const args: StayGuidePrintArgs = {
+      bookingId: booking.bookingId,
+      guestName: booking.guestName,
+      propertyName: booking.propertyName,
+      listingName: booking.listingName,
+      checkinDate: booking.checkinDate,
+      checkoutDate: booking.checkoutDate,
+      nights: booking.nights,
+      propertyAddress: booking.propertyAddress,
+      propertyPhone: booking.propertyPhone,
+      checkInTime: booking.checkInTime,
+      checkOutTime: booking.checkOutTime,
+      wifiVisible: booking.wifiVisible,
+      wifiName: booking.wifiName,
+      wifiPassword: booking.wifiPassword,
+      checkinInstructions: booking.checkinInstructions,
+      brandName,
+      fallbackPhone: resolvedFallbackPhone,
+      fallbackEmail: supportEmail,
+      guidebookCheckoutChecklistText: booking.guidebookCheckoutChecklistText,
+      guidebookTrashParkingText: booking.guidebookTrashParkingText,
+      nearbyLandmarks: booking.nearbyLandmarks,
+    };
+    openPrintableHtml(buildStayGuideHtml(args));
+  }
+
   function toBase64UrlUint8Array(base64String: string) {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -1104,7 +1165,7 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {/* Documents: GST invoice + booking voucher grouped */}
+        {/* Documents: GST invoice + booking voucher + stay receipt + stay guide (TASK-102057) */}
         {!isCancelled && ((booking.hasGstInvoice && pdfUrl) || voucherUrl) && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-4">
             <h2 className="text-sm font-semibold text-text-primary">Documents</h2>
@@ -1153,6 +1214,38 @@ export default function BookingConfirmationPage() {
                 </a>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TASK-102057: in-portal Stay Receipt + Stay Guide. Always available for
+            non-cancelled bookings — built from the same data shown on screen so
+            the wording matches what the guest sees on screen. */}
+        {!isCancelled && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="stay-documents-section">
+            <h2 className="text-sm font-semibold text-text-primary">Stay documents</h2>
+            <p className="text-sm text-text-secondary">
+              Save a copy of your stay receipt or print a check-in guide with WiFi, directions and host contacts.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={openStayReceipt}
+                data-testid="download-receipt-btn"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
+                aria-label={`Download stay receipt for booking #${booking.bookingId}`}
+              >
+                🧾 Download Stay Receipt
+              </button>
+              <button
+                type="button"
+                onClick={openStayGuide}
+                data-testid="download-stay-guide-btn"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
+                aria-label={`Download printable stay guide for booking #${booking.bookingId}`}
+              >
+                🗺️ Download Stay Guide
+              </button>
+            </div>
           </div>
         )}
 
