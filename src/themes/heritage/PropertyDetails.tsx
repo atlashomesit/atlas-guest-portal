@@ -74,6 +74,7 @@ import ListingWhatsAppFloat from '@/components/property/ListingWhatsAppFloat'; /
 import HostAboutNote from '@/components/property/HostAboutNote';
 import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
+import LocalGuideAccordion from '@/components/homepage_components/homepage_Propertydetails/LocalGuideAccordion'; // TASK-102117
 import type { BookingStickySummary } from '@/components/availability/UnitBookingWidget';
 
 const UnitBookingWidget = lazy(() => import('@/components/availability/UnitBookingWidget'));
@@ -2479,22 +2480,10 @@ useEffect(() => {
                   );
                 })()}
 
-                {/* Nearby places — standalone section (map promoted to upper-third in v2) */}
-                {(data.property_nearplaces || []).length > 0 && (
-                  <section className="pp-section" aria-label="Nearby places">
-                    <div className="pp-section-head">
-                      <h2>Nearby places</h2>
-                    </div>
-                    <div className="pp-nearby">
-                      {data.property_nearplaces!.slice(0, 9).map((place, idx) => (
-                        <div key={`place-${idx}`} className="pp-nearby-item">
-                          <b>{place}</b>
-                          <span>Nearby</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                {/* TASK-102117: Explore the Neighborhood — categorized accordion over
+                    the listing's own `property_nearplaces` strings (distances render
+                    only when embedded in the source entry; section omitted when empty). */}
+                <LocalGuideAccordion places={data.property_nearplaces} />
 
               </div>
               {/* ===== END LEFT COLUMN ===== */}
