@@ -70,6 +70,7 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '@/utils/guestHist
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '@/components/apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
+import ListingWhatsAppFloat from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
 import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
@@ -2779,6 +2780,16 @@ useEffect(() => {
         <Suspense fallback={null}>
           <GuestAssistant listingId={resolvedListingId ?? data.listingId ?? null} />
         </Suspense>
+
+        {/* TASK-102116: floating "Chat with Host on WhatsApp" bubble with pre-filled
+            room query. Phone comes from the listing/tenant data already on this page
+            (ppHostPhone) — the bubble hides itself when no host number is available. */}
+        <ListingWhatsAppFloat
+          listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
+          phoneDigits={ppHostPhone}
+          brandName={ppBrandName}
+          listingId={resolvedListingId ?? data.listingId ?? null}
+        />
         </>
     );
 };
