@@ -61,6 +61,7 @@ import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
 import HostAboutNote from '@/components/property/HostAboutNote';
+import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
 import type { BookingStickySummary } from '@/components/availability/UnitBookingWidget';
 
@@ -541,6 +542,10 @@ const PropertyDetails = () => {
     }, [showAmenitiesModal]);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
+    /** TASK-102112: guest review star filter (null = All) + sort. Pure client-side —
+        filtering/sorting re-renders the already-fetched cards instantly, no reload. */
+    const [reviewStarFilter, setReviewStarFilter] = useState<number | null>(null);
+    const [reviewSort, setReviewSort] = useState<ReviewSortKey>('recent');
     const [stickyBookingSummary, setStickyBookingSummary] = useState<BookingStickySummary | null>(null);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
@@ -891,6 +896,13 @@ const PropertyDetails = () => {
             }
         })();
         return () => ac.abort();
+    }, [resolvedListingId]);
+
+    // TASK-102112: reset the guest review filter/sort when the listing changes so a stale
+    // pill cannot blank a newly-loaded review set.
+    useEffect(() => {
+        setReviewStarFilter(null);
+        setReviewSort('recent');
     }, [resolvedListingId]);
 
     useEffect(() => {
@@ -1585,8 +1597,15 @@ useEffect(() => {
     const ppHasApiReviews = Boolean(
         ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
     );
+    /** TASK-102112: pill counts + the filtered/sorted review set (instant, client-side). */
+    const ppReviewFilterCounts = {
+        all: ppMergedReviews.length,
+        five: ppMergedReviews.filter((r) => Number(r.rating) === 5).length,
+        four: ppMergedReviews.filter((r) => Number(r.rating) === 4).length,
+    };
+    const ppFilteredSortedReviews = applyReviewFilterSort(ppMergedReviews, { starFilter: reviewStarFilter, sort: reviewSort });
     const ppDisplayedReviews = ppHasApiReviews
-        ? (showAllReviews ? ppMergedReviews : ppMergedReviews.slice(0, 6))
+        ? (showAllReviews ? ppFilteredSortedReviews : ppFilteredSortedReviews.slice(0, 6))
         : [];
     const ppAmenityDisplay = ppAmenityLabels.slice(0, 12);
     const ppAmenityCodes = data.amenityCodes && data.amenityCodes.length > 0
@@ -2273,6 +2292,16 @@ useEffect(() => {
                           <Suspense fallback={null}>
                             <ReviewSummary listingId={Number(resolvedListingId ?? NaN)} />
                           </Suspense>
+                          {/* TASK-102112: star filter pills + Most Recent / Highest Rated sort (instant, client-side) */}
+                          <ReviewFilterSortControls
+                            starFilter={reviewStarFilter}
+                            sort={reviewSort}
+                            onStarFilterChange={(f) => { setReviewStarFilter(f); setShowAllReviews(false); }}
+                            onSortChange={setReviewSort}
+                            counts={ppReviewFilterCounts}
+                          />
+                          {ppFilteredSortedReviews.length > 0 ? (
+                          <>
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
@@ -2348,7 +2377,7 @@ useEffect(() => {
                               </article>
                             ))}
                           </div>
-                          {ppMergedReviews.length > 6 && (
+                          {ppFilteredSortedReviews.length > 6 && (
                             <button
                               type="button"
                               onClick={() => setShowAllReviews((s) => !s)}
@@ -2358,9 +2387,23 @@ useEffect(() => {
                             >
                               {showAllReviews
                                 ? 'Show fewer reviews'
-                                : `View all ${count} reviews`}
+                                : `View all ${ppFilteredSortedReviews.length} reviews`}
                               <PpChevronDown size={14} />
                             </button>
+                          )}
+                          </>
+                          ) : (
+                            <p data-testid="reviews-empty-filter" style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', fontStyle: 'italic' }}>
+                              No {reviewStarFilter}-star reviews yet.{' '}
+                              <button
+                                type="button"
+                                onClick={() => setReviewStarFilter(null)}
+                                className="pp-prose-more"
+                                style={{ display: 'inline' }}
+                              >
+                                Clear filter
+                              </button>
+                            </p>
                           )}
                         </>
                       ) : (
