@@ -30,7 +30,7 @@ import {
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
-import { HelpCircle } from 'lucide-react';
+import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import {
   fetchCalendarPricing,
@@ -49,10 +49,6 @@ import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
-import {
-  accommodationGstLineAmount,
-  accommodationGstSlabPercentForChargedRate,
-} from '@/utils/guestPriceEstimate';
 
 declare global {
   interface Window {
@@ -91,6 +87,14 @@ interface UnitBookingWidgetProps {
   graceHours?: number | null;
   /** DESIGN-003: live total + free-cancel deadline for the mobile sticky bar. */
   onStickySummaryChange?: (summary: BookingStickySummary) => void;
+  /**
+   * TASK-102485: true when the parent property-details listing lookup FAILED (settled with an
+   * error and no resolved id) — as opposed to still resolving. With `listingId` undefined the
+   * availability GET early-returns without ever setting `availabilityFailed`, which left the
+   * empty maps reading as all-available with Reserve enabled (fail-OPEN). This prop lets the
+   * widget distinguish "resolving" (pending — keep interactive) from "failed" (fail closed).
+   */
+  lookupFailed?: boolean;
 }
 
 export type BookingStickySummary = {
@@ -170,6 +174,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   cancellationWindowHours: cancellationWindowHoursProp,
   graceHours: graceHoursProp,
   onStickySummaryChange,
+  lookupFailed = false,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -219,9 +224,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const lastSettledHeadlineRef = useRef(0);
   const calendarOpenFetchGenRef = useRef(0);
   const openPricingInflightRef = useRef(0);
-  // TASK-4303: pricing fetch terminally failed (network/API error, not an abort). Only then do
-  // we degrade to the base-rate fallback estimate instead of holding the loading skeleton.
-  const [calendarPricingFailed, setCalendarPricingFailed] = useState(false);
+  // TASK-4303 / TASK-102023: pricing fetch terminally failed (network/API error, not an abort).
+  // Split into shown-month and selected-range states so a success on one does not overwrite
+  // a genuine failure on the other.
+  const [shownMonthPricingFailed, setShownMonthPricingFailed] = useState(false);
+  const [selectedRangePricingFailed, setSelectedRangePricingFailed] = useState(false);
   // TASK-4331 / TASK-7016: authoritative server quote (charge engine, not calendar display engine).
   const [serverPriceBreakdown, setServerPriceBreakdown] = useState<GuestPriceBreakdown | null>(null);
   const [guests, setGuests] = useState(2);
@@ -247,6 +254,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // flag lets the UI fail *closed* on failure (disable Reserve + offer retry) while STILL not
   // gating on the loading/latency window (that stays TASK-4277-compliant — see the fetch effect).
   const [availabilityFailed, setAvailabilityFailed] = useState(false);
+  // TASK-102485: the parent property-details listing lookup FAILED after settling (not still
+  // resolving) and no listingId was resolved. The availability fetch effect below early-returns
+  // on a falsy listingId without ever setting `availabilityFailed`, so without this the empty
+  // dateStatusMap/blockedSet would read as "every night is free" with Reserve enabled
+  // (fail-OPEN). Fold it into the same fail-closed posture as a terminal fetch failure.
+  const listingLookupFailed = lookupFailed && listingId == null;
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
   // TASK-8218: stable idempotency key for the CURRENT reserve attempt (listingId, checkIn,
@@ -499,6 +512,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // Update the date range: set check-in to the selected date, clear check-out
         // This prompts the user to select a check-out date
         setDateRange({ startDate: selectedDate, endDate: null });
+        // The availability grid lives below the booking form. Keep the conversion flow
+        // continuous by opening the range picker so the guest can choose check-out immediately
+        // after selecting a check-in there.
+        setOpenCalendar(true);
 
         // Optionally scroll to the date picker to make it visible
         if (calendarButtonRef.current) {
@@ -760,12 +777,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setCalendarPricingLoading(true);
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
-    setCalendarPricingFailed(false);
+    setShownMonthPricingFailed(false);
     fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
-        setCalendarPricingFailed(false);
+        setShownMonthPricingFailed(false);
       })
       .catch((error: unknown) => {
         // Fetch failure: leave any already-merged prices in place rather than clearing the
@@ -774,7 +791,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // TASK-4303: flag a genuine failure (not an unmount/StrictMode abort) so the
         // pricing-pending gate below can degrade to the fallback estimate instead of
         // holding the skeleton forever.
-        if ((error as Error)?.name !== 'AbortError') setCalendarPricingFailed(true);
+        if ((error as Error)?.name !== 'AbortError') setShownMonthPricingFailed(true);
       })
       .finally(() => {
         setCalendarPricingLoading(false);
@@ -846,15 +863,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const controller = new AbortController();
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
-    setCalendarPricingFailed(false);
+    setSelectedRangePricingFailed(false);
     fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
-        setCalendarPricingFailed(false);
+        setSelectedRangePricingFailed(false);
       })
       .catch((error: unknown) => {
-        if ((error as Error)?.name !== 'AbortError') setCalendarPricingFailed(true);
+        if ((error as Error)?.name !== 'AbortError') setSelectedRangePricingFailed(true);
       });
     return () => controller.abort();
   }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso]);
@@ -1245,7 +1262,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // message (blank date, inverted range, min-stay, advance notice) is not evidence the nights are
   // taken, and must leave Reserve clickable so handleReserve can keep surfacing it.
   const datesUnavailable =
-    availabilityConflict || checkinUnavailable || availabilityFailed;
+    availabilityConflict || checkinUnavailable || availabilityFailed || listingLookupFailed;
+
+  // TASK-102023: gate range pricing pending, fallback estimate, and Reserve on the failure state
+  // covering the selected range. If the selected range falls within the shown month, use that
+  // fetch's failure state; otherwise use the selected-range fetch's failure state.
+  const isSelectedRangeCoveredByShownMonth =
+    !selectedStartMonthIso || selectedStartMonthIso === shownMonthIso;
+  const calendarPricingFailed = isSelectedRangeCoveredByShownMonth
+    ? shownMonthPricingFailed
+    : selectedRangePricingFailed;
 
   // TASK-4303: per-date pricing + fee percent for the selected range are still resolving.
   // While pending, the headline total and price breakdown render a loading skeleton instead
@@ -1316,33 +1342,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
    * client-derived slab only while that fetch is in flight or has failed (loading/offline UX),
    * consistent with the widget's existing graceful-degradation pattern.
    */
-  const gstSlabPercent =
-    serverGstMatchesSelection && serverGstPercent != null
-      ? serverGstPercent
-      : hasSelectedRange && perNightForDisplay > 0
-        ? accommodationGstSlabPercentForChargedRate(perNightForDisplay)
-        : null;
-
-  /**
-   * GST component of room fare (ADDITIVE — CPO formula per 2026-05-21).
-   * TASK-4322: `breakdownPrice` (from selectedRangeTotalFromCalendar / effectiveDailyPricing.actualPrice)
-   * is ALREADY discount-net — the tenant global discount is netted in server-side per-day
-   * `actualPrice = base - discount` (src/api/pricingClient.ts). A second subtraction here
-   * (previously via a mislabeled "LOS discount") double-counted the same discount and
-   * understated the total vs. what the server actually charges. taxableBase == breakdownPrice.
-   * Real TASK-571 LOS discounts are not exposed by the calendar pricing DTO today, so there
-   * is nothing genuine left to subtract; when that DTO gains a real per-day LOS field, apply
-   * it here (once) instead of re-deriving it from the discount already netted into the price.
-   */
+  // TASK-102037 (ADR-0107): Zero GST added on top at guest checkout time.
+  const gstSlabPercent = null;
   const taxableBase = Math.max(0, breakdownPrice);
-  // TASK-4331: prefer the server's own computed GST amount (already rounded server-side on
-  // its own post-adjustment base) over recomputing from the (possibly divergent) taxableBase.
-  const gstLineAmount =
-    serverGstMatchesSelection && serverGstAmount != null
-      ? serverGstAmount
-      : gstSlabPercent != null && taxableBase > 0
-        ? accommodationGstLineAmount(taxableBase, perNightForDisplay)
-        : 0;
+  const gstLineAmount = 0;
+  void serverGstPercent;
+  void serverGstAmount;
+  void gstSlabPercent;
+  void gstLineAmount;
 
   // TASK-4913 (founder-ruled 2026-07-17, option c): the 3% "Payment processing" fee is charged
   // on the BASE accommodation amount only — NOT on base+GST. Supersedes the prior base+GST rule
@@ -1364,14 +1371,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? Math.round(serverPriceBreakdown.touristTaxAmount)
       : 0;
 
-  // TASK-4322: Total = discount-net base + GST + Service Fee (canonical formula).
+  // TASK-4322 / TASK-102037: Total = discount-net base + Service Fee + tourist tax (zero GST on top).
   // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
   // TASK-7428: when online payment is off, never fold a server FinalAmount that still includes the gateway fee.
-  // TASK-8293: the fallback must carry tourist tax too, or the no-online-rail branch (which
-  // always lands here) renders a Tourist tax row that the Total does not account for.
   const breakdownFinalTotal = Math.max(
     1,
-    taxableBase + gstLineAmount + breakdownConvenienceFee + touristTaxLineAmount,
+    taxableBase + breakdownConvenienceFee + touristTaxLineAmount,
   );
 
   const finalTotal =
@@ -1468,6 +1473,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setFormError('We couldn’t confirm availability for these dates. Please retry checking availability before reserving.');
       return;
     }
+    // TASK-102485: same defense-in-depth for a failed parent listing lookup — without a
+    // listingId there was never any availability data, so never create a hold for it.
+    if (listingLookupFailed) {
+      setFormError('We couldn’t confirm availability for these dates. Please retry checking availability before reserving.');
+      return;
+    }
     setDateError(null);
     setFormError(null);
 
@@ -1480,6 +1491,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? 'Add a check-in date to continue.'
         : 'Add a check-out date to continue.';
       setDateError(message);
+      setOpenCalendar(true);
       if (!dateRange.startDate) {
         calendarButtonRef.current?.focus();
       } else {
@@ -2081,20 +2093,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             }
           })()}
 
-          {gstSlabPercent != null && breakdownPrice > 0 && gstLineAmount > 0 && (
-            <div className="lv-price-row" data-testid="bw-bd-gst-row">
-              <span>
-                GST ({gstSlabPercent}%)
-              </span>
-              <span className="lv-num">{displayPrice(gstLineAmount)}</span>
-            </div>
-          )}
+
 
           {/* TASK-8293: tourist tax is inside the server FinalAmount the Total prefers, so it
               must appear as its own line or the breakdown does not sum to its own Total. */}
           {touristTaxLineAmount > 0 && (
             <div className="lv-price-row" data-testid="bw-bd-tourist-tax-row">
-              <span>Tourist tax</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                Tourist tax
+                {/* TASK-102113: (?) tooltip explaining the levy — hover on desktop, tap popover on mobile. */}
+                <FeeInfoTip fee="touristTax" label="Tourist tax" testId="fee-info-tourist-tax" />
+              </span>
               <span className="lv-num">{displayPrice(touristTaxLineAmount)}</span>
             </div>
           )}
@@ -2117,10 +2126,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <div className="lv-price-row" data-testid="bw-bd-service-fee-row">
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               Payment processing{convenienceFeePctLabel > 0 ? ` (${convenienceFeePctLabel}%)` : ''}
-              <HelpCircle
-                className="h-3 w-3 cursor-help text-text-muted"
-                aria-label="Razorpay payment gateway fee — passed through, not a platform markup."
-              />
+              {/* TASK-102113: (?) tooltip — hover on desktop, tap popover on mobile.
+                  Replaces the bare HelpCircle icon (aria-label only, undiscoverable on touch). */}
+              <FeeInfoTip fee="paymentProcessing" label="Payment processing" testId="fee-info-payment-processing" />
             </span>
             <span className="lv-num">{displayPrice(breakdownConvenienceFee)}</span>
           </div>
@@ -2185,8 +2193,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </p>
       )}
 
-      {/* TASK-4830: availability fetch failed — keep retry; DESIGN-030: this is the sole alert when fetch fails. */}
-      {availabilityFailed && (
+      {/* TASK-4830: availability fetch failed — keep retry; DESIGN-030: this is the sole alert when fetch fails.
+          TASK-102485: also covers a failed parent listing lookup (no listingId) — same error +
+          retry UI instead of an interactive all-available calendar. Retry reloads the page in
+          that case because there is no availability GET to re-issue without a listing id. */}
+      {(availabilityFailed || listingLookupFailed) && (
         <div
           className="text-sm text-support-error"
           role="alert"
@@ -2196,7 +2207,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <span>We couldn’t check availability for these dates. Please retry before reserving.</span>
           <button
             type="button"
-            onClick={handleAvailabilityRetry}
+            onClick={listingLookupFailed ? () => window.location.reload() : handleAvailabilityRetry}
             data-testid="guest-booking-availability-retry"
             style={{ background: 'transparent', color: '#c2410c', border: '1px solid #c2410c', borderRadius: 8, padding: '4px 12px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
           >

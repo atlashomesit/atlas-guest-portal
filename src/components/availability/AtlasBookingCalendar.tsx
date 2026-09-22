@@ -100,6 +100,25 @@ function formatINR(n: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Popover placement
+// ---------------------------------------------------------------------------
+
+/**
+ * Stacking order of the portaled popover. It must sit above every piece of fixed page chrome
+ * that can overlap the booking column, or that chrome swallows guests' clicks on day cells:
+ * the fixed navbar (--z-sticky 20), the "Chat with us" / assistant buttons (--z-floating 30)
+ * and the mobile sticky Reserve bar (.pp-m-sticky, 50). Sliding UNDER the navbar while the
+ * page scrolls is done by clipping (see `reposition`), never by dropping the z-index.
+ */
+const BOOKING_CALENDAR_Z_INDEX = 100;
+
+/** Mirrors the bottom-sheet `@media` block in AtlasBookingCalendar.css (CSS owns placement there). */
+const BOTTOM_SHEET_MEDIA_QUERY = '(max-width: 620px)';
+
+/** Smallest height the popover is capped to on a very short viewport (its grid then scrolls). */
+const MIN_CAPPED_POPOVER_HEIGHT = 160;
+
+// ---------------------------------------------------------------------------
 // Quick preset definitions
 // ---------------------------------------------------------------------------
 
@@ -438,7 +457,7 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
   useFocusTrap<HTMLDivElement>(open, popoverRef);
 
   // Position the popover below the anchor button, extending left so it stays
-  // within the viewport.  Re-runs every time the popover opens or the anchor
+  // within the viewport. Re-runs every time the popover opens or the anchor
   // resizes/scrolls.
   useLayoutEffect(() => {
     if (!open) return;
@@ -450,19 +469,11 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
 
       const anchorRect = anchor.getBoundingClientRect();
       const popWidth = pop.offsetWidth || 390;
-      const popHeight = pop.offsetHeight || 350;
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       const MARGIN = 8; // px from viewport edges
 
-      // Measure fixed/sticky navbar so the popover never renders underneath it
-      const navEl =
-        document.getElementById('navbar_container') ||
-        document.querySelector('header');
-      const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 0;
-      const topMin = Math.max(MARGIN, (navBottom > 0 ? navBottom : 0) + MARGIN);
-
-      // Move calendar to the right side: align with the left edge of the booking column
+      // Align with the left edge of the booking column
       // so it does not spill over to the left side ("this side" / main content area).
       const bookingAside =
         anchor.closest('.pp-booking-col') ||
@@ -479,40 +490,60 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         left = MARGIN;
       }
 
-      // Vertical positioning: choose best fit between navbar and viewport bottom
-      const spaceBelow = viewportHeight - MARGIN - (anchorRect.bottom + MARGIN);
-      const spaceAbove = anchorRect.top - MARGIN - topMin;
-
-      let finalTop: number;
-      if (spaceBelow >= popHeight) {
-        // Fits comfortably below the anchor
-        finalTop = anchorRect.bottom + MARGIN;
-      } else if (spaceAbove >= popHeight) {
-        // Fits comfortably above the anchor without colliding with the navbar
-        finalTop = anchorRect.top - popHeight - MARGIN;
-      } else if (spaceBelow >= spaceAbove) {
-        // More room below than above: align to bottom of viewport or below anchor
-        finalTop = Math.max(topMin, viewportHeight - popHeight - MARGIN);
-      } else {
-        // More room above: clamp to topMin so it never goes behind navbar
-        finalTop = Math.max(topMin, anchorRect.top - popHeight - MARGIN);
-      }
-
-      setPositionStyle({
+      // Vertical positioning: open directly below the Check-in date field (never flip above it).
+      const belowTop = anchorRect.bottom + MARGIN;
+      let top = belowTop;
+      const next: React.CSSProperties = {
         position: 'fixed',
-        top: `${finalTop}px`,
         left: `${left}px`,
-      });
+        zIndex: BOOKING_CALENDAR_Z_INDEX,
+      };
+
+      const isBottomSheet =
+        typeof window.matchMedia === 'function' && window.matchMedia(BOTTOM_SHEET_MEDIA_QUERY).matches;
+      if (!isBottomSheet) {
+        const navEl = document.getElementById('navbar_container');
+        const navBottom = navEl ? Math.max(0, navEl.getBoundingClientRect().bottom) : 0;
+        // Natural height, unaffected by a maxHeight applied on an earlier pass.
+        const popHeight = pop.scrollHeight + (pop.offsetHeight - pop.clientHeight);
+        const visibleBottom = viewportHeight - MARGIN;
+
+        // The popover is position:fixed beside a sticky booking column, so scrolling the page can
+        // never reveal a part of it that opens below the fold. When the space below the field is
+        // too short, slide it up just far enough to keep every day on screen (not above the navbar).
+        if (belowTop + popHeight > visibleBottom && belowTop > navBottom + MARGIN) {
+          top = Math.max(visibleBottom - popHeight, navBottom + MARGIN);
+        }
+        // Viewport too short even then: cap the height so the grid scrolls inside the popover.
+        if (top >= navBottom && top + popHeight > visibleBottom) {
+          next.maxHeight = `${Math.max(visibleBottom - top, MIN_CAPPED_POPOVER_HEIGHT)}px`;
+        }
+        // The field has scrolled under the fixed navbar: clip the overlapped strip so the calendar
+        // slides UNDER the navbar instead of painting over it. clip-path also removes that strip
+        // from hit-testing, so the navbar stays clickable.
+        if (top < navBottom) {
+          next.clipPath = `inset(${Math.ceil(navBottom - top)}px 0 0 0)`;
+        }
+      }
+      next.top = `${top}px`;
+
+      setPositionStyle((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
 
     // Run immediately, then again after a paint so offsetWidth is accurate
     reposition();
     const raf = requestAnimationFrame(reposition);
 
+    // Month navigation can add or remove a week row; re-fit when the popover's size changes.
+    const resizeObserver =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => reposition());
+    if (resizeObserver && popoverRef.current) resizeObserver.observe(popoverRef.current);
+
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', reposition, true);
     return () => {
       cancelAnimationFrame(raf);
+      resizeObserver?.disconnect();
       window.removeEventListener('resize', reposition);
       window.removeEventListener('scroll', reposition, true);
     };
@@ -729,7 +760,13 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
   if (!open) return null;
 
   const popoverNode = (
-    <div ref={popoverRef} className="bc-popover" style={positionStyle} role="dialog" aria-label="Select dates">
+    <div
+      ref={popoverRef}
+      className="bc-popover"
+      style={positionStyle}
+      role="dialog"
+      aria-label="Select dates"
+    >
       <div className="bc-root">
         {/* Quick presets */}
         <div className="bc-presets">

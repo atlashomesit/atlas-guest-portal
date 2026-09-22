@@ -12,6 +12,7 @@ import {
   getTenantOverrides,
   getTenantPublicListingIdAllowlist,
 } from "@/tenant/tenantOverrides";
+import { resolveEffectiveListingAddress } from "@/utils/listingAddress";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -54,6 +55,9 @@ export type TenantPropertyRecord = {
   longitude?: number | null;
   /** DESIGN-028: listing cancellation tier for card trust chips. */
   cancellationTier?: "Flexible" | "Moderate" | "Strict" | null;
+  /** TASK-102020: listing check-in/out times for property page display. */
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -126,13 +130,15 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
       const tenantCtx = getTenantContext();
       const overrides = getTenantOverrides(tenantCtx?.slug);
       const overrideAddr = getTenantListingAddress(overrides, dto.id);
-      return (overrideAddr ?? dto.propertyAddress ?? "").trim();
+      const resolved = resolveEffectiveListingAddress(dto, overrideAddr);
+      return (resolved ?? "").trim();
     })(),
     propertyAddress: (() => {
       const tenantCtx = getTenantContext();
       const overrides = getTenantOverrides(tenantCtx?.slug);
       const overrideAddr = getTenantListingAddress(overrides, dto.id);
-      return overrideAddr ?? (dto.propertyAddress ? dto.propertyAddress.trim() : null);
+      const resolved = resolveEffectiveListingAddress(dto, overrideAddr);
+      return resolved ? resolved.trim() : null;
     })(),
     property_neighborhoods: [],
     property_reviews: dto.reviewCount ?? local?.property_reviews ?? 0,
@@ -154,6 +160,8 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     latitude: dto.latitude ?? null,
     longitude: dto.longitude ?? null,
     cancellationTier: dto.cancellationTier ?? null,
+    checkInTime: dto.checkInTime?.trim() || null,
+    checkOutTime: dto.checkOutTime?.trim() || null,
   };
 };
 

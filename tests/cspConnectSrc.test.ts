@@ -31,9 +31,11 @@ describe("public/_headers Content-Security-Policy connect-src (TASK-7705)", () =
     expect(connectSrc).toContain("https://api.atlaspms.in");
   });
 
+  // 2026-09-17: the dev API moved to the free App Service tier, which cannot hold a custom domain,
+  // so dev portals now call its azurewebsites host and devapi.atlaspms.in is retired.
   it("still allows the dev API host", () => {
     expect(connectSrc).toContain(
-      "https://devapi.atlaspms.in",
+      "https://atlas-homes-api-dev-lx.azurewebsites.net",
     );
   });
 });

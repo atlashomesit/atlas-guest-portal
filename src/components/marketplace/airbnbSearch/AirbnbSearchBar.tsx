@@ -109,15 +109,19 @@ export default function AirbnbSearchBar() {
     [destinationQuery, recentOptions],
   );
 
-  // URL prefill
+  // URL prefill — restores the bar when arriving with search criteria in the URL
+  // (Back-navigation from property details, shared links). TASK-102058: the `/`
+  // homepage search writes only the `guests` TOTAL, never adults/children, so the
+  // total must hydrate Who — otherwise Back-navigation silently resets guests to 2.
   useEffect(() => {
     const dest = searchParams.get('destination') ?? searchParams.get('city') ?? '';
     const checkIn = searchParams.get('checkIn') ?? searchParams.get('checkin');
     const checkOut = searchParams.get('checkOut') ?? searchParams.get('checkout');
-    const adults = Number(searchParams.get('adults')) || 2;
-    const children = Number(searchParams.get('children')) || 0;
-    const infants = Number(searchParams.get('infants')) || 0;
-    const pets = Number(searchParams.get('pets')) || 0;
+    const adultsRaw = searchParams.get('adults');
+    const childrenRaw = searchParams.get('children');
+    const infantsRaw = searchParams.get('infants');
+    const petsRaw = searchParams.get('pets');
+    const guestsRaw = searchParams.get('guests');
 
     if (dest) {
       setDestination(dest);
@@ -128,7 +132,28 @@ export default function AirbnbSearchBar() {
     if (start || end) {
       setDateRange({ startDate: start, endDate: end });
     }
-    setGuestCounts({ adults: Math.max(1, adults), children, infants, pets });
+    // Only touch guest state when the URL actually carries guest criteria, so an
+    // unrelated param change never clobbers an in-progress Who edit.
+    if (adultsRaw != null || childrenRaw != null || infantsRaw != null || petsRaw != null || guestsRaw != null) {
+      const guestsTotal = guestsRaw != null && guestsRaw.trim() !== '' ? Number(guestsRaw) : NaN;
+      // `/` writes only the total: fold it into adults so Who restores. Breakdown
+      // params (written by /search) take precedence when present.
+      const adultsFallback =
+        Number.isFinite(guestsTotal) && guestsTotal > 0
+          ? Math.min(Math.max(1, Math.floor(guestsTotal)), MAX_GUESTS)
+          : 2;
+      const numOr = (raw: string | null, fallback: number): number => {
+        if (raw == null || raw.trim() === '') return fallback;
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+      };
+      setGuestCounts({
+        adults: Math.max(1, numOr(adultsRaw, adultsFallback)),
+        children: numOr(childrenRaw, 0),
+        infants: numOr(infantsRaw, 0),
+        pets: numOr(petsRaw, 0),
+      });
+    }
   }, [searchParams]);
 
   const closeAllPanels = useCallback(() => {
@@ -394,6 +419,15 @@ export default function AirbnbSearchBar() {
             shownDate={dateRange.startDate ?? today}
             onShownDateChange={(d) => setDateRange((r) => ({ ...r, startDate: r.startDate ?? startOfMonth(d) }))}
             activeField={activeDateField}
+            // TASK-102076: same keep-open contract as SearchAvailabilityWidget —
+            // the picker's check-out auto-advance holds step 2, so stay open with
+            // focus on check-out instead of dropping the guest mid-flow.
+            onActiveFieldChange={(field) => {
+              setActiveDateField(field);
+              if (field === 'checkout') {
+                setIsCalendarOpen(true);
+              }
+            }}
           />
         </div>
 

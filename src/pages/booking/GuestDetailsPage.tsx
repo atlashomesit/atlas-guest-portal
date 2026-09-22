@@ -20,6 +20,7 @@ import React, {
 } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { Lock, ShieldCheck } from 'lucide-react';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
@@ -53,6 +54,7 @@ import {
   type FreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
 function abandonPaymentPendingCheckout(
@@ -549,7 +551,7 @@ const GuestDetailsPage: React.FC = () => {
   // `/api/Razorpay/order` echoes the authoritative discount (`serverPromoLocked`).
   const confirmedPromoDiscount = serverPromoLocked ? promoDiscountAmount : 0;
 
-  const { perNight, gstSlabPercent, gstLineAmount, displayTotal } =
+  const { perNight, displayTotal } =
     computeCheckoutTotal({
       baseAmount,
       globalDiscountAmount,
@@ -749,6 +751,22 @@ const GuestDetailsPage: React.FC = () => {
       setPromoValidating(false);
     }
   }, [promoCode, holdListingId, baseAmount, effectiveTenantSlug]);
+
+  // ── Promo remove (TASK-102118) ──────────────────────────────────────────
+  // 1-click remove behind the savings chip's (x) button. No dedicated
+  // coupon-remove path exists — the input's onChange clearing IS the remove
+  // path — so this replays exactly those state transitions, plus releases
+  // the server-promo lock and drops the persisted seed so a reload cannot
+  // reseed a deliberately-removed code. Pricing math untouched:
+  // confirmedPromoDiscount derives from this same state.
+  const handlePromoRemove = useCallback(() => {
+    setPromoCode('');
+    setPromoMessage(null);
+    setAppliedPromoCode(null);
+    setPromoDiscountAmount(0);
+    setServerPromoLocked(false);
+    try { window.localStorage.removeItem('atlas_guest_promo_code'); } catch { /* ignore */ }
+  }, []);
 
   const handleReferralBlur = useCallback(() => {
     const code = referralCode.trim();
@@ -1746,6 +1764,24 @@ const GuestDetailsPage: React.FC = () => {
                         {appliedPromoCode ? 'Applied' : 'Apply'}
                       </button>
                     </div>
+                    {/* TASK-102118: celebratory green savings chip. Displays the
+                        already-computed discount figure (promoDiscountAmount) —
+                        never recomputed here. Remove reuses the existing
+                        coupon-clear path (handlePromoRemove). */}
+                    {!promoValidating && appliedPromoCode && promoDiscountAmount > 0 && (
+                      <div data-testid="promo-savings-chip" role="status" className="gd-promo-chip">
+                        <span>{appliedPromoCode} applied · You saved {displayPrice(promoDiscountAmount)}!</span>
+                        <button
+                          type="button"
+                          onClick={handlePromoRemove}
+                          aria-label={`Remove promo code ${appliedPromoCode}`}
+                          data-testid="promo-savings-remove"
+                          className="gd-promo-chip-x"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
                     {promoValidating && <div className="gd-input-help">Checking code…</div>}
                     {!promoValidating && promoMessage && (
                       <div id="gd-promo-message" className={`gd-input-help${appliedPromoCode ? ' success' : ' error'}`} role={appliedPromoCode ? undefined : 'alert'}>
@@ -2122,6 +2158,10 @@ const GuestDetailsPage: React.FC = () => {
             <span className="gd-pay-mark razorpay">Razorpay</span>
           </div>
 
+          {/* Security badges (mobile only — desktop in aside). Gated on the online rail:
+              never on the TASK-8048 WhatsApp-handoff branch. */}
+          {hasOnlineRail && <SecurityBadges className="gd-sec--mobile" />}
+
           {/* Trust band (mobile only — desktop in aside) */}
           <TrustBand
             freeCancellationCopy={freeCancellationCopy}
@@ -2168,14 +2208,22 @@ const GuestDetailsPage: React.FC = () => {
               <span className="num">{displayPrice(baseAmount)}</span>
             </div>
             {cleaningFeeAmount > 0 && (
-              <div className="gd-price-row">
-                <span>Cleaning fee</span>
+              <div className="gd-price-row" data-testid="cleaning-fee-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Cleaning fee
+                  {/* TASK-102113: (?) tooltip with the generic host-policy explanation — hover on desktop, tap popover on mobile. */}
+                  <FeeInfoTip fee="cleaning" label="Cleaning fee" testId="fee-info-cleaning" />
+                </span>
                 <span className="num">{displayPrice(cleaningFeeAmount)}</span>
               </div>
             )}
             {addOnsTotal > 0 && (
               <div className="gd-price-row">
-                <span>Add-on services</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Add-on services
+                  {/* TASK-102113: (?) tooltip — hover on desktop, tap popover on mobile. */}
+                  <FeeInfoTip fee="addOns" label="Add-on services" testId="fee-info-addons" />
+                </span>
                 <span className="num">{displayPrice(addOnsTotal)}</span>
               </div>
             )}
@@ -2191,23 +2239,24 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="num">−{displayPrice(referralDiscountAmount)}</span>
               </div>
             )}
-            {gstSlabPercent != null && gstLineAmount > 0 && (
-              <div className="gd-price-row gst">
-                <div className="desc">
-                  <span>GST {gstSlabPercent}%</span>
-                </div>
-                <span className="num">{displayPrice(gstLineAmount)}</span>
-              </div>
-            )}
             {touristTaxAmount > 0 && (
               <div className="gd-price-row" data-testid="tourist-tax-row">
-                <span>Tourist tax</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Tourist tax
+                  {/* TASK-102113: (?) tooltip — hover on desktop, tap popover on mobile. */}
+                  <FeeInfoTip fee="touristTax" label="Tourist tax" testId="fee-info-tourist-tax" />
+                </span>
                 <span className="num">{displayPrice(touristTaxAmount)}</span>
               </div>
             )}
             {convenienceFeeAmount > 0 && (
               <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not a platform markup.">
-                <span>Payment processing</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Payment processing
+                  {/* TASK-102113: (?) tooltip — hover on desktop, tap popover on mobile.
+                      The row `title` is kept as a native-hover fallback. */}
+                  <FeeInfoTip fee="paymentProcessing" label="Payment processing" testId="fee-info-payment-processing" />
+                </span>
                 <span className="num">{displayPrice(convenienceFeeAmount)}</span>
               </div>
             )}
@@ -2217,7 +2266,9 @@ const GuestDetailsPage: React.FC = () => {
             <span className="label">Total</span>
             <div style={{ textAlign: 'right' }}>
               <div className="num">{displayPrice(displayTotal)}</div>
-              <small className="num-sub">Includes GST · INR</small>
+              <small className="num-sub" data-testid="checkout-total-gst-note">
+                INR
+              </small>
             </div>
           </div>
 
@@ -2285,6 +2336,10 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="gd-pay-mark">Net banking</span>
                 <span className="gd-pay-mark razorpay">Razorpay</span>
               </div>
+
+              {/* Security badges — gated on the online rail: never rendered on the
+                  TASK-8048 WhatsApp-handoff branch where there is no gateway to claim. */}
+              <SecurityBadges />
             </>
           ) : (
             <>
@@ -2424,6 +2479,24 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
         </span>
       </div>
     )}
+  </div>
+);
+
+// ── SecurityBadges atom (TASK-102074) ──────────────────────────────────────
+// Rendered ONLY while an online payment rail exists (caller gates on hasOnlineRail).
+// Claims are tied to the Razorpay gateway (privacy.ts:91 "RBI-regulated"), so rendering
+// on the TASK-8048 WhatsApp-handoff branch would be a false security claim.
+interface SecurityBadgesProps {
+  className?: string;
+}
+const SecurityBadges: React.FC<SecurityBadgesProps> = ({ className }) => (
+  <div className={`gd-sec${className ? ` ${className}` : ''}`} data-testid="guest-checkout-security-badges">
+    <span className="gd-sec-label">Secure checkout</span>
+    <div className="gd-sec-row">
+      <span className="gd-sec-pill"><Lock size={12}/> 256-Bit SSL Encrypted</span>
+      <span className="gd-sec-pill"><ShieldCheck size={12}/> RBI-Regulated Gateway</span>
+      <span className="gd-sec-pill"><IconCheck size={12}/> Instant Booking Confirmation</span>
+    </div>
   </div>
 );
 
@@ -2921,6 +2994,45 @@ const gdStyles = `
   letter-spacing: 0.04em;
 }
 
+/* TASK-102118: celebratory green savings chip after a coupon applies */
+.gd-promo-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px 10px 14px;
+  background: var(--gd-success-bg);
+  border: 1px solid var(--gd-success-border);
+  border-radius: 12px;
+  color: var(--gd-success);
+  font-size: 13.5px;
+  font-weight: 700;
+  animation: gd-chip-pop .25s ease-out;
+}
+.gd-promo-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid var(--gd-success-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--gd-success);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+@keyframes gd-chip-pop {
+  from { opacity: 0; transform: scale(.96) translateY(-2px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gd-promo-chip { animation: none; }
+}
+
 /* Inline input (promo/referral) */
 .gd-inline-input {
   display: flex;
@@ -3213,6 +3325,45 @@ const gdStyles = `
 .gd-trust-row a { color: var(--gd-coral); font-weight: 600; text-decoration: none; }
 .gd-trust--mobile { display: none; }
 @media (max-width: 1023px) { .gd-trust--mobile { display: grid; } }
+
+/* Security badges (TASK-102074) */
+.gd-sec {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.gd-sec-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94755b;
+}
+.gd-sec-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.gd-sec-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: var(--gd-ivory);
+  border: 1px solid var(--gd-line);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--gd-ink-soft);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.gd-sec-pill svg { color: var(--gd-success); flex-shrink: 0; }
+.gd-sec--mobile { display: none; }
+@media (max-width: 1023px) { .gd-sec--mobile { display: flex; } }
 
 /* Pay rail */
 .gd-pay-rail {

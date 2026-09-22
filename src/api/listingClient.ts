@@ -4,6 +4,7 @@ import { dedupedJsonFetch } from '@/api/dedupedJsonFetch';
 import { getAccessibilityDeclarations } from '@/utils/amenityCodes';
 import { getTenantContext } from '@/tenant/tenantContext';
 import { getTenantOverrides, getTenantListingAddress } from '@/tenant/tenantOverrides';
+import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -94,6 +95,10 @@ export type PublicListing = {
   propertyId?: number;
   propertyName?: string;
   propertyAddress?: string | null;
+  /** Optional unit-level street address override (from Listing.Address). */
+  address?: string | null;
+  /** Location address of the property (from Property.Address). */
+  locationAddress?: string | null;
   name?: string;
   /**
    * TASK-101640: server-resolved guest-facing unit name from `PublicListingDto.displayName`
@@ -202,11 +207,14 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     propertyAddress: (() => {
       const overrides = getTenantOverrides(getTenantContext()?.slug);
       const override = getTenantListingAddress(overrides, Number.isFinite(id) ? id : null);
-      if (override) return override;
-      return payload.propertyAddress === null || typeof payload.propertyAddress === 'string'
-        ? (payload.propertyAddress as string | null)
-        : undefined;
+      return resolveEffectiveListingAddress(payload as Record<string, unknown>, override);
     })(),
+    address: typeof payload.address === 'string' && payload.address.trim() ? payload.address.trim() : null,
+    locationAddress: typeof payload.locationAddress === 'string' && payload.locationAddress.trim()
+      ? payload.locationAddress.trim()
+      : typeof payload.propertyLocationAddress === 'string' && payload.propertyLocationAddress.trim()
+        ? payload.propertyLocationAddress.trim()
+        : null,
     name: typeof payload.name === 'string' ? payload.name : undefined,
     // TASK-101640: thread the server-resolved display name through (camelCase or PascalCase).
     displayName:
@@ -585,6 +593,10 @@ export const fetchListingById = async (
   }
 
   const payload = (result.body ?? {}) as Record<string, unknown>;
+  const overrides = getTenantOverrides(getTenantContext()?.slug);
+  const numId = Number(payload.id ?? payload.listingId ?? listingId);
+  const override = getTenantListingAddress(overrides, Number.isFinite(numId) ? numId : null);
+  const resolvedAddress = resolveEffectiveListingAddress(payload, override);
   const normalized: ListingDetail = {
     ...payload,
     id: (payload.id ?? payload.listingId ?? listingId) as string | number,
@@ -593,6 +605,13 @@ export const fetchListingById = async (
       | number
       | undefined,
     name: (payload.name ?? payload.property_name ?? payload.title) as string | undefined,
+    propertyAddress: resolvedAddress,
+    address: typeof payload.address === 'string' && payload.address.trim() ? payload.address.trim() : null,
+    locationAddress: typeof payload.locationAddress === 'string' && payload.locationAddress.trim()
+      ? payload.locationAddress.trim()
+      : typeof payload.propertyLocationAddress === 'string' && payload.propertyLocationAddress.trim()
+        ? payload.propertyLocationAddress.trim()
+        : null,
     // TASK-101640: keep the server-resolved display name (camelCase or PascalCase).
     displayName: (payload.displayName ?? payload.DisplayName ?? null) as string | null | undefined,
   };

@@ -56,6 +56,7 @@ interface AtlasDateRangePickerProps {
   dateRangeProps?: Partial<React.ComponentProps<typeof DateRange>>;
   afterCalendar?: React.ReactNode;
   activeField?: 'checkin' | 'checkout' | null;
+  onActiveFieldChange?: (field: 'checkin' | 'checkout' | null) => void;
   instructionText?: string;
   popoverClassName?: string;
 }
@@ -86,6 +87,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   shownDate,
   value,
   activeField,
+  onActiveFieldChange,
 }) => {
   const fallbackLabelId = useId();
   const fallbackContentId = useId();
@@ -157,12 +159,30 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       ? Math.max(1, differenceInCalendarDays(value.endDate, value.startDate))
       : null;
 
+  /**
+   * TASK-102076: the provisional check-out written by the auto-advance in
+   * handleRangeChange (check-in + 1 night). The value round-trips through the
+   * parent, so by the time the guest's next click lands `value` already holds a
+   * COMPLETE range — without this marker the sync effect below would flip the
+   * picker to RANGE_SELECTED and the next click would restart the check-in
+   * instead of completing the check-out the guest is being asked for.
+   */
+  const autoAdvancedEndRef = useRef<number | null>(null);
+
   useEffect(() => {
     if (value.startDate && value.endDate) {
-      setSelectionState('RANGE_SELECTED');
+      if (autoAdvancedEndRef.current !== null && value.endDate.getTime() === autoAdvancedEndRef.current) {
+        // Provisional auto-advance: hold step 2 so the next click completes the
+        // check-out instead of restarting the stay.
+        setSelectionState('CHECK_IN_SELECTED');
+      } else {
+        autoAdvancedEndRef.current = null;
+        setSelectionState('RANGE_SELECTED');
+      }
     } else if (value.startDate) {
       setSelectionState('CHECK_IN_SELECTED');
     } else {
+      autoAdvancedEndRef.current = null;
       setSelectionState('IDLE');
     }
   }, [value.startDate, value.endDate]);
@@ -317,9 +337,44 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       return;
     }
 
-    // RANGE_SELECTED: start over with new check-in
+    // RANGE_SELECTED: start over with new check-in.
+    // TASK-102076: when the newly picked check-in invalidates the held check-out
+    // (equal to or later than it), auto-advance check-out to check-in + 1 night
+    // instead of surfacing the 'must be after check-in' error, hold step 2, and
+    // move focus to the check-out field so the guest picks their real check-out
+    // next. No minNights/minLOS concept exists on this component — the 1-night
+    // minimum is hardcoded in validateDateRange/isTooEarlyForCheckout — so +1
+    // night is the advance. Max-stay and all other validations are untouched: a
+    // +1-night range can never trip them, and applySelection still enforces them
+    // on every other path.
+    const heldCheckOut = normalizeDate(value.endDate);
+    if (heldCheckOut && startDate >= heldCheckOut) {
+      const autoCheckout = addDays(startDate, 1);
+      if (!isDayUnavailable(autoCheckout)) {
+        autoAdvancedEndRef.current = autoCheckout.getTime();
+        setValidationError(null);
+        if (applySelection(startDate, autoCheckout)) {
+          setSelectionState('CHECK_IN_SELECTED');
+          onActiveFieldChange?.('checkout');
+          return;
+        }
+        autoAdvancedEndRef.current = null;
+        // applySelection reports max-stay etc. — fall through to the legacy
+        // restart below only if it somehow rejected the +1-night range.
+      } else if (applySelection(startDate, null)) {
+        // Auto-advanced night is unavailable (disabled/booked/past window): keep
+        // the new check-in, stay on step 2, no error modal for this case.
+        setValidationError(null);
+        setSelectionState('CHECK_IN_SELECTED');
+        onActiveFieldChange?.('checkout');
+        return;
+      } else {
+        return;
+      }
+    }
     if (applySelection(startDate, null)) {
       setSelectionState('CHECK_IN_SELECTED');
+      onActiveFieldChange?.('checkout');
     }
   };
 
@@ -410,7 +465,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       : {
           label: nights ? `Range selected: ${nights} night${nights === 1 ? '' : 's'}` : 'Range selected',
           bg: 'bg-[#ffe8d6]',
-          color: 'text-[#c2410c]',
+          color: 'text-[#9a3412]',
           dot: 'bg-[#c2410c]',
         };
 

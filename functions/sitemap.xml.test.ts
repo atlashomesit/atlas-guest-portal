@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   buildSitemapXml,
+  citySlugsWithMarketplaceSupply,
   listingPathSlug,
+  marketplaceListingPath,
+  onRequestGet,
   resolveSitemapTenantSlug,
   SHARED_SITEMAP_PATHS,
   SITEMAP_PATHS,
@@ -94,5 +97,67 @@ describe('sitemap.xml', () => {
       expect(xml).toContain(`<loc>https://staybycf.atlastays.com${path}</loc>`);
     }
     expect(xml).not.toContain('atlas-homes');
+  });
+
+  // MKT-006: a homestays-in-<city> URL is offered only when the marketplace has ≥1 matching listing.
+  it('MKT-006: citySlugsWithMarketplaceSupply drops cities with zero live listings', () => {
+    const listings = [
+      { id: 1, tenantSlug: 'atlas', title: 'KPHB 7th Phase 2BHK', city: null },
+      { id: 2, tenantSlug: 'sahil-goyal', title: 'Calangute Beach Villa', city: 'Goa' },
+    ];
+    expect(citySlugsWithMarketplaceSupply(listings)).toEqual(
+      expect.arrayContaining(['hyderabad', 'goa']),
+    );
+    expect(citySlugsWithMarketplaceSupply(listings)).not.toContain('coorg');
+    expect(citySlugsWithMarketplaceSupply(listings)).not.toContain('manali');
+  });
+
+  it('MKT-006: marketplaceListingPath carries ?tenant= for the cross-tenant listing', () => {
+    const path = marketplaceListingPath(
+      { id: 191, tenantSlug: 'staybycf', title: 'Elsiya loft' },
+      { allowAtlasHomesFallback: true },
+    );
+    expect(path).toBe('/homes/elsiya-loft/191?tenant=staybycf');
+  });
+
+  // MKT-006: the marketplace host previously advertised 0 /homes/ URLs and offered
+  // /homestays-in-coorg + /homestays-in-manali with zero supply — this reproduces the RED state
+  // before the fix (tenantSlug: null skipped listing enumeration entirely) and asserts the fix.
+  it('MKT-006: marketplace host sitemap enumerates cross-tenant listings and drops empty cities', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes('/marketplace/listings')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              { id: 1, tenantSlug: 'atlas', title: 'KPHB 7th Phase 2BHK', city: null },
+              { id: 2, tenantSlug: 'sahil-goyal', title: 'Calangute Beach Villa', city: 'Goa' },
+            ],
+            total: 2,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response('not found', { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      const res = await onRequestGet({
+        request: new Request('https://atlastays.com/sitemap.xml'),
+        env: { ATLAS_API_BASE_URL: 'https://api.example.com' },
+      });
+      const xml = await res.text();
+
+      expect(xml).toContain('<loc>https://atlastays.com/homes/kphb-7th-phase-2bhk/1?tenant=atlas</loc>');
+      expect(xml).toContain(
+        '<loc>https://atlastays.com/homes/calangute-beach-villa/2?tenant=sahil-goyal</loc>',
+      );
+      expect(xml).toContain('<loc>https://atlastays.com/homestays-in-hyderabad</loc>');
+      expect(xml).toContain('<loc>https://atlastays.com/homestays-in-goa</loc>');
+      expect(xml).not.toContain('/homestays-in-coorg');
+      expect(xml).not.toContain('/homestays-in-manali');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

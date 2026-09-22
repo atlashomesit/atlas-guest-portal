@@ -79,7 +79,10 @@ vi.mock('@/hooks/useDailyPricingSummary', () => ({
 }));
 vi.mock('@/components/FomoBar', () => ({ default: () => null }));
 vi.mock('@/lib/events', () => ({ track: vi.fn() }));
-vi.mock('./AtlasBookingCalendar', () => ({ AtlasBookingCalendar: () => null }));
+vi.mock('./AtlasBookingCalendar', () => ({
+  AtlasBookingCalendar: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="atlas-booking-calendar-open" /> : null,
+}));
 
 describe('UnitBookingWidget - TASK-2460: order API errors surface body.message', () => {
   it('422 PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT includes API message and WhatsApp hint', () => {
@@ -157,11 +160,9 @@ describe('UnitBookingWidget - TASK-2623: .bw-* design header, price labels, trus
     expect(content).not.toContain('>Room fare<');
   });
 
-  it('GST row is standardized to "GST (N%)" with no redundant "on accommodation" sublabel (TASK-4097)', () => {
+  it('GST row is removed under ADR-0107 zero GST ruling (TASK-102037)', () => {
     content = readFileSync(filePath, 'utf-8');
-    // TASK-4097 (PR #242, commit 54200ec3) deliberately dropped the redundant
-    // "on accommodation" sublabel and standardized the GST row to "GST (N%)".
-    expect(content).toContain('GST ({gstSlabPercent}%)');
+    expect(content).not.toContain('bw-bd-gst-row');
     expect(content).not.toContain('on accommodation');
   });
 
@@ -277,13 +278,11 @@ describe('UnitBookingWidget - TASK-4285: past-dated check-in from URL params is 
   });
 });
 
-describe('UnitBookingWidget - TASK-2870: accommodation GST uses 18% slab above ₹7,500', () => {
+describe('UnitBookingWidget - TASK-2870 / TASK-102037: accommodation GST removed under ADR-0107', () => {
   const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
 
-  it('uses shared guestPriceEstimate GST helpers (not retired 12% slab)', () => {
+  it('does not use retired 12% slab and zero GST is added on top under ADR-0107', () => {
     const content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('accommodationGstSlabPercentForChargedRate');
-    expect(content).toContain('accommodationGstLineAmount');
     expect(content).not.toMatch(/<= 7500 \? 5 : 12/);
     expect(content).not.toContain('else 12%');
   });
@@ -330,24 +329,10 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
     expect(content).toContain('serverFinalAmount');
   });
 
-  it('gstSlabPercent prefers the server value when it matches the current selection', () => {
+  it('gstSlabPercent and gstLineAmount are null/0 under ADR-0107 zero GST ruling (TASK-102037)', () => {
     const content = readFileSync(filePath, 'utf-8');
-    // Must check serverGstMatchesSelection && serverGstPercent != null BEFORE falling back
-    // to the client-derived accommodationGstSlabPercentForChargedRate(perNightForDisplay).
-    expect(content).toMatch(
-      /const gstSlabPercent =\s*\n\s*serverGstMatchesSelection && serverGstPercent != null/,
-    );
-    // Client-derived slab must remain as the fallback path (loading/offline UX), not removed —
-    // and TASK-8294: it must be the exempt-aware three-band function, not the retired two-band
-    // accommodationGstSlabPercent (which had no 0% tier and misquoted sub-₹1,000/night stays).
-    expect(content).toContain('accommodationGstSlabPercentForChargedRate(perNightForDisplay)');
-  });
-
-  it('gstLineAmount prefers the server-computed amount over recomputing from taxableBase', () => {
-    const content = readFileSync(filePath, 'utf-8');
-    expect(content).toMatch(
-      /const gstLineAmount =\s*\n\s*serverGstMatchesSelection && serverGstAmount != null/,
-    );
+    expect(content).toContain('const gstSlabPercent = null;');
+    expect(content).toContain('const gstLineAmount = 0;');
   });
 
   it('finalTotal prefers server FinalAmount when it matches the current selection (TASK-5184)', () => {
@@ -613,14 +598,14 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
       await pricingPromise;
     });
 
-    // Settled: base ₹6,500 × 2 = ₹13,000; GST 5% = ₹650; fee 3% × ₹13,000 = ₹390 (base only,
-    // TASK-4913 founder-ruled 2026-07-17 option c); Total ₹14,040.
+    // Settled: base ₹6,500 × 2 = ₹13,000; GST = ₹0 (ADR-0107); fee 3% × ₹13,000 = ₹390 (base only,
+    // TASK-4913 founder-ruled 2026-07-17 option c); Total ₹13,390.
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('14040');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('13390');
     // Headline total matches the breakdown total — the FIRST total ever rendered IS the settled one
     // (the queryByText('Total') assertion above proved nothing rendered earlier).
-    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('14040');
+    expect(screen.getByTestId('bw-per-night-price').textContent?.replace(/[^0-9]/g, '')).toBe('13390');
     // Processing fee shows the real 3% amount, never a ₹0 placeholder.
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
     expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('390');
@@ -1022,6 +1007,20 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
     expect(document.activeElement).toBe(screen.getByTestId('unit-booking-checkout-cell'));
   });
 
+  it('opens the range picker when a check-in is selected from the property availability grid', async () => {
+    await renderWidget();
+
+    expect(screen.queryByTestId('atlas-booking-calendar-open')).toBeNull();
+
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('atlas:set-checkin', { detail: toISODate(checkin) }));
+    });
+
+    expect(screen.getByTestId('atlas-booking-calendar-open')).toBeInTheDocument();
+    expect(screen.getByTestId('unit-booking-checkout-cell')).toHaveTextContent('Add date');
+  });
+
   it('the check-in and check-out date cells are aria-described-by the inline error once shown', async () => {
     await renderWidget();
 
@@ -1091,10 +1090,8 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
     expect(screen.queryByTestId('bw-price-pending')).toBeNull();
   });
 
-  it('a complete date range still renders the full breakdown, including the GST line, once selection is valid', async () => {
-    // 1 night ₹6,000 → GST 5% = ₹300; processing fee 3% × 6,000 = ₹180 (base only, TASK-4913
-    // founder-ruled 2026-07-17 option c); Total ₹6,480 — matches the TASK-4910 repro example
-    // (30 Jun→01 Jul) updated to the base-only fee ruling.
+  it('a complete date range renders the breakdown with zero GST added on top once selection is valid (TASK-102037)', async () => {
+    // 1 night ₹6,000; processing fee 3% × 6,000 = ₹180; Total ₹6,180 (zero GST on top per TASK-102030 / TASK-102037).
     const checkin = addDays(getIstStartOfDay(new Date()), 5);
     const checkout = addDays(checkin, 1);
     const nightIso = toISODate(checkin);
@@ -1104,17 +1101,15 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
       dateToPrice: new Map([[nightIso, 6000]]),
       convenienceFeePercent: 3,
     });
-    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6480 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 0, gstAmount: 0, finalAmount: 6180 });
 
     await renderWidget();
 
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6480');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6180');
 
-    const gstRow = screen.getByTestId('bw-bd-gst-row');
-    expect(gstRow.textContent).toContain('GST (5%)');
-    expect(gstRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('300');
+    expect(screen.queryByTestId('bw-bd-gst-row')).toBeNull();
 
     const feeRow = screen.getByTestId('bw-bd-service-fee-row');
     expect(feeRow.querySelector('.lv-num')?.textContent?.replace(/[^0-9]/g, '')).toBe('180');
@@ -1172,8 +1167,8 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
 
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    // Base ₹6,000 + GST ₹300 = ₹6,300 — no 3% processing fee.
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6300');
+    // Base ₹6,000 + GST ₹0 = ₹6,000 — no 3% processing fee.
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
     expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
     expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
     expect(screen.queryByText(/Secured by Razorpay/i)).toBeNull();
@@ -1214,7 +1209,7 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
 
     const totalLabel = await screen.findByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
-    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6300');
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
     expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
     expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
   });
@@ -1317,5 +1312,141 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
         expect(strip.textContent?.trim(), `daysOut=${daysOut}`).not.toBe('');
       }
     }
+  });
+});
+
+describe('UnitBookingWidget - TASK-102023: split pricing failure flags', () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  it('selected-range fetch failure is preserved even if shown-month fetch resolves after it', async () => {
+    const nextYear = new Date().getFullYear() + 1;
+    task4303.booking.checkIn = `${nextYear}-03-10`;
+    task4303.booking.checkOut = `${nextYear}-03-12`;
+
+    let resolveShownMonth!: (r: { dateToPrice: Map<string, number>; convenienceFeePercent?: number }) => void;
+    const shownMonthPromise = new Promise<{ dateToPrice: Map<string, number>; convenienceFeePercent?: number }>(
+      (res) => { resolveShownMonth = res; },
+    );
+
+    task4303.fetchCalendarPricing.mockImplementation((_listingId: number, monthIso: string) => {
+      if (monthIso.startsWith(`${nextYear}-03`)) {
+        return Promise.reject(new Error('Network error on selected range'));
+      }
+      return shownMonthPromise;
+    });
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+
+    // Wait for the selected-range fetch to fail and render error affordance
+    await waitFor(() => {
+      expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
+    });
+
+    // Now resolve the shown-month fetch
+    await act(async () => {
+      resolveShownMonth({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+      await shownMonthPromise;
+    });
+
+    // Verify widget does not return to pending skeleton, and error/retry affordance remains
+    expect(screen.queryByTestId('bw-price-pending')).toBeNull();
+    expect(screen.queryByTestId('bw-breakdown-pending')).toBeNull();
+    expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
+  });
+});
+
+describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-closes (source)', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('accepts a lookupFailed prop that distinguishes failed lookup from still-resolving', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('lookupFailed?: boolean;');
+    expect(content).toContain('const listingLookupFailed = lookupFailed && listingId == null;');
+  });
+
+  it('folds the failed lookup into the fail-closed Reserve posture', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const datesUnavailableDef = content.slice(
+      content.indexOf('const datesUnavailable ='),
+      content.indexOf('const datesUnavailable =') + 200,
+    );
+    expect(datesUnavailableDef).toContain('listingLookupFailed');
+  });
+
+  it('handleReserve refuses to create a hold when the listing lookup failed', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toMatch(/if \(listingLookupFailed\) \{\s*\n\s*setFormError\(/);
+  });
+});
+
+describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-closes (render)', () => {
+  beforeEach(() => {
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 0, finalAmount: 0 });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  const renderWidgetLookup = async (lookupFailed?: boolean) => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    return render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={undefined}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+          lookupFailed={lookupFailed}
+        />
+      </MemoryRouter>,
+    );
+  };
+
+  it('fail-closes Reserve with error + retry when lookupFailed and no listingId', async () => {
+    await renderWidgetLookup(true);
+
+    await screen.findByTestId('guest-booking-availability-error');
+    expect(screen.getByTestId('guest-booking-availability-retry')).toBeInTheDocument();
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(reserve).toBeDisabled();
+    expect(reserve.textContent).toContain('Unavailable');
+    // No availability GET could have run — there is no listing id to fetch for.
+    expect(availabilityMock.fetch).not.toHaveBeenCalled();
+  });
+
+  it('stays interactive (no error) while the lookup is still resolving', async () => {
+    await renderWidgetLookup(undefined);
+
+    // Resolving ≠ failed: the widget must not show the failure UI …
+    await waitFor(() => {
+      expect(screen.getByTestId('guest-booking-form')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
+    // … and Reserve stays clickable for blank dates (TASK-4277).
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });

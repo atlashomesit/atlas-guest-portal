@@ -1,19 +1,36 @@
 import type { ListingDetail } from '../api/listingClient';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { dedupedJsonFetch } from '@/api/dedupedJsonFetch';
+import { getTenantContext } from '@/tenant/tenantContext';
+import { getTenantOverrides, getTenantListingAddress } from '@/tenant/tenantOverrides';
+import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
 
 const normalizeListingPayload = (
   payload: Record<string, unknown>,
   fallbackId: string,
-): ListingDetail => ({
-  ...payload,
-  id: (payload.id ?? payload.listingId ?? fallbackId) as string | number,
-  propertyId: (payload.propertyId ?? payload.property_id ?? payload.propertyID) as
-    | string
-    | number
-    | undefined,
-  name: (payload.name ?? payload.property_name ?? payload.title) as string | undefined,
-});
+): ListingDetail => {
+  const overrides = getTenantOverrides(getTenantContext()?.slug);
+  const rawId = payload.id ?? payload.listingId ?? fallbackId;
+  const numId = Number(rawId);
+  const override = getTenantListingAddress(overrides, Number.isFinite(numId) ? numId : null);
+  const resolvedAddress = resolveEffectiveListingAddress(payload, override);
+  return {
+    ...payload,
+    id: rawId as string | number,
+    propertyId: (payload.propertyId ?? payload.property_id ?? payload.propertyID) as
+      | string
+      | number
+      | undefined,
+    name: (payload.name ?? payload.property_name ?? payload.title) as string | undefined,
+    propertyAddress: resolvedAddress,
+    address: typeof payload.address === 'string' && payload.address.trim() ? payload.address.trim() : null,
+    locationAddress: typeof payload.locationAddress === 'string' && payload.locationAddress.trim()
+      ? payload.locationAddress.trim()
+      : typeof payload.propertyLocationAddress === 'string' && payload.propertyLocationAddress.trim()
+        ? payload.propertyLocationAddress.trim()
+        : null,
+  };
+};
 
 const normalizeMatchValue = (value: string) =>
   value

@@ -18,15 +18,27 @@ describe("selectPropertyMapMode — Task 3 precedence", () => {
   it("falls back to the custom mapSrc iframe when coords are absent", () => {
     const sel = selectPropertyMapMode({
       mapSrc: "https://maps.example/embed",
+      address: "123 Main St",
       useMultiPin: true,
       mapLocation: tenantDefault,
     });
     expect(sel.kind).toBe("iframe");
   });
 
-  it("falls back to multi-pin when no coords and no custom mapSrc", () => {
+  it("falls back to the precise address when no coords and no mapSrc", () => {
     const sel = selectPropertyMapMode({
       mapSrc: "",
+      address: "123 Main St",
+      useMultiPin: true,
+      mapLocation: tenantDefault,
+    });
+    expect(sel).toEqual({ kind: "address", address: "123 Main St" });
+  });
+
+  it("falls back to multi-pin when no coords, no mapSrc, and no address", () => {
+    const sel = selectPropertyMapMode({
+      mapSrc: "",
+      address: "",
       useMultiPin: true,
       mapLocation: tenantDefault,
     });

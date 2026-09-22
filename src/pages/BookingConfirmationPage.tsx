@@ -21,6 +21,12 @@ import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
+import {
+  buildReceiptHtml,
+  buildStayGuideHtml,
+  openPrintableHtml,
+  type StayGuidePrintArgs,
+} from "../components/booking/StayGuidePrint"; // TASK-102057
 
 const GuestAssistant = lazy(() => import("../components/GuestAssistant")); // TASK-4415
 
@@ -49,6 +55,94 @@ function listingTimeToIcsHHMM(t: string | undefined, fallback: string): string {
   const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
   if (m) return `${m[1].padStart(2, "0")}:${m[2]}`;
   return fallback;
+}
+
+/** TASK-102114: shared calendar-export model. Both the Google Calendar 1-click
+ *  link and the .ics download (TASK-333) are built from the booking data
+ *  already on screen — check-in time / property address / booking id are
+ *  passed in, never invented. Stamps are floating IST local time. */
+interface BookingCalendarEvent {
+  checkinStamp: string;
+  checkoutStamp: string;
+  title: string;
+  details: string;
+  location: string;
+}
+
+function formatCalendarStamp(dateIso: string, timeHHMM: string): string {
+  // dateIso is YYYY-MM-DD, timeHHMM is HH:MM (24h IST).
+  const [y, m, d] = dateIso.split("-");
+  const [h, min] = timeHHMM.split(":");
+  return `${y}${m}${d}T${h}${min}00`;
+}
+
+function buildBookingCalendarEvent(args: {
+  propertyName: string;
+  bookingId: number | string;
+  checkinDate: string;
+  checkoutDate: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  propertyAddress: string;
+  hostPhone: string;
+}): BookingCalendarEvent {
+  const cinIso = summaryDisplayDateToIso(args.checkinDate);
+  const coutIso = summaryDisplayDateToIso(args.checkoutDate);
+  const cinTime = listingTimeToIcsHHMM(args.checkInTime, "14:00");
+  const coutTime = listingTimeToIcsHHMM(args.checkOutTime, "12:00");
+  const location = args.propertyAddress || args.propertyName;
+  return {
+    checkinStamp: formatCalendarStamp(cinIso, cinTime),
+    checkoutStamp: formatCalendarStamp(coutIso, coutTime),
+    title: `Check-in at ${args.propertyName}`,
+    details:
+      `Booking #${args.bookingId}. Check-in ${args.checkinDate} ${cinTime}. ` +
+      `Check-out on ${args.checkoutDate}. Host: ${args.hostPhone}.`,
+    location,
+  };
+}
+
+function buildGoogleCalendarUrl(event: BookingCalendarEvent): string {
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: event.title,
+    dates: `${event.checkinStamp}/${event.checkoutStamp}`,
+    details: event.details,
+    location: event.location,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+function buildBookingIcsContent(args: {
+  propertyName: string;
+  bookingId: number | string;
+  checkinDate: string;
+  checkoutDate: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  propertyAddress: string;
+  hostPhone: string;
+  uid: string;
+  prodName: string;
+}): string {
+  const event = buildBookingCalendarEvent(args);
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    `PRODID:-//${args.prodName}//BookingConfirmation//EN`,
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${args.uid}`,
+    `DTSTART:${event.checkinStamp}`,
+    `DTEND:${event.checkoutStamp}`,
+    `SUMMARY:${event.title}`,
+    `DESCRIPTION:${event.details}`,
+    `LOCATION:${event.location}`,
+    "STATUS:CONFIRMED",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
 }
 
 /** TASK-2490: guest web self-check-in form — posts arrival time + party size + optional ID link. */
@@ -606,41 +700,26 @@ export default function BookingConfirmationPage() {
 
   const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
-  // TASK-333: Generate and download ICS calendar event for check-in
+  // TASK-333: Generate and download ICS calendar event for check-in.
+  // TASK-102114: event content shared with the Google Calendar 1-click link.
+  const calendarEventArgs = booking
+    ? {
+        propertyName: booking.propertyName,
+        bookingId: booking.bookingId,
+        checkinDate: booking.checkinDate,
+        checkoutDate: booking.checkoutDate,
+        checkInTime: booking.checkInTime,
+        checkOutTime: booking.checkOutTime,
+        propertyAddress: booking.propertyAddress,
+        hostPhone,
+      }
+    : null;
+  const googleCalendarUrl = calendarEventArgs ? buildGoogleCalendarUrl(buildBookingCalendarEvent(calendarEventArgs)) : "";
   function downloadCalendar() {
-    if (!booking) return;
-    const formatIcsDate = (dateStr: string, timeStr: string) => {
-      // dateStr is YYYY-MM-DD, timeStr is HH:MM (24h IST)
-      const [y, m, d] = dateStr.split("-");
-      const [h, min] = timeStr.split(":");
-      // Store as floating time (no timezone conversion needed — IST local)
-      return `${y}${m}${d}T${h}${min}00`;
-    };
-    const cinIso = summaryDisplayDateToIso(booking.checkinDate);
-    const coutIso = summaryDisplayDateToIso(booking.checkoutDate);
-    const cinTime = listingTimeToIcsHHMM(booking.checkInTime, "14:00");
-    const coutTime = listingTimeToIcsHHMM(booking.checkOutTime, "12:00");
-    const checkin = formatIcsDate(cinIso, cinTime);
-    const checkout = formatIcsDate(coutIso, coutTime);
+    if (!booking || !calendarEventArgs) return;
     const uid = `atlas-booking-${booking.bookingId}@atlashomestays.com`; // eslint-disable-line atlas-brand/no-atlas-string-leak -- iCal UID domain, not user-visible
     const tenantName = brandName;
-    const ics = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      `PRODID:-//${tenantName}//BookingConfirmation//EN`,
-      "CALSCALE:GREGORIAN",
-      "METHOD:PUBLISH",
-      "BEGIN:VEVENT",
-      `UID:${uid}`,
-      `DTSTART:${checkin}`,
-      `DTEND:${checkout}`,
-      `SUMMARY:Check-in at ${booking.propertyName}`,
-      `DESCRIPTION:Booking #${booking.bookingId}. Host: ${hostPhone}. Check-out on ${booking.checkoutDate}.`,
-      `LOCATION:${booking.propertyAddress || booking.propertyName}`,
-      "STATUS:CONFIRMED",
-      "END:VEVENT",
-      "END:VCALENDAR",
-    ].join("\r\n");
+    const ics = buildBookingIcsContent({ ...calendarEventArgs, uid, prodName: tenantName });
 
     const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -649,6 +728,61 @@ export default function BookingConfirmationPage() {
     a.download = `atlas-booking-${booking.bookingId}.ics`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // TASK-102057: open a printable Stay Receipt in a new window.
+  // Renders from booking data already on screen — no second source of truth.
+  function openStayReceipt() {
+    if (!booking) return;
+    const args: StayGuidePrintArgs = {
+      bookingId: booking.bookingId,
+      guestName: booking.guestName,
+      propertyName: booking.propertyName,
+      listingName: booking.listingName,
+      checkinDate: booking.checkinDate,
+      checkoutDate: booking.checkoutDate,
+      nights: booking.nights,
+      propertyAddress: booking.propertyAddress,
+      propertyPhone: booking.propertyPhone,
+      checkInTime: booking.checkInTime,
+      checkOutTime: booking.checkOutTime,
+      brandName,
+      fallbackPhone: resolvedFallbackPhone,
+      fallbackEmail: supportEmail,
+      currency: booking.currency,
+      totalAmount: booking.totalAmount,
+      gstInvoiceNumber: booking.gstInvoiceNumber ?? null,
+    };
+    openPrintableHtml(buildReceiptHtml(args));
+  }
+
+  // TASK-102057: open a printable Stay Guide (check-in, WiFi, directions, host contacts).
+  function openStayGuide() {
+    if (!booking) return;
+    const args: StayGuidePrintArgs = {
+      bookingId: booking.bookingId,
+      guestName: booking.guestName,
+      propertyName: booking.propertyName,
+      listingName: booking.listingName,
+      checkinDate: booking.checkinDate,
+      checkoutDate: booking.checkoutDate,
+      nights: booking.nights,
+      propertyAddress: booking.propertyAddress,
+      propertyPhone: booking.propertyPhone,
+      checkInTime: booking.checkInTime,
+      checkOutTime: booking.checkOutTime,
+      wifiVisible: booking.wifiVisible,
+      wifiName: booking.wifiName,
+      wifiPassword: booking.wifiPassword,
+      checkinInstructions: booking.checkinInstructions,
+      brandName,
+      fallbackPhone: resolvedFallbackPhone,
+      fallbackEmail: supportEmail,
+      guidebookCheckoutChecklistText: booking.guidebookCheckoutChecklistText,
+      guidebookTrashParkingText: booking.guidebookTrashParkingText,
+      nearbyLandmarks: booking.nearbyLandmarks,
+    };
+    openPrintableHtml(buildStayGuideHtml(args));
   }
 
   function toBase64UrlUint8Array(base64String: string) {
@@ -1031,7 +1165,7 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {/* Documents: GST invoice + booking voucher grouped */}
+        {/* Documents: GST invoice + booking voucher + stay receipt + stay guide (TASK-102057) */}
         {!isCancelled && ((booking.hasGstInvoice && pdfUrl) || voucherUrl) && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-4">
             <h2 className="text-sm font-semibold text-text-primary">Documents</h2>
@@ -1080,6 +1214,38 @@ export default function BookingConfirmationPage() {
                 </a>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TASK-102057: in-portal Stay Receipt + Stay Guide. Always available for
+            non-cancelled bookings — built from the same data shown on screen so
+            the wording matches what the guest sees on screen. */}
+        {!isCancelled && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="stay-documents-section">
+            <h2 className="text-sm font-semibold text-text-primary">Stay documents</h2>
+            <p className="text-sm text-text-secondary">
+              Save a copy of your stay receipt or print a check-in guide with WiFi, directions and host contacts.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={openStayReceipt}
+                data-testid="download-receipt-btn"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
+                aria-label={`Download stay receipt for booking #${booking.bookingId}`}
+              >
+                🧾 Download Stay Receipt
+              </button>
+              <button
+                type="button"
+                onClick={openStayGuide}
+                data-testid="download-stay-guide-btn"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
+                aria-label={`Download printable stay guide for booking #${booking.bookingId}`}
+              >
+                🗺️ Download Stay Guide
+              </button>
+            </div>
           </div>
         )}
 
@@ -1488,19 +1654,32 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {/* Add to Calendar (TASK-333) */}
+        {/* Add to Calendar (TASK-333 .ics + TASK-102114 Google Calendar 1-click) */}
         {!isCancelled && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="confirmation-calendar-section">
             <h2 className="text-sm font-semibold text-text-primary">Add to your calendar</h2>
             <p className="text-sm text-text-secondary">Save your check-in date and property details to your phone calendar.</p>
-            <button
-              type="button"
-              onClick={downloadCalendar}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
-              aria-label="Download calendar event for your stay"
-            >
-              📅 Add to Calendar
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={googleCalendarUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="confirmation-add-google-calendar"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+                aria-label="Add your stay to Google Calendar"
+              >
+                🗓️ Add to Google Calendar
+              </a>
+              <button
+                type="button"
+                onClick={downloadCalendar}
+                data-testid="confirmation-download-ics"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+                aria-label="Download calendar file for Apple Calendar"
+              >
+                📅 Download .ics (Apple Calendar)
+              </button>
+            </div>
           </div>
         )}
 

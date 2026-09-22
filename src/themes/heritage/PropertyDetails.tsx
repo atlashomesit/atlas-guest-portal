@@ -49,6 +49,7 @@ import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
+import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
 import { buildGuestImageSrcSet, filterGuestImageUrls, GUEST_IMAGE_SRCSET_WIDTHS, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '@/utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '@/api/listingClient';
 import {
@@ -62,14 +63,18 @@ import SEO from '@/components/SEO';
 import StateMessage from '@/components/StateMessage';
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap';
 import SinglePinGoogleMap from '@/components/map/SinglePinGoogleMap';
+import EmbeddedListingMap from '@/components/map/EmbeddedListingMap';
 import { selectPropertyMapMode } from '@/components/homepage_components/homepage_Propertydetails/propertyMapMode';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '@/utils/guestHistory';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '@/components/apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
+import ListingWhatsAppFloat from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
+import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
+import LocalGuideAccordion from '@/components/homepage_components/homepage_Propertydetails/LocalGuideAccordion'; // TASK-102117
 import type { BookingStickySummary } from '@/components/availability/UnitBookingWidget';
 
 const UnitBookingWidget = lazy(() => import('@/components/availability/UnitBookingWidget'));
@@ -324,8 +329,8 @@ interface Property {
     maxGuests?: number;
     maxCapacity?: number;
     /** G3-002: from API listing when available */
-    checkInTime?: string;
-    checkOutTime?: string;
+    checkInTime?: string | null;
+    checkOutTime?: string | null;
     /** TASK-1676: nested policy times from listing DTO when present */
     unitPolicy?: { checkInTime?: string | null; checkOutTime?: string | null };
     /** AMN-001: amenity codes from API (e.g. ["wifi","ac","parking"]) */
@@ -533,7 +538,7 @@ const PropertyDetails = () => {
     const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
     // TASK-2739-v1: "Draft" | "Published" (undefined on legacy payloads = treated as live).
     const [publishStatus, setPublishStatus] = useState<string | undefined>(undefined);
-    const [, setListingLookupError] = useState<string | null>(null);
+    const [listingLookupError, setListingLookupError] = useState<string | null>(null);
     const [isListingLookupPending, setIsListingLookupPending] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const amenitiesModalRef = useFocusTrap<HTMLDivElement>(showAmenitiesModal);
@@ -548,6 +553,10 @@ const PropertyDetails = () => {
     }, [showAmenitiesModal]);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
+    /** TASK-102112: guest review star filter (null = All) + sort. Pure client-side —
+        filtering/sorting re-renders the already-fetched cards instantly, no reload. */
+    const [reviewStarFilter, setReviewStarFilter] = useState<number | null>(null);
+    const [reviewSort, setReviewSort] = useState<ReviewSortKey>('recent');
     const [stickyBookingSummary, setStickyBookingSummary] = useState<BookingStickySummary | null>(null);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
@@ -559,7 +568,15 @@ const PropertyDetails = () => {
         if (!hasSearchParams) return null;
         return `/search?${searchParams.toString()}`;
     }, [searchParams]);
-    const showAvailabilityPlaceholder = false;
+    // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
+    // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
+    // never render, silently masking the degraded-state UI for a failed listing lookup (the
+    // lookup error string was set via setListingLookupError but destructured away and never
+    // rendered, while resolvedListingId stayed null so the AvailabilityCalendar never mounted
+    // and the UnitBookingWidget fail-OPENED an all-available calendar). Wire the panel to the
+    // real lookup-failure state instead: no resolved id, lookup settled, and an error recorded.
+    const showAvailabilityPlaceholder =
+      !resolvedListingId && !isListingLookupPending && listingLookupError != null;
     const [fav, setFav] = useState(false);
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
     /** TASK-1726: host response time badge text (e.g. "Replies in <1h"). */
@@ -888,6 +905,13 @@ const PropertyDetails = () => {
         return () => ac.abort();
     }, [resolvedListingId]);
 
+    // TASK-102112: reset the guest review filter/sort when the listing changes so a stale
+    // pill cannot blank a newly-loaded review set.
+    useEffect(() => {
+        setReviewStarFilter(null);
+        setReviewSort('recent');
+    }, [resolvedListingId]);
+
     useEffect(() => {
         setNotFound(false);
         setLoadFailed(false); // TASK-7195: clear the failure state on every re-resolve, like notFound.
@@ -1072,18 +1096,16 @@ const PropertyDetails = () => {
                         const psFallback = (apiListing as Record<string, unknown>).publishStatus;
                         if (typeof psFallback === 'string') setPublishStatus(psFallback);
                     }
-                    const rawAddr =
-                        (apiListing as Record<string, unknown>).propertyAddress ??
-                        (apiListing as Record<string, unknown>).property_address;
-                    const streetFromApi =
-                        typeof rawAddr === 'string' && rawAddr.trim() ? rawAddr.trim() : null;
                     const listingNumericId = Number(apiListing.id) || listingId;
+                    const resolvedListingAddress = resolveEffectiveListingAddress(
+                        apiListing as Record<string, unknown>,
+                    );
                     const mapped: Property = {
                         id: listingNumericId,
                         listingId: listingNumericId,
                         property_name: (apiListing.name as string) ?? `Listing ${apiListing.id}`,
                         property_img: photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
-                        property_location: (apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified',
+                        property_location: resolvedListingAddress ?? ((apiListing as Record<string, unknown>).property_location as string ?? 'Location not specified'),
                         property_neighborhoods: Array.isArray((apiListing as Record<string, unknown>).property_neighborhoods) ? (apiListing as Record<string, unknown>).property_neighborhoods as string[] : [],
                         property_amenities: Array.isArray((apiListing as Record<string, unknown>).property_amenities) ? (apiListing as Record<string, unknown>).property_amenities as PropertyAmenity[] : [],
                         property_description: (apiListing as Record<string, unknown>).property_description as string ?? '',
@@ -1096,8 +1118,8 @@ const PropertyDetails = () => {
                         property_price: Number(apiListing.baseNightlyRate ?? (apiListing as Record<string, unknown>).property_price) || 0,
                         timezoneId: (apiListing as Record<string, unknown>).timezoneId as string | undefined,
                         maxGuests: parseMaxGuestsFromPayload(apiListing as Record<string, unknown>),
-                        checkInTime: pub.checkInTime?.trim() || undefined,
-                        checkOutTime: pub.checkOutTime?.trim() || undefined,
+                        checkInTime: pub.checkInTime?.trim() || (typeof (apiListing as Record<string, unknown>).checkInTime === 'string' ? ((apiListing as Record<string, unknown>).checkInTime as string).trim() : undefined) || (typeof (apiListing as Record<string, unknown>).CheckInTime === 'string' ? ((apiListing as Record<string, unknown>).CheckInTime as string).trim() : undefined) || undefined,
+                        checkOutTime: pub.checkOutTime?.trim() || (typeof (apiListing as Record<string, unknown>).checkOutTime === 'string' ? ((apiListing as Record<string, unknown>).checkOutTime as string).trim() : undefined) || (typeof (apiListing as Record<string, unknown>).CheckOutTime === 'string' ? ((apiListing as Record<string, unknown>).CheckOutTime as string).trim() : undefined) || undefined,
                         unitPolicy: (() => {
                           const raw = (apiListing as Record<string, unknown>).unitPolicy;
                           if (!raw || typeof raw !== "object") return undefined;
@@ -1129,11 +1151,7 @@ const PropertyDetails = () => {
                             }
                             return undefined;
                         })(),
-                        propertyAddress:
-                            streetFromApi ??
-                            (typeof pub.propertyAddress === 'string' && pub.propertyAddress.trim()
-                                ? pub.propertyAddress.trim()
-                                : null),
+                        propertyAddress: resolvedListingAddress,
                         virtualTourUrl: (() => {
                             const raw = (apiListing as Record<string, unknown>).virtualTourUrl;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
@@ -1450,9 +1468,15 @@ useEffect(() => {
     const property = data;
 
     const resolvedCheckInTime =
-      property.checkInTime?.trim() || property.unitPolicy?.checkInTime?.trim() || null;
+      property.checkInTime?.trim() ||
+      property.unitPolicy?.checkInTime?.trim() ||
+      ((property as unknown as Record<string, unknown>).listing as Record<string, unknown> | undefined)?.checkInTime?.toString()?.trim() ||
+      null;
     const resolvedCheckOutTime =
-      data?.checkOutTime?.trim() || data?.unitPolicy?.checkOutTime?.trim() || null;
+      data?.checkOutTime?.trim() ||
+      data?.unitPolicy?.checkOutTime?.trim() ||
+      ((data as unknown as Record<string, unknown>).listing as Record<string, unknown> | undefined)?.checkOutTime?.toString()?.trim() ||
+      null;
     const cancellationPolicyText = (() => {
         const policies = data?.property_policy_details ?? [];
         const fromListingPolicy = policies.find((p) =>
@@ -1569,8 +1593,15 @@ useEffect(() => {
     const ppHasApiReviews = Boolean(
         ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
     );
+    /** TASK-102112: pill counts + the filtered/sorted review set (instant, client-side). */
+    const ppReviewFilterCounts = {
+        all: ppMergedReviews.length,
+        five: ppMergedReviews.filter((r) => Number(r.rating) === 5).length,
+        four: ppMergedReviews.filter((r) => Number(r.rating) === 4).length,
+    };
+    const ppFilteredSortedReviews = applyReviewFilterSort(ppMergedReviews, { starFilter: reviewStarFilter, sort: reviewSort });
     const ppDisplayedReviews = ppHasApiReviews
-        ? (showAllReviews ? ppMergedReviews : ppMergedReviews.slice(0, 6))
+        ? (showAllReviews ? ppFilteredSortedReviews : ppFilteredSortedReviews.slice(0, 6))
         : [];
     const ppAmenityDisplay = ppAmenityLabels.slice(0, 12);
     const ppAmenityCodes = data.amenityCodes && data.amenityCodes.length > 0
@@ -1854,12 +1885,17 @@ useEffect(() => {
                 <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0e6dc' }}>
                   {(() => {
                     // Task 3: property's own coords win over custom embed / multi-pin / tenant default.
+                    const propertyAddressStr = typeof data.propertyAddress === 'string' ? data.propertyAddress :
+                      typeof data.property_address === 'string' ? data.property_address :
+                      typeof data.property_location === 'string' ? data.property_location : null;
+
                     const mapSelection = selectPropertyMapMode({
                       latitude: data.latitude,
                       longitude: data.longitude,
                       mapSrc: mapSrcTrimmed,
                       useMultiPin,
                       mapLocation,
+                      address: propertyAddressStr,
                     });
                     switch (mapSelection.kind) {
                       case 'coords':
@@ -1869,6 +1905,15 @@ useEffect(() => {
                             lng={mapSelection.lng}
                             zoom={15}
                             markerTitle={data.property_name}
+                          />
+                        );
+                      case 'address':
+                        return (
+                          <EmbeddedListingMap
+                            address={mapSelection.address}
+                            label={data.property_name}
+                            zoom={15}
+                            height={300}
                           />
                         );
                       case 'iframe':
@@ -2230,6 +2275,16 @@ useEffect(() => {
                           <Suspense fallback={null}>
                             <ReviewSummary listingId={Number(resolvedListingId ?? NaN)} />
                           </Suspense>
+                          {/* TASK-102112: star filter pills + Most Recent / Highest Rated sort (instant, client-side) */}
+                          <ReviewFilterSortControls
+                            starFilter={reviewStarFilter}
+                            sort={reviewSort}
+                            onStarFilterChange={(f) => { setReviewStarFilter(f); setShowAllReviews(false); }}
+                            onSortChange={setReviewSort}
+                            counts={ppReviewFilterCounts}
+                          />
+                          {ppFilteredSortedReviews.length > 0 ? (
+                          <>
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
@@ -2280,7 +2335,7 @@ useEffect(() => {
                               </article>
                             ))}
                           </div>
-                          {api.reviews.length > 6 && (
+                          {ppFilteredSortedReviews.length > 6 && (
                             <button
                               type="button"
                               onClick={() => setShowAllReviews((s) => !s)}
@@ -2290,9 +2345,23 @@ useEffect(() => {
                             >
                               {showAllReviews
                                 ? 'Show fewer reviews'
-                                : `View all ${api.totalCount} reviews`}
+                                : `View all ${ppFilteredSortedReviews.length} reviews`}
                               <PpChevronDown size={14} />
                             </button>
+                          )}
+                          </>
+                          ) : (
+                            <p data-testid="reviews-empty-filter" style={{ fontSize: 14, color: '#475569', fontStyle: 'italic' }}>
+                              No {reviewStarFilter}-star reviews yet.{' '}
+                              <button
+                                type="button"
+                                onClick={() => setReviewStarFilter(null)}
+                                className="pp-prose-more"
+                                style={{ display: 'inline' }}
+                              >
+                                Clear filter
+                              </button>
+                            </p>
                           )}
                         </>
                       ) : (
@@ -2411,22 +2480,10 @@ useEffect(() => {
                   );
                 })()}
 
-                {/* Nearby places — standalone section (map promoted to upper-third in v2) */}
-                {(data.property_nearplaces || []).length > 0 && (
-                  <section className="pp-section" aria-label="Nearby places">
-                    <div className="pp-section-head">
-                      <h2>Nearby places</h2>
-                    </div>
-                    <div className="pp-nearby">
-                      {data.property_nearplaces!.slice(0, 9).map((place, idx) => (
-                        <div key={`place-${idx}`} className="pp-nearby-item">
-                          <b>{place}</b>
-                          <span>Nearby</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                {/* TASK-102117: Explore the Neighborhood — categorized accordion over
+                    the listing's own `property_nearplaces` strings (distances render
+                    only when embedded in the source entry; section omitted when empty). */}
+                <LocalGuideAccordion places={data.property_nearplaces} />
 
               </div>
               {/* ===== END LEFT COLUMN ===== */}
@@ -2473,6 +2530,10 @@ useEffect(() => {
                         maxGuests={data.maxGuests}
                         propertySlug={propertySlugParam}
                         unitSlug={unitSlugParam}
+                        // TASK-102485: tell the widget the listing lookup FAILED (vs still
+                        // resolving) so that with listingId undefined it fail-closes with the
+                        // availability error + retry UI instead of an all-available calendar.
+                        lookupFailed={!resolvedListingId && !isListingLookupPending && listingLookupError != null}
                         reviewRating={ppHasApiReviews ? ppCombinedAverageRating : undefined}
                         reviewCount={ppHasApiReviews ? ppCombinedReviewCount : undefined}
                         minStayNights={
@@ -2595,7 +2656,7 @@ useEffect(() => {
                 )}
 
                 {showAvailabilityPlaceholder && (
-                  <div style={{ borderRadius: 18, border: '1px solid #f0e6dc', background: '#fff', padding: 24, marginTop: 16 }}>
+                  <div data-testid="availability-lookup-fallback" style={{ borderRadius: 18, border: '1px solid #f0e6dc', background: '#fff', padding: 24, marginTop: 16 }}>
                     <h3 style={{ fontSize: 18, fontWeight: 600, color: '#1a1a2e', marginBottom: 8 }}>Check Availability</h3>
                     <p style={{ fontSize: 14, color: '#64748b', marginBottom: 16 }}>
                       Availability check is currently unavailable. Please try again later.
@@ -2708,6 +2769,16 @@ useEffect(() => {
         <Suspense fallback={null}>
           <GuestAssistant listingId={resolvedListingId ?? data.listingId ?? null} />
         </Suspense>
+
+        {/* TASK-102116: floating "Chat with Host on WhatsApp" bubble with pre-filled
+            room query. Phone comes from the listing/tenant data already on this page
+            (ppHostPhone) — the bubble hides itself when no host number is available. */}
+        <ListingWhatsAppFloat
+          listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
+          phoneDigits={ppHostPhone}
+          brandName={ppBrandName}
+          listingId={resolvedListingId ?? data.listingId ?? null}
+        />
         </>
     );
 };

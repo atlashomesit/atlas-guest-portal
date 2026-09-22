@@ -7,12 +7,13 @@ import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getListingDisplayName } from "../lib/listingDisplayName";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { parseDate } from "../utils/formatting";
-import { toISODate } from "../utils/dateRange";
+import { toCalendarISO } from "../utils/date";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding, getTenantListingAddress } from "../tenant/tenantOverrides";
+import { resolveEffectiveListingAddress } from "../utils/listingAddress";
 import { LoadingState } from "../components/LoadingState";
 import ErrorBanner from "../components/ErrorBanner"; // TASK-7195
 import SEO from "../components/SEO"; // TASK-4290
@@ -156,7 +157,7 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
       );
 
       const overrides = getTenantOverrides(getTenantContext()?.slug);
-      const unitAddress = getTenantListingAddress(overrides, l.id) ?? l.propertyAddress ?? "";
+      const unitAddress = resolveEffectiveListingAddress(l, getTenantListingAddress(overrides, l.id)) ?? "";
 
       return {
         id: `api-${l.id}`,
@@ -524,10 +525,10 @@ const SearchPage = () => {
       setDateAvailLoading(false);
       return;
     }
-    // IST calendar day (toISODate) — checkIn/checkOut round-trip a UTC-midnight ISO param today,
-    // but toISODate keeps them correct if the source ever becomes a local Date (ADR-0077).
-    const startStr = toISODate(checkIn);
-    const endStr = toISODate(checkOut);
+    // IST calendar day (toCalendarISO) — checkIn/checkOut round-trip a UTC-midnight ISO param today,
+    // but toCalendarISO keeps them correct if the source ever becomes a local Date (ADR-0077).
+    const startStr = toCalendarISO(checkIn);
+    const endStr = toCalendarISO(checkOut);
     const cacheKey = `${startStr}|${endStr}`;
     if (dateAvailCacheRef.current.has(cacheKey)) {
       setDateAvailableIds(new Set(dateAvailCacheRef.current.get(cacheKey)!));
@@ -1038,6 +1039,26 @@ const SearchPage = () => {
             price inputs. Capping max-height cannot fix this — see search-page.css. */}
         <div className="search-filters">
           <div className="search-filters__row search-filters__row--fields">
+            <div className="search-filters__field">
+              <label htmlFor="filter-checkin">Check-in</label>
+              <input
+                id="filter-checkin"
+                type="date"
+                min={new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date())}
+                value={checkInParam ?? ""}
+                onChange={(e) => updateParam("checkIn", e.target.value)}
+              />
+            </div>
+            <div className="search-filters__field">
+              <label htmlFor="filter-checkout">Check-out</label>
+              <input
+                id="filter-checkout"
+                type="date"
+                min={checkInParam || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date())}
+                value={checkOutParam ?? ""}
+                onChange={(e) => updateParam("checkOut", e.target.value)}
+              />
+            </div>
             <div className="search-filters__field">
               <label htmlFor="filter-min-price">Min price / night</label>
               <input

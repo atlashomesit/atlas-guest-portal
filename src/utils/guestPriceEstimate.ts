@@ -32,13 +32,12 @@ export const ACCOMMODATION_GST_EXEMPT_THRESHOLD_INR = 1000;
  * does not exist for that stay. It has been deleted rather than fixed-in-place, specifically
  * because two near-identically-named helpers where only one is correct is itself the hazard — do
  * not reintroduce a second slab helper; add new bands to this one.
- *
- * KEEP THIS IN SYNC with `GstInvoiceConstants.cs` if that table ever changes — nothing enforces
- * the two stay aligned automatically; this comment is the enforcement.
+ * KEEP THIS IN SYNC with `GstInvoiceCalculation.ResolveAccommodationGstRate` (TASK-101988) —
+ * exempt band is strictly below ₹1,000 (< 1000). Exactly ₹1,000 is 5%.
  */
 export function accommodationGstSlabPercentForChargedRate(chargedPerNight: number): number | null {
   if (chargedPerNight <= 0) return null;
-  if (chargedPerNight <= ACCOMMODATION_GST_EXEMPT_THRESHOLD_INR) return 0;
+  if (chargedPerNight < ACCOMMODATION_GST_EXEMPT_THRESHOLD_INR) return 0;
   return chargedPerNight <= ACCOMMODATION_GST_THRESHOLD_INR ? 5 : 18;
 }
 
@@ -110,45 +109,20 @@ export function computeCheckoutTotal(input: CheckoutTotalInput): CheckoutTotalBr
     referralDiscountAmount,
   } = input;
 
-  // TASK-4421: global discount applies before GST; per-night slab decision uses the post-discount base.
+  // TASK-4421: global discount applies before fee; per-night uses the post-discount base.
   const discountedSubtotal = Math.max(0, baseAmount - globalDiscountAmount);
   const perNight = nights > 0 ? Math.round(discountedSubtotal / nights) : 0;
   const touristTaxAmount = Math.max(0, Number(touristTaxInput) || 0);
 
-  // TASK-8294: this is a client-side fallback (used only when no server finalAmount is available)
-  // — the same category of fallback as UnitBookingWidget's, so it must use the exempt-aware
-  // three-band function too; otherwise a sub-₹1,000/night stay's GST% label would disagree with
-  // the (already-fixed) ₹0 line amount computed below.
-  const clientSlabPercent = accommodationGstSlabPercentForChargedRate(perNight);
-  const clientGstLineAmount =
-    clientSlabPercent != null && discountedSubtotal > 0
-      ? accommodationGstLineAmount(discountedSubtotal, perNight)
-      : 0;
+  // TASK-102037 (ADR-0107): Zero GST added on top at guest checkout time.
+  const gstLineAmount = 0;
+  const gstSlabPercent = null;
 
   const hasServerFinal = typeof serverFinalAmount === 'number' && serverFinalAmount > 0;
 
-  // Back the GST line out of the authoritative finalAmount so
-  // base + GST + convenience fee + tourist tax == finalAmount.
-  // Guard the legacy path (TASK-4286) where convenienceFeeAmount is a client fallback not baked into
-  // finalAmount, which would make the backed-out GST negative — there, keep the client slab estimate for
-  // the line while the total still prefers finalAmount.
-  // TASK-5185: subtract tourist tax before attributing the remainder to GST (else Goa 5%+5% shows as "GST 10%").
-  const derivedGst = hasServerFinal
-    ? Math.round(
-        (serverFinalAmount as number) - discountedSubtotal - convenienceFeeAmount - touristTaxAmount,
-      )
-    : null;
-  const useServerGst = derivedGst != null && derivedGst >= 0;
-
-  const gstLineAmount = useServerGst ? (derivedGst as number) : clientGstLineAmount;
-  const gstSlabPercent =
-    useServerGst && discountedSubtotal > 0 && gstLineAmount > 0
-      ? Math.round((gstLineAmount / discountedSubtotal) * 100)
-      : clientSlabPercent;
-
   const baseStayTotal = hasServerFinal
     ? (serverFinalAmount as number)
-    : discountedSubtotal + clientGstLineAmount + convenienceFeeAmount + touristTaxAmount;
+    : discountedSubtotal + convenienceFeeAmount + touristTaxAmount;
 
   const displayTotal = Math.max(
     1,
@@ -173,41 +147,43 @@ export function estimateStayNights(checkIn: Date | null, checkOut: Date | null):
 }
 
 /**
- * TASK-4832: single source of truth for the guest est-total number.
- * Room fare × nights, plus slab GST (skipped when the host isn't GST-registered),
- * plus the payment-processing fee — the exact amount rendered both in the collapsed
- * estimate line and the expanded "See total" figure, so a card toggle never shows
- * two different money totals.
- *
- * TASK-7543: `perNight` is the rate the guest actually pays (post-discount) and is what the fare,
- * the GST *band*, and the fee are all computed from — matching
- * `GstInvoiceCalculation.ResolveCheckoutAccommodationGstPercentForChargedBase`, which now bands
- * off that same charged value. `chargedPerNight` defaults to `perNight` and should be left at its
- * default for nearly every caller; only pass something else when you have an independent,
- * already-REAL (never published/sticker) per-night figure to bias the band toward — e.g.
- * RecentlyViewedPage.tsx compares today's live price against a previously-viewed price. Never pass
- * a pre-discount published rate here — that was the TASK-7011-era convention; TASK-7540 fixed the
- * last callers still doing it (see `accommodationGstSlabPercentForChargedRate`'s doc comment).
+ * TASK-102037 (ADR-0107): single source of truth for the guest est-total number.
+ * Zero GST added on top at checkout time.
+ * Room fare × nights, plus the payment-processing fee.
  */
+export function estTotal(
+  perNight: number,
+  nights: number,
+  convenienceFeePercent: number = 3,
+): number {
+  const stayNights = Math.max(1, nights);
+  const baseTotal = perNight * stayNights;
+  const convenienceFee = Math.round((baseTotal * convenienceFeePercent) / 100);
+  return Math.round(baseTotal + convenienceFee);
+}
+
+export function formatEstTotal(
+  perNight: number,
+  nights: number,
+  formatCurrency: (amount: number, options?: { maximumFractionDigits?: number }) => string,
+  convenienceFeePercent: number = 3,
+): string {
+  const stayNights = Math.max(1, nights);
+  const total = estTotal(perNight, stayNights, convenienceFeePercent);
+  const nightLabel = stayNights === 1 ? '1 night' : `${stayNights} nights`;
+  const feeLabel = convenienceFeePercent > 0 ? `${convenienceFeePercent}% payment processing ` : '';
+  return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${feeLabel}(${nightLabel})`.trim();
+}
+
+/** Legacy aliases retained for zero-GST compatibility (ADR-0107) */
 export function estTotalInclGst(
   perNight: number,
   nights: number,
   convenienceFeePercent: number = 3,
-  isGstRegistered: boolean = true, // TASK-4312: respect listing's GST registration status
-  chargedPerNight: number = perNight,
+  _isGstRegistered: boolean = true,
+  _chargedPerNight: number = perNight,
 ): number {
-  const stayNights = Math.max(1, nights);
-  // TASK-4312: if listing is not GST-registered, no GST is charged; otherwise apply slab rate.
-  // TASK-7543: slab is selected off the CHARGED (post-discount) rate, matching the server — see
-  // accommodationGstSlabPercentForChargedRate's doc comment.
-  const gstPct = isGstRegistered ? (accommodationGstSlabPercentForChargedRate(chargedPerNight) ?? 5) : 0;
-  const gstMult = gstPct === 18 ? 1.18 : gstPct === 5 ? 1.05 : 1.0;
-  const baseTotal = perNight * stayNights;
-  const withGst = Math.round(baseTotal * gstMult);
-  // TASK-4302 / TASK-4312: include payment processing fee in the displayed total.
-  // TASK-4913 (founder-ruled 2026-07-17, option c): fee is 3% of BASE only, not base+GST.
-  const convenienceFee = Math.round((baseTotal * convenienceFeePercent) / 100);
-  return Math.round(withGst + convenienceFee);
+  return estTotal(perNight, nights, convenienceFeePercent);
 }
 
 export function formatEstTotalInclGst(
@@ -215,13 +191,8 @@ export function formatEstTotalInclGst(
   nights: number,
   formatCurrency: (amount: number, options?: { maximumFractionDigits?: number }) => string,
   convenienceFeePercent: number = 3,
-  isGstRegistered: boolean = true, // TASK-4312: respect listing's GST registration status
-  chargedPerNight: number = perNight, // TASK-7543: see estTotalInclGst's doc comment
+  _isGstRegistered: boolean = true,
+  _chargedPerNight: number = perNight,
 ): string {
-  const stayNights = Math.max(1, nights);
-  const gstPct = isGstRegistered ? (accommodationGstSlabPercentForChargedRate(chargedPerNight) ?? 5) : 0;
-  const total = estTotalInclGst(perNight, stayNights, convenienceFeePercent, isGstRegistered, chargedPerNight);
-  const nightLabel = stayNights === 1 ? '1 night' : `${stayNights} nights`;
-  const gstLabel = gstPct > 0 ? `incl. ${gstPct}% GST + ` : '';
-  return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${gstLabel}3% payment processing (${nightLabel})`;
+  return formatEstTotal(perNight, nights, formatCurrency, convenienceFeePercent);
 }
