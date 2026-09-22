@@ -134,6 +134,10 @@ describe('AtlasDateRangePicker — completing a range in two clicks', () => {
   });
 
   // A third click starts a new stay rather than extending the finished one.
+  // TASK-102076: the new check-in (May 26) invalidates the held check-out
+  // (May 23), so check-out auto-advances to check-in + 1 night instead of being
+  // cleared — still a new stay, held on step 2 with no error, so the guest
+  // picks their real check-out next.
   it('starts over from a completed range', () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
@@ -144,7 +148,8 @@ describe('AtlasDateRangePicker — completing a range in two clicks', () => {
 
     const last = onChange.mock.calls.at(-1)![0] as AtlasDateRangePickerValue;
     expect(isoOf(last.startDate)).toBe('2026-05-26');
-    expect(last.endDate).toBeNull();
+    expect(isoOf(last.endDate)).toBe('2026-05-27');
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByText('Step 2: Select your check-out date')).toBeInTheDocument();
   });
 });

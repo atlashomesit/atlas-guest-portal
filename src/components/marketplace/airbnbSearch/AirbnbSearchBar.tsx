@@ -394,6 +394,15 @@ export default function AirbnbSearchBar() {
             shownDate={dateRange.startDate ?? today}
             onShownDateChange={(d) => setDateRange((r) => ({ ...r, startDate: r.startDate ?? startOfMonth(d) }))}
             activeField={activeDateField}
+            // TASK-102076: same keep-open contract as SearchAvailabilityWidget —
+            // the picker's check-out auto-advance holds step 2, so stay open with
+            // focus on check-out instead of dropping the guest mid-flow.
+            onActiveFieldChange={(field) => {
+              setActiveDateField(field);
+              if (field === 'checkout') {
+                setIsCalendarOpen(true);
+              }
+            }}
           />
         </div>
 

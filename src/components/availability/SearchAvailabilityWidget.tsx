@@ -646,6 +646,19 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           rangeColors={[dateError ? 'var(--support-error)' : 'var(--cta-primary)']}
           loading={!calendarReady}
           activeField={activeField}
+          // TASK-102076: the picker auto-advances an invalidated check-out to
+          // check-in + 1 night and holds step 2. handleRangeChange above closes
+          // the calendar on every complete range, so without this the guest
+          // would be dropped out of the flow just when they must pick their
+          // real check-out. Re-opening here batches with that close in the same
+          // tick, so the calendar stays open with focus on check-out; genuine
+          // guest completions never emit this and still close as before.
+          onActiveFieldChange={(field) => {
+            setActiveField(field);
+            if (field === 'checkout') {
+              setIsCalendarOpen(true);
+            }
+          }}
           dayContentRenderer={(day) => {
             const checkIn = dateRange.startDate ? startOfCalendarDay(dateRange.startDate) : null;
             const checkOut = dateRange.endDate ? startOfCalendarDay(dateRange.endDate) : null;
