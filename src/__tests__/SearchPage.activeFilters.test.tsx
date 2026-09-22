@@ -60,4 +60,29 @@ describe('SearchPage — active filter chips (TASK-1456)', () => {
     });
     expect(screen.getByTestId('search-active-filter-chips')).not.toHaveTextContent('WiFi');
   });
+
+  it('TASK-102077: one click on "Clear filters" resets every filter and removes the badge', async () => {
+    render(
+      <CurrencyProvider>
+        <MemoryRouter initialEntries={['/search?minPrice=1000&guests=2&amenities=WiFi']}>
+          <SearchPage />
+        </MemoryRouter>
+      </CurrencyProvider>,
+    );
+
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
+      },
+      { timeout: 15_000 },
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^clear filters$/i }));
+
+    // Single click clears all: badge + chip strip disappear together.
+    await waitFor(() => {
+      expect(screen.queryByTestId('search-active-filter-badge')).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('search-active-filter-chips')).not.toBeInTheDocument();
+  });
 });
