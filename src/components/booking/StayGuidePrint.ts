@@ -103,7 +103,10 @@ function printBtnHtml(): string {
  */
 export function buildReceiptHtml(args: StayGuidePrintArgs): string {
   const currency = args.currency ?? "INR";
-  const total = Number.isFinite(args.totalAmount) ? args.totalAmount : 0;
+  // `Number.isFinite` takes `unknown` and returns a plain `boolean` (not a `value is number`
+  // type predicate), so it does not narrow `args.totalAmount` here — add an explicit `typeof`
+  // check so TS can see `total` is a `number`, same runtime behavior as before.
+  const total = typeof args.totalAmount === "number" && Number.isFinite(args.totalAmount) ? args.totalAmount : 0;
   const totalLine = `<div class="row">
       <span class="label">Total paid (incl. GST)</span>
       <span class="value" style="font-weight:700;font-size:16px;">${esc(formatCurrency(total, { currency }))}</span>

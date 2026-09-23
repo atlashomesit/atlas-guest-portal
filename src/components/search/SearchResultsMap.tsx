@@ -24,7 +24,14 @@ export type SearchMapUnit = {
 };
 
 function resolvePosition(u: SearchMapUnit): LatLngExpression | null {
-  if (hasMapCoords(u.latitude, u.longitude)) return [u.latitude, u.longitude];
+  // `hasMapCoords` returns a plain `boolean`, not a type predicate, so it doesn't narrow
+  // `u.latitude`/`u.longitude` from `number | null` to `number`. Destructure to locals and
+  // add explicit non-null checks (guaranteed true whenever hasMapCoords is true) so TS can
+  // see the tuple below is `[number, number]`.
+  const { latitude, longitude } = u;
+  if (latitude != null && longitude != null && hasMapCoords(latitude, longitude)) {
+    return [latitude, longitude];
+  }
   const fb = fallbackCoordsForListing(u.numericId, u.city);
   return fb ? [fb.lat, fb.lng] : null;
 }

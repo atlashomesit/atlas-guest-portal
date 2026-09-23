@@ -21,6 +21,12 @@ interface CheckinDetails {
   emergencyContactPhone: string;
   doorCode: string;
   idUploadRequired: boolean;
+  /**
+   * ISO-8601 UTC timestamp (from atlas-api `SelfCheckinDetailsDto.HouseRulesSignedAt`, a
+   * `DateTime?` serialized by `UtcIsoNullableDateTimeJsonConverter`) once the guest has accepted
+   * house rules; null until then. Lets a resumed self check-in skip re-showing the checkbox.
+   */
+  houseRulesSignedAt?: string | null;
   guestCount?: number | null;
   guestName?: string | null;
   // TASK-4510: Digital Guest Guidebook
