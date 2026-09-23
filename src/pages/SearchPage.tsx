@@ -107,7 +107,9 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
       if (!Number.isFinite(id) || id <= 0) return null;
       const propertySlug = getPropertySlug(property);
       const canonicalPath = buildHomeUnitPath(propertySlug, id);
-      const pin = fallbackCoordsForListing(id);
+      // TASK-102490: city-aware fallback — null when the city is unrecognised, so a
+      // non-Hyderabad static listing never renders a fake Hyderabad pin.
+      const pin = fallbackCoordsForListing(id, property.property_location ?? null);
       // TASK-10086: derive step-free declarations from static amenity icons (exact codes only).
       const staticAccessibility = getAccessibilityDeclarations(
         (property.property_amenities ?? []).map((a) => a?.amenities_icon ?? ""),
@@ -127,8 +129,8 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         property,
         rating: property.property_rating ?? undefined,
         reviewCount: (property as unknown as { property_reviews?: number }).property_reviews ?? null,
-        latitude: pin.lat,
-        longitude: pin.lng,
+        latitude: pin?.lat ?? null,
+        longitude: pin?.lng ?? null,
         accessibilityFeatures: staticAccessibility,
         accessibilityUnknown: staticAccessibility.length === 0,
       };
@@ -926,14 +928,17 @@ const SearchPage = () => {
         const exact = hasMapCoords(u.latitude, u.longitude);
         const pin = exact
           ? { lat: u.latitude as number, lng: u.longitude as number }
-          : fallbackCoordsForListing(u.numericId);
+          : fallbackCoordsForListing(u.numericId, u.location);
         return {
           numericId: u.numericId,
           title: u.title,
           pricePerNight: u.pricePerNight,
           canonicalPath: u.canonicalPath,
-          latitude: pin.lat,
-          longitude: pin.lng,
+          // TASK-102490: null = unplaceable (no API coords, unrecognised city);
+          // SearchResultsMap drops these instead of pinning fake Hyderabad.
+          latitude: pin?.lat ?? null,
+          longitude: pin?.lng ?? null,
+          city: u.location,
         };
       }),
     [sortedUnits],

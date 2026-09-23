@@ -17,14 +17,16 @@ export type SearchMapUnit = {
   title: string;
   pricePerNight: number;
   canonicalPath: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
+  /** TASK-102490: listing city for the coordinate fallback — no city, no fake pin. */
+  city?: string | null;
 };
 
-function resolvePosition(u: SearchMapUnit): LatLngExpression {
+function resolvePosition(u: SearchMapUnit): LatLngExpression | null {
   if (hasMapCoords(u.latitude, u.longitude)) return [u.latitude, u.longitude];
-  const fb = fallbackCoordsForListing(u.numericId);
-  return [fb.lat, fb.lng];
+  const fb = fallbackCoordsForListing(u.numericId, u.city);
+  return fb ? [fb.lat, fb.lng] : null;
 }
 
 function usedApiCoords(u: SearchMapUnit): boolean {
@@ -76,7 +78,16 @@ const MAX_MARKERS = 100;
  */
 export default function SearchResultsMap({ units, formatPrice, querySuffix }: SearchResultsMapProps) {
   const capped = useMemo(() => units.slice(0, MAX_MARKERS), [units]);
-  const positions = useMemo(() => capped.map((u) => resolvePosition(u)), [capped]);
+  // TASK-102490: units with neither API coords nor a recognised fallback city render
+  // NO pin rather than a fake Hyderabad pin.
+  const placed = useMemo(
+    () =>
+      capped
+        .map((u) => ({ unit: u, position: resolvePosition(u) }))
+        .filter((x): x is { unit: SearchMapUnit; position: LatLngExpression } => x.position !== null),
+    [capped],
+  );
+  const positions = useMemo(() => placed.map((x) => x.position), [placed]);
   const withApiCoords = useMemo(() => capped.filter(usedApiCoords).length, [capped]);
   const center: LatLngExpression = [HYDERABAD_CENTER.lat, HYDERABAD_CENTER.lng];
   const unitNoun = getUnitNoun(getTenantOverrides(getTenantContext()?.slug));
@@ -87,7 +98,7 @@ export default function SearchResultsMap({ units, formatPrice, querySuffix }: Se
       {withApiCoords < capped.length ? (
         <p className="text-xs text-text-muted">
           {withApiCoords === 0
-            ? `Showing ${capped.length} ${unitNoun.plural} with approximate map pins (set property coordinates in ${brandName} admin for exact locations).`
+            ? `Showing ${placed.length} of ${capped.length} ${unitNoun.plural} with approximate map pins (set property coordinates in ${brandName} admin for exact locations; homes without a recognised city are listed below, not pinned).`
             : `${withApiCoords} of ${capped.length} with exact coordinates; others use approximate pins.`}
         </p>
       ) : null}
@@ -108,10 +119,10 @@ export default function SearchResultsMap({ units, formatPrice, querySuffix }: Se
           />
           <FitBounds positions={positions.length ? positions : [center]} />
           <MarkerClusterGroup chunkedLoading>
-            {capped.map((u) => (
+            {placed.map(({ unit: u, position }) => (
               <Marker
                 key={`m-${u.numericId}`}
-                position={resolvePosition(u)}
+                position={position}
                 icon={makePriceIcon(formatPrice(u.pricePerNight))}
               >
                 <Popup>
