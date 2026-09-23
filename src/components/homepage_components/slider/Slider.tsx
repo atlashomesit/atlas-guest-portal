@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { HERO_IMAGE_URL } from '../../../config/hero';
-import { toTransformedGuestImageUrl } from '../../../utils/guestImageUrl';
+import { buildGuestImageSrcSet, toTransformedGuestImageUrl } from '../../../utils/guestImageUrl';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
@@ -45,6 +45,11 @@ const Slider = () => {
     ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
     : '';
   const hasHeroPhoto = Boolean(heroImageUrl.trim());
+  // TASK-102426: responsive hero — a phone must never download the desktop asset.
+  // Previously a single 1200w CSS background-image (no srcset possible, always eager
+  // full-res). Now a real <img> over GUEST_IMAGE_SRCSET_WIDTHS through the /img
+  // transform proxy (compressed, width-appropriate), eager + fetchpriority high as LCP.
+  const heroImageSrcSet = showAtlasContent ? buildGuestImageSrcSet(HERO_IMAGE_URL) : undefined;
   const heroPhotoAriaLabel = showAtlasContent
     ? `A warm, owner-run ${brandName} living room`
     : `Welcome to ${brandName}`;
@@ -163,11 +168,15 @@ const Slider = () => {
       {/* Right — cinematic photo (Atlas root) or warm gradient (white-label) */}
       <div className="ahv2-hero-right">
         {hasHeroPhoto ? (
-          <div
+          <img
             className="ahv2-hero-photo"
-            style={{ backgroundImage: `url("${heroImageUrl}")` }}
-            role="img"
-            aria-label={heroPhotoAriaLabel}
+            src={heroImageUrl}
+            srcSet={heroImageSrcSet}
+            sizes="(max-width: 760px) 100vw, 50vw"
+            alt={heroPhotoAriaLabel}
+            loading="eager"
+            fetchPriority="high"
+            style={{ objectFit: 'cover' }}
           />
         ) : (
           <div
