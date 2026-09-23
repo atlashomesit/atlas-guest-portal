@@ -147,9 +147,11 @@ describe("_middleware onRequest — non-HTML / excluded-host short-circuits (no 
     vi.stubGlobal("fetch", fetchSpy);
     vi.stubGlobal("HTMLRewriter", FakeHTMLRewriter);
 
+    // Not www.atlashomestays.com: TASK-102420 now 301s that host to the apex before this
+    // middleware ever runs, so it no longer exercises the excluded-host short-circuit below.
     const html = makeHtmlResponse();
     const result = await onRequest(
-      makeContext({ url: "https://www.atlashomestays.com/", next: async () => html }),
+      makeContext({ url: "https://atlashomestays.com/", next: async () => html }),
     );
 
     await expectPassthroughWithClickjacking(result, html);
