@@ -1,5 +1,5 @@
 import { isRewriteEligibleHost, buildMetaRewriteValues, type TenantSiteMeta } from "./_lib/tenantSiteMeta";
-import { buildAtlasHostCanonical, isAtlasSelfCanonicalHost } from "./_lib/atlasHostCanonical";
+import { apexRedirectForHost, buildAtlasHostCanonical, isAtlasSelfCanonicalHost } from "./_lib/atlasHostCanonical";
 import { TtlCache } from "./_lib/ttlCache";
 
 /**
@@ -164,6 +164,20 @@ export const onRequest = async (context: {
   env: Env;
   next: () => Promise<Response>;
 }): Promise<Response> => {
+  // TASK-102420: duplicate-alias → apex 301 BEFORE touching origin. Direct traffic only:
+  // behind the Worker the URL host is *.pages.dev (never an alias), so skipping those
+  // preserves the proxy flow by construction. Fail-open by shape: every parse is guarded
+  // and redirect preserves path+query; garbage URLs fall through to normal handling.
+  try {
+    const host = new URL(context.request.url).hostname.toLowerCase();
+    if (!host.endsWith(".pages.dev")) {
+      const apex = apexRedirectForHost(context.request.url);
+      if (apex) return Response.redirect(apex, 301);
+    }
+  } catch {
+    // fall through to normal handling
+  }
+
   const response = await context.next();
   // TASK-10164: clickjacking headers must apply even when the OG rewrite fail-opens.
   const framed = applyFrameProtection(context.request, response);

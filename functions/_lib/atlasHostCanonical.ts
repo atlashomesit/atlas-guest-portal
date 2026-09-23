@@ -41,6 +41,34 @@ const ATLAS_DUPLICATE_ALIAS_HOSTS = new Set<string>([
 ]);
 /* eslint-enable atlas-brand/no-atlas-string-leak */
 
+/**
+ * TASK-102420: duplicate-alias → apex 301 target. `www.atlashomestays.com` serves the
+ * apex site byte-identical with HTTP 200 (measured 2026-09-17), so crawlers index two
+ * copies; `atlashomes.in` / `www.atlashomes.in` are deliberately NOT mapped here — that
+ * is a branding decision (different domain), not a www-prefix cleanup, and needs a
+ * founder call before any redirect ships.
+ */
+const APEX_HOST = "atlashomestays.com";
+
+/**
+ * Returns the 301 target URL when `requestUrl` arrived on a duplicate alias host that
+ * should canonically resolve to the apex, else null. Pure (no fetch), so unit-tested.
+ * Callers must only invoke this for DIRECT traffic — behind the tenant-subdomain-router
+ * Worker the URL host is `*.pages.dev` and redirecting would break the proxy flow.
+ */
+export function apexRedirectForHost(requestUrl: string): string | null {
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return null;
+  }
+  if (url.hostname.toLowerCase() !== `www.${APEX_HOST}`) return null;
+  url.hostname = APEX_HOST;
+  url.protocol = "https:";
+  return url.toString();
+}
+
 /** React Router's `/homes/:propertySlug/:unitSlug` (case-insensitive, optional trailing slash). */
 const PROPERTY_DETAIL_PATH_RE = /^\/homes\/[^/]+\/[^/]+\/?$/i;
 
