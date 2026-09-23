@@ -905,6 +905,7 @@ export default function BookingConfirmationPage() {
       <SEO
         title={`Booking #${booking.bookingId} — ${booking.propertyName}`}
         description={`Your stay at ${booking.propertyName}: ${booking.checkinDate} to ${booking.checkoutDate}.`}
+        robots="noindex, nofollow"
       />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-6" data-testid="booking-confirmation-page">
 

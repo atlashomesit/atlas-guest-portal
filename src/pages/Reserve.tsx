@@ -43,7 +43,7 @@ const Reserve = () => {
 
   return (
     <>
-    <SEO title={`Reserve | ${brandName}`} description={`Review your stay details and continue to secure payment with ${brandName}.`} />
+    <SEO title={`Reserve | ${brandName}`} description={`Review your stay details and continue to secure payment with ${brandName}.`} robots="noindex, nofollow" />
     <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
       {/* TASK-102109: numbered funnel progress — Reserve is step 3 (Review). */}
       <BookingProgressSteps
