@@ -63,7 +63,7 @@ Any new or materially changed user-facing behavior requires E2E coverage in the 
 - [ ] Reference related issues in the description.
 - [ ] Summarize high-level changes and screenshots when UI is impacted.
 - [ ] Run the **release gate** (`cd atlas-e2e; npm run release-gate`) or at minimum: `npm ci && npm run lint && npm run build && npm test`.
-- [ ] The **CI** workflow (`.github/workflows/ci.yml`) runs the same on push/PR; it must pass before merge.
+- [ ] No CI build/test gate exists on `dev` PRs to catch a broken build — `.github/workflows/ci.yml` and its **build** required check were retired fleet-wide (TASK-101886, 2026-09-23). The local run above is the only verification; do not skip it.
 - [ ] **Never commit `.env` or `.env.local`** – they may contain API keys and other secrets; keep them out of version control.
 - [ ] Update documentation when new configuration, commands, or data model changes occur.
 - [ ] Request review from at least one maintainer.
