@@ -30,6 +30,19 @@ const getEnv = (): AnalyticsEnv =>
 
 const getGaMeasurementId = () => import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined;
 
+/**
+ * TASK-102427 — sanitize a host-entered GA4 measurement ID before it ever reaches
+ * the DOM. Only the strict `G-XXXXXXXXXX` shape is accepted; anything carrying HTML
+ * entities, quotes, angle brackets or URL metacharacters (the board's "escaped tag
+ * breaks execution" class) is rejected to null. The injector below builds the script
+ * via DOM APIs only — never innerHTML — so a rejected value can never execute.
+ */
+export function sanitizeGaMeasurementId(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const id = raw.trim();
+  return /^G-[A-Z0-9]{4,}$/.test(id) ? id : null;
+}
+
 const getCurrentRoute = () => {
   if (typeof window === 'undefined') return undefined;
   return window.location.pathname || '/';
@@ -46,6 +59,7 @@ const defaultTransport: AnalyticsTransport = (payload) => {
 
 let transport: AnalyticsTransport = defaultTransport;
 let gtagInitialized = false;
+let activeMeasurementId: string | null = null;
 
 const ensureGtag = (measurementId: string) => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return false;
@@ -110,13 +124,35 @@ export const initAnalytics = () => {
   if (!hasAcceptedCookies()) return;
   if (transport !== defaultTransport) return;
 
-  const measurementId = getGaMeasurementId();
+  const measurementId = sanitizeGaMeasurementId(getGaMeasurementId());
 
   if (!measurementId) {
     return;
   }
 
+  activeMeasurementId = measurementId;
   setAnalyticsTransport(createGtagTransport(measurementId));
+};
+
+/**
+ * TASK-102427 — pick up a host-entered measurement ID from tenant resolution at
+ * runtime (admin settings), falling back to the build-time env. Idempotent per ID:
+ * repeat calls and route re-renders never inject a second gtag script. Must run
+ * after the tenant is resolved (see src/main.tsx boot, next to applyTenantBranding).
+ */
+export const initTenantAnalytics = (tenantGaMeasurementId: unknown) => {
+  if (!hasAcceptedCookies()) return;
+  const measurementId =
+    sanitizeGaMeasurementId(tenantGaMeasurementId) ?? sanitizeGaMeasurementId(getGaMeasurementId());
+  if (!measurementId || measurementId === activeMeasurementId) return;
+  activeMeasurementId = measurementId;
+  setAnalyticsTransport(createGtagTransport(measurementId));
+};
+
+export const resetAnalyticsForTests = () => {
+  activeMeasurementId = null;
+  gtagInitialized = false;
+  resetAnalyticsTransport();
 };
 
 const buildPayload = (
