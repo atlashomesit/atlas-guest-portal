@@ -3168,11 +3168,15 @@ const gdStyles = `
 
 /* Consent block */
 .gd-consent { margin-top: 22px; display: grid; gap: 12px; }
+/* TASK-102395: consent rows are full-card tap targets — never less than 48px
+   even if padding is restyled, so touch users can't hit a 12px-hitbox trap. */
 .gd-consent-row {
   display: grid;
   grid-template-columns: 22px 1fr;
   gap: 12px;
   padding: 14px 16px;
+  min-height: 48px;
+  align-items: center;
   border: 1.5px solid var(--gd-line-strong);
   border-radius: 12px;
   background: #fff;
