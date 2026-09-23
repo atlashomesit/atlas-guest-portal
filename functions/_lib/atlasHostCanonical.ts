@@ -48,6 +48,7 @@ const ATLAS_DUPLICATE_ALIAS_HOSTS = new Set<string>([
  * is a branding decision (different domain), not a www-prefix cleanup, and needs a
  * founder call before any redirect ships.
  */
+// eslint-disable-next-line atlas-brand/no-atlas-string-leak -- TASK-102528: literal edge 301 target, not guest-facing brand text; must stay the real Atlas apex host for every tenant (same pattern as the ATLAS_DUPLICATE_ALIAS_HOSTS eslint-disable block above)
 const APEX_HOST = "atlashomestays.com";
 
 /**
