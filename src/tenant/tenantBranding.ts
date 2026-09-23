@@ -101,6 +101,20 @@ export function applyTenantBranding(tenant: TenantInfo): void {
     link.href = faviconUrl;
   }
 
+  // TASK-102423: mobile homescreen bookmark icon must follow the host brand too —
+  // index.html ships the Atlas default (/icons/logo192.png) and it otherwise survives
+  // on tenant sites even after the tab favicon above is swapped.
+  const touchIconUrl = overrides.logoUrl ?? tenant.logoUrl;
+  if (touchIconUrl) {
+    let touchIcon = document.querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"]');
+    if (!touchIcon) {
+      touchIcon = document.createElement('link');
+      touchIcon.rel = 'apple-touch-icon';
+      document.head.appendChild(touchIcon);
+    }
+    touchIcon.href = touchIconUrl;
+  }
+
   applyTenantWebManifest(tenant);
   applyAppleWebAppTitle(tenant);
 }
