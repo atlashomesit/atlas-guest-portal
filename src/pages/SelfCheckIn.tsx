@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
@@ -54,7 +54,6 @@ type Step = "auth" | "summary" | "id-upload" | "house-rules" | "damage-waiver" |
 export default function SelfCheckIn() {
   const brandName = getTenantBrandName();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [bookingRef, setBookingRef] = useState(urlRef ?? "");
   const [lastName, setLastName] = useState("");
@@ -73,7 +72,11 @@ export default function SelfCheckIn() {
   const [waiverAgreed, setWaiverAgreed] = useState(false);
   // TASK-4009: Government ID file upload
   const [idFile, setIdFile] = useState<File | null>(null);
-  const [idFilePreview, setIdFilePreview] = useState<string | null>(null);
+  // TASK-102530: setIdFilePreview is still called live from updateGuest() (mirrors the primary
+  // guest's preview into this top-level slot), but nothing reads the value back — the UI renders
+  // the per-guest g.idFilePreview instead. Kept (not deleted) so that live setter call stays
+  // valid; prefixed so the now-dead read doesn't trip no-unused-vars.
+  const [_idFilePreview, setIdFilePreview] = useState<string | null>(null);
   // TASK-4514: Collect arrival time and guest count in canonical flow
   const [arrivalTime, setArrivalTime] = useState("");
   const [guestCount, setGuestCount] = useState("");
@@ -82,9 +85,13 @@ export default function SelfCheckIn() {
   const [nationality, setNationality] = useState("");
   const [passportNumber, setPassportNumber] = useState("");
   // TASK-5131: Aadhaar VC preferred; photo upload is explicit fallback only
-  const [aadhaarPhotoFallback, setAadhaarPhotoFallback] = useState(false);
   const [aadhaarVcVerified, setAadhaarVcVerified] = useState(false);
-  const [aadhaarMasked, setAadhaarMasked] = useState("");
+  // TASK-102530: setAadhaarMasked is still called live from updateGuest() and
+  // handleContinueFromIdUpload() (mirrors the primary guest's masked Aadhaar number into this
+  // top-level slot), but nothing reads the value back — the UI renders the per-guest
+  // g.maskedNumber instead. Kept (not deleted) so those live setter calls stay valid; prefixed
+  // so the now-dead read doesn't trip no-unused-vars.
+  const [_aadhaarMasked, setAadhaarMasked] = useState("");
   // TASK-5346: auditable skip when ID was collected through another channel
   const [idCollectedElsewhere, setIdCollectedElsewhere] = useState(false);
   const [guests, setGuests] = useState<GuestInfo[]>([
@@ -423,41 +430,6 @@ export default function SelfCheckIn() {
       setError("Could not verify your booking. Please try again.");
     } finally {
       setBusy(false);
-    }
-  };
-
-  // TASK-4009: Handle file selection and preview
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Client-side validation: image or PDF only
-    if (!/\.(jpg|jpeg|png|pdf)$/i.test(file.name)) {
-      setError("Please upload a JPG, PNG, or PDF file.");
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File must be under 10 MB.");
-      return;
-    }
-
-    setIdFile(file);
-    updateGuest(0, { idFile: file });
-    setError("");
-
-    // Show preview for images
-    if (file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (evt) => {
-        const preview = evt.target?.result as string;
-        setIdFilePreview(preview);
-        updateGuest(0, { idFilePreview: preview });
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setIdFilePreview(null);
-      updateGuest(0, { idFilePreview: null });
     }
   };
 
