@@ -148,10 +148,16 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
     [bookingId, token, noteHostReplies],
   );
 
+  // TASK-102401: skip poll ticks while the tab is hidden — a backgrounded chat
+  // must not burn battery/data polling for messages nobody is reading. The next
+  // visible tick (or remount) refreshes immediately.
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal);
-    const interval = window.setInterval(() => void load(), POLL_INTERVAL_MS);
+    const interval = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void load();
+    }, POLL_INTERVAL_MS);
     return () => {
       controller.abort();
       window.clearInterval(interval);
@@ -178,7 +184,12 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
       }
     };
     void pollTyping();
-    const interval = window.setInterval(() => void pollTyping(), TYPING_POLL_INTERVAL_MS);
+    // TASK-102401: typing presence is ephemeral UI state — no reason to poll it
+    // from a hidden tab.
+    const interval = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      void pollTyping();
+    }, TYPING_POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(interval);
