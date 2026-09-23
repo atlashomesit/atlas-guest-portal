@@ -233,6 +233,19 @@ function remainingPct(expiresAt: string, ttlMs = CHECKOUT_HOLD_MINUTES * 60 * 10
   return Math.max(0, Math.min(1, ms / ttlMs));
 }
 
+/**
+ * TASK-102394: keep the focused checkout field above the mobile virtual keyboard.
+ * iOS/Android keyboards can push the active input below the fold; scrolling the
+ * field to viewport center on focus keeps what the guest types visible.
+ */
+function scrollFieldIntoView(e: React.FocusEvent<HTMLElement>) {
+  try {
+    e.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch {
+    // jsdom / old webviews without scrollIntoView options — non-fatal.
+  }
+}
+
 function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => void) {
   if (window.Razorpay) { onSuccess(); return; }
 
@@ -1620,6 +1633,7 @@ const GuestDetailsPage: React.FC = () => {
                   placeholder="As on a government ID"
                   value={formData.name}
                   onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+                  onFocus={scrollFieldIntoView}
                   data-testid="guest-booking-name"
                 />
                 {formErrors.name && <div id="gd-name-error" className="gd-input-help error" role="alert">{formErrors.name}</div>}
@@ -1640,6 +1654,7 @@ const GuestDetailsPage: React.FC = () => {
                   placeholder="you@example.com"
                   value={formData.email}
                   onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                  onFocus={scrollFieldIntoView}
                   data-testid="guest-booking-email"
                 />
                 <div id="gd-email-help" className="gd-input-help">Booking confirmation goes here</div>
@@ -1686,6 +1701,7 @@ const GuestDetailsPage: React.FC = () => {
                         phone: clampNationalDigits(e.target.value, dial.maxDigits),
                       }));
                     }}
+                    onFocus={scrollFieldIntoView}
                     data-testid="guest-booking-phone"
                   />
                 </div>
