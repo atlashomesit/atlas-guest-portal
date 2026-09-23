@@ -313,6 +313,18 @@ const GuestDetailsPage: React.FC = () => {
     setHoldHydrationDone(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only rehydrate
 
+  // TASK-102391: warm the Razorpay SDK on mount so Pay opens instantly. Razorpay
+  // renders an in-page iframe modal (never a popup window), so iOS popup blockers
+  // do not apply — the real mobile failure mode is first-tap script-fetch latency
+  // reading as "nothing happens". No-op callbacks: a failed preload simply falls
+  // back to loading on Pay click via the existing path below.
+  useEffect(() => {
+    loadRazorpayScript(
+      () => {},
+      () => {},
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only preload
+
   // ── Hold state from context ──────────────────────────────────────────────
   const holdId = booking.holdId;
   const holdToken = booking.holdToken;
