@@ -1041,39 +1041,61 @@ export default function SelfCheckIn() {
                             JPG, PNG, or PDF — max 10 MB
                           </p>
 
-                          <div
-                            className="rounded-lg border-2 border-dashed border-border-subtle p-4 text-center cursor-pointer hover:border-brand-primary transition bg-white"
-                            onClick={() => {
-                              const el = document.getElementById(idPhotoInputId) as HTMLInputElement | null;
-                              el?.click();
-                            }}
-                          >
-                            <input
-                              id={idPhotoInputId}
-                              type="file"
-                              accept="image/*,.pdf"
-                              capture="environment"
-                              onChange={(e) => handleGuestFileSelect(idx, e)}
-                              className="hidden"
-                              aria-label={isFirst
-                                ? (g.govtIdType === "Aadhaar" ? "Aadhaar photo (fallback)" : "ID photo (optional)")
-                                : `ID photo (${guestLabel})`}
-                              aria-describedby={idPhotoHelpId}
-                            />
-                            {g.idFilePreview ? (
-                              <div className="space-y-2">
-                                <img src={g.idFilePreview} alt="ID preview" className="max-h-32 mx-auto rounded" />
-                                <p className="text-xs text-text-primary font-medium">{g.idFile?.name}</p>
+                          {g.idFilePreview ? (
+                            <div className="rounded-lg border border-border-subtle p-4 bg-white text-center">
+                              <img src={g.idFilePreview} alt="ID preview" className="max-h-48 mx-auto rounded-lg object-contain mb-3" />
+                              <p className="text-xs text-text-primary font-medium mb-3">{g.idFile?.name}</p>
+                              <div className="flex flex-wrap justify-center gap-2">
+                                <label className="cursor-pointer rounded-lg bg-bg-muted px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-surface border border-border-subtle transition">
+                                  📸 Retake Photo
+                                  <input type="file" accept="image/*" capture="environment" onChange={(e) => handleGuestFileSelect(idx, e)} className="hidden" />
+                                </label>
+                                <label className="cursor-pointer rounded-lg bg-bg-muted px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-surface border border-border-subtle transition">
+                                  📁 Choose File
+                                  <input type="file" accept="image/*,.pdf" onChange={(e) => handleGuestFileSelect(idx, e)} className="hidden" />
+                                </label>
                               </div>
-                            ) : g.idFile ? (
-                              <p className="text-sm text-text-primary font-medium">📄 {g.idFile.name}</p>
-                            ) : (
-                              <div className="space-y-1">
-                                <p className="text-sm font-medium text-text-primary">📷 Click to upload ID document photo</p>
-                                <p className="text-xs text-text-muted">JPG, PNG, or PDF</p>
-                              </div>
-                            )}
-                          </div>
+                            </div>
+                          ) : g.idFile ? (
+                            <div className="rounded-lg border border-border-subtle p-4 bg-white text-center">
+                              <p className="text-sm text-text-primary font-medium mb-3">📄 {g.idFile.name}</p>
+                              <label className="cursor-pointer rounded-lg bg-bg-muted px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-surface border border-border-subtle transition">
+                                Replace File
+                                <input type="file" accept="image/*,.pdf" onChange={(e) => handleGuestFileSelect(idx, e)} className="hidden" />
+                              </label>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col sm:flex-row gap-3">
+                              <label className="flex-1 rounded-xl border-2 border-dashed border-border-subtle p-4 text-center cursor-pointer hover:border-brand-primary transition bg-white flex flex-col items-center justify-center gap-2">
+                                <span className="text-2xl">📸</span>
+                                <span className="text-sm font-medium text-text-primary">Take Photo</span>
+                                <input
+                                  id={idPhotoInputId}
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  onChange={(e) => handleGuestFileSelect(idx, e)}
+                                  className="hidden"
+                                  aria-label={isFirst
+                                    ? (g.govtIdType === "Aadhaar" ? "Aadhaar photo (fallback)" : "ID photo (optional)")
+                                    : `ID photo (${guestLabel})`}
+                                  aria-describedby={idPhotoHelpId}
+                                />
+                              </label>
+                              <label className="flex-1 rounded-xl border-2 border-dashed border-border-subtle p-4 text-center cursor-pointer hover:border-brand-primary transition bg-white flex flex-col items-center justify-center gap-2">
+                                <span className="text-2xl">📁</span>
+                                <span className="text-sm font-medium text-text-primary">Upload File</span>
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  onChange={(e) => handleGuestFileSelect(idx, e)}
+                                  className="hidden"
+                                  aria-label={`Upload file for ${guestLabel}`}
+                                  aria-describedby={idPhotoHelpId}
+                                />
+                              </label>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
