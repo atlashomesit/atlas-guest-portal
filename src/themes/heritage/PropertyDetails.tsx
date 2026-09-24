@@ -44,6 +44,7 @@ import {
 } from '@/utils/cancellationPolicy';
 import { trackEvent } from '@/utils/analytics';
 import { Button } from '@/components/ui/Button';
+import Lightbox from '@/components/ui/Lightbox';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
@@ -586,6 +587,10 @@ const PropertyDetails = () => {
     /** AMN-001: amenity master code→label map */
     const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
     const [amenityCategoryMaster, setAmenityCategoryMaster] = useState<Map<string, string>>(new Map());
+
+    // Lightbox state
+    const [showLightbox, setShowLightbox] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(0);
 
     /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
     const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
@@ -1268,38 +1273,6 @@ useEffect(() => {
 
     useEffect(() => {
         if (!data) return;
-
-        const initFancybox = async () => {
-            try {
-                // CSS bundled from the installed package (matches the v6 JS) — avoids
-                // the CSP style-src violation from the previous cdn.jsdelivr.net link
-                // and the v5↔v6 version mismatch.
-                const [{ Fancybox }] = await Promise.all([
-                    import("@fancyapps/ui"),
-                    import("@fancyapps/ui/dist/fancybox/fancybox.css"),
-                ]);
-
-                (Fancybox as { bind: (sel: string, opts: object) => void }).bind("[data-fancybox='property-gallery']", {
-                    Thumbs: {
-                        type: "classic",
-                    },
-                    Carousel: {
-                        transition: "slide",
-                    },
-                });
-
-                return () => {
-                    Fancybox.destroy();
-                };
-            } catch (err) {
-                console.warn('Failed to load Fancybox', err);
-            }
-        };
-
-        const cleanup = initFancybox();
-        return () => {
-            cleanup?.then((fn) => fn?.());
-        };
     }, [data]);
 
     useEffect(() => {
@@ -1789,7 +1762,7 @@ useEffect(() => {
                 aria-label={galleryUrls[0] ? undefined : `${data.property_name} — photo coming soon`}
               >
                 {galleryUrls[0] ? (
-                  <a href={galleryUrls[0]} data-fancybox="property-gallery" data-caption={`${data.property_name} — main photo`} style={{ display: 'block', width: '100%', height: '100%' }}>
+                  <button onClick={(e) => { e.preventDefault(); setLightboxIndex(0); setShowLightbox(true); }} className="block w-full h-full p-0 border-0 bg-transparent cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-accent transition-shadow">
                     <img
                       src={getHeritageTransformedUrl(galleryUrls[0], 768)}
                       srcSet={getHeritageSrcSet(galleryUrls[0])}
@@ -1801,7 +1774,7 @@ useEffect(() => {
                       className="pp-gallery-img"
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
-                  </a>
+                  </button>
                 ) : (
                   <div className="pp-cell-overlay">
                     <span className="pp-dot" aria-hidden="true" />
@@ -1821,7 +1794,7 @@ useEffect(() => {
                     key={i}
                     className={`pp-cell pp-cell-${i + 1} pp-cell--photo`}
                   >
-                    <a href={photo} data-fancybox="property-gallery" data-caption={`${data.property_name} — photo ${i + 1}`} style={{ display: 'block', width: '100%', height: '100%' }}>
+                    <button onClick={(e) => { e.preventDefault(); setLightboxIndex(i); setShowLightbox(true); }} className="block w-full h-full p-0 border-0 bg-transparent cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-accent transition-shadow">
                       <img
                         src={getHeritageTransformedUrl(photo, 480)}
                         srcSet={getHeritageSrcSet(photo)}
@@ -1832,7 +1805,7 @@ useEffect(() => {
                         className="pp-gallery-img"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                       />
-                    </a>
+                    </button>
                   </div>
                 );
               })}
@@ -1843,20 +1816,22 @@ useEffect(() => {
                 aria-label="View all photos"
                 onClick={() => {
                   if (galleryUrls.length === 0) return;
-                  Promise.all([
-                    import('@fancyapps/ui'),
-                    import('@fancyapps/ui/dist/fancybox/fancybox.css'),
-                  ]).then(([{ Fancybox }]) => {
-                    (Fancybox as { show: (items: object[]) => void }).show(
-                      galleryUrls.map((u) => ({ src: getHeritageTransformedUrl(u, 1200), type: 'image' })),
-                    );
-                  }).catch(() => {});
+                  setLightboxIndex(0);
+                  setShowLightbox(true);
                 }}
               >
                 <PpGridIcon size={13} />
                 {galleryUrls.length > 5 ? `View all ${galleryUrls.length} photos` : 'View gallery'}
               </button>
             </div>
+
+            {showLightbox && (
+              <Lightbox
+                images={galleryUrls}
+                initialIndex={lightboxIndex}
+                onClose={() => setShowLightbox(false)}
+              />
+            )}
 
             {/* ---- TASK-1359: Virtual tour ---- */}
             {data.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
