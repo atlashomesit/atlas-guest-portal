@@ -1052,6 +1052,7 @@ export default function SelfCheckIn() {
                               id={idPhotoInputId}
                               type="file"
                               accept="image/*,.pdf"
+                              capture="environment"
                               onChange={(e) => handleGuestFileSelect(idx, e)}
                               className="hidden"
                               aria-label={isFirst
