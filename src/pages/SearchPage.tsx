@@ -1164,7 +1164,23 @@ const SearchPage = () => {
           </div>
 
           <div className="search-filters__chips">
-            <span className="search-filters__chip-label">Amenities</span>
+            <div className="flex items-center gap-2 min-w-[150px]">
+              <span className="search-filters__chip-label !min-w-0">Amenities</span>
+              {selectedAmenities.length > 0 && (
+                <>
+                  <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-cta-primary px-1.5 text-[10px] font-bold text-[var(--text-on-cta)]">
+                    {selectedAmenities.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => updateParam("amenities", "")}
+                    className="text-xs font-medium text-cta-primary hover:underline whitespace-nowrap"
+                  >
+                    Clear All
+                  </button>
+                </>
+              )}
+            </div>
             {["AC", "Parking", "Pool", "WiFi", "Pet-friendly", "Balcony"].map((amenity) => (
               <button
                 key={amenity}
