@@ -47,6 +47,7 @@ import { Button } from '@/components/ui/Button';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
+import { centroidForCity } from '@/utils/mapCoords';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
@@ -1897,12 +1898,22 @@ useEffect(() => {
                       mapLocation,
                       address: propertyAddressStr,
                     });
-                    switch (mapSelection.kind) {
+                    // TASK-102490: when the property has no coordinates and no custom embed,
+                    // use the listing's city centroid instead of the tenant default so the
+                    // pin lands in the right city rather than a generalized location.
+                    let finalMapSelection = mapSelection;
+                    if (finalMapSelection.kind === 'none' || finalMapSelection.kind === 'tenant') {
+                      const cityCenter = centroidForCity(data.property_location);
+                      if (cityCenter) {
+                        finalMapSelection = { kind: 'coords', lat: cityCenter.lat, lng: cityCenter.lng };
+                      }
+                    }
+                    switch (finalMapSelection.kind) {
                       case 'coords':
                         return (
                           <SinglePinGoogleMap
-                            lat={mapSelection.lat}
-                            lng={mapSelection.lng}
+                            lat={finalMapSelection.lat}
+                            lng={finalMapSelection.lng}
                             zoom={15}
                             markerTitle={data.property_name}
                           />
@@ -1910,7 +1921,7 @@ useEffect(() => {
                       case 'address':
                         return (
                           <EmbeddedListingMap
-                            address={mapSelection.address}
+                            address={finalMapSelection.address}
                             label={data.property_name}
                             zoom={15}
                             height={300}
@@ -1932,8 +1943,8 @@ useEffect(() => {
                       case 'tenant':
                         return (
                           <SinglePinGoogleMap
-                            lat={mapSelection.lat}
-                            lng={mapSelection.lng}
+                            lat={finalMapSelection.lat}
+                            lng={finalMapSelection.lng}
                             zoom={mapLocation && typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
                             markerTitle={mapLocation?.markerLabel ?? tenantNameForMap}
                           />
