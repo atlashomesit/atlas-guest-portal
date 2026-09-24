@@ -180,6 +180,21 @@ describe('TASK-8231: amenities modal accessible close + dialog semantics', () =>
       // The labelledby target must actually exist on the visible title.
       expect(content).toContain('<h3 id={amenitiesModalTitleId}');
     });
+
+    it(`${label}: amenities list ARIA structure satisfies aria-required-children, and the scrollable region is keyboard-focusable`, () => {
+      const content = readFileSync(path, 'utf-8');
+      // Scrollable region must be keyboard-focusable (axe scrollable-region-focusable).
+      expect(content).toContain(
+        'role="region" aria-label="List of all amenities" tabIndex={0}',
+      );
+      // role="list" must sit directly on the element whose children are role="listitem"
+      // (axe aria-required-children) — not on the outer multi-category wrapper, which
+      // spans several category grids and is no longer itself a "list".
+      expect(content).not.toMatch(/className="flex flex-col gap-8" role="list"/);
+      expect(content).toContain(
+        'className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list"',
+      );
+    });
   }
 
   it('AtlasChat: voice-input and send buttons have accessible names', () => {

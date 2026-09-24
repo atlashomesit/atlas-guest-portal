@@ -2709,8 +2709,12 @@ useEffect(() => {
                   <X className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
                 </button>
               </div>
-              <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
-                <div className="flex flex-col gap-8" role="list">
+              <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities" tabIndex={0}>
+                {/* TASK-8231 a11y fix: role="list" must sit directly on the element whose
+                    children are role="listitem" (axe aria-required-children). The outer
+                    wrapper spans multiple categories, each with its own heading + grid, so
+                    it no longer claims to be a list itself — each grid below does instead. */}
+                <div className="flex flex-col gap-8">
                   {(() => {
                     if (data.amenityCodes && data.amenityCodes.length > 0) {
                       const groups: Record<string, string[]> = {};
@@ -2722,7 +2726,7 @@ useEffect(() => {
                       return Object.entries(groups).map(([cat, codes]) => (
                         <div key={cat}>
                           <h4 className="text-lg font-medium text-text-primary mb-4">{cat}</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
                             {codes.map((code) => {
                               const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
                               return (
@@ -2739,7 +2743,7 @@ useEffect(() => {
                       ));
                     }
                     return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
                         {(data.property_amenities || []).map((amenity, idx) => {
                           const icon = amenity?.amenities_icon || '';
                           const displayName = icon ? formatAmenityName(icon) : 'Amenity';
