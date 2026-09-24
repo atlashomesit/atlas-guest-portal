@@ -231,17 +231,31 @@ const ListingCard: React.FC<ListingCardProps> = ({
           {/* TASK-4012: Rating chip on listing cards */}
           <div className="flex flex-shrink-0 items-center">
             {hasVerifiedReviews && (reviewCount ?? 0) > 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800">
+              <a
+                href={`/property/${id}#reviews`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                className="inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100 transition-colors"
+                aria-label="View guest reviews"
+              >
                 <span aria-hidden>★</span>
                 <span>{rating.toFixed(1)}</span>
                 <span className="text-xs font-normal">({(reviewCount ?? 0).toLocaleString()})</span>
-              </span>
+              </a>
             ) : hasVerifiedReviews ? (
-              <span className="inline-flex items-center gap-1 text-sm font-semibold text-text-primary">
+              <a
+                href={`/property/${id}#reviews`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
+                className="inline-flex items-center gap-1 text-sm font-semibold text-text-primary hover:opacity-80 transition-opacity"
+                aria-label="View guest reviews"
+              >
                 <span aria-hidden>★</span>
                 <span>{rating.toFixed(2)}</span>
                 <span className="text-text-muted">({reviews.toLocaleString()})</span>
-              </span>
+              </a>
             ) : (
               <span className="text-xs font-semibold text-text-muted">New listing</span>
             )}

@@ -1084,3 +1084,15 @@
   .pp-v2-review-grid { grid-template-columns: 1fr; }
   .pp-v2-location { margin: 16px 0 0; }
 }
+
+#reviews:target {
+  animation: pp-target-pulse 2s ease-out;
+}
+@keyframes pp-target-pulse {
+  0% { background-color: rgba(192, 69, 40, 0.1); }
+  100% { background-color: transparent; }
+}
+
+#reviews {
+  scroll-margin-top: 100px;
+}

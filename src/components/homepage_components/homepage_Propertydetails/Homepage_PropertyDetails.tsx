@@ -1686,10 +1686,10 @@ useEffect(() => {
                       native-only fields render ★ 0.0 (0 reviews) when Google imports are the only source. */}
                   {ppHasApiReviews && ppCombinedReviewCount > 0 && (
                     <>
-                      <span className="pp-rating" data-testid="property-header-rating">
+                      <a href="#reviews" className="pp-rating hover:opacity-80 transition-opacity" data-testid="property-header-rating" aria-label="View guest reviews">
                         ★ {ppCombinedAverageRating.toFixed(1)}{' '}
                         <em>({ppCombinedReviewCount} {ppCombinedReviewCount === 1 ? 'review' : 'reviews'})</em>
-                      </span>
+                      </a>
                       <span className="pp-submeta-sep" aria-hidden="true">·</span>
                     </>
                   )}
@@ -2200,7 +2200,7 @@ useEffect(() => {
                   // TASK-8019: "verified stay(s) / through this platform" only for native Atlas reviews.
                   const nativeVerifiedCount = api.totalCount;
                   return (
-                    <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
+                    <section id="reviews" className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
                         <h2>
                           ★ {rating.toFixed(1)} from {count}{' '}
