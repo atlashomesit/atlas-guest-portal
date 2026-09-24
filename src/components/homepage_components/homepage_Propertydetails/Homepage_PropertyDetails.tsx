@@ -576,6 +576,7 @@ const PropertyDetails = () => {
     const [reviewReplyRateBadge, setReviewReplyRateBadge] = useState<string | null>(null);
     /** AMN-001: amenity master code→label map */
     const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
+    const [amenityCategoryMaster, setAmenityCategoryMaster] = useState<Map<string, string>>(new Map());
 
     /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
     const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
@@ -595,10 +596,15 @@ const PropertyDetails = () => {
             .then((items: unknown) => {
                 if (!active || !Array.isArray(items)) return;
                 const map = new Map<string, string>();
-                (items as { code: string; label: string }[]).forEach(({ code, label }) => {
-                    if (code && label) map.set(code.toLowerCase(), label);
+                const catMap = new Map<string, string>();
+                (items as { code: string; label: string; category?: string }[]).forEach(({ code, label, category }) => {
+                    if (code && label) {
+                        map.set(code.toLowerCase(), label);
+                        catMap.set(code.toLowerCase(), category || 'General');
+                    }
                 });
                 setAmenityMaster(map);
+                setAmenityCategoryMaster(catMap);
             })
             .catch(() => { /* non-critical */ });
         return () => { active = false; };
@@ -2158,7 +2164,7 @@ useEffect(() => {
                   </div>
                   <div className="pp-amenities">
                     {ppAmenityCodes
-                      ? ppAmenityCodes.map((code) => {
+                      ? ppAmenityCodes.slice(0, 8).map((code) => {
                           const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
                           return (
                             <div key={code} className="pp-amenity">
@@ -2169,7 +2175,7 @@ useEffect(() => {
                             </div>
                           );
                         })
-                      : ppAmenityDisplay.map((label, idx) => (
+                      : ppAmenityDisplay.slice(0, 8).map((label, idx) => (
                           <div key={`${label}-${idx}`} className="pp-amenity">
                             <span style={{ fontSize: 18, color: 'var(--brand-accent, #f08c71)', flexShrink: 0 }} aria-hidden="true">
                               {renderIcon(label)}
@@ -2179,7 +2185,7 @@ useEffect(() => {
                         ))
                     }
                   </div>
-                  {ppAmenityLabels.length > 12 && (
+                  {ppAmenityLabels.length > 8 && (
                     <button
                       type="button"
                       className="pp-prose-more"
@@ -2774,33 +2780,51 @@ useEffect(() => {
                 </button>
               </div>
               <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
-                  {data.amenityCodes && data.amenityCodes.length > 0 ? (
-                    data.amenityCodes.map((code) => {
-                      const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
-                      return (
-                        <div key={code} className="flex items-center gap-3 sm:gap-4" role="listitem">
-                          <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
-                            {renderIconForCode(code)}
-                          </span>
-                          <span className="text-text-primary text-sm sm:text-base">{label}</span>
+                <div className="flex flex-col gap-8" role="list">
+                  {(() => {
+                    if (data.amenityCodes && data.amenityCodes.length > 0) {
+                      const groups: Record<string, string[]> = {};
+                      data.amenityCodes.forEach((code) => {
+                        const cat = amenityCategoryMaster.get(code.toLowerCase()) || 'General';
+                        if (!groups[cat]) groups[cat] = [];
+                        groups[cat].push(code);
+                      });
+                      return Object.entries(groups).map(([cat, codes]) => (
+                        <div key={cat}>
+                          <h4 className="text-lg font-medium text-text-primary mb-4">{cat}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                            {codes.map((code) => {
+                              const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
+                              return (
+                                <div key={code} className="flex items-center gap-3 sm:gap-4" role="listitem">
+                                  <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                                    {renderIconForCode(code)}
+                                  </span>
+                                  <span className="text-text-primary text-sm sm:text-base">{label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      );
-                    })
-                  ) : (
-                    (data.property_amenities || []).map((amenity, idx) => {
-                      const icon = amenity?.amenities_icon || '';
-                      const displayName = icon ? formatAmenityName(icon) : 'Amenity';
-                      return (
-                        <div key={`amenity-${idx}-${displayName}`} className="flex items-center gap-3 sm:gap-4" role="listitem">
-                          <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
-                            {renderIcon(icon) || '•'}
-                          </span>
-                          <span className="text-text-primary text-sm sm:text-base">{displayName}</span>
-                        </div>
-                      );
-                    })
-                  )}
+                      ));
+                    }
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                        {(data.property_amenities || []).map((amenity, idx) => {
+                          const icon = amenity?.amenities_icon || '';
+                          const displayName = icon ? formatAmenityName(icon) : 'Amenity';
+                          return (
+                            <div key={`amenity-${idx}-${displayName}`} className="flex items-center gap-3 sm:gap-4" role="listitem">
+                              <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                                {renderIcon(icon) || '•'}
+                              </span>
+                              <span className="text-text-primary text-sm sm:text-base">{displayName}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="p-6 border-t border-border-subtle">
