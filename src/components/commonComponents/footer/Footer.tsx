@@ -6,6 +6,7 @@ import { footerData } from '../../../data';
 import { Link } from 'react-router-dom';
 import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
 import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
+import { TrustBanner } from './TrustBanner';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
@@ -117,6 +118,8 @@ const Footer = () => {
     }
 
     return (
+        <>
+        <TrustBanner />
         <footer
             className='pt-16 md:pt-20 pb-28 md:pb-24 px-[5%] text-[var(--footer-text)] border-t border-[color:var(--border-subtle)]'
             style={{ background: 'var(--footer-bg)' }}
@@ -289,7 +292,9 @@ const Footer = () => {
                 </div>
             )}
 
-        </footer>    );
+        </footer>
+        </>
+    );
 };
 
 export default Footer;
