@@ -1,3 +1,4 @@
+import CookieConsentBanner from "../../CookieConsentBanner";
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { HERO_IMAGE_URL } from '../../../config/hero';
@@ -97,6 +98,8 @@ const Slider = () => {
         <div data-testid="hero-widget" className="ahv2-hero-widget">
           <SearchAvailabilityWidget />
         </div>
+
+        <CookieConsentBanner inline />
 
         {directPromo.show ? (
           <div
