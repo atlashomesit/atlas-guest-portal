@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { FaFacebook, FaTwitter, FaYoutube, FaInstagram, FaMapMarkerAlt, FaWhatsapp } from 'react-icons/fa';
 import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
@@ -27,6 +27,19 @@ const iconMap = {
 };
 
 const Footer = () => {
+    // DESIGN (atlastays-redesign spike): "Get exclusive offers" email box from the reference
+    // mockup. There is no newsletter-subscription API in this codebase (grepped for
+    // newsletter/subscribe — none), so this is intentionally a front-end-only affordance:
+    // it captures the address locally and shows an inline confirmation. It does not call any
+    // backend. Documented as a judgment call in the spike doc.
+    const [newsletterEmail, setNewsletterEmail] = useState('');
+    const [newsletterSubmitted, setNewsletterSubmitted] = useState(false);
+    const handleNewsletterSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!newsletterEmail.trim()) return;
+        setNewsletterSubmitted(true);
+    };
+
     const tenant = getTenantContext();
     const brandName = getTenantBrandName();
     const socialLabelByIcon: Record<string, string> = {
@@ -124,7 +137,7 @@ const Footer = () => {
             className='pt-16 md:pt-20 pb-28 md:pb-24 px-[5%] text-[var(--footer-text)] border-t border-[color:var(--border-subtle)]'
             style={{ background: 'var(--footer-bg)' }}
         >
-            <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10 lg:items-start'>
+            <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-10 lg:items-start'>
                 <div className='flex flex-col gap-3 items-center lg:items-start'>
                     {showLogo && (
                         <img
@@ -205,8 +218,50 @@ const Footer = () => {
                     </div>
                 </div>
 
+                {/* DESIGN (atlastays-redesign spike): "Get exclusive offers" email box — see
+                    the front-end-only note above handleNewsletterSubmit. */}
                 <div className="text-center lg:text-left min-w-0">
-                    <h2 className="font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Locate Us</h2>
+                    <h2 className="font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Get exclusive offers</h2>
+                    <p className="text-sm text-[var(--footer-link)] mb-3">
+                        Be the first to know about new homes, discounts and special offers.
+                    </p>
+                    {newsletterSubmitted ? (
+                        <p
+                            className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-primary)_92%,transparent)] px-4 py-2.5 text-sm font-semibold text-[var(--footer-heading)]"
+                            role="status"
+                            data-testid="footer-newsletter-success"
+                        >
+                            Thanks — you&apos;re on the list!
+                        </p>
+                    ) : (
+                        <form
+                            className="flex items-center gap-2 rounded-full bg-[var(--bg-primary)] p-1.5 shadow-sm"
+                            onSubmit={handleNewsletterSubmit}
+                            data-testid="footer-newsletter-form"
+                        >
+                            <label htmlFor="footer-newsletter-email" className="sr-only">Email address</label>
+                            <input
+                                id="footer-newsletter-email"
+                                type="email"
+                                required
+                                value={newsletterEmail}
+                                onChange={(event) => setNewsletterEmail(event.target.value)}
+                                placeholder="Enter your email"
+                                className="min-w-0 flex-1 rounded-full bg-transparent px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+                            />
+                            <button
+                                type="submit"
+                                aria-label="Subscribe"
+                                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--cta-primary)] text-[var(--text-on-cta)] transition hover:bg-[var(--cta-primary-hover)]"
+                            >
+                                <IoIosArrowForward aria-hidden />
+                            </button>
+                        </form>
+                    )}
+                </div>
+
+                <div className="text-center lg:text-left min-w-0">
+                    <h2 className="font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Contact Us</h2>
                     <ul className="m-0 flex list-none flex-col gap-3 p-0 text-base text-[var(--footer-link)]">
                         {locateRows.map((row) => (
                             <li key={row.key} className="flex flex-row items-center justify-center gap-3 lg:justify-start">

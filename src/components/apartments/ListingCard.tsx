@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Bath, BedDouble, Car, Heart, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
 import { priceDisplayConfig } from "../../config/priceDisplay.config";
 import { type NightlyPriceBreakdown } from "../../utils/pricing";
 import OptimizedImage from "../ui/OptimizedImage";
@@ -14,6 +14,7 @@ import {
   type CancellationTier,
 } from "../../utils/cancellationPolicy";
 import { hasOnlinePaymentRail } from "../../tenant/paymentRail";
+import { isFavorite, toggleFavorite } from "../../utils/guestHistory";
 
 type ListingCardProps = {
   id: string;
@@ -94,6 +95,20 @@ const ListingCard: React.FC<ListingCardProps> = ({
   const showRazorpayChip = hasOnlinePaymentRail();
   const { format: formatCurrency } = useCurrency();
   const { booking } = useBooking();
+  // DESIGN (atlastays-redesign spike): reference mockup shows a heart/save toggle on the
+  // card image, mirroring MarketplaceHomepage.tsx's existing save-heart pattern. Reuses the
+  // same localStorage-backed favorites util everywhere else in the app already reads from.
+  const numericId = Number(id);
+  const [favEpoch, setFavEpoch] = useState(0);
+  const saved = useMemo(() => {
+    void favEpoch;
+    return Number.isFinite(numericId) ? isFavorite(numericId) : false;
+  }, [favEpoch, numericId]);
+  useEffect(() => {
+    const sync = () => setFavEpoch((e) => e + 1);
+    window.addEventListener("atlas-favorites-changed", sync);
+    return () => window.removeEventListener("atlas-favorites-changed", sync);
+  }, []);
   const estimateNights = useMemo(() => {
     if (estimateNightsProp != null) return estimateNightsProp;
     const ci = booking.checkIn ? new Date(booking.checkIn) : null;
@@ -196,7 +211,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
         }
       }}
     >
-      <div className="relative h-56 w-full overflow-hidden">
+      <div className="relative h-56 w-full overflow-hidden rounded-t-3xl">
         <OptimizedImage
           src={image?.trim() ? image : getPropertyDesignImage(id)}
           alt={name}
@@ -204,9 +219,27 @@ const ListingCard: React.FC<ListingCardProps> = ({
           wrapperClassName="h-full"
           sizes="(max-width: 768px) 100vw, 33vw"
         />
-        <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary">
+        <span className="absolute left-3 top-3 inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary shadow-sm">
           {propertyType}
         </span>
+        <button
+          type="button"
+          aria-label={saved ? `Remove ${name} from saved` : `Save ${name}`}
+          aria-pressed={saved}
+          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] text-text-primary shadow-sm transition hover:scale-105"
+          onClick={(event) => {
+            event.stopPropagation();
+            if (Number.isFinite(numericId)) {
+              toggleFavorite(numericId);
+              setFavEpoch((e) => e + 1);
+            }
+          }}
+        >
+          <Heart
+            className={`h-4 w-4 ${saved ? "fill-[color:var(--cta-primary)] text-[color:var(--cta-primary)]" : "text-text-primary"}`}
+            aria-hidden
+          />
+        </button>
       </div>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
@@ -413,14 +446,15 @@ const ListingCard: React.FC<ListingCardProps> = ({
               </div>
               <button
                 type="button"
-                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-3 text-sm font-semibold text-[color:var(--text-on-cta)] transition duration-150 hover:-translate-y-0.5  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-[color:var(--brand)] px-4 py-3 text-sm font-semibold text-[color:var(--text-on-cta)] transition duration-150 hover:-translate-y-0.5  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
                 onClick={(event) => {
                   event.stopPropagation();
                   onClick?.();
                 }}
-                aria-label={`View room ${name}`}
+                aria-label={`View home ${name}`}
               >
-                View room
+                View home
+                <span aria-hidden>→</span>
               </button>
               <p className="w-full text-xs font-semibold text-text-muted">Total shown before payment; no hidden charges.</p>
             </div>

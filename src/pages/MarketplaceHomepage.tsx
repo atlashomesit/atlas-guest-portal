@@ -324,7 +324,7 @@ export default function MarketplaceHomepage() {
   }, [marketplaceProperties, searchSuffix]);
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
+    <section className="w-full" data-testid="marketplace-homepage">
       {/* TASK-1876: SEO meta for marketplace homepage.
           TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
           shipped brand baseline (MARKETPLACE_BRAND_BASELINE), mirroring Home.tsx's
@@ -337,78 +337,108 @@ export default function MarketplaceHomepage() {
         url={`${getPublicSiteOrigin()}/`}
         siteName={MARKETPLACE_BRAND_BASELINE}
       />
-      <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
-      <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
 
-      {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
-      {!loading && items.length > 0 && (
-        <div
-          data-testid="marketplace-trust-strip"
-          className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted"
-        >
-          {/* MKT-002: `Listings.PhotosVerifiedAt` is unset on 0 of 136 prod listings today, so
-              this item would always read "0 Verified homes" — an unearned trust claim. Omit it
-              entirely rather than show a zero; it reappears the moment any listing is verified. */}
-          {verifiedHomesCount > 0 && (
-            <>
-              <span>{verifiedHomesCount} Verified homes</span>
+      {/* DESIGN (atlastays-redesign spike): warm gradient hero band behind the wordmark +
+          search bar, matching the reference mockup and the same --gradient-hero token
+          Home.tsx's hero already uses. */}
+      <div className="w-full px-4 py-10 md:py-14" style={{ background: 'var(--gradient-hero)' }}>
+        <div className="mx-auto w-full max-w-6xl text-center">
+          <h1
+            className="text-3xl md:text-4xl font-medium text-text-primary"
+            style={{ fontFamily: 'var(--font-family-display)' }}
+          >
+            Atlastays Marketplace
+          </h1>
+          <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
+
+          {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
+          {!loading && items.length > 0 && (
+            <div
+              data-testid="marketplace-trust-strip"
+              className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-text-secondary"
+            >
+              {/* MKT-002: `Listings.PhotosVerifiedAt` is unset on 0 of 136 prod listings today, so
+                  this item would always read "0 Verified homes" — an unearned trust claim. Omit it
+                  entirely rather than show a zero; it reappears the moment any listing is verified. */}
+              {verifiedHomesCount > 0 && (
+                <>
+                  <span>{verifiedHomesCount} Verified homes</span>
+                  <span aria-hidden>·</span>
+                </>
+              )}
+              {/* TASK-101491: the server's total, not the number loaded so far - this read "20
+                  listings" while the API reported 27. `verifiedHomesCount` above stays a count of
+                  LOADED items on purpose: it is a trust signal, and undercounting it is the safe
+                  direction (never claim verification we have not observed). */}
+              <span>{total || items.length} listings</span>
               <span aria-hidden>·</span>
-            </>
+              <span className="font-semibold text-[var(--accent-text)]">Book direct from the owner</span>
+              {hasOnlinePaymentRail() ? (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>Price shown: room + GST + 3% payment-processing fee</span>
+                </>
+              ) : null}
+            </div>
           )}
-          {/* TASK-101491: the server's total, not the number loaded so far - this read "20
-              listings" while the API reported 27. `verifiedHomesCount` above stays a count of
-              LOADED items on purpose: it is a trust signal, and undercounting it is the safe
-              direction (never claim verification we have not observed). */}
-          <span>{total || items.length} listings</span>
-          <span aria-hidden>·</span>
-          <span className="font-medium text-emerald-700">Book direct from the owner</span>
-          {hasOnlinePaymentRail() ? (
-            <>
-              <span aria-hidden>·</span>
-              <span>Price shown: room + GST + 3% payment-processing fee</span>
-            </>
-          ) : null}
-        </div>
-      )}
 
-      <div className="mt-8">
-        <AirbnbSearchBar />
+          <div className="mt-8">
+            <AirbnbSearchBar />
+          </div>
+        </div>
       </div>
 
+      <div className="mx-auto w-full max-w-6xl px-4 py-8">
+
+      {/* DESIGN (atlastays-redesign spike): secondary filter bar restyled as rounded pills in
+          the site's warm coral palette, matching the reference mockup's Price / Property type
+          / List-Map row — same filters/state as before, visual treatment only. */}
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <input
           data-testid="marketplace-search"
-          className="min-h-[44px] rounded-xl border border-border px-4 py-2"
+          className="min-h-[44px] rounded-full border border-border-subtle bg-bg-surface px-4 py-2 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
           placeholder="Search by city"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {(['all', 'homes', 'rooms'] as const).map((c) => (
-          <button
-            key={c}
-            data-testid={`marketplace-filter-${c}`}
-            className={`min-h-[44px] rounded-xl px-4 py-2 ${category === c ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
-            onClick={() => setCategory(c)}
-          >
-            {c[0].toUpperCase() + c.slice(1)}
-          </button>
-        ))}
+        <div className="inline-flex rounded-full border border-border-subtle bg-bg-surface p-1 shadow-sm">
+          {(['all', 'homes', 'rooms'] as const).map((c) => (
+            <button
+              key={c}
+              data-testid={`marketplace-filter-${c}`}
+              className={`min-h-[38px] rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${category === c ? 'bg-cta-primary text-[var(--text-on-cta)]' : 'text-text-primary hover:bg-bg-muted'}`}
+              onClick={() => setCategory(c)}
+            >
+              {c[0].toUpperCase() + c.slice(1)}
+            </button>
+          ))}
+        </div>
         {/* TL-PROP: map view toggle. Hidden if no properties have lat/lng configured. */}
         {mapPins.length > 0 && (
-          <button
-            data-testid="marketplace-map-toggle"
-            className={`ml-auto min-h-[44px] rounded-xl px-4 py-2 ${showMap ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
-            onClick={() => setShowMap((v) => !v)}
-            aria-pressed={showMap}
-          >
-            {showMap ? 'Hide map' : `Map (${mapPins.length})`}
-          </button>
+          <div className="ml-auto inline-flex rounded-full border border-border-subtle bg-bg-surface p-1 shadow-sm">
+            <button
+              data-testid="marketplace-map-toggle-list"
+              className={`min-h-[38px] rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${!showMap ? 'bg-cta-primary text-[var(--text-on-cta)]' : 'text-text-primary hover:bg-bg-muted'}`}
+              onClick={() => setShowMap(false)}
+              aria-pressed={!showMap}
+            >
+              List
+            </button>
+            <button
+              data-testid="marketplace-map-toggle"
+              className={`min-h-[38px] rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${showMap ? 'bg-cta-primary text-[var(--text-on-cta)]' : 'text-text-primary hover:bg-bg-muted'}`}
+              onClick={() => setShowMap(true)}
+              aria-pressed={showMap}
+            >
+              {`Map (${mapPins.length})`}
+            </button>
+          </div>
         )}
       </div>
 
       {/* TASK-4413: price-range control — client-side filter over the fetched grid. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <label htmlFor="marketplace-min-price" className="text-sm font-medium text-text-muted">
+      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-full border border-border-subtle bg-bg-surface px-4 py-2 w-fit">
+        <label htmlFor="marketplace-min-price" className="text-sm font-semibold text-text-primary">
           Price / night
         </label>
         <input
@@ -419,7 +449,7 @@ export default function MarketplaceHomepage() {
           placeholder="Min"
           value={minPriceInput}
           onChange={(e) => setMinPriceInput(e.target.value)}
-          className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
+          className="min-h-[36px] w-20 rounded-full border border-border-subtle bg-bg-muted px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cta-primary"
         />
         <span aria-hidden className="text-text-muted">–</span>
         <input
@@ -431,7 +461,7 @@ export default function MarketplaceHomepage() {
           aria-label="Max price"
           value={maxPriceInput}
           onChange={(e) => setMaxPriceInput(e.target.value)}
-          className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
+          className="min-h-[36px] w-20 rounded-full border border-border-subtle bg-bg-muted px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cta-primary"
         />
         {(minPriceInput !== '' || maxPriceInput !== '') && (
           <button
@@ -440,7 +470,7 @@ export default function MarketplaceHomepage() {
               setMinPriceInput('');
               setMaxPriceInput('');
             }}
-            className="min-h-[40px] rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-muted"
+            className="min-h-[36px] rounded-full border border-border-subtle px-3 py-1 text-sm font-medium text-text-primary hover:bg-bg-muted"
           >
             Clear price
           </button>
@@ -453,7 +483,7 @@ export default function MarketplaceHomepage() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketplace-grid">
+      <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" data-testid="marketplace-grid">
         {/* TASK-1875: skeleton cards while loading */}
         {loading && Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
 
@@ -464,7 +494,7 @@ export default function MarketplaceHomepage() {
             return (
               <article
                 key={item.id}
-                className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-sm transition-colors hover:border-border-subtle"
+                className="relative flex flex-col overflow-hidden rounded-3xl border border-border-subtle bg-bg-surface shadow-level1 transition hover:-translate-y-0.5 hover:shadow-level2"
                 data-testid="marketplace-card"
               >
                 {/* TASK-1874: OptimizedImage replaces raw <img> */}
@@ -585,10 +615,11 @@ export default function MarketplaceHomepage() {
                   <OwnerShareBadge className="self-start" />
 
                   <Link
-                    className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
+                    className="mt-auto inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full bg-[var(--cta-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--text-on-cta)] transition hover:-translate-y-0.5 hover:bg-[var(--cta-primary-hover)]"
                     to={marketplaceListingPath(item, searchSuffix)}
                   >
                     View home
+                    <span aria-hidden>→</span>
                   </Link>
                 </div>
               </article>
@@ -606,9 +637,9 @@ export default function MarketplaceHomepage() {
             data-testid="marketplace-load-more"
             onClick={loadMore}
             disabled={loadingMore}
-            className="min-h-[44px] rounded-xl bg-black px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-60"
+            className="min-h-[44px] rounded-full border border-[var(--cta-primary)] bg-bg-surface px-8 py-2.5 text-sm font-semibold text-[var(--cta-primary)] transition hover:bg-[var(--cta-primary)] hover:text-[var(--text-on-cta)] disabled:opacity-60"
           >
-            {loadingMore ? 'Loading…' : 'Show more homes'}
+            {loadingMore ? 'Loading…' : 'Load more'}
           </button>
           <p className="text-sm text-text-muted" data-testid="marketplace-load-more-count" aria-live="polite">
             Showing {items.length} of {total}
@@ -630,6 +661,7 @@ export default function MarketplaceHomepage() {
           </p>
         </div>
       )}
+      </div>
     </section>
   );
 }

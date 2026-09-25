@@ -402,14 +402,15 @@
 
 .navbar-search-pill {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
-  min-width: 220px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 240px;
   max-width: 320px;
   /* TASK-7822: desktop-only pill (`hidden lg:flex`) must occupy a stable box. */
   min-height: 44px;
-  padding: 0.55rem 1rem;
+  padding: 0.4rem 0.4rem 0.4rem 1.1rem;
   border-radius: 999px;
   border: 1px solid var(--navbar-search-pill-border, rgba(220, 210, 200, 0.55));
   background: var(--navbar-search-pill-bg, rgba(255, 250, 245, 0.95));
@@ -424,6 +425,14 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
 }
 
+.navbar-search-pill__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
 .navbar-search-pill__label {
   font-size: 0.875rem;
   font-weight: 600;
@@ -433,6 +442,18 @@
 .navbar-search-pill__hint {
   font-size: 0.75rem;
   color: var(--text-muted, #6b7280);
+}
+
+.navbar-search-pill__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--cta-primary, #c04528);
+  color: var(--text-on-cta, #fff);
 }
 
 .navbar-account-avatar {

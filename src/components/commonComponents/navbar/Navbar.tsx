@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
+import { Search } from 'lucide-react';
 import './navbar.css';
 import './mobile-search.css';
 import MobileSearchPill from './MobileSearchPill';
@@ -286,8 +287,13 @@ const Navbar = () => {
         {/* CENTER - Desktop Navigation: Stays | Hyderabad | Trips | Help */}
         <div className="hidden lg:flex items-center flex-1 justify-center">
           <Link to="/search" className="navbar-search-pill" data-testid="navbar-search-pill">
-            <span className="navbar-search-pill__label">Where to?</span>
-            <span className="navbar-search-pill__hint">Search stays</span>
+            <span className="navbar-search-pill__text">
+              <span className="navbar-search-pill__label">Where to?</span>
+              <span className="navbar-search-pill__hint">Search stays</span>
+            </span>
+            <span className="navbar-search-pill__icon" aria-hidden>
+              <Search className="h-4 w-4" strokeWidth={2.5} />
+            </span>
           </Link>
         </div>
 

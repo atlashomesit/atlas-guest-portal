@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { AlertTriangle, Briefcase, CalendarDays, CalendarRange, Wifi } from "lucide-react";
+import { AlertTriangle, Briefcase, CalendarDays, CalendarRange, Heart, Wifi } from "lucide-react";
 
 import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -43,6 +43,7 @@ import {
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 import { CONTACT } from "../config/contact";
 import { getPropertyDesignImage } from "../config/branding";
+import { getFavoriteIds, toggleFavorite } from "../utils/guestHistory";
 import "./search-page.css";
 
 const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMap"));
@@ -280,6 +281,13 @@ const SearchPage = () => {
   // primary listings fetch failed on first load was told "No <homes> match your filters" with no
   // way to retry, indistinguishable from a real zero-result search.
   const [retryCount, setRetryCount] = useState(0);
+  // DESIGN (atlastays-redesign spike): card save/heart toggle — same localStorage-backed
+  // favorites util ListingCard.tsx / MarketplaceHomepage.tsx already use.
+  const [favEpoch, setFavEpoch] = useState(0);
+  const savedIds = useMemo(() => {
+    void favEpoch;
+    return new Set(getFavoriteIds());
+  }, [favEpoch]);
 
   const checkInParam = searchParams.get("checkIn");
   const checkOutParam = searchParams.get("checkOut");
@@ -1663,8 +1671,28 @@ const SearchPage = () => {
                     alt={unit.title ?? "Property listing"}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
-                    sizes="(max-width: 640px) 100vw, 50vw"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 25vw"
                   />
+                  {/* DESIGN (atlastays-redesign spike): save/heart toggle over the image,
+                      matching the reference mockup's card treatment. Same localStorage
+                      favorites util as ListingCard.tsx / MarketplaceHomepage.tsx. */}
+                  <button
+                    type="button"
+                    className="search-card__save"
+                    aria-label={savedIds.has(unit.numericId) ? `Remove ${unit.title} from saved` : `Save ${unit.title}`}
+                    aria-pressed={savedIds.has(unit.numericId)}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      toggleFavorite(unit.numericId);
+                      setFavEpoch((e) => e + 1);
+                    }}
+                  >
+                    <Heart
+                      className={`h-4 w-4 ${savedIds.has(unit.numericId) ? "fill-[color:var(--cta-primary)] text-[color:var(--cta-primary)]" : "text-text-primary"}`}
+                      aria-hidden
+                    />
+                  </button>
                 </div>
                 <div className="search-card__body">
                   <div className="min-h-6" data-testid="search-listing-availability-slot">
