@@ -176,6 +176,18 @@ describe('estTotalInclGst / formatEstTotalInclGst — TASK-7543 search-card esti
     const label7600 = formatEstTotalInclGst(7600, 1, (n) => `₹${n}`, 3, true);
     expect(label7600).not.toContain('GST');
   });
+
+  it('TASK-102042: exempt 800 and upper 8000 bands est-total matches zero-GST breakdown within ₹1', () => {
+    for (const perNight of [800, 8000]) {
+      const nights = 2;
+      const base = perNight * nights;
+      const fee = Math.round((base * 3) / 100);
+      const serverTotal = base + fee;
+      const est = estTotalInclGst(perNight, nights, 3, true);
+      expect(Math.abs(est - serverTotal)).toBeLessThanOrEqual(1);
+      expect(formatEstTotalInclGst(perNight, nights, (n) => `₹${n}`, 3, true)).not.toContain('GST');
+    }
+  });
 });
 
 describe('computeCheckoutTotal — TASK-102037 zero GST added on top at checkout', () => {
