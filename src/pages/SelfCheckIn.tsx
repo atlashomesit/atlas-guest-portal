@@ -1048,7 +1048,7 @@ export default function SelfCheckIn() {
                               <div className="flex flex-wrap justify-center gap-2">
                                 <label className="cursor-pointer rounded-lg bg-bg-muted px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-surface border border-border-subtle transition">
                                   📸 Retake Photo
-                                  <input type="file" accept="image/*" capture="environment" onChange={(e) => handleGuestFileSelect(idx, e)} className="hidden" />
+                                  <input id={idPhotoInputId} type="file" accept="image/*" capture="environment" onChange={(e) => handleGuestFileSelect(idx, e)} className="hidden" />
                                 </label>
                                 <label className="cursor-pointer rounded-lg bg-bg-muted px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-surface border border-border-subtle transition">
                                   📁 Choose File
@@ -1061,7 +1061,7 @@ export default function SelfCheckIn() {
                               <p className="text-sm text-text-primary font-medium mb-3">📄 {g.idFile.name}</p>
                               <label className="cursor-pointer rounded-lg bg-bg-muted px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-surface border border-border-subtle transition">
                                 Replace File
-                                <input type="file" accept="image/*,.pdf" onChange={(e) => handleGuestFileSelect(idx, e)} className="hidden" />
+                                <input id={idPhotoInputId} type="file" accept="image/*,.pdf" onChange={(e) => handleGuestFileSelect(idx, e)} className="hidden" />
                               </label>
                             </div>
                           ) : (

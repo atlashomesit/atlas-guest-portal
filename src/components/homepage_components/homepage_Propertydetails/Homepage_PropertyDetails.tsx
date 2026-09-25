@@ -1686,7 +1686,19 @@ useEffect(() => {
                       native-only fields render ★ 0.0 (0 reviews) when Google imports are the only source. */}
                   {ppHasApiReviews && ppCombinedReviewCount > 0 && (
                     <>
-                      <a href="#reviews" className="pp-rating hover:opacity-80 transition-opacity" data-testid="property-header-rating" aria-label="View guest reviews">
+                      <a
+                        href="#reviews"
+                        className="pp-rating hover:opacity-80 transition-opacity"
+                        data-testid="property-header-rating"
+                        aria-label="View guest reviews"
+                        onClick={() => {
+                          // TASK-102616: native fragment nav scrolls but never moves
+                          // keyboard focus — move it explicitly (WCAG 2.4.3).
+                          window.setTimeout(() => {
+                            document.getElementById('reviews')?.focus();
+                          }, 0);
+                        }}
+                      >
                         ★ {ppCombinedAverageRating.toFixed(1)}{' '}
                         <em>({ppCombinedReviewCount} {ppCombinedReviewCount === 1 ? 'review' : 'reviews'})</em>
                       </a>
@@ -2200,7 +2212,7 @@ useEffect(() => {
                   // TASK-8019: "verified stay(s) / through this platform" only for native Atlas reviews.
                   const nativeVerifiedCount = api.totalCount;
                   return (
-                    <section id="reviews" className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
+                    <section id="reviews" tabIndex={-1} className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
                         <h2>
                           ★ {rating.toFixed(1)} from {count}{' '}
