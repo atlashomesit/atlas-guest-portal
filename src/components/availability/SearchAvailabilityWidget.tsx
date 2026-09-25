@@ -441,7 +441,7 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         infants: guestCounts.infants,
         pets: guestCounts.pets,
       },
-      { route: `/search?${params.toString()}` },
+      { route: `/search?${validation.searchParams.toString()}` },
     );
 
     trackEvent(
@@ -452,11 +452,11 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         checkOut: istInstantFromCalendarDate(validation.endDate).toISOString(),
         guests: guestCounts.adults + guestCounts.children + guestCounts.infants,
       },
-      { route: `/search?${params.toString()}` },
+      { route: `/search?${validation.searchParams.toString()}` },
     );
 
     // P0 fix (5th-pass): navigate directly to /search — no split-stays modal
-    navigate({ pathname: '/search', search: params.toString() });
+    navigate({ pathname: '/search', search: validation.searchParams.toString() });
   };
 
   const handleRangeChange = (selection: AtlasDateRangePickerValue) => {
