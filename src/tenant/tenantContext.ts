@@ -30,6 +30,13 @@ export interface TenantInfo {
   category?: string;
   /** TASK-1727: true when the tenant has a valid GSTIN on file. */
   isGstVerified?: boolean;
+  /**
+   * TASK-102427: host-entered GA4 measurement ID (admin settings → Tenant.GaMeasurementId).
+   * Undefined until the host configures it AND atlas-api ships the DTO field — the portal
+   * falls back to build-time VITE_GA_MEASUREMENT_ID. Always consumed via
+   * sanitizeGaMeasurementId, never injected raw.
+   */
+  gaMeasurementId?: string;
   // ── RA-006: TenantBrandPack payment fields ─────────────────────────────────
   /** Active payment provider type (RAZORPAY, UPI_QR, MANUAL…). Undefined = not configured. */
   paymentProvider?: string;
@@ -273,6 +280,10 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
       isMarketplaceRoot,
       brandColor: data.primaryColor ?? undefined, // backward compat
       isGstVerified: Boolean(data.isGstVerified), // TASK-1727
+      // TASK-102427: defensive read — undefined until the host configures it server-side.
+      gaMeasurementId: typeof data.gaMeasurementId === 'string' && data.gaMeasurementId.trim().length > 0
+        ? data.gaMeasurementId.trim()
+        : undefined,
       // RA-006: TenantBrandPack payment fields
       paymentProvider: data.paymentProvider ?? undefined,
       displayMerchantName: data.displayMerchantName ?? undefined,
@@ -365,6 +376,11 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
     logoUrl: data.logoUrl ?? undefined,
     primaryColor: data.brandColor ?? undefined,
     brandColor: data.brandColor ?? undefined,
+    // TASK-102427: same defensive read as resolveFromDomain() above.
+    gaMeasurementId: typeof (data as Record<string, unknown>).gaMeasurementId === 'string' &&
+      ((data as Record<string, unknown>).gaMeasurementId as string).trim().length > 0
+      ? ((data as Record<string, unknown>).gaMeasurementId as string).trim()
+      : undefined,
     mapLocation: (data.mapLocation && typeof data.mapLocation.lat === 'number' && typeof data.mapLocation.lng === 'number')
       ? {
           lat: data.mapLocation.lat,

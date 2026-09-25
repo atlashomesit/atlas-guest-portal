@@ -156,6 +156,23 @@ function slugify(value: string): string {
  * TASK-7430: listing path slug for sitemap — never invent "atlas-homes" for a non-Atlas host.
  * Prefer API-provided slug fields, then property/listing name, then home-{id}.
  */
+/**
+ * TASK-102424: sitemap must list only published, active, public-facing pages.
+ * The generator used to emit every `/listings/public` row with a numeric id, so
+ * deleted/unpublished drafts leaked in as 404 crawl errors. Drop rows carrying an
+ * explicit unpublished/inactive/deleted signal; rows without any status fields
+ * (the API's normal published shape) still pass.
+ */
+export function isSitemapEligibleListing(raw: unknown): boolean {
+  const l = (raw ?? {}) as Record<string, unknown>;
+  if (l.isPublished === false || l.isActive === false || l.isDeleted === true) return false;
+  const status = String(l.status ?? l.state ?? '').trim().toLowerCase();
+  if (status && ['draft', 'unpublished', 'inactive', 'deleted', 'archived'].includes(status)) {
+    return false;
+  }
+  return true;
+}
+
 export function listingPathSlug(
   listing: {
     id?: unknown;
@@ -261,6 +278,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
         const rows = await fetchAllMarketplaceListings(apiBase, fetch);
         for (const row of rows) {
           if (!Number.isFinite(row.id) || row.id <= 0 || !row.tenantSlug) continue;
+          if (!isSitemapEligibleListing(row)) continue;
           listingPaths.push(marketplaceListingPath(row, { allowAtlasHomesFallback: true }));
         }
         // A homestays-in-<city> URL is offered only when the marketplace actually has supply
@@ -302,6 +320,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
             const l = raw as Record<string, unknown>;
             const id = Number(l?.id);
             if (!Number.isFinite(id) || id <= 0) continue;
+            if (!isSitemapEligibleListing(l)) continue;
             const propertySlug = listingPathSlug(l, { allowAtlasHomesFallback });
             listingPaths.push(`/homes/${propertySlug}/${id}`);
           }

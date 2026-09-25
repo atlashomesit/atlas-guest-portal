@@ -267,12 +267,23 @@ describe("Atlas direct-booking hosts: canonical + og:url before JS (TASK-101940)
   });
 
   it.each([
-    "https://www.atlashomestays.com/",
     "https://atlashomes.in/",
     "https://www.atlashomes.in/homes/atlas-homes/1",
   ])("leaves duplicate alias host %s untouched (no self-canonical duplicate of the apex)", async (url) => {
     const { body } = await serve(url);
     expect(body).toBe(INDEX_HTML);
+    expect(constructed).toEqual([]);
+  });
+
+  it("301s the www duplicate alias to the apex before any canonical rewrite runs (TASK-102420)", async () => {
+    const { response, body } = await serve(
+      "https://www.atlashomestays.com/homes/atlas-homes/1?checkin=2026-10-01",
+    );
+    expect(response.status).toBe(301);
+    expect(response.headers.get("location")).toBe(
+      "https://atlashomestays.com/homes/atlas-homes/1?checkin=2026-10-01",
+    );
+    expect(body).toBe("");
     expect(constructed).toEqual([]);
   });
 

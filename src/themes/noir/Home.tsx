@@ -32,7 +32,7 @@ import FooterCtaStrip from '../../components/home/FooterCtaStrip';
 import SEO from '../../components/SEO';
 import { LOGO_URL } from '../../config/branding';
 import { HERO_IMAGE_URL } from '../../config/hero';
-import { sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '../../utils/guestImageUrl';
+import { buildGuestImageSrcSet, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '../../utils/guestImageUrl';
 import { CONTACT, getContactEmail } from '../../config/contact';
 import { getTenantBrandName } from '../../tenant/displayBrand';
 import { enableFooterMiniCtaAboveFooter } from '../../config/homepageUxFlags';
@@ -99,6 +99,7 @@ const NoirHome = () => {
     const heroImageUrl = showAtlasContent
         ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
         : '';
+    const heroImageSrcSet = showAtlasContent ? buildGuestImageSrcSet(HERO_IMAGE_URL) : undefined;
     const hasHeroPhoto = Boolean(heroImageUrl.trim());
     const heroPhotoAriaLabel = showAtlasContent
         ? `A warm, owner-run ${schemaBrandName} living room, shown at night`
@@ -166,11 +167,13 @@ const NoirHome = () => {
                     beyond one restrained search card. */}
                 <div className="noir-hero" data-testid="noir-hero">
                     {hasHeroPhoto ? (
-                        <div
+                        <img
                             className="noir-hero-photo"
-                            style={{ backgroundImage: `url("${heroImageUrl}")` }}
-                            role="img"
-                            aria-label={heroPhotoAriaLabel}
+                            src={heroImageUrl}
+                            srcSet={heroImageSrcSet}
+                            sizes="100vw"
+                            alt={heroPhotoAriaLabel}
+                            fetchPriority="high"
                         />
                     ) : (
                         <div

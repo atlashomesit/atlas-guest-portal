@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { useBooking } from '../contexts/BookingContext';
 import { Button } from '../components/ui/Button';
+import BookingProgressSteps from '../components/booking/BookingProgressSteps';
 import Subheading from '../components/commonComponents/subheading/Subheading';
 import SEO from '../components/SEO';
 import { getTenantBrandName } from '../tenant/displayBrand';
@@ -42,8 +43,16 @@ const Reserve = () => {
 
   return (
     <>
-    <SEO title={`Reserve | ${brandName}`} description={`Review your stay details and continue to secure payment with ${brandName}.`} />
+    <SEO title={`Reserve | ${brandName}`} description={`Review your stay details and continue to secure payment with ${brandName}.`} robots="noindex, nofollow" />
     <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-8">
+      {/* TASK-102109: numbered funnel progress — Reserve is step 3 (Review). */}
+      <BookingProgressSteps
+        currentStep={3}
+        onStepClick={(step) => {
+          if (step === 1) navigate('/search');
+          else if (step === 2) navigate(-1);
+        }}
+      />
       <div className="pt-6">
         <Subheading />
       </div>

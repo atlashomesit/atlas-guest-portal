@@ -232,6 +232,8 @@ Migrate `atlas-guest-portal` from static SPA to SSR framework (Astro, Remix, Nex
 
 ---
 
-**Approval required:** Founder confirmation that deferral is acceptable. Next implementation task will be filed only if founder requests social-preview correctness.
+**Approval required:** ~~Founder confirmation that deferral is acceptable.~~ **RULED 2026-09-22: NOT deferred — founder wants the fix filed.**
 
-**Spike completion:** Investigation complete. Memo returned to founder for direction on ADR-0018 revisit.
+**Founder ruling 2026-09-22:** Reverse ADR-0018's deferral. Implement **Option (b): Cloudflare Worker HTMLRewriter** — the spike's own "if forced to recommend" pick, and now doubly justified: `atlas-guest-portal` already runs a Cloudflare Pages Function for the image-resizing proxy (`TASK-7821`, `/img` route), so this reuses infra already in place rather than introducing a new deployment model. Scope: intercept `/homes/{slug}/{unit-slug}` (and city/region pages), inject `og:title`/`og:description`/JSON-LD from `GET /api/listings/{id}` via HTMLRewriter, with cache TTL (~1h listings, ~5min reviews) and a fallback to the SPA shell on API timeout. Needs a real implementation task filed against `atlas-guest-portal` before work starts.
+
+**Spike completion:** Investigation complete. Deferral reversed 2026-09-22; implementation task to follow.

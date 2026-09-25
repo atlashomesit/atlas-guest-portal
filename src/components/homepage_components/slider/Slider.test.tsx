@@ -86,6 +86,7 @@ vi.mock("../../../hooks/useTenantListings", () => ({
 }));
 import Slider from "./Slider";
 import * as analytics from "../../../utils/analytics";
+import { getIstCalendarDate } from "../../../utils/date";
 import { BookingProvider } from "../../../contexts/BookingContext";
 import { getTenantContext } from "../../../tenant/tenantContext";
 
@@ -262,12 +263,17 @@ describe("Slider hero search", () => {
       renderSlider();
       fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
 
-      // Default dates are today/tomorrow (both filled). Clicking a NEW future day while a full
-      // range is already selected starts a fresh check-in selection and clears check-out
-      // (AtlasDateRangePicker's RANGE_SELECTED → CHECK_IN_SELECTED transition) — reproducing the
-      // "check-out left empty" repro state without needing a two-click calendar interaction.
-      const futureDateTestId = `hero-date-${format(addDays(new Date(), 3), "yyyy-MM-dd")}`;
-      fireEvent.click(screen.getByTestId(futureDateTestId));
+      // Default dates are today/tomorrow (both filled). Clicking the CURRENT
+      // check-in day while a full range is already selected restarts the stay
+      // and clears check-out (AtlasDateRangePicker's RANGE_SELECTED →
+      // CHECK_IN_SELECTED transition for a check-in that does NOT invalidate
+      // the held check-out; TASK-102076 auto-advances only the invalidating
+      // case) — reproducing the "check-out left empty" repro state without
+      // needing a two-click calendar interaction. The day is derived from the
+      // property's IST civil date, not the runner's local date, so this holds
+      // in every zone.
+      const todayTestId = `hero-date-${format(getIstCalendarDate(), "yyyy-MM-dd")}`;
+      fireEvent.click(screen.getByTestId(todayTestId));
 
       const submit = screen.getAllByTestId("hero-search-submit")[0];
       // TASK-4911: must stay clickable — an html-disabled button is the original silent no-op bug.
@@ -284,8 +290,12 @@ describe("Slider hero search", () => {
       renderSlider();
       fireEvent.click(screen.getAllByTestId("hero-date-toggle")[0]);
 
-      const futureDateTestId = `hero-date-${format(addDays(new Date(), 3), "yyyy-MM-dd")}`;
-      fireEvent.click(screen.getByTestId(futureDateTestId));
+      // Same checkout-cleared setup as above: re-picking the current check-in
+      // day restarts the stay without invalidating the held check-out, so the
+      // picker clears (not auto-advances, see TASK-102076) and check-out is
+      // left empty for the submit below.
+      const todayTestId = `hero-date-${format(getIstCalendarDate(), "yyyy-MM-dd")}`;
+      fireEvent.click(screen.getByTestId(todayTestId));
 
       const submit = screen.getAllByTestId("hero-search-submit")[0];
       fireEvent.click(submit);

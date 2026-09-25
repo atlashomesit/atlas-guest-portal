@@ -506,7 +506,19 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         const navBottom = navEl ? Math.max(0, navEl.getBoundingClientRect().bottom) : 0;
         // Natural height, unaffected by a maxHeight applied on an earlier pass.
         const popHeight = pop.scrollHeight + (pop.offsetHeight - pop.clientHeight);
-        const visibleBottom = viewportHeight - MARGIN;
+        // The Reserve CTA sits directly below the date fields in the booking column. A
+        // popover that visually overlaps it also swallows its clicks: the click-outside
+        // handler below only closes when the mousedown target is OUTSIDE popoverRef, so a
+        // click aimed at an overlapped Reserve button lands inside the popover's own DOM and
+        // neither reaches Reserve nor closes the calendar (TASK-102485 regression — the
+        // atlas:set-checkin bridge auto-opens this popover, and it can cover the CTA beneath).
+        // Treat the Reserve button's top edge as a floor, same as the navbar ceiling below.
+        const reserveEl = document.querySelector('[data-testid="guest-booking-submit"]');
+        const reserveTop = reserveEl ? reserveEl.getBoundingClientRect().top : null;
+        const visibleBottom =
+          reserveTop != null && reserveTop > navBottom
+            ? Math.min(viewportHeight - MARGIN, reserveTop - MARGIN)
+            : viewportHeight - MARGIN;
 
         // The popover is position:fixed beside a sticky booking column, so scrolling the page can
         // never reveal a part of it that opens below the fold. When the space below the field is

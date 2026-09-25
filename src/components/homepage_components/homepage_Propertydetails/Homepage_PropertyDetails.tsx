@@ -25,6 +25,7 @@ import { usePropertyListings } from '../../../hooks/usePropertyListings';
 import { useFocusTrap } from '../../../hooks/useFocusTrap';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
+import Lightbox from '../../ui/Lightbox';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
 import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
@@ -60,8 +61,11 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/gu
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
+import ListingWhatsAppFloat from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
+import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
+import LocalGuideAccordion from './LocalGuideAccordion'; // TASK-102117
 import type { BookingStickySummary } from '@/components/availability/UnitBookingWidget';
 
 const UnitBookingWidget = lazy(() => import('../../availability/UnitBookingWidget'));
@@ -526,7 +530,7 @@ const PropertyDetails = () => {
     const [resolvedListingId, setResolvedListingId] = useState<string | number | null>(null);
     // TASK-2739-v1: "Draft" | "Published" (undefined on legacy payloads = treated as live).
     const [publishStatus, setPublishStatus] = useState<string | undefined>(undefined);
-    const [, setListingLookupError] = useState<string | null>(null);
+    const [listingLookupError, setListingLookupError] = useState<string | null>(null);
     const [isListingLookupPending, setIsListingLookupPending] = useState(false);
     const [showAmenitiesModal, setShowAmenitiesModal] = useState(false);
     const amenitiesModalRef = useFocusTrap<HTMLDivElement>(showAmenitiesModal);
@@ -541,6 +545,10 @@ const PropertyDetails = () => {
     }, [showAmenitiesModal]);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
+    /** TASK-102112: guest review star filter (null = All) + sort. Pure client-side —
+        filtering/sorting re-renders the already-fetched cards instantly, no reload. */
+    const [reviewStarFilter, setReviewStarFilter] = useState<number | null>(null);
+    const [reviewSort, setReviewSort] = useState<ReviewSortKey>('recent');
     const [stickyBookingSummary, setStickyBookingSummary] = useState<BookingStickySummary | null>(null);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
@@ -552,7 +560,15 @@ const PropertyDetails = () => {
         if (!hasSearchParams) return null;
         return `/search?${searchParams.toString()}`;
     }, [searchParams]);
-    const showAvailabilityPlaceholder = false;
+    // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
+    // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
+    // never render, silently masking the degraded-state UI for a failed listing lookup (the
+    // lookup error string was set via setListingLookupError but destructured away and never
+    // rendered, while resolvedListingId stayed null so the AvailabilityCalendar never mounted
+    // and the UnitBookingWidget fail-OPENED an all-available calendar). Wire the panel to the
+    // real lookup-failure state instead: no resolved id, lookup settled, and an error recorded.
+    const showAvailabilityPlaceholder =
+      !resolvedListingId && !isListingLookupPending && listingLookupError != null;
     const [fav, setFav] = useState(false);
     const [similarFromApi, setSimilarFromApi] = useState<null | { loading: boolean; items: any[] }>(null);
     /** TASK-1726: host response time badge text (e.g. "Replies in <1h"). */
@@ -561,6 +577,11 @@ const PropertyDetails = () => {
     const [reviewReplyRateBadge, setReviewReplyRateBadge] = useState<string | null>(null);
     /** AMN-001: amenity master code→label map */
     const [amenityMaster, setAmenityMaster] = useState<Map<string, string>>(new Map());
+    const [amenityCategoryMaster, setAmenityCategoryMaster] = useState<Map<string, string>>(new Map());
+
+    // Lightbox state
+    const [showLightbox, setShowLightbox] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState(0);
 
     /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
     const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
@@ -580,10 +601,15 @@ const PropertyDetails = () => {
             .then((items: unknown) => {
                 if (!active || !Array.isArray(items)) return;
                 const map = new Map<string, string>();
-                (items as { code: string; label: string }[]).forEach(({ code, label }) => {
-                    if (code && label) map.set(code.toLowerCase(), label);
+                const catMap = new Map<string, string>();
+                (items as { code: string; label: string; category?: string }[]).forEach(({ code, label, category }) => {
+                    if (code && label) {
+                        map.set(code.toLowerCase(), label);
+                        catMap.set(code.toLowerCase(), category || 'General');
+                    }
                 });
                 setAmenityMaster(map);
+                setAmenityCategoryMaster(catMap);
             })
             .catch(() => { /* non-critical */ });
         return () => { active = false; };
@@ -883,6 +909,13 @@ const PropertyDetails = () => {
             }
         })();
         return () => ac.abort();
+    }, [resolvedListingId]);
+
+    // TASK-102112: reset the guest review filter/sort when the listing changes so a stale
+    // pill cannot blank a newly-loaded review set.
+    useEffect(() => {
+        setReviewStarFilter(null);
+        setReviewSort('recent');
     }, [resolvedListingId]);
 
     useEffect(() => {
@@ -1239,38 +1272,6 @@ useEffect(() => {
 
     useEffect(() => {
         if (!data) return;
-
-        const initFancybox = async () => {
-            try {
-                // CSS bundled from the installed package (matches the v6 JS) — avoids
-                // the CSP style-src violation from the previous cdn.jsdelivr.net link
-                // and the v5↔v6 version mismatch.
-                const [{ Fancybox }] = await Promise.all([
-                    import("@fancyapps/ui"),
-                    import("@fancyapps/ui/dist/fancybox/fancybox.css"),
-                ]);
-
-                (Fancybox as { bind: (sel: string, opts: object) => void }).bind("[data-fancybox='property-gallery']", {
-                    Thumbs: {
-                        type: "classic",
-                    },
-                    Carousel: {
-                        transition: "slide",
-                    },
-                });
-
-                return () => {
-                    Fancybox.destroy();
-                };
-            } catch (err) {
-                console.warn('Failed to load Fancybox', err);
-            }
-        };
-
-        const cleanup = initFancybox();
-        return () => {
-            cleanup?.then((fn) => fn?.());
-        };
     }, [data]);
 
     useEffect(() => {
@@ -1577,8 +1578,15 @@ useEffect(() => {
     const ppHasApiReviews = Boolean(
         ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
     );
+    /** TASK-102112: pill counts + the filtered/sorted review set (instant, client-side). */
+    const ppReviewFilterCounts = {
+        all: ppMergedReviews.length,
+        five: ppMergedReviews.filter((r) => Number(r.rating) === 5).length,
+        four: ppMergedReviews.filter((r) => Number(r.rating) === 4).length,
+    };
+    const ppFilteredSortedReviews = applyReviewFilterSort(ppMergedReviews, { starFilter: reviewStarFilter, sort: reviewSort });
     const ppDisplayedReviews = ppHasApiReviews
-        ? (showAllReviews ? ppMergedReviews : ppMergedReviews.slice(0, 6))
+        ? (showAllReviews ? ppFilteredSortedReviews : ppFilteredSortedReviews.slice(0, 6))
         : [];
     const ppAmenityDisplay = ppAmenityLabels.slice(0, 12);
     const ppAmenityCodes = data.amenityCodes && data.amenityCodes.length > 0
@@ -1678,10 +1686,10 @@ useEffect(() => {
                       native-only fields render ★ 0.0 (0 reviews) when Google imports are the only source. */}
                   {ppHasApiReviews && ppCombinedReviewCount > 0 && (
                     <>
-                      <span className="pp-rating" data-testid="property-header-rating">
+                      <a href="#reviews" className="pp-rating hover:opacity-80 transition-opacity" data-testid="property-header-rating" aria-label="View guest reviews">
                         ★ {ppCombinedAverageRating.toFixed(1)}{' '}
                         <em>({ppCombinedReviewCount} {ppCombinedReviewCount === 1 ? 'review' : 'reviews'})</em>
-                      </span>
+                      </a>
                       <span className="pp-submeta-sep" aria-hidden="true">·</span>
                     </>
                   )}
@@ -1764,7 +1772,7 @@ useEffect(() => {
                   aria-label={galleryUrls[0] ? undefined : `${data.property_name} — photo coming soon`}
                 >
                 {galleryUrls[0] ? (
-                  <a href={galleryUrls[0]} data-fancybox="property-gallery" data-caption={`${data.property_name} — main photo`} style={{ display: 'block', width: '100%', height: '100%' }}>
+                  <button onClick={(e) => { e.preventDefault(); setLightboxIndex(0); setShowLightbox(true); }} className="block w-full h-full p-0 border-0 bg-transparent cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-accent transition-shadow">
                     <img
                       src={getGalleryTransformedUrl(galleryUrls[0], 768)}
                       srcSet={getGallerySrcSet(galleryUrls[0])}
@@ -1776,7 +1784,7 @@ useEffect(() => {
                       className="pp-gallery-img"
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
-                  </a>
+                  </button>
                 ) : (
                   <div className="pp-cell-overlay">
                     <span className="pp-dot" aria-hidden="true" />
@@ -1796,7 +1804,7 @@ useEffect(() => {
                     key={i}
                     className={`pp-cell pp-cell-${i + 1} pp-cell--photo`}
                   >
-                    <a href={photo} data-fancybox="property-gallery" data-caption={`${data.property_name} — photo ${i + 1}`} style={{ display: 'block', width: '100%', height: '100%' }}>
+                    <button onClick={(e) => { e.preventDefault(); setLightboxIndex(i); setShowLightbox(true); }} className="block w-full h-full p-0 border-0 bg-transparent cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-accent transition-shadow">
                       <img
                         src={getGalleryTransformedUrl(photo, 480)}
                         srcSet={getGallerySrcSet(photo)}
@@ -1807,7 +1815,7 @@ useEffect(() => {
                         className="pp-gallery-img"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                       />
-                    </a>
+                    </button>
                   </div>
                 );
               })}
@@ -1818,20 +1826,22 @@ useEffect(() => {
                 aria-label="View all photos"
                 onClick={() => {
                   if (galleryUrls.length === 0) return;
-                  Promise.all([
-                    import('@fancyapps/ui'),
-                    import('@fancyapps/ui/dist/fancybox/fancybox.css'),
-                  ]).then(([{ Fancybox }]) => {
-                    (Fancybox as { show: (items: object[]) => void }).show(
-                      galleryUrls.map((u) => ({ src: getGalleryTransformedUrl(u, 1200), type: 'image' })),
-                    );
-                  }).catch(() => {});
+                  setLightboxIndex(0);
+                  setShowLightbox(true);
                 }}
               >
                 <PpGridIcon size={13} />
                 {galleryUrls.length > 5 ? `View all ${galleryUrls.length} photos` : 'View gallery'}
               </button>
             </div>
+
+            {showLightbox && (
+              <Lightbox
+                images={galleryUrls}
+                initialIndex={lightboxIndex}
+                onClose={() => setShowLightbox(false)}
+              />
+            )}
 
             {/* ---- TASK-1359: Virtual tour ---- */}
             {data.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
@@ -2129,7 +2139,7 @@ useEffect(() => {
                   </div>
                   <div className="pp-amenities">
                     {ppAmenityCodes
-                      ? ppAmenityCodes.map((code) => {
+                      ? ppAmenityCodes.slice(0, 8).map((code) => {
                           const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
                           return (
                             <div key={code} className="pp-amenity">
@@ -2140,7 +2150,7 @@ useEffect(() => {
                             </div>
                           );
                         })
-                      : ppAmenityDisplay.map((label, idx) => (
+                      : ppAmenityDisplay.slice(0, 8).map((label, idx) => (
                           <div key={`${label}-${idx}`} className="pp-amenity">
                             <span style={{ fontSize: 18, color: 'var(--brand-accent, #f08c71)', flexShrink: 0 }} aria-hidden="true">
                               {renderIcon(label)}
@@ -2150,7 +2160,7 @@ useEffect(() => {
                         ))
                     }
                   </div>
-                  {ppAmenityLabels.length > 12 && (
+                  {ppAmenityLabels.length > 8 && (
                     <button
                       type="button"
                       className="pp-prose-more"
@@ -2190,7 +2200,7 @@ useEffect(() => {
                   // TASK-8019: "verified stay(s) / through this platform" only for native Atlas reviews.
                   const nativeVerifiedCount = api.totalCount;
                   return (
-                    <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
+                    <section id="reviews" className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
                         <h2>
                           ★ {rating.toFixed(1)} from {count}{' '}
@@ -2265,6 +2275,16 @@ useEffect(() => {
                           <Suspense fallback={null}>
                             <ReviewSummary listingId={Number(resolvedListingId ?? NaN)} />
                           </Suspense>
+                          {/* TASK-102112: star filter pills + Most Recent / Highest Rated sort (instant, client-side) */}
+                          <ReviewFilterSortControls
+                            starFilter={reviewStarFilter}
+                            sort={reviewSort}
+                            onStarFilterChange={(f) => { setReviewStarFilter(f); setShowAllReviews(false); }}
+                            onSortChange={setReviewSort}
+                            counts={ppReviewFilterCounts}
+                          />
+                          {ppFilteredSortedReviews.length > 0 ? (
+                          <>
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
@@ -2340,7 +2360,7 @@ useEffect(() => {
                               </article>
                             ))}
                           </div>
-                          {ppMergedReviews.length > 6 && (
+                          {ppFilteredSortedReviews.length > 6 && (
                             <button
                               type="button"
                               onClick={() => setShowAllReviews((s) => !s)}
@@ -2350,9 +2370,23 @@ useEffect(() => {
                             >
                               {showAllReviews
                                 ? 'Show fewer reviews'
-                                : `View all ${count} reviews`}
+                                : `View all ${ppFilteredSortedReviews.length} reviews`}
                               <PpChevronDown size={14} />
                             </button>
+                          )}
+                          </>
+                          ) : (
+                            <p data-testid="reviews-empty-filter" style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', fontStyle: 'italic' }}>
+                              No {reviewStarFilter}-star reviews yet.{' '}
+                              <button
+                                type="button"
+                                onClick={() => setReviewStarFilter(null)}
+                                className="pp-prose-more"
+                                style={{ display: 'inline' }}
+                              >
+                                Clear filter
+                              </button>
+                            </p>
                           )}
                         </>
                       ) : (
@@ -2471,22 +2505,10 @@ useEffect(() => {
                   );
                 })()}
 
-                {/* Nearby places — standalone section (map promoted to upper-third in v2) */}
-                {(data.property_nearplaces || []).length > 0 && (
-                  <section className="pp-section" aria-label="Nearby places">
-                    <div className="pp-section-head">
-                      <h2>Nearby places</h2>
-                    </div>
-                    <div className="pp-nearby">
-                      {data.property_nearplaces!.slice(0, 9).map((place, idx) => (
-                        <div key={`place-${idx}`} className="pp-nearby-item">
-                          <b>{place}</b>
-                          <span>Nearby</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                {/* TASK-102117: Explore the Neighborhood — categorized accordion over
+                    the listing's own `property_nearplaces` strings (distances render
+                    only when embedded in the source entry; section omitted when empty). */}
+                <LocalGuideAccordion places={data.property_nearplaces} />
 
               </div>
               {/* ===== END LEFT COLUMN ===== */}
@@ -2533,6 +2555,10 @@ useEffect(() => {
                         maxGuests={data.maxGuests}
                         propertySlug={propertySlugParam}
                         unitSlug={unitSlugParam}
+                        // TASK-102485: tell the widget the listing lookup FAILED (vs still
+                        // resolving) so that with listingId undefined it fail-closes with the
+                        // availability error + retry UI instead of an all-available calendar.
+                        lookupFailed={!resolvedListingId && !isListingLookupPending && listingLookupError != null}
                         reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
                         reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
                         minStayNights={
@@ -2655,7 +2681,7 @@ useEffect(() => {
                 )}
 
                 {showAvailabilityPlaceholder && (
-                  <div style={{ borderRadius: 18, border: '1px solid #f0ddd0', background: '#fff', padding: 24, marginTop: 16 }}>
+                  <div data-testid="availability-lookup-fallback" style={{ borderRadius: 18, border: '1px solid #f0ddd0', background: '#fff', padding: 24, marginTop: 16 }}>
                     <h3 style={{ fontSize: 18, fontWeight: 600, color: '#4a3535', marginBottom: 8 }}>Check Availability</h3>
                     <p style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', marginBottom: 16 }}>
                       Availability check is currently unavailable. Please try again later.
@@ -2728,34 +2754,56 @@ useEffect(() => {
                   <X className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" />
                 </button>
               </div>
-              <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
-                  {data.amenityCodes && data.amenityCodes.length > 0 ? (
-                    data.amenityCodes.map((code) => {
-                      const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
-                      return (
-                        <div key={code} className="flex items-center gap-3 sm:gap-4" role="listitem">
-                          <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
-                            {renderIconForCode(code)}
-                          </span>
-                          <span className="text-text-primary text-sm sm:text-base">{label}</span>
+              <div className="overflow-y-auto p-6" role="region" aria-label="List of all amenities" tabIndex={0}>
+                {/* TASK-8231 a11y fix: role="list" must sit directly on the element whose
+                    children are role="listitem" (axe aria-required-children). The outer
+                    wrapper spans multiple categories, each with its own heading + grid, so
+                    it no longer claims to be a list itself — each grid below does instead. */}
+                <div className="flex flex-col gap-8">
+                  {(() => {
+                    if (data.amenityCodes && data.amenityCodes.length > 0) {
+                      const groups: Record<string, string[]> = {};
+                      data.amenityCodes.forEach((code) => {
+                        const cat = amenityCategoryMaster.get(code.toLowerCase()) || 'General';
+                        if (!groups[cat]) groups[cat] = [];
+                        groups[cat].push(code);
+                      });
+                      return Object.entries(groups).map(([cat, codes]) => (
+                        <div key={cat}>
+                          <h4 className="text-lg font-medium text-text-primary mb-4">{cat}</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
+                            {codes.map((code) => {
+                              const label = amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code);
+                              return (
+                                <div key={code} className="flex items-center gap-3 sm:gap-4" role="listitem">
+                                  <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                                    {renderIconForCode(code)}
+                                  </span>
+                                  <span className="text-text-primary text-sm sm:text-base">{label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      );
-                    })
-                  ) : (
-                    (data.property_amenities || []).map((amenity, idx) => {
-                      const icon = amenity?.amenities_icon || '';
-                      const displayName = icon ? formatAmenityName(icon) : 'Amenity';
-                      return (
-                        <div key={`amenity-${idx}-${displayName}`} className="flex items-center gap-3 sm:gap-4" role="listitem">
-                          <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
-                            {renderIcon(icon) || '•'}
-                          </span>
-                          <span className="text-text-primary text-sm sm:text-base">{displayName}</span>
-                        </div>
-                      );
-                    })
-                  )}
+                      ));
+                    }
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6" role="list">
+                        {(data.property_amenities || []).map((amenity, idx) => {
+                          const icon = amenity?.amenities_icon || '';
+                          const displayName = icon ? formatAmenityName(icon) : 'Amenity';
+                          return (
+                            <div key={`amenity-${idx}-${displayName}`} className="flex items-center gap-3 sm:gap-4" role="listitem">
+                              <span className="text-xl sm:text-2xl text-text-primary" aria-hidden="true">
+                                {renderIcon(icon) || '•'}
+                              </span>
+                              <span className="text-text-primary text-sm sm:text-base">{displayName}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
               <div className="p-6 border-t border-border-subtle">
@@ -2769,6 +2817,16 @@ useEffect(() => {
         <Suspense fallback={null}>
           <GuestAssistant listingId={resolvedListingId ?? data.listingId ?? null} />
         </Suspense>
+
+        {/* TASK-102116: floating "Chat with Host on WhatsApp" bubble with pre-filled
+            room query. Phone comes from the listing/tenant data already on this page
+            (ppHostPhone) — the bubble hides itself when no host number is available. */}
+        <ListingWhatsAppFloat
+          listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
+          phoneDigits={ppHostPhone}
+          brandName={ppBrandName}
+          listingId={resolvedListingId ?? data.listingId ?? null}
+        />
         </>
     );
 };

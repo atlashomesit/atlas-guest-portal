@@ -551,6 +551,31 @@
 .pp-nearby-item b { display: block; color: #3b1f1e; font-weight: 600; margin-bottom: 2px; font-size: 13.5px; }
 .pp-nearby-item span { color: var(--text-muted, #6b5a55); font-size: 12.5px; }
 
+/* ---------- Local guide accordion (TASK-102117) -------------------------- */
+.pp-guide-accordion { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.pp-guide-group {
+  background: #fefcf9; border: 1px solid #f0ddd0; border-radius: 12px; overflow: hidden;
+}
+.pp-guide-toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 12px 14px; background: none; border: 0; cursor: pointer;
+  font-size: 14px; font-weight: 600; color: #3b1f1e; text-align: left;
+}
+.pp-guide-count {
+  margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-muted, #6b5a55);
+  background: #f5ebe0; border-radius: 999px; padding: 1px 9px;
+}
+.pp-guide-chevron { transition: transform 0.15s ease; flex-shrink: 0; }
+.pp-guide-chevron-open { transform: rotate(180deg); }
+.pp-guide-panel { padding: 2px 14px 12px; }
+.pp-guide-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pp-guide-spot {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-top: 1px solid #f0ddd0; font-size: 13.5px;
+}
+.pp-guide-spot-name { color: #3b1f1e; font-weight: 600; }
+.pp-guide-spot-distance { color: var(--text-muted, #6b5a55); font-size: 12.5px; white-space: nowrap; }
+
 /* ---------- Sticky booking aside ---------------------------------------- */
 .pp-booking-col { position: sticky; top: 130px; }
 
@@ -1058,4 +1083,16 @@
   .pp-v2-knowgrid { grid-template-columns: 1fr; }
   .pp-v2-review-grid { grid-template-columns: 1fr; }
   .pp-v2-location { margin: 16px 0 0; }
+}
+
+#reviews:target {
+  animation: pp-target-pulse 2s ease-out;
+}
+@keyframes pp-target-pulse {
+  0% { background-color: rgba(192, 69, 40, 0.1); }
+  100% { background-color: transparent; }
+}
+
+#reviews {
+  scroll-margin-top: 100px;
 }

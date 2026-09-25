@@ -60,9 +60,19 @@ type MarketplaceItem = {
   convenienceFeePercent?: number;
 };
 
-function marketplaceListingPath(item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>): string {
+function marketplaceListingPath(
+  item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>,
+  searchSuffix = '',
+): string {
   const propertySlug = getPropertySlug({ property_name: item.title });
-  return `${buildHomeUnitPath(propertySlug, item.id)}?tenant=${encodeURIComponent(item.tenantSlug)}`;
+  const base = buildHomeUnitPath(propertySlug, item.id);
+  // TASK-102058: carry the active search criteria forward into the details URL
+  // (mirrors SearchPage's querySuffix). Without this the details page hydrates
+  // default dates/guests, its back-to-results link is null, and Back-navigation
+  // restores the grid but the booking context is already lost.
+  const p = new URLSearchParams(searchSuffix);
+  p.set('tenant', item.tenantSlug);
+  return `${base}?${p.toString()}`;
 }
 
 // TASK-10089: source-aware provenance labels. "Verified" applies ONLY to completed
@@ -105,9 +115,29 @@ export default function MarketplaceHomepage() {
   }, [favEpoch]);
   // TL-PROP: map view of all marketplace properties. Toggle to show/hide.
   const [showMap, setShowMap] = useState(false);
-  const [mapPins, setMapPins] = useState<MapPin[]>([]);
+  const [marketplaceProperties, setMarketplaceProperties] = useState<MarketplacePropertyApi[]>([]);
   // TASK-4413: read dates and guest count from URL params (from AirbnbSearchBar)
   const [searchParams] = useSearchParams();
+  // TASK-102058: the criteria the grid was filtered by, forwarded into every property
+  // link (cards + map pins) so details hydrates and Back-navigation restores the bar.
+  const searchSuffix = useMemo(() => {
+    const p = new URLSearchParams();
+    for (const k of [
+      'city',
+      'destination',
+      'checkIn',
+      'checkOut',
+      'guests',
+      'adults',
+      'children',
+      'infants',
+      'pets',
+    ]) {
+      const v = searchParams.get(k);
+      if (v != null && v !== '') p.set(k, v);
+    }
+    return p.toString();
+  }, [searchParams]);
   // TASK-4413: price-range control — client-side filter over the fetched grid, mirroring
   // SearchPage.tsx's minPrice/maxPrice pattern. Local state (not URL) — the marketplace
   // grid fetch already covers date/guest/category/city; price narrows the same result set.
@@ -255,34 +285,43 @@ export default function MarketplaceHomepage() {
       .then(async (r) => (r.ok ? ((await r.json()) as MarketplacePropertyApi[]) : []))
       .then((rows) => {
         if (cancelled) return;
-        const seen = new Map<number, MapPin>();
-        for (const row of rows ?? []) {
-          if (row.latitude == null || row.longitude == null) continue;
-          if (seen.has(row.propertyId)) continue;
-          seen.set(row.propertyId, {
-            id: `mp-${row.propertyId}`,
-            lat: Number(row.latitude),
-            lng: Number(row.longitude),
-            title: row.propertyName || row.listingName || `Property ${row.propertyId}`,
-            subtitle: row.propertyAddress ?? undefined,
-            href: row.tenantSlug
-              ? marketplaceListingPath({
-                  id: row.listingId,
-                  title: row.listingName || row.propertyName || `Listing ${row.listingId}`,
-                  tenantSlug: row.tenantSlug,
-                })
-              : buildHomeUnitPath(getPropertySlug({ property_name: row.listingName }), row.listingId),
-          });
-        }
-        setMapPins(Array.from(seen.values()));
+        setMarketplaceProperties(rows ?? []);
       })
       .catch(() => {
-        if (!cancelled) setMapPins([]);
+        if (!cancelled) setMarketplaceProperties([]);
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // TASK-102058: pin hrefs carry the active search criteria (recomputed from rows so a
+  // search submit never refetches the properties endpoint just to rewrite links).
+  const mapPins = useMemo(() => {
+    const seen = new Map<number, MapPin>();
+    for (const row of marketplaceProperties) {
+      if (row.latitude == null || row.longitude == null) continue;
+      if (seen.has(row.propertyId)) continue;
+      seen.set(row.propertyId, {
+        id: `mp-${row.propertyId}`,
+        lat: Number(row.latitude),
+        lng: Number(row.longitude),
+        title: row.propertyName || row.listingName || `Property ${row.propertyId}`,
+        subtitle: row.propertyAddress ?? undefined,
+        href: row.tenantSlug
+          ? marketplaceListingPath(
+              {
+                id: row.listingId,
+                title: row.listingName || row.propertyName || `Listing ${row.listingId}`,
+                tenantSlug: row.tenantSlug,
+              },
+              searchSuffix,
+            )
+          : buildHomeUnitPath(getPropertySlug({ property_name: row.listingName }), row.listingId),
+      });
+    }
+    return Array.from(seen.values());
+  }, [marketplaceProperties, searchSuffix]);
 
   return (
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
@@ -547,7 +586,7 @@ export default function MarketplaceHomepage() {
 
                   <Link
                     className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
-                    to={marketplaceListingPath(item)}
+                    to={marketplaceListingPath(item, searchSuffix)}
                   >
                     View home
                   </Link>

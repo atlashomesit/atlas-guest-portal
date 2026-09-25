@@ -5,7 +5,7 @@ import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
 import ApiConfigGuard from './components/ApiConfigGuard'
 import { initMonitoring } from './lib/monitoring'
-import { initAnalytics } from './utils/analytics'
+import { initAnalytics, initTenantAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
@@ -152,6 +152,12 @@ const bootstrapApp = async () => {
       // Marketplace apex uses Atlas Stays branding from static assets — not a single host tenant.
     } else if (resolved) {
       applyTenantBranding(resolved);
+    }
+    // TASK-102427: pick up a host-entered GA4 measurement ID (admin settings) now that the
+    // tenant is resolved — falls back to build-time VITE_GA_MEASUREMENT_ID when unset.
+    // Page_view tracking itself already ships (App.tsx router effect → trackEvent).
+    if (resolved?.gaMeasurementId) {
+      initTenantAnalytics(resolved.gaMeasurementId);
     }
 
     // TASK-4903 (ADR-0081 D2/D3/D5/D6a): resolve the layout-theme + color-preset axes once

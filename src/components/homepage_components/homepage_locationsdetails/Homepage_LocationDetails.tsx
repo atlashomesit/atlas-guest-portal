@@ -1,4 +1,5 @@
-import { useLocation } from "react-router-dom"
+import { useLocation } from "react-router-dom";
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import Heading from "../../commonComponents/heading/Heading"
 import '../../../App.css'
 import { FaBed, FaShower, FaSwimmingPool, FaCar } from "react-icons/fa";
@@ -238,7 +239,7 @@ const Homepage_LocationDetails = () => {
                                                     onClick={() => handleNavigate(String(data.property_name ?? ""))}
                                                     className="h-full w-full cursor-pointer"
                                                 >
-                                                    <img
+                                                    <OptimizedImage
                                                         src={image}
                                                         alt={`${data.property_name} - Image ${index + 1}`}
                                                         className="object-cover w-full h-full"

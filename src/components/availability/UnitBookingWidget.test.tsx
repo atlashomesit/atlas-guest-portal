@@ -79,7 +79,10 @@ vi.mock('@/hooks/useDailyPricingSummary', () => ({
 }));
 vi.mock('@/components/FomoBar', () => ({ default: () => null }));
 vi.mock('@/lib/events', () => ({ track: vi.fn() }));
-vi.mock('./AtlasBookingCalendar', () => ({ AtlasBookingCalendar: () => null }));
+vi.mock('./AtlasBookingCalendar', () => ({
+  AtlasBookingCalendar: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="atlas-booking-calendar-open" /> : null,
+}));
 
 describe('UnitBookingWidget - TASK-2460: order API errors surface body.message', () => {
   it('422 PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT includes API message and WhatsApp hint', () => {
@@ -1004,6 +1007,20 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
     expect(document.activeElement).toBe(screen.getByTestId('unit-booking-checkout-cell'));
   });
 
+  it('opens the range picker when a check-in is selected from the property availability grid', async () => {
+    await renderWidget();
+
+    expect(screen.queryByTestId('atlas-booking-calendar-open')).toBeNull();
+
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent('atlas:set-checkin', { detail: toISODate(checkin) }));
+    });
+
+    expect(screen.getByTestId('atlas-booking-calendar-open')).toBeInTheDocument();
+    expect(screen.getByTestId('unit-booking-checkout-cell')).toHaveTextContent('Add date');
+  });
+
   it('the check-in and check-out date cells are aria-described-by the inline error once shown', async () => {
     await renderWidget();
 
@@ -1354,3 +1371,82 @@ describe('UnitBookingWidget - TASK-102023: split pricing failure flags', () => {
   });
 });
 
+describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-closes (source)', () => {
+  const filePath = resolve(__dirname, './UnitBookingWidget.tsx');
+
+  it('accepts a lookupFailed prop that distinguishes failed lookup from still-resolving', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('lookupFailed?: boolean;');
+    expect(content).toContain('const listingLookupFailed = lookupFailed && listingId == null;');
+  });
+
+  it('folds the failed lookup into the fail-closed Reserve posture', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    const datesUnavailableDef = content.slice(
+      content.indexOf('const datesUnavailable ='),
+      content.indexOf('const datesUnavailable =') + 200,
+    );
+    expect(datesUnavailableDef).toContain('listingLookupFailed');
+  });
+
+  it('handleReserve refuses to create a hold when the listing lookup failed', () => {
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toMatch(/if \(listingLookupFailed\) \{\s*\n\s*setFormError\(/);
+  });
+});
+
+describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-closes (render)', () => {
+  beforeEach(() => {
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 0, finalAmount: 0 });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+    availabilityMock.fetch.mockReset();
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+  });
+
+  const renderWidgetLookup = async (lookupFailed?: boolean) => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    return render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={undefined}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+          lookupFailed={lookupFailed}
+        />
+      </MemoryRouter>,
+    );
+  };
+
+  it('fail-closes Reserve with error + retry when lookupFailed and no listingId', async () => {
+    await renderWidgetLookup(true);
+
+    await screen.findByTestId('guest-booking-availability-error');
+    expect(screen.getByTestId('guest-booking-availability-retry')).toBeInTheDocument();
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(reserve).toBeDisabled();
+    expect(reserve.textContent).toContain('Unavailable');
+    // No availability GET could have run — there is no listing id to fetch for.
+    expect(availabilityMock.fetch).not.toHaveBeenCalled();
+  });
+
+  it('stays interactive (no error) while the lookup is still resolving', async () => {
+    await renderWidgetLookup(undefined);
+
+    // Resolving ≠ failed: the widget must not show the failure UI …
+    await waitFor(() => {
+      expect(screen.getByTestId('guest-booking-form')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
+    // … and Reserve stays clickable for blank dates (TASK-4277).
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
+  });
+});

@@ -1,5 +1,8 @@
-# SPIKE: Listing Photo Responsive srcset — Cost & Feasibility Analysis
-**TASK-4513** | Investigator: Claude | Date: 2026-07-09
+# SPIKE: Listing Photo Responsive srcset — Cost & Feasibility Analysis — SUPERSEDED 2026-09-22
+
+**Status:** ✅ SUPERSEDED — do not re-run this decision. `TASK-7821` already shipped a same-origin `/img` Cloudflare Pages Function proxy (`atlas-guest-portal/src/utils/guestImageUrl.ts`) that runs Cloudflare Image Resizing on the existing ~$5/mo Cloudflare plan, with responsive srcset already built at 480/768/1200w (`buildGuestImageSrcSet`). This is effectively Option (b) from this spike, but on infra Atlas was already paying for rather than a new $15–20/mo Azure CDN rule — so it shipped at near-zero incremental cost. Founder confirmed 2026-09-22 this is the active solution; options (b) Azure CDN and (c) imgproxy sidecar below are moot and should not be built.
+
+**TASK-4513** | Investigator: Claude | Date: 2026-07-09 (spike; historical analysis retained below for context only)
 
 ## Executive Summary
 Listing photos currently ship full-resolution from Azure blob storage with **no responsive srcset**. This spike investigates three options to restore responsive images and quantifies bandwidth savings and implementation effort.

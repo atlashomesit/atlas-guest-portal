@@ -12,6 +12,8 @@ interface DayEntry {
 interface Props {
   listingId: number | string;
   onDateSelect?: (date: string) => void;
+  /** TASK-102485: optional parent-driven retry (e.g. re-run a failed listing lookup). */
+  onRetry?: () => void;
 }
 
 interface PaymentStatusPollBody {
@@ -59,10 +61,14 @@ function formatHoldCountdown(remainingMs: number): string {
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
-export default function AvailabilityCalendar({ listingId, onDateSelect }: Props) {
+export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry }: Props) {
   const { booking, updateBooking } = useBooking();
   const [calData, setCalData] = useState<Map<string, DayEntry['status']>>(new Map());
   const [loading, setLoading] = useState(true);
+  // TASK-102485: real error state. Previously a non-OK response / fetch rejection only
+  // console.warned in DEV and left the empty map to render as all-available (fail-OPEN).
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [nowTick, setNowTick] = useState(() => Date.now());
 
   const holdBookingId = booking.paymentHoldBookingId;
@@ -156,8 +162,18 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
   }, []);
 
   useEffect(() => {
-    if (!listingId) return;
+    // TASK-102485: a falsy listingId previously early-returned leaving `loading` stuck true
+    // forever. There is nothing to fetch for — settle loading (and stay unmounted via the
+    // render-null guard below) instead of hanging a skeleton.
+    if (!listingId) {
+      if (import.meta.env.DEV) {
+        console.warn('AvailabilityCalendar mounted without a listingId; rendering nothing.');
+      }
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setLoadError(null);
     const url = new URL(buildApiUrl(`/api/public/listings/${listingId}/availability-calendar`));
     url.searchParams.set('from', fromStr);
     url.searchParams.set('to', toStr);
@@ -178,15 +194,19 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         const map = new Map<string, DayEntry['status']>();
         (items as DayEntry[]).forEach(({ date, status }) => map.set(date, status));
         setCalData(map);
+        setLoadError(null);
       })
       .catch((error) => {
         if (import.meta.env.DEV) {
           console.warn('Failed to fetch availability calendar:', error);
         }
+        // TASK-102485: fail CLOSED — record the error so the grid below renders the retry
+        // UI instead of the empty map as all-available.
+        setLoadError(error instanceof Error ? error.message : 'Availability temporarily unavailable.');
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listingId]);
+  }, [listingId, retryNonce]);
 
   const renderMonth = (monthOffset: number) => {
     const base = addMonths(monthStart, monthOffset);
@@ -283,6 +303,22 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
 
   const countdownLabel = holdActive ? formatHoldCountdown(remainingMs) : null;
 
+  // TASK-102485: falsy listingId renders nothing — matches the early return in the fetch
+  // effect above (which settles `loading` instead of hanging a skeleton). Hooks above must
+  // stay unconditional, so this guard lives here, after all of them.
+  if (!listingId) return null;
+
+  // TASK-102485: manual retry after a calendar-fetch failure. Bump the nonce so the fetch
+  // effect re-runs and re-issues the GET; `loadError` stays set until a load succeeds, so
+  // the grid below remains fail-closed through the retry's loading window.
+  const handleRetry = () => {
+    if (onRetry) {
+      onRetry();
+      return;
+    }
+    setRetryNonce((n) => n + 1);
+  };
+
   return (
     <div className="py-4 border-t border-border-subtle relative">
       {holdActive && countdownLabel && (
@@ -297,6 +333,26 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         </div>
       )}
       <h3 className="text-base font-semibold text-text-primary mb-3">Availability</h3>
+      {/* TASK-102485: fail CLOSED — on a terminal fetch failure render the error + retry UI
+          instead of the grid, whose empty map would otherwise read as all-available. */}
+      {loadError && !loading ? (
+        <div
+          className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-4 text-sm text-text-primary"
+          role="alert"
+          data-testid="availability-calendar-error"
+        >
+          <p className="font-semibold">Availability is currently unavailable.</p>
+          <p className="mt-1 text-xs text-text-muted">Please retry — dates are hidden until availability loads.</p>
+          <button
+            type="button"
+            onClick={handleRetry}
+            data-testid="availability-calendar-retry"
+            className="mt-3 rounded-lg border px-3 py-1.5 text-[13px] font-semibold"
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
       <div className={`relative flex flex-col sm:flex-row gap-6 ${holdActive ? 'pointer-events-none select-none' : ''}`}>
         {holdActive && (
           <div
@@ -308,6 +364,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect }: Props)
         {renderMonth(0)}
         {renderMonth(1)}
       </div>
+      )}
       <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-3 rounded bg-white border border-green-200" /> Available
