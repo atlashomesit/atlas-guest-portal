@@ -1,0 +1,31 @@
+/* Classic tenant homepage: retain resolved brand/theme tokens and the existing search widget. */
+.home-first-glance.ahv2-hero { min-height:0; background:var(--bg-primary); }
+.home-first-glance.ahv2-hero::before { display:none; }
+.home-first-glance .ahv2-hero-left { max-width:1120px; margin:auto; width:100%; padding:34px 24px 20px; display:grid; grid-template-columns:1fr 1.1fr; gap:12px 32px; align-items:start; text-align:left; }
+.home-first-glance .ahv2-hero-eyebrow { grid-column:1; margin:12px 0 0; }
+.home-first-glance .ahv2-hero-h1 { grid-column:1; margin:0; font-size:44px; max-width:18ch; }
+.home-first-glance .ahv2-hero-sub { grid-column:1; margin:0; font-size:16px; max-width:42ch; }
+.home-first-glance .ahv2-hero-widget { grid-column:2; grid-row:1 / span 4; margin:0; min-height:0; }
+.home-first-glance .hero-form-grid { grid-template-columns:1fr 1fr; }
+.home-first-glance .ahv2-chip-row { grid-column:1 / -1; justify-content:flex-start; margin:8px 0 0; }
+.home-first-glance [data-testid=home-direct-booking-promo] { grid-column:1 / -1; margin:8px 0 0 !important; min-height:0 !important; }
+.home-privacy-choice { max-width:1120px; margin:0 auto 24px; padding:0 24px; }
+.home-privacy-choice > div { max-width:none; box-shadow:none; padding:16px; }
+.home-privacy-choice #cookie-consent-desc { font-size:13px; }
+.home-privacy-choice button { white-space:nowrap; }
+.navbar-home .navbar-search-pill { display:none; }
+@media(max-width:760px) {
+ .home-first-glance .ahv2-hero-left { display:flex; padding:20px 18px 14px; gap:0; align-items:stretch; }
+ .home-first-glance .ahv2-hero-eyebrow { margin:0 0 8px; font-size:10px; }
+ .home-first-glance .ahv2-hero-h1 { font-size:32px; max-width:none; margin:0 0 10px; }
+ .home-first-glance .ahv2-hero-sub { font-size:14px; margin:0 0 16px; }
+ .home-first-glance .ahv2-hero-widget { margin:0; }
+ .home-first-glance .hero-form { padding:12px; }
+ .home-first-glance .hero-form-grid { gap:10px; }
+ .home-first-glance .ahv2-chip-row { margin-top:12px; gap:8px; }
+ .home-first-glance .ahv2-chip { font-size:11px; }
+ .home-privacy-choice { padding:0 18px; margin-bottom:20px; }
+ .home-privacy-choice > div { padding:14px; }
+ .home-privacy-choice button { white-space:normal; font-size:12px; padding:10px; }
+ .navbar-home .navbar-logo-text { display:block; font-size:13px; max-width:170px; white-space:normal; }
+}

@@ -13,6 +13,7 @@ import { resolveHeroRefundProcessingChip } from '../../../utils/cancellationPoli
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import '../atlas-home-v2.css';
+import '../home-first-glance.css';
 
 // Ivory seam (left 120px) + a soft 8% coral wash over the hero photo. Kept as a
 // single overlay element so its backgroundImage is readable by jsdom-based tests.
@@ -72,7 +73,7 @@ const Slider = () => {
   }, []);
 
   return (
-    <section className="ahv2-hero w-full">
+    <section className="ahv2-hero home-first-glance w-full">
       {/* Left — ivory editorial column */}
       <div className="ahv2-hero-left">
         <span className="ahv2-eyebrow ahv2-hero-eyebrow">{getTenantBrandName()}</span>
@@ -89,7 +90,7 @@ const Slider = () => {
         <p className="ahv2-hero-sub">
           {showAtlasContent
             ? atlasHeroSub
-            : 'Direct from the owner — WhatsApp-first support from a team that lives down the street.'}
+            : 'Choose your dates and guests to explore available stays.'}
         </p>
 
         {/* Floating search card — the real, functional availability widget */}
