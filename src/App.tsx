@@ -138,6 +138,10 @@ function AppWrapper() {
     Boolean(matchPath(pattern, location.pathname))
   );
   const shouldHideFooter = isEmbedRoute;
+  // Classic tenant home owns the inline consent region immediately after its search.
+  // Other themes/routes keep the global consent banner; no tenant resolution changes.
+  const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
+    && !(isMarketplaceMode() && isAtlastaysMarketplaceSurface());
 
   const withBoundary = (element: React.ReactNode, name: string) => (
     <ErrorBoundary key={`${name}-${location.pathname}`} name={name}>
@@ -261,7 +265,7 @@ function AppWrapper() {
       </ErrorBoundary>
       {!shouldHideFooter && <Suspense fallback={null}><SupportWidget /></Suspense>}
       {!shouldHideFooter && <Footer />}
-      {!shouldHideFooter && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
+      {!shouldHideFooter && !inlineHomeConsent && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );
