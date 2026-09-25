@@ -1,4 +1,3 @@
-import CookieConsentBanner from "../../components/CookieConsentBanner";
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { lazy, Suspense, useEffect, useMemo } from "react";
@@ -156,7 +155,6 @@ const Home = () => {
             <section className="relative font-roboto select-none">
                 <div className="w-full h-fit relative ">
                     <Slider />
-                    <CookieConsentBanner inline />
                 </div>
                 <WaveDivider tone="coral" className="px-[5%] md:px-[12%] -mt-1" />
                 <AtlasNeighbourhoodRibbon />

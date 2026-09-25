@@ -29,3 +29,17 @@
  .home-privacy-choice button { white-space:normal; font-size:12px; padding:10px; }
  .navbar-home .navbar-logo-text { display:block; font-size:13px; max-width:170px; white-space:normal; }
 }
+
+.home-first-glance .hero-form-grid > div:first-child { grid-column:1 / -1; grid-template-columns:1fr 1fr; }
+.home-first-glance .field-card { min-height:96px; padding:12px; border-radius:12px; }
+.home-first-glance .home-privacy-choice {grid-column:1 / -1; padding:0; width:100%; margin:8px 0 0;}
+.home-inline-support {display:flex;justify-content:center;padding:16px;}
+.home-inline-support > button {position:static;}
+@media(max-width:760px){
+ .home-first-glance .field-card {min-height:90px;gap:6px;}
+ .home-first-glance .hf-field-label {font-size:10px;}
+ .home-first-glance .field-card .hf-value-text {font-size:13px;}
+ .home-first-glance .hf-cta-card {padding:8px;}
+ .home-first-glance .hf-cta-card [type=submit] {padding:6px;font-size:12px;}
+ .home-first-glance .home-privacy-choice {margin-top:14px;}
+}

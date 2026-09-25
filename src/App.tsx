@@ -263,7 +263,7 @@ function AppWrapper() {
         </Suspense>
         </main>
       </ErrorBoundary>
-      {!shouldHideFooter && <Suspense fallback={null}><SupportWidget /></Suspense>}
+      {!shouldHideFooter && <div className={inlineHomeConsent ? "home-inline-support" : undefined}><Suspense fallback={null}><SupportWidget /></Suspense></div>}
       {!shouldHideFooter && <Footer />}
       {!shouldHideFooter && !inlineHomeConsent && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
