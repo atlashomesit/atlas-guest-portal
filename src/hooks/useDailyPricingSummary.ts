@@ -46,23 +46,45 @@ function getCachedOrFetch(listingId?: string | number): Promise<DailyPricingSumm
   return promise;
 }
 
-export function useDailyPricingSummary(listingId?: string | number): {
+export function useDailyPricingSummary(
+  listingId?: string | number,
+  options?: { skip?: boolean },
+): {
   data: DailyPricingSummaryDto | null;
   loading: boolean;
   error: Error | null;
   getListingPricing: (listingId: string | number) => TodayBreakdown | null;
 } {
+  // TASK-2118 / TASK-7823 follow-up: `skip` lets a single-listing page (PropertyDetails) wait for
+  // its OWN listingId to resolve before fetching anything, instead of firing the catalog-wide
+  // (`*`) request on first render and then immediately refetching scoped once the id is known.
+  // That stray `*` request is what TASK-7823 already intended to stop on property pages, and it
+  // is a real console-error source (CORS on a highly-contended shared cache bucket) — see
+  // PropertyDetails.tsx / Homepage_PropertyDetails.tsx call sites. Pages that intentionally want
+  // every listing (SearchPage, FavoritesPage, HomePage_Locations) never pass `options`, so `skip`
+  // defaults to false and their existing fetch-on-mount behaviour is unchanged.
+  const skip = options?.skip ?? false;
   const key = cacheKey(listingId);
   const cache = cacheByKey.get(key) ?? { status: 'idle' };
   const [data, setData] = useState<DailyPricingSummaryDto | null>(
-    cache.status === 'success' ? cache.data : null,
+    !skip && cache.status === 'success' ? cache.data : null,
   );
-  const [loading, setLoading] = useState(cache.status === 'loading' || cache.status === 'idle');
+  const [loading, setLoading] = useState(
+    skip ? true : cache.status === 'loading' || cache.status === 'idle',
+  );
   const [error, setError] = useState<Error | null>(
-    cache.status === 'error' ? cache.error : null,
+    !skip && cache.status === 'error' ? cache.error : null,
   );
 
   useEffect(() => {
+    if (skip) {
+      // Still waiting on our own listingId -- do not touch the cache at all (in particular,
+      // never populate or read the catalog-wide `*` bucket on behalf of a single listing).
+      setData(null);
+      setError(null);
+      setLoading(true);
+      return;
+    }
     const current = cacheByKey.get(key) ?? { status: 'idle' };
     if (current.status === 'success') {
       setData(current.data);
@@ -87,7 +109,7 @@ export function useDailyPricingSummary(listingId?: string | number): {
         setData(null);
       })
       .finally(() => setLoading(false));
-  }, [key, listingId]);
+  }, [key, listingId, skip]);
 
   const listingMap = useMemo(() => {
     if (!data?.listings?.length) return new Map<string, TodayBreakdown>();

@@ -669,10 +669,15 @@ const PropertyDetails = () => {
     }, [data, unitType]);
 
     const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
+    // TASK-2118: wait for our OWN listingId before fetching daily-summary at all -- passing
+    // `undefined` here used to still fire the catalog-wide (`*`) request on first render (before
+    // resolvedListingId/data resolve), contradicting TASK-7823's "a property page does not price
+    // the whole catalog" and surfacing as a CORS console error on that heavily-contended bucket.
     const dailyPricing = useDailyPricingSummary(
       Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0
         ? listingNumericForPricing
         : undefined,
+      { skip: !(Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0) },
     );
     const dailyPricingRow = useMemo(() => {
         if (!Number.isFinite(listingNumericForPricing) || listingNumericForPricing <= 0) return undefined;
