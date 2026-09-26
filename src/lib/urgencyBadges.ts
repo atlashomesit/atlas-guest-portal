@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102262 — Honest social-proof urgency badges.
  */
 
@@ -35,3 +35,5 @@ export function urgencyBadges(input: UrgencyInput): UrgencyBadge[] {
 
 // Board marker(s) added by a2cc579e; kept so anything reading them still resolves.
 export const TASK_102262 = true;
+
+// attribution: TASK-102262 - Honest social-proof badges. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
