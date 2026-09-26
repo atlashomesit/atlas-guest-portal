@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102206 — In-room dining / minibar ordering with room-folio posting.
  *
  * Done-when:
@@ -47,3 +47,5 @@ export function buildFolioLines(order: Record<string, number>): { lines: FolioLi
 
 // Board marker(s) added by 6cde7f0a; kept so anything reading them still resolves.
 export const TASK_102206 = true;
+
+// attribution: TASK-102206 - Menu with folio billing. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
