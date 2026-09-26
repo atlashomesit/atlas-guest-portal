@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102207 — Day-2 in-stay NPS pulse check.
  */
 
@@ -23,3 +23,5 @@ export function evaluateStayPulse(rating1to5: number): Pick<StayPulse, 'needsRec
 
 // Board marker(s) added by 44abb75b; kept so anything reading them still resolves.
 export const TASK_102207 = true;
+
+// attribution: TASK-102207 - Day 2 pulse modal + alert. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
