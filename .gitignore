@@ -7,6 +7,10 @@ dist/
 # worktrees, this one included.
 .atlas-sandbox
 .atlas-agent-skill
+# 2026-09-26 (later the same day): per-worktree scratch dir for throwaway agent files (dev-stack
+# helper scripts, port-lock files, logs) that don't belong in the shared ambient scratchpad --
+# see Get-AgentScratchDir in atlas-e2e/scripts/agent-worktree.ps1.
+.agent-tmp/
 
 .vscode/
 .cursor/
