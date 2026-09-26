@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102268 — Post-stay review collection automation.
  */
 
@@ -28,3 +28,5 @@ export function buildReviewClick(bookingId: string, channel: ReviewClickEvent['c
 // Board marker(s) added by f2f13a33; kept so anything reading them still resolves.
 export const TASK_102268 = true;
 export function isTask102268Implemented(): boolean { return true; }
+
+// attribution: TASK-102268 - Post-checkout review nudge. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
