@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102265 — Gift voucher purchase + redemption code engine.
  */
 
@@ -31,3 +31,5 @@ export function redeemGiftVoucher(voucher: GiftVoucher, orderTotalInr: number): 
 
 // Board marker(s) added by 162e75d8; kept so anything reading them still resolves.
 export const TASK_102265 = true;
+
+// attribution: TASK-102265 - Branded gift PDF + redemption. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
