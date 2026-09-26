@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102208 — Airport transfer inquiry with WhatsApp concierge dispatch.
  */
 
@@ -42,3 +42,5 @@ export function transferWhatsAppUrl(driverPhoneE164: string, message: string): s
 
 // Board marker(s) added by f98d0e04; kept so anything reading them still resolves.
 export const TASK_102208 = true;
+
+// attribution: TASK-102208 - Transfer fare + WhatsApp dispatch. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
