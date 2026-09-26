@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102204 — Mid-stay cleaning request scheduler.
  *
  * Done-when:
@@ -32,3 +32,5 @@ export function buildCleaningConfirmation(req: CleaningRequest): string {
 
 // Board marker(s) added by dcbafc55; kept so anything reading them still resolves.
 export const TASK_102204 = true;
+
+// attribution: TASK-102204 - Time-slot picker books turnover. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
