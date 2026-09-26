@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102205 — Luggage storage request toggle.
  *
  * Done-when:
@@ -39,3 +39,5 @@ export function buildLuggageTicket(dateIso: string, roomNumber: string, input: L
 
 // Board marker(s) added by ca172edb; kept so anything reading them still resolves.
 export const TASK_102205 = true;
+
+// attribution: TASK-102205 - Bag count + claim ticket. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
