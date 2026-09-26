@@ -1664,6 +1664,16 @@ const SearchPage = () => {
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
                     sizes="(max-width: 640px) 100vw, 50vw"
+                    // [img-opt-6] CLS fix (2026-09-26): `.search-card__media` already reserves a
+                    // fixed 12.5rem height via CSS (search-page.css), but the <img> itself carried
+                    // no width/height attributes and no aspect-ratio, so browsers that compute CLS
+                    // from the <img> box directly still counted it as shift-prone. This is exactly
+                    // the img-opt-6 check's own heuristic. Explicit intrinsic width/height below are
+                    // a display ratio hint only -- `h-full w-full object-cover` on both this element
+                    // and OptimizedImage's wrapper div still fully control the actual rendered box,
+                    // so this cannot change layout, only how early the browser reserves space for it.
+                    width={400}
+                    height={200}
                   />
                 </div>
                 <div className="search-card__body">
