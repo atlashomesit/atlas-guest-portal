@@ -4,6 +4,7 @@ import { DateRange } from 'react-date-range';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
 import { formatDisplayNumber } from '@/config/contact';
+import { isCheckoutAfterCheckin } from '@/utils/dateRangeValidation';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
 // CALENDAR basis throughout this picker — see the header comment in utils/date.ts.
@@ -193,7 +194,10 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
     if (!checkIn || !checkOut) return { valid: true, error: null };
     // Civil nights, not elapsed 24h blocks — see the note on `nights` above.
     const diffDays = differenceInCalendarDays(checkOut, checkIn);
-    if (checkOut <= checkIn) {
+    // TASK-102389: ordering via the shared full-timestamp helper — a month-only
+    // comparison would reject Dec 28 → Jan 3 (0 >= 11 is false). Identical
+    // semantics to the previous `checkOut <= checkIn`, single source of truth.
+    if (!isCheckoutAfterCheckin(checkIn, checkOut)) {
       return { valid: false, error: 'Check-out date must be after check-in date' };
     }
     if (diffDays < 1) {
