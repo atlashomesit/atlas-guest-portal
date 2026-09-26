@@ -628,6 +628,8 @@
   margin: 0;
   color: #1a1a2e;
   letter-spacing: -0.005em;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .pp-v2-loc-chip {
   display: inline-flex;
