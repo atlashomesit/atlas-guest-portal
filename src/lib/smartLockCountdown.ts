@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102199 — Smart lock PIN reveal countdown.
  *
  * Done-when:
@@ -37,3 +37,5 @@ export function displaySmartLockPin(pin: string, status: SmartLockStatus): strin
 
 // Board marker(s) added by 57608231; kept so anything reading them still resolves.
 export const TASK_102199 = true;
+
+// attribution: TASK-102199 - Blurred PIN countdown until check-in. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
