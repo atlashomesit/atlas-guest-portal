@@ -98,7 +98,10 @@ export function useDailyPricingSummary(
     !skip && isFresh(cache) ? cache.data : null,
   );
   const [loading, setLoading] = useState(
-    skip || !isFresh(cache) ? true : cache.status === 'loading' || cache.status === 'idle',
+    // Not fresh = idle, loading, error or TTL-expired success: each one waits on or starts a fetch.
+    // (The old ternary's else-branch compared a narrowed fresh 'success' to 'loading'/'idle' -- always
+    // false, and a TS2367 error under tsconfig.app.json.)
+    skip || !isFresh(cache),
   );
   const [error, setError] = useState<Error | null>(
     !skip && cache.status === 'error' ? cache.error : null,
