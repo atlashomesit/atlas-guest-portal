@@ -5,6 +5,14 @@ type CalculateNightlyPriceInput = {
   unitType: UnitType;
   checkInDate: Date | string;
   guests?: number;
+  /**
+   * TASK-102396: infants under 2 stay free and never trigger extra-bed fees.
+   * Callers passing a real party composition put the infant headcount here; it is
+   * excluded from the bedding count before the over-capacity fee is computed.
+   * (Mirrors `extraBedPolicy.extraBedsRequired`; capacity validation elsewhere
+   * still sees the full party — this only affects the fee.)
+   */
+  infants?: number;
 };
 
 export type NightlyPriceBreakdown = {
@@ -139,6 +147,7 @@ export const calculateNightlyPrice = ({
   unitType,
   checkInDate,
   guests,
+  infants,
 }: CalculateNightlyPriceInput): NightlyPriceBreakdown => {
   const validDate = new Date(checkInDate);
   if (Number.isNaN(validDate.getTime())) {
@@ -156,7 +165,11 @@ export const calculateNightlyPrice = ({
   const includedGuests = getIncludedGuests(unitType);
   const extraGuestFee = getExtraGuestFee(unitType);
   const guestCount = Math.max(guests ?? includedGuests, 1);
-  const extraGuests = Math.max(0, guestCount - includedGuests);
+  // TASK-102396: infants (under 2) need no bedding — exclude them before the
+  // over-capacity fee so 2 adults + 1 infant in a 2-capacity unit is charged 0.
+  const infantHeadcount = Math.max(Math.floor(infants ?? 0), 0);
+  const billableGuests = Math.max(guestCount - infantHeadcount, 1);
+  const extraGuests = Math.max(0, billableGuests - includedGuests);
   const extraGuestCharge = extraGuests > 0 ? extraGuests * extraGuestFee : 0;
 
   const discountAmount = (baseNightlyPrice * discountPercent) / 100;
