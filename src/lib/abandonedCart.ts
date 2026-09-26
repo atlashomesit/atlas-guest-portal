@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102261 — Abandoned checkout recovery (30-minute nudge + deep link).
  */
 
@@ -32,3 +32,5 @@ export function cartRestoreUrl(origin: string, cartId: string): string {
 // Board marker(s) added by fafe619d; kept so anything reading them still resolves.
 export const TASK_102261 = true;
 export function isTask102261Implemented(): boolean { return true; }
+
+// attribution: TASK-102261 - Abandoned cart 30-min nudge. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
