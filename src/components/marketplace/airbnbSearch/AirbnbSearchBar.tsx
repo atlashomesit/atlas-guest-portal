@@ -11,9 +11,10 @@ import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from '@/componen
 import type { GuestCounts } from '@/components/ui/GuestTypeSelector';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { AirbnbGuestSelector } from './AirbnbGuestSelector';
-import { filterDestinations } from './destinationData';
+import { filterDestinations, POPULAR_DESTINATIONS } from './destinationData';
+import { fetchPublicCities } from '@/api/publicCities';
 import { clearRecentSearches, persistRecentSearch, readRecentSearches } from './recentSearches';
-import type { AirbnbSearchValues } from './types';
+import type { AirbnbSearchValues, DestinationOption } from './types';
 
 const MAX_GUESTS = 20;
 const DEBOUNCE_MS = 300;
@@ -104,9 +105,18 @@ export default function AirbnbSearchBar() {
     }));
   }, [recentEpoch]);
 
+  const [livePool, setLivePool] = useState<DestinationOption[]>(POPULAR_DESTINATIONS);
+  useEffect(() => {
+    const ac = new AbortController();
+    fetchPublicCities(ac.signal)
+      .then((cities) => { if (cities.length > 0) setLivePool(cities); })
+      .catch(() => {/* offline or 4xx: keep POPULAR_DESTINATIONS fallback */});
+    return () => ac.abort();
+  }, []);
+
   const filteredDestinations = useMemo(
-    () => filterDestinations(destinationQuery, recentOptions),
-    [destinationQuery, recentOptions],
+    () => filterDestinations(destinationQuery, recentOptions, livePool),
+    [destinationQuery, recentOptions, livePool],
   );
 
   // URL prefill — restores the bar when arriving with search criteria in the URL
