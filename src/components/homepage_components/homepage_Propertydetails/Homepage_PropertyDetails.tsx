@@ -669,7 +669,7 @@ const PropertyDetails = () => {
     }, [data, unitType]);
 
     const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
-    // TASK-2118: wait for our OWN listingId before fetching daily-summary at all -- passing
+    // TASK-2118: wait for our OWN listingId before fetching the daily pricing summary at all -- passing
     // `undefined` here used to still fire the catalog-wide (`*`) request on first render (before
     // resolvedListingId/data resolve), contradicting TASK-7823's "a property page does not price
     // the whole catalog" and surfacing as a CORS console error on that heavily-contended bucket.
