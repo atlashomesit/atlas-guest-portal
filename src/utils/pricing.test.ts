@@ -63,6 +63,34 @@ describe("calculateNightlyPrice", () => {
     expect(result.finalNightlyPrice).toBe(3905);
   });
 
+  it("TASK-102396: infants under 2 never trigger extra-bed fees", () => {
+    // Board case: 2 adults + 1 infant in a 2-capacity unit must be charged 0,
+    // where the same headcount with no infants (3 adults) is charged 1 bed.
+    const withInfant = calculateNightlyPrice({
+      unitType: "1bhk",
+      checkInDate: "2024-12-15",
+      guests: 3,
+      infants: 1,
+    });
+    expect(withInfant.extraGuestFee).toBe(0);
+
+    const withoutInfant = calculateNightlyPrice({
+      unitType: "1bhk",
+      checkInDate: "2024-12-15",
+      guests: 3,
+    });
+    expect(withoutInfant.extraGuestFee).toBe(500);
+
+    // Defensive: infant counts clamp (negative / fractional cannot credit beds).
+    const clamped = calculateNightlyPrice({
+      unitType: "1bhk",
+      checkInDate: "2024-12-15",
+      guests: 4,
+      infants: -2,
+    });
+    expect(clamped.extraGuestFee).toBe(1000);
+  });
+
   it("respects runtime config discount", () => {
     setRuntimeConfig({ apiBaseUrl: "https://api.test", globalDiscountPercent: 10 });
 

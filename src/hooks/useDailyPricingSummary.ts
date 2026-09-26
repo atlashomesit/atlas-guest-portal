@@ -9,11 +9,23 @@ import {
 type CacheState =
   | { status: 'idle' }
   | { status: 'loading'; promise: Promise<DailyPricingSummaryDto> }
-  | { status: 'success'; data: DailyPricingSummaryDto }
+  | { status: 'success'; data: DailyPricingSummaryDto; storedAt: number }
   | { status: 'error'; error: Error };
 
 /** Catalog-wide (`*`) vs one listing. Search/favorites stay on `*`. */
 const cacheByKey = new Map<string, CacheState>();
+
+/**
+ * TASK-102563: bounded cache TTL so a tab left open overnight never feeds a
+ * stale estimate into the live booking widget. 5 minutes — chosen well under
+ * a normal host re-pricing cadence and the booking-hold window (15 min),
+ * so a guest is never quoted a rate the server has already retired.
+ */
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function isFresh(state: CacheState | undefined): state is { status: 'success'; data: DailyPricingSummaryDto; storedAt: number } {
+  return !!state && state.status === 'success' && Date.now() - state.storedAt < CACHE_TTL_MS;
+}
 
 function cacheKey(listingId?: string | number): string {
   if (listingId == null || String(listingId).trim() === '') return '*';
@@ -23,7 +35,7 @@ function cacheKey(listingId?: string | number): string {
 function getCachedOrFetch(listingId?: string | number): Promise<DailyPricingSummaryDto> {
   const key = cacheKey(listingId);
   const cache = cacheByKey.get(key) ?? { status: 'idle' };
-  if (cache.status === 'success') {
+  if (isFresh(cache)) {
     return Promise.resolve(cache.data);
   }
   if (cache.status === 'loading') {
@@ -32,7 +44,7 @@ function getCachedOrFetch(listingId?: string | number): Promise<DailyPricingSumm
   const controller = new AbortController();
   const promise = fetchDailySummary(controller.signal, listingId)
     .then((data) => {
-      cacheByKey.set(key, { status: 'success', data });
+      cacheByKey.set(key, { status: 'success', data, storedAt: Date.now() });
       return data;
     })
     .catch((err) => {
@@ -44,6 +56,22 @@ function getCachedOrFetch(listingId?: string | number): Promise<DailyPricingSumm
     });
   cacheByKey.set(key, { status: 'loading', promise });
   return promise;
+}
+
+/**
+ * TASK-102563: drop every cached entry so the next mount refetches. Fired on
+ * visibility-regain (a tab returning to the foreground after >TTL is
+ * definitionally stale — the guest saw the pre-hidden state) and available to
+ * callers that mutate rates locally.
+ */
+export function invalidateDailyPricingCache(): void {
+  cacheByKey.clear();
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') invalidateDailyPricingCache();
+  });
 }
 
 export function useDailyPricingSummary(
@@ -67,10 +95,10 @@ export function useDailyPricingSummary(
   const key = cacheKey(listingId);
   const cache = cacheByKey.get(key) ?? { status: 'idle' };
   const [data, setData] = useState<DailyPricingSummaryDto | null>(
-    !skip && cache.status === 'success' ? cache.data : null,
+    !skip && isFresh(cache) ? cache.data : null,
   );
   const [loading, setLoading] = useState(
-    skip ? true : cache.status === 'loading' || cache.status === 'idle',
+    skip || !isFresh(cache) ? true : cache.status === 'loading' || cache.status === 'idle',
   );
   const [error, setError] = useState<Error | null>(
     !skip && cache.status === 'error' ? cache.error : null,
@@ -86,7 +114,7 @@ export function useDailyPricingSummary(
       return;
     }
     const current = cacheByKey.get(key) ?? { status: 'idle' };
-    if (current.status === 'success') {
+    if (isFresh(current)) {
       setData(current.data);
       setLoading(false);
       setError(null);

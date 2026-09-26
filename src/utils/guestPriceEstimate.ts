@@ -175,6 +175,25 @@ export function formatEstTotal(
   return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${feeLabel}(${nightLabel})`.trim();
 }
 
+/**
+ * TASK-102392: plug row so the rendered breakdown lines sum EXACTLY to the
+ * displayed Total.
+ *
+ * The base row shows the pre-discount `baseAmount` while `displayTotal` nets
+ * the global discount (via `computeCheckoutTotal`, directly or inside the
+ * server `finalAmount`). With no discount row, lines and Total disagree
+ * whenever a discount applies (board case: lines sum 12,320 vs Total 12,000).
+ *
+ * Given the rendered additive rows (gross = base + cleaning + tourist tax +
+ * convenience fee; net adjustments = add-ons − promo − referral), the missing
+ * row is `gross + net − displayTotal`: positive means an unbilled discount,
+ * negative means the Total carries something the rows do not. Rendered as a
+ * signed row, lines always reconcile with the Total by construction.
+ */
+export function discountPlugRow(grossRows: number, netAdjustRows: number, displayTotal: number): number {
+  return Math.round(grossRows + netAdjustRows - displayTotal);
+}
+
 /** Legacy aliases retained for zero-GST compatibility (ADR-0107) */
 export function estTotalInclGst(
   perNight: number,
