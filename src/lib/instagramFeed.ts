@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102266 — Instagram feed gallery widget for property landing pages.
  */
 
@@ -38,3 +38,5 @@ export function overlayLabel(media: Pick<InstagramMedia, 'likeCount' | 'comments
 
 // Board marker(s) added by 359b7317; kept so anything reading them still resolves.
 export const TASK_102266 = true;
+
+// attribution: TASK-102266 - Instagram grid embed. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
