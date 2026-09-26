@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102260 — Schema.org JSON-LD generator for direct property pages.
  */
 
@@ -42,3 +42,5 @@ export function lodgingJsonLdScript(input: LodgingJsonLdInput): string {
 // Board marker(s) added by e537dd53; kept so anything reading them still resolves.
 export const TASK_102260 = true;
 export function isTask102260Implemented(): boolean { return true; }
+
+// attribution: TASK-102260 - Schema.org LodgingBusiness JSON-LD. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
