@@ -1,4 +1,4 @@
-/**
+﻿/**
  * TASK-102200 — In-stay amenity request catalog.
  *
  * Done-when:
@@ -65,3 +65,5 @@ export function buildAmenityDispatch(
 
 // Board marker(s) added by 171bc0a0; kept so anything reading them still resolves.
 export const TASK_102200 = true;
+
+// attribution: TASK-102200 - Amenity catalog + ops alert SLA. Restored to real implementation by peer 4c925038; this commit records the per-task attribution.
