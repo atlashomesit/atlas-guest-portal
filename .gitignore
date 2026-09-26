@@ -1,5 +1,13 @@
 node_modules/
 dist/
+
+# agent-worktree.ps1 sandbox markers (atlas-e2e/scripts/agent-worktree.ps1) -- each describes ONE
+# checkout's isolation/identity, never the repo. Gitignored fleet-wide 2026-09-26; previously only
+# atlas-e2e's own .gitignore covered these, though agent-worktree.ps1 writes them into every repo's
+# worktrees, this one included.
+.atlas-sandbox
+.atlas-agent-skill
+
 .vscode/
 .cursor/
 .DS_Store
