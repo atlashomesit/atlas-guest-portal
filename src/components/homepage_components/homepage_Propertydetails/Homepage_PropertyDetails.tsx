@@ -2512,7 +2512,15 @@ useEffect(() => {
                           const id = Number(it.id);
                           const rawName = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
                           const name = getListingDisplayName(id, rawName);
-                          const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
+                          // TASK-102647: this card used to render it.coverPhotoUrl / photoUrls[0]
+                          // straight from the API — a raw atlashomestorage.blob.core.windows.net
+                          // URL with no allowlist check and no /img transform, unlike the gallery
+                          // above (TASK-8216). Sanitize + route through the same transform helper.
+                          const rawImg = sanitizeGuestImageUrl(
+                            (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined),
+                          );
+                          const img = rawImg ? toTransformedGuestImageUrl(rawImg, 480) : undefined;
+                          const imgSrcSet = rawImg ? buildGuestImageSrcSet(rawImg, GUEST_IMAGE_SRCSET_WIDTHS) : undefined;
                           const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
                           return (
                             <Link
@@ -2520,7 +2528,19 @@ useEffect(() => {
                               to={path}
                               style={{ display: 'block', borderRadius: 16, border: '1px solid var(--border-subtle, #f0ddd0)', overflow: 'hidden', textDecoration: 'none', background: '#fff' }}
                             >
-                              {img && <img src={img} alt={name} style={{ width: '100%', height: 140, objectFit: 'cover' }} loading="lazy" decoding="async" width={300} height={140} />}
+                              {img && (
+                                <img
+                                  src={img}
+                                  srcSet={imgSrcSet}
+                                  sizes="(max-width: 640px) 50vw, 200px"
+                                  alt={name}
+                                  style={{ width: '100%', height: 140, objectFit: 'cover' }}
+                                  loading="lazy"
+                                  decoding="async"
+                                  width={300}
+                                  height={140}
+                                />
+                              )}
                               <div style={{ padding: '12px 14px' }}>
                                 <p style={{ fontWeight: 600, color: 'var(--text-primary, #4a3535)', fontSize: 14, margin: '0 0 4px' }}>{name}</p>
                                 <p style={{ fontSize: 12.5, color: 'var(--text-muted, #6b5a55)', margin: 0 }}>{String(it.propertyAddress ?? '').slice(0, 60)}</p>
