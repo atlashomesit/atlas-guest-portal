@@ -44,7 +44,7 @@ import {
   razorpayOrderAmountInrToPaise,
 } from '@/utils/razorpayOrderAmount';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
-import { computeCheckoutTotal } from '@/utils/guestPriceEstimate';
+import { computeCheckoutTotal, discountPlugRow } from '@/utils/guestPriceEstimate';
 import {
   buildRazorpayCheckoutDisplayConfig,
   isMobileCheckoutUserAgent,
@@ -588,6 +588,16 @@ const GuestDetailsPage: React.FC = () => {
       promoDiscountAmount: confirmedPromoDiscount,
       referralDiscountAmount,
     });
+
+  // TASK-102392: the base row renders pre-discount `baseAmount` while the Total
+  // nets the global discount, so lines and Total disagree whenever a discount
+  // applies. Plug row reconciles them by construction (positive = discount,
+  // negative = Total carries what rows do not show).
+  const discountPlug = discountPlugRow(
+    baseAmount + cleaningFeeAmount + touristTaxAmount + convenienceFeeAmount,
+    addOnsTotal - confirmedPromoDiscount - referralDiscountAmount,
+    displayTotal,
+  );
 
   // ── Check-in/out display ─────────────────────────────────────────────────
   const checkInDisplay = booking.checkIn
@@ -2286,6 +2296,15 @@ const GuestDetailsPage: React.FC = () => {
                   <FeeInfoTip fee="paymentProcessing" label="Payment processing" testId="fee-info-payment-processing" />
                 </span>
                 <span className="num">{displayPrice(convenienceFeeAmount)}</span>
+              </div>
+            )}
+            {/* TASK-102392: plug row so the visible lines sum exactly to the Total.
+                Positive = a global discount the base row already netted out; negative
+                = the Total carries an amount not shown by any row above. */}
+            {discountPlug !== 0 && (
+              <div className={`gd-price-row${discountPlug > 0 ? ' save' : ''}`} data-testid="price-line-discount-plug">
+                <span>{discountPlug > 0 ? 'Discount' : 'Other charges'}</span>
+                <span className="num">{discountPlug > 0 ? '−' : ''}{displayPrice(Math.abs(discountPlug))}</span>
               </div>
             )}
           </div>

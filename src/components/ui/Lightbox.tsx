@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 interface LightboxProps {
   images: string[];
@@ -59,10 +60,13 @@ export default function Lightbox({ images, initialIndex = 0, onClose }: Lightbox
     if (isRightSwipe) goToPrevious();
   };
 
+  const dialogRef = useFocusTrap<HTMLDivElement>(!!images && images.length > 0);
+
   if (!images || images.length === 0) return null;
 
   return createPortal(
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center overscroll-none"
       role="dialog"
       aria-modal="true"

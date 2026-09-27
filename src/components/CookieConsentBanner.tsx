@@ -15,7 +15,7 @@ import { getTenantOverrides } from "../tenant/tenantOverrides"; // TASK-1877
 // - Rejecting does NOT block access to any part of the site.
 // - Clicking the X (close without choice) is NOT treated as consent — banner re-appears next page.
 // - TASK-1877: banner copy + privacy link are tenant-aware for white-label subdomains.
-const CookieConsentBanner = () => {
+const CookieConsentBanner = ({ inline = false }: { inline?: boolean }) => {
   const [record, setRecord] = useState<CookieConsentRecord | null>(() => {
     // SSR-safe default: no record. We re-read in useEffect after mount.
     return null;
@@ -58,11 +58,11 @@ const CookieConsentBanner = () => {
 
   return (
     <div
-      role="dialog"
+      role={inline ? "region" : "dialog"}
       aria-live="polite"
       aria-labelledby="cookie-consent-title"
       aria-describedby="cookie-consent-desc"
-      className="fixed inset-x-0 bottom-0 z-[9999] px-4 pb-4 md:pb-6"
+      className={inline ? "home-privacy-choice" : "fixed inset-x-0 bottom-0 z-[9999] px-4 pb-4 md:pb-6"}
     >
       <div className="max-w-3xl mx-auto bg-bg-surface border border-border-subtle rounded-2xl shadow-level2 p-5 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -89,7 +89,7 @@ const CookieConsentBanner = () => {
             <button
               type="button"
               onClick={onAccept}
-              className="px-4 py-3 min-h-11 rounded-xl bg-primary text-[var(--text-on-cta)] font-semibold hover:shadow-level2 flex-1 md:flex-none"
+              className="px-4 py-3 min-h-11 rounded-xl border border-border-subtle text-text-primary font-semibold hover:border-primary flex-1 md:flex-none"
             >
               Accept all
             </button>

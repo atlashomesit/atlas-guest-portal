@@ -56,6 +56,7 @@ import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import EmbeddedListingMap from '../../map/EmbeddedListingMap';
 import { selectPropertyMapMode } from './propertyMapMode';
+import { centroidForCity } from '../../../utils/mapCoords';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
@@ -668,10 +669,15 @@ const PropertyDetails = () => {
     }, [data, unitType]);
 
     const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
+    // TASK-2118: wait for our OWN listingId before fetching the daily pricing summary at all -- passing
+    // `undefined` here used to still fire the catalog-wide (`*`) request on first render (before
+    // resolvedListingId/data resolve), contradicting TASK-7823's "a property page does not price
+    // the whole catalog" and surfacing as a CORS console error on that heavily-contended bucket.
     const dailyPricing = useDailyPricingSummary(
       Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0
         ? listingNumericForPricing
         : undefined,
+      { skip: !(Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0) },
     );
     const dailyPricingRow = useMemo(() => {
         if (!Number.isFinite(listingNumericForPricing) || listingNumericForPricing <= 0) return undefined;
@@ -1686,7 +1692,19 @@ useEffect(() => {
                       native-only fields render ★ 0.0 (0 reviews) when Google imports are the only source. */}
                   {ppHasApiReviews && ppCombinedReviewCount > 0 && (
                     <>
-                      <a href="#reviews" className="pp-rating hover:opacity-80 transition-opacity" data-testid="property-header-rating" aria-label="View guest reviews">
+                      <a
+                        href="#reviews"
+                        className="pp-rating hover:opacity-80 transition-opacity"
+                        data-testid="property-header-rating"
+                        aria-label="View guest reviews"
+                        onClick={() => {
+                          // TASK-102616: native fragment nav scrolls but never moves
+                          // keyboard focus — move it explicitly (WCAG 2.4.3).
+                          window.setTimeout(() => {
+                            document.getElementById('reviews')?.focus();
+                          }, 0);
+                        }}
+                      >
                         ★ {ppCombinedAverageRating.toFixed(1)}{' '}
                         <em>({ppCombinedReviewCount} {ppCombinedReviewCount === 1 ? 'review' : 'reviews'})</em>
                       </a>
@@ -1888,12 +1906,22 @@ useEffect(() => {
                       mapLocation,
                       address: propertyAddressStr,
                     });
-                    switch (mapSelection.kind) {
+                    // TASK-102490: when the property has no coordinates and no custom embed,
+                    // use the listing's city centroid instead of the tenant default so the
+                    // pin lands in the right city rather than a generalized location.
+                    let finalMapSelection = mapSelection;
+                    if (finalMapSelection.kind === 'none' || finalMapSelection.kind === 'tenant') {
+                      const cityCenter = centroidForCity(data.property_location);
+                      if (cityCenter) {
+                        finalMapSelection = { kind: 'coords', lat: cityCenter.lat, lng: cityCenter.lng };
+                      }
+                    }
+                    switch (finalMapSelection.kind) {
                       case 'coords':
                         return (
                           <SinglePinGoogleMap
-                            lat={mapSelection.lat}
-                            lng={mapSelection.lng}
+                            lat={finalMapSelection.lat}
+                            lng={finalMapSelection.lng}
                             zoom={15}
                             markerTitle={data.property_name}
                           />
@@ -1901,7 +1929,7 @@ useEffect(() => {
                       case 'address':
                         return (
                           <EmbeddedListingMap
-                            address={mapSelection.address}
+                            address={finalMapSelection.address}
                             label={data.property_name}
                             zoom={15}
                             height={300}
@@ -1923,8 +1951,8 @@ useEffect(() => {
                       case 'tenant':
                         return (
                           <SinglePinGoogleMap
-                            lat={mapSelection.lat}
-                            lng={mapSelection.lng}
+                            lat={finalMapSelection.lat}
+                            lng={finalMapSelection.lng}
                             zoom={mapLocation && typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
                             markerTitle={mapLocation?.markerLabel ?? tenantNameForMap}
                           />
@@ -2200,7 +2228,7 @@ useEffect(() => {
                   // TASK-8019: "verified stay(s) / through this platform" only for native Atlas reviews.
                   const nativeVerifiedCount = api.totalCount;
                   return (
-                    <section id="reviews" className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
+                    <section id="reviews" tabIndex={-1} className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
                         <h2>
                           ★ {rating.toFixed(1)} from {count}{' '}

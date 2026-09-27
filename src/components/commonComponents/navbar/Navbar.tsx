@@ -9,7 +9,7 @@ import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldShowHostAcquisitionCtas } from '../../../tenant/tenantOverrides';
-import { getTenantSlug } from '../../../tenant/tenantResolver';
+import { getTenantSlug, isMarketplaceMode, isAtlastaysMarketplaceSurface } from '../../../tenant/tenantResolver';
 import { getAdminPortalLoginUrl } from '../../../config/adminPortal';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
@@ -50,6 +50,7 @@ const Navbar = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const isTenantHome = location.pathname === '/' && !(isMarketplaceMode() && isAtlastaysMarketplaceSurface());
   const { booking } = useBooking();
   const { language, changeLanguage, availableLanguages, getLanguageName } = useTranslation();
 
@@ -159,7 +160,7 @@ const Navbar = () => {
   }, [location.pathname]);
 
   return (
-    <header className="navbar-container" id="navbar_container">
+    <header className={`navbar-container${isTenantHome ? ' navbar-home' : ''}`} id="navbar_container">
       {/* Slim utility bar — Home v2 design §1: dark strip above main header */}
       <div className="util-bar" aria-hidden="false">
         <div className="util-bar-inner">
@@ -263,7 +264,7 @@ const Navbar = () => {
           </Link>
 
           {/* DESIGN-026: persistent mobile search pill — sits between logo and hamburger */}
-          <MobileSearchPill />
+          {!isTenantHome && <MobileSearchPill />}
 
           {/* Mobile Menu Button - Only visible on mobile */}
           <div className="lg:hidden">

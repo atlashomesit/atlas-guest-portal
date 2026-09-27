@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   accommodationGstLineAmount,
   accommodationGstSlabPercentForChargedRate,
+  discountPlugRow,
   estTotalInclGst,
   computeCheckoutTotal,
   formatEstTotalInclGst,
@@ -164,6 +165,7 @@ describe('estTotalInclGst / formatEstTotalInclGst — TASK-7543 search-card esti
   });
 
   it('TASK-102037: search-card estimator renders no GST line across rates', () => {
+
     const total = estTotalInclGst(900, 1, 3, true);
     const label = formatEstTotalInclGst(900, 1, (n) => `₹${n}`, 3, true);
     expect(label).not.toContain('GST');
@@ -175,6 +177,18 @@ describe('estTotalInclGst / formatEstTotalInclGst — TASK-7543 search-card esti
 
     const label7600 = formatEstTotalInclGst(7600, 1, (n) => `₹${n}`, 3, true);
     expect(label7600).not.toContain('GST');
+  });
+
+  it('TASK-102042: exempt 800 and upper 8000 bands est-total matches zero-GST breakdown within ₹1', () => {
+    for (const perNight of [800, 8000]) {
+      const nights = 2;
+      const base = perNight * nights;
+      const fee = Math.round((base * 3) / 100);
+      const serverTotal = base + fee;
+      const est = estTotalInclGst(perNight, nights, 3, true);
+      expect(Math.abs(est - serverTotal)).toBeLessThanOrEqual(1);
+      expect(formatEstTotalInclGst(perNight, nights, (n) => `₹${n}`, 3, true)).not.toContain('GST');
+    }
   });
 });
 
@@ -256,5 +270,26 @@ describe('computeCheckoutTotal — TASK-102037 zero GST added on top at checkout
     expect(result.gstSlabPercent).toBeNull();
     expect(result.gstLineAmount).toBe(0);
     expect(result.displayTotal).toBe(15_450);
+  });
+});
+
+describe('discountPlugRow — TASK-102392 lines sum exactly to the Total', () => {
+  it('returns the unbilled discount when a global discount applies', () => {
+    // Board shape: base 10,000 + cleaning 1,000 + fee, total netted 10% off.
+    // gross 11,000 + net 0 − total 10,000 (fee folded) → plug 1,000.
+    expect(discountPlugRow(11_000, 0, 10_000)).toBe(1_000);
+  });
+
+  it('returns 0 when lines already reconcile', () => {
+    expect(discountPlugRow(15_450, 0, 15_450)).toBe(0);
+  });
+
+  it('nets add-ons/promo/referral rows into the reconciliation', () => {
+    // gross 11,000, add-ons 500, promo −200 → rows 11,300 vs total 10,300.
+    expect(discountPlugRow(11_000, 300, 10_300)).toBe(1_000);
+  });
+
+  it('negative plug flags a Total carrying what rows do not show', () => {
+    expect(discountPlugRow(10_000, 0, 10_500)).toBe(-500);
   });
 });

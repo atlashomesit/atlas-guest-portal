@@ -68,6 +68,12 @@ afterEach(() => {
 });
 
 describe("Navbar CTA", () => {
+  it("leaves the tenant homepage search to the hero and retains navigation", () => {
+    renderNavbar();
+    expect(screen.queryByTestId('mobile-search-pill')).toBeNull();
+    expect(screen.getByRole('button', { name: /toggle navigation/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Stays$/i })).toHaveAttribute('href', '/#our-homes');
+  });
   it("renders Help navigation as internal link (replaces Contact — Gap 1 simplification)", () => {
     renderNavbar();
 
@@ -186,7 +192,7 @@ describe("Navbar CTA", () => {
 
   it("DESIGN-026: renders a persistent mobile search pill", () => {
     Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 });
-    renderNavbar();
+    renderNavbar(["/search"]);
 
     const pill = screen.getByTestId("mobile-search-pill");
     expect(pill).toBeInTheDocument();
@@ -196,7 +202,7 @@ describe("Navbar CTA", () => {
 
   it("DESIGN-026: mobile search pill opens full-screen overlay", () => {
     Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 });
-    renderNavbar();
+    renderNavbar(["/search"]);
 
     const pill = screen.getByTestId("mobile-search-pill");
     fireEvent.click(pill);
@@ -213,7 +219,7 @@ describe("Navbar CTA", () => {
   });
 
   it("DESIGN-026: mobile search overlay navigates to /search on submit", () => {
-    renderNavbar();
+    renderNavbar(["/search"]);
 
     fireEvent.click(screen.getByTestId("mobile-search-pill"));
     const input = screen.getByTestId("mobile-search-destination-input");

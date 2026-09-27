@@ -9,17 +9,21 @@ export const POPULAR_DESTINATIONS: DestinationOption[] = [
   { label: 'Paris', region: 'France', kind: 'popular' },
 ];
 
-export function filterDestinations(query: string, recent: DestinationOption[]): DestinationOption[] {
+export function filterDestinations(
+  query: string,
+  recent: DestinationOption[],
+  pool: DestinationOption[] = POPULAR_DESTINATIONS,
+): DestinationOption[] {
   const q = query.trim().toLowerCase();
   if (!q) {
     return [
       ...recent,
-      ...POPULAR_DESTINATIONS.filter((p) => !recent.some((r) => r.label.toLowerCase() === p.label.toLowerCase())),
+      ...pool.filter((p) => !recent.some((r) => r.label.toLowerCase() === p.label.toLowerCase())),
     ];
   }
-  const pool = [...recent, ...POPULAR_DESTINATIONS];
+  const all = [...recent, ...pool];
   const seen = new Set<string>();
-  return pool.filter((item) => {
+  return all.filter((item) => {
     const key = item.label.toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
