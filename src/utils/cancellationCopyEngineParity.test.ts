@@ -120,21 +120,8 @@ describe('TASK-8020 — FAQ refund copy agrees with the refund engine', () => {
     expect(src).not.toMatch(CLAIMS_PRORATION);
   });
 
-  it('faq.tsx source never claims pro-rating or nights-stayed refund arithmetic', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { fileURLToPath } = await import('node:url');
-    const { dirname, join } = await import('node:path');
-    const here = dirname(fileURLToPath(import.meta.url));
-    const src = readFileSync(join(here, '../content/faq.tsx'), 'utf8');
-    expect(src).not.toMatch(CLAIMS_PRORATION);
-  });
-
-  it('buildRetailFaqSections refund answers defer to listing policy without invented arithmetic', async () => {
-    const { buildRetailFaqSections } = await import('../content/faq');
-    const sections = buildRetailFaqSections('Atlas');
-    const partial = sections.flatMap((s) => s.items).find((i) => i.id === 'partial-refunds');
-    expect(partial).toBeTruthy();
-    expect(partial!.question).toMatch(/partial refund/i);
-    expect((partial!.tags ?? []).join(' ')).not.toMatch(/pro-rated/i);
-  });
+  // The two tests that used to live here covered src/content/faq.tsx, which was deleted as
+  // unreachable dead code (its own header comment called it an "unused legacy widget"; the
+  // live FAQ page renders faqHighlights.ts / content/legal/faqs.ts instead) -- dead-code
+  // cleanup, import-graph sweep 2026-09-28.
 });
