@@ -17,6 +17,9 @@
   <meta name="apple-mobile-web-app-title" content="Atlastays" />
   <!-- TASK-7755: icons lived under /be/ until that orphaned CRA tree was deleted; keep them under /icons. -->
   <link rel="apple-touch-icon" href="/icons/logo192.png" />
+  <!-- TASK-101940: keep this canonical (and og:url below) EMPTY. functions/_middleware.ts fills in the pre-JS
+       value on the routes it can mirror; this one file is served as-is on every other route, where "" self-references
+       and a static "/" would name the home page as canonical for /search, /faq, blog posts, ... -->
   <link rel="canonical" href="" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

@@ -169,6 +169,20 @@ describe('SPA canonical formulas mirrored at the edge', () => {
     expect(seo).toContain('ogUrl.content = url ?? "";');
   });
 
+  it('index.html ships ONE canonical and ONE og:url for the edge to set, both left EMPTY', () => {
+    // The edge only rewrites a tag that exists, so dropping either one silently turns the pre-JS
+    // canonical off. The static value is what every route `buildAtlasHostCanonical` returns null for
+    // is served with: "" self-references like SEO.tsx's reset, while a non-empty fallback such as "/"
+    // would name the home page canonical on /search, /faq and every blog post.
+    const html = read('index.html');
+    const canonical = html.match(/<link\b[^>]*\brel="canonical"[^>]*>/g) ?? [];
+    const ogUrl = html.match(/<meta\b[^>]*\bproperty="og:url"[^>]*>/g) ?? [];
+    expect(canonical).toHaveLength(1);
+    expect(ogUrl).toHaveLength(1);
+    expect(canonical[0]).toMatch(/\shref=""/);
+    expect(ogUrl[0]).toMatch(/\scontent=""/);
+  });
+
   it('getPublicSiteOrigin() is VITE_PUBLIC_SITE_ORIGIN (http/https, trailing slashes stripped) else window.location.origin', () => {
     const siteOrigin = read('src/config/siteOrigin.ts');
     expect(siteOrigin).toContain('import.meta.env.VITE_PUBLIC_SITE_ORIGIN');
