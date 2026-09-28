@@ -706,7 +706,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         const hasTurnover = Array.from(newDateStatusMap.values()).some((s) => s === 'Turnover');
         setStatusMessage(
           hasTurnover
-            ? 'Light grey “Turnover” nights are cleaning windows — still bookable. Striped grey is unavailable (blocked or on hold).'
+            ? '“Turnover” nights are cleaning windows — still bookable. Striped grey is unavailable (blocked or on hold).'
             : newBlockedDates.size > 0
               ? 'Striped grey dates are unavailable (blocked or on hold) and cannot be selected.'
               : 'All dates shown are available to book.'
@@ -1917,35 +1917,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               setShownDate(nextShownDate);
             }}
           />
-        {/* Incomplete date hint */}
-        {dateRange.startDate && !dateRange.endDate && (
-          <p
-            role="status"
-            data-testid="guest-booking-incomplete-dates"
-            className="text-xs text-text-secondary"
-            style={{ marginTop: 4 }}
-          >
-            Select your check-out date (minimum one night after check-in).
-          </p>
-        )}
-        {/* Legend for calendar cell colours */}
-        <p className="text-xs text-text-secondary" style={{ marginTop: 6, lineHeight: 1.5 }}>
-          <span className="mr-1 inline-block rounded bg-[#ffe4d6]/60 px-1.5 py-0.5 text-[color:var(--accent-text,#a84832)]">Available</span>
-          open for booking.
-          <span className="mx-1 inline-block rounded bg-[#ffe4d6] px-1.5 py-0.5 text-[#4a3535]">Turnover</span>
-          cleaning window (still bookable).
-          <span
-            className="mx-1 inline-block rounded px-1.5 py-0.5 text-[#6b5a55]"
-            style={{
-              background:
-                'repeating-linear-gradient(-45deg, #f5ebe0, #f5ebe0 3px, #ecdfd2 3px, #ecdfd2 6px)',
-            }}
-          >
-            Unavailable
-          </span>
-          booked, blocked, or on hold.
-        </p>
-
         {/* v2 guests card */}
         <div className="lv-guest-cell bw-guests" style={{ marginTop: 0 }}>
           <button
@@ -2003,6 +1974,43 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
+        {/* The hint and legend sit BELOW the joined dates + guests card: the guests cell has no
+            top border, so anything rendered between the two halves splits the card. */}
+        {/* Incomplete date hint */}
+        {dateRange.startDate && !dateRange.endDate && (
+          <p
+            role="status"
+            data-testid="guest-booking-incomplete-dates"
+            className="text-xs text-text-secondary"
+            style={{ marginTop: 8 }}
+          >
+            Select your check-out date (minimum one night after check-in).
+          </p>
+        )}
+        {/* Legend for calendar cell colours — same swatches as the calendar popover's legend. */}
+        <ul className="bw-legend" aria-label="Calendar legend" data-testid="bw-availability-legend">
+          <li className="bw-legend-item">
+            <span className="bw-legend-label">
+              <span className="bc-sw bc-sw-available" aria-hidden="true" />
+              Available
+            </span>
+            <span className="bw-legend-desc">Open for booking</span>
+          </li>
+          <li className="bw-legend-item">
+            <span className="bw-legend-label">
+              <span className="bc-sw bc-sw-turnover" aria-hidden="true" />
+              Turnover
+            </span>
+            <span className="bw-legend-desc">Cleaning window (still bookable)</span>
+          </li>
+          <li className="bw-legend-item">
+            <span className="bw-legend-label">
+              <span className="bc-sw bc-sw-unavail" aria-hidden="true" />
+              Unavailable
+            </span>
+            <span className="bw-legend-desc">Booked, blocked, or on hold</span>
+          </li>
+        </ul>
         {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
             AND the range is valid (checkout > checkin) (TASK-4284).
             Showing a breakdown for a reversed or same-day range would display either a

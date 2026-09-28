@@ -1450,3 +1450,56 @@ describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-clo
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });
+
+describe('UnitBookingWidget - availability legend layout (render)', () => {
+  beforeEach(() => {
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 0, gstAmount: 0, finalAmount: 0 });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('lists Available → Turnover → Unavailable, each label separate from its description, below an unbroken dates + guests card', async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    const { container } = render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+
+    const legend = await screen.findByTestId('bw-availability-legend');
+    const items = Array.from(legend.querySelectorAll('li'));
+    expect(items.map((li) => li.querySelector('.bw-legend-label')?.textContent?.trim())).toEqual([
+      'Available',
+      'Turnover',
+      'Unavailable',
+    ]);
+    expect(items.map((li) => li.querySelector('.bw-legend-desc')?.textContent?.trim())).toEqual([
+      'Open for booking',
+      'Cleaning window (still bookable)',
+      'Booked, blocked, or on hold',
+    ]);
+    // Same swatches as the calendar popover's own legend, so the colours match the day cells.
+    expect(items.map((li) => li.querySelector('.bc-sw')?.className)).toEqual([
+      'bc-sw bc-sw-available',
+      'bc-sw bc-sw-turnover',
+      'bc-sw bc-sw-unavail',
+    ]);
+
+    // The guests cell has no top border, so the dates + guests card only reads as one card when
+    // nothing renders between the two halves; the legend sits below it.
+    const datePair = container.querySelector('.lv-date-pair');
+    const guests = container.querySelector('.lv-guest-cell');
+    expect(datePair?.nextElementSibling).toBe(guests);
+    expect(guests!.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
