@@ -38,6 +38,7 @@ import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '@/hooks/useTenantListings';
 import { usePropertyListings } from '@/hooks/usePropertyListings';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useListingHostDescription } from '@/hooks/useListingHostDescription';
 import {
   describeCancellationPolicy,
   resolveEffectiveCancellationTier,
@@ -52,6 +53,7 @@ import { centroidForCity } from '@/utils/mapCoords';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { previewListingDescription } from '@/utils/listingDescription';
 import { buildGuestImageSrcSet, filterGuestImageUrls, GUEST_IMAGE_SRCSET_WIDTHS, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '@/utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '@/api/listingClient';
 import {
@@ -824,6 +826,9 @@ const PropertyDetails = () => {
         return () => ac.abort();
     }, [hasPropertyRow, resolvedListingId, dataListingId, listingId]);
 
+    // "About this home": the description the host entered under Rooms & prices → Listing details.
+    const hostDescription = useListingHostDescription(Number(resolvedListingId ?? dataListingId ?? listingId ?? NaN));
+
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');
     const contactToken = searchParams.get('t');
@@ -1558,6 +1563,11 @@ useEffect(() => {
     const ppWaDigits = ppHostPhone.length === 10 ? `91${ppHostPhone}` : ppHostPhone;
     const ppWaBookingUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}` : '';
     const ppWaAskUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}` : '';
+    // "About this home": the host's own description wins; the "Ask them" empty state only shows
+    // once GET /listings/{id} has confirmed there is none (no flash before the detail lands).
+    const ppAboutText = hostDescription.text || data.property_description?.trim() || '';
+    const ppAboutPreview = previewListingDescription(ppAboutText);
+    const ppShowAboutAskHost = !ppAboutText && !!ppWaAskUrl && hostDescription.loaded;
     const ppShowRegRow = (ppTenantOverrides.gstin != null) ||
         (ppTenantOverrides.tourismRegNumbers != null && ppTenantOverrides.tourismRegNumbers.length > 0);
 
@@ -2067,21 +2077,20 @@ useEffect(() => {
                 />
 
                 {/* About this home — DESIGN-031: omit invented prose; Ask host when empty */}
-                {(data.property_description?.trim() ||
+                {(ppAboutText ||
                   resolvedCheckInTime ||
                   resolvedCheckOutTime ||
                   (data.property_neighborhoods || []).length > 0 ||
-                  ppWaAskUrl) && (
+                  ppShowAboutAskHost) && (
                 <section className="pp-section" aria-label="About this home" data-testid="property-about-section">
                   <h2>About this home</h2>
-                  {data.property_description?.trim() ? (
+                  {ppAboutText ? (
                     <>
-                      <p className="pp-prose">
-                        {showAboutMore
-                          ? data.property_description
-                          : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                      {/* pre-wrap keeps the host's own line breaks, blank lines and bullet lines. */}
+                      <p className="pp-prose whitespace-pre-wrap break-words" data-testid="property-about-description">
+                        {showAboutMore ? ppAboutText : ppAboutPreview.preview}
                       </p>
-                      {data.property_description.length > 300 && (
+                      {ppAboutPreview.truncated && (
                         <button
                           type="button"
                           className="pp-prose-more"
@@ -2093,7 +2102,7 @@ useEffect(() => {
                         </button>
                       )}
                     </>
-                  ) : ppWaAskUrl ? (
+                  ) : ppShowAboutAskHost ? (
                     <p className="pp-prose" data-testid="property-about-ask-host">
                       The host hasn&apos;t added a description yet.{' '}
                       <a
