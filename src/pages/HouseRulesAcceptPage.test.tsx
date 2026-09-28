@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import HouseRulesAcceptPage from './HouseRulesAcceptPage';
@@ -88,6 +88,9 @@ describe('HouseRulesAcceptPage', () => {
 
     const status = await screen.findByRole('status');
     expect(status).toHaveTextContent(/accepted the House Rules/i);
-    expect(status).toHaveFocus();
+    // The focus move runs in a passive useEffect after the commit that mounts the banner, and
+    // findByRole can resolve on that commit's DOM mutation before React flushes the effect
+    // (seen under load on the 2026-09-28 release gate: focus still on <body>). Wait for it.
+    await waitFor(() => expect(status).toHaveFocus());
   });
 });
