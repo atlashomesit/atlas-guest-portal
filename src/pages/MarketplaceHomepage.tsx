@@ -10,6 +10,7 @@ import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
 import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
+import MobileMarketplaceNav from '@/components/marketplace/MobileMarketplaceNav'; // TASK-102165
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
@@ -324,6 +325,7 @@ export default function MarketplaceHomepage() {
   }, [marketplaceProperties, searchSuffix]);
 
   return (
+    <>
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
       {/* TASK-1876: SEO meta for marketplace homepage.
           TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
@@ -631,5 +633,8 @@ export default function MarketplaceHomepage() {
         </div>
       )}
     </section>
+    {/* TASK-102165: mobile bottom nav (Explore, Wishlists, Bookings, Support). */}
+    <MobileMarketplaceNav />
+    </>
   );
 }
