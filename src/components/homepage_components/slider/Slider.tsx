@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { buildGuestImageSrcSet, toTransformedGuestImageUrl } from '../../../utils/guestImageUrl';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import {
@@ -137,21 +138,21 @@ const Slider = () => {
 
         {/* Trust strip — DESIGN-028 three-surface model (hero):
             Defer free-cancel deadlines (no listing in scope); assert unconditional refund
-            *processing* from refundPolicyTimelines; keep Instant/Verified as marketing chips.
-            Listing cards + detail disclose the per-tier free-cancel promise. */}
+            *processing* from refundPolicyTimelines. Listing cards + detail disclose the
+            per-tier free-cancel promise.
+            TASK-101317 (reverses DESIGN-028's "keep Instant/Verified as marketing chips"):
+            "Verified homes" is gone — no home verification exists (MKT-002: none ever recorded);
+            "Instant confirmation" shows only when the tenant takes online payment, because
+            WhatsApp/manual-booking tenants confirm by hand. */}
         <ul className="ahv2-chip-row" role="list" aria-label="Booking guarantees">
-          <li role="listitem" className="ahv2-chip">
-            <span className="ahv2-tick" aria-hidden="true">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </span>
-            Instant confirmation
-          </li>
-          <li role="listitem" className="ahv2-chip">
-            <span className="ahv2-tick" aria-hidden="true">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </span>
-            Verified homes
-          </li>
+          {hasOnlinePaymentRail(tenant) && (
+            <li role="listitem" className="ahv2-chip">
+              <span className="ahv2-tick" aria-hidden="true">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              </span>
+              Instant confirmation
+            </li>
+          )}
           <li role="listitem" className="ahv2-chip" data-testid="hero-refund-processing-chip">
             <span className="ahv2-tick" aria-hidden="true">
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
