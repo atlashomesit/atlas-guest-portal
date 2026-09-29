@@ -16,6 +16,8 @@ export interface BlogPost {
   canonicalPath?: string;
 }
 
+// Shared articles appear on every tenant site. Keep them text-only until article
+// images have an explicit tenant-owned source; listing photos are not shared assets.
 export const blogPosts: BlogPost[] = [
   {
     id: "1",
@@ -25,7 +27,6 @@ export const blogPosts: BlogPost[] = [
     excerpt: "Plan your arrival, explore nearby dining, and discover how to get the most from your stay.",
     content:
       "Explore the neighborhood, check in smoothly, and review our on-site amenities before you arrive.",
-    featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/101/img_9.jpg",
     metaTitle: `Guest Guide | ${TENANT_BRAND_PLACEHOLDER}`,
     metaDescription: `Arrival tips, local attractions, and stay recommendations for ${TENANT_BRAND_PLACEHOLDER} guests.`,
     canonicalPath: "/blog/essential-guest-guide",
@@ -37,7 +38,6 @@ export const blogPosts: BlogPost[] = [
     category: "hospitality-tech",
     excerpt: `How ${TENANT_BRAND_PLACEHOLDER} uses automation, security, and smart features to improve each visit.`,
     content: "Learn how smart entry, responsive support, and automation make your stay seamless.",
-    featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/102/img_2.jpg",
     metaTitle: `Hospitality Tech & AI | ${TENANT_BRAND_PLACEHOLDER}`,
     metaDescription: `Discover the technology powering comfort, safety, and service at ${TENANT_BRAND_PLACEHOLDER}.`,
     canonicalPath: "/blog/hospitality-tech-ai",
@@ -50,7 +50,6 @@ export const blogPosts: BlogPost[] = [
     excerpt: "A practical shortlist for travelers who want comfort, fast check-in, and reliable neighborhoods.",
     content:
       "Compare neighborhoods, commute windows, and must-have amenities before choosing your Hyderabad stay.",
-    featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/103/img_1.jpg",
     metaTitle: `Homestays in Hyderabad | ${TENANT_BRAND_PLACEHOLDER} Blog`,
     metaDescription: `Explore how to choose the right Hyderabad homestay by area, budget, and trip type on ${TENANT_BRAND_PLACEHOLDER}.`,
     canonicalPath: "/blog/homestays-in-hyderabad",
@@ -63,7 +62,6 @@ export const blogPosts: BlogPost[] = [
     excerpt: "Understand when to book a room listing versus a whole-home listing for better value.",
     content:
       "Use trip length, group size, and privacy needs to pick the best category across marketplace stays.",
-    featuredImage: "https://atlashomestorage.blob.core.windows.net/listing-images/104/img_3.jpg",
     metaTitle: `Rooms vs Homes | ${TENANT_BRAND_PLACEHOLDER} Blog`,
     metaDescription: `A quick guide to choosing between room and home category listings on ${TENANT_BRAND_PLACEHOLDER}.`,
     canonicalPath: "/blog/rooms-vs-homes",
