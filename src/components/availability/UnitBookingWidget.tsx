@@ -1,3 +1,4 @@
+import { feePercent, feeAmount } from "../../utils/paymentFeeCopy";
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { addDays, differenceInCalendarDays, format, startOfMonth } from 'date-fns';
@@ -1430,7 +1431,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const displayPrice = (n: number) =>
     formatCurrency(n, { maximumFractionDigits: 0 });
 
-  const convenienceFeePctLabel = Math.round(convenienceFeePercent * 100);
+  const convenienceFeePctLabel = Number((convenienceFeePercent * 100).toFixed(2));
   const referralDiscountApplied = 0;
   const promoDiscountApplied = 0;
   const addOnsTotal = 0;
@@ -1609,6 +1610,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         prepToken,
         baseAmount: serverBaseAmount,
         convenienceFeeAmount: serverConvFee,
+        convenienceFeePercent: serverConvPercent,
         finalAmount: serverFinalAmount,
         touristTaxAmount: serverTouristTax,
         TouristTaxAmount: serverTouristTaxPascal,
@@ -1644,6 +1646,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
         holdPriceBreakdown: {
+          paymentFeeDisplay: { percent: feePercent(serverConvPercent), amount: feeAmount(serverConvFee) },
           baseAmount: typeof serverBaseAmount === 'number' && serverBaseAmount > 0 ? serverBaseAmount : breakdownPrice,
           discountAmount: 0,
           // TASK-4286: only trust server convenienceFeeAmount when it is a positive number.

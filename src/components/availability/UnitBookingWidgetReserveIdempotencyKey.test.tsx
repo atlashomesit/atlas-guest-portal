@@ -121,6 +121,26 @@ describe('UnitBookingWidget - TASK-8218: Reserve idempotency key is stable acros
     return reserve;
   };
 
+  it.each([
+    [1.25, 125],
+    [1.25, 0],
+    [undefined, 80],
+    [undefined, undefined],
+  ])('preserves authoritative hold display metadata (%s percent, %s amount)', async (percent, amount) => {
+    vi.spyOn(axios, 'post').mockResolvedValueOnce({ data: {
+      holdId: 503, holdExpiresAt: new Date(Date.now() + 900_000).toISOString(),
+      baseAmount: 10000, finalAmount: 10125, convenienceFeePercent: percent, convenienceFeeAmount: amount,
+    } });
+    const reserve = await renderWidget();
+    await act(async () => { fireEvent.click(reserve); });
+    await waitFor(() => expect(ctx.updateBooking).toHaveBeenCalledWith(expect.objectContaining({
+      holdPriceBreakdown: expect.objectContaining({
+        finalAmount: 10125,
+        paymentFeeDisplay: { percent: percent ?? null, amount: amount ?? null },
+      }),
+    })));
+  });
+
   it('reuses the SAME Idempotency-Key on a retry after a lost/timed-out response (same listing/dates/guests)', async () => {
     const timeoutError = new AxiosError('timeout of 15000ms exceeded', 'ECONNABORTED');
     const postSpy = vi.spyOn(axios, 'post')

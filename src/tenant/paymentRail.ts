@@ -23,6 +23,7 @@
  */
 
 import { getTenantContext, type TenantInfo } from '@/tenant/tenantContext';
+import { paymentFeeCopy } from '@/utils/paymentFeeCopy';
 
 /** Providers that never produce an online gateway charge for the guest. */
 const OFFLINE_PROVIDERS = new Set(['MANUAL']);
@@ -43,7 +44,7 @@ export function hasOnlinePaymentRail(ctx: TenantInfo | null = getTenantContext()
 
 /** Shared copy when an online rail exists (TASK-8055). */
 export const DIRECT_BOOKING_PRICE_WITH_FEE =
-  'The host keeps more when you book direct. Price shown includes room rate, GST, and a 3% payment-processing fee.';
+  'The host keeps more when you book direct. Any payment-processing fee is shown before payment.';
 
 /** Shared copy when there is no online rail — never invent a fee (TASK-8055). */
 export const DIRECT_BOOKING_PRICE_NO_FEE =
@@ -53,6 +54,8 @@ export const DIRECT_BOOKING_PRICE_NO_FEE =
  * TASK-8055: one helper for the "what does the price include?" claim so homepage / theme /
  * marketplace surfaces cannot re-invent a 3% fee when `bookingMode` is WHATSAPP/MANUAL.
  */
-export function directBookingPriceClaim(ctx: TenantInfo | null = getTenantContext()): string {
-  return hasOnlinePaymentRail(ctx) ? DIRECT_BOOKING_PRICE_WITH_FEE : DIRECT_BOOKING_PRICE_NO_FEE;
+export function directBookingPriceClaim(ctx: TenantInfo | null = getTenantContext(), percent: number | null = null): string {
+  return hasOnlinePaymentRail(ctx)
+    ? `The host keeps more when you book direct. ${paymentFeeCopy({ percent })}`
+    : DIRECT_BOOKING_PRICE_NO_FEE;
 }

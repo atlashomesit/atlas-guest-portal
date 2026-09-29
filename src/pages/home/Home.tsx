@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { lazy, Suspense, useEffect, useMemo } from "react";
@@ -81,7 +82,8 @@ const Home = () => {
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
     /** TASK-8055: fee claim follows payment rail; branding still gates Atlas operator voice. */
-    const payDirectBody = directBookingPriceClaim(tenant);
+    const processingFeePercent = useTenantProcessingFee();
+    const payDirectBody = directBookingPriceClaim(tenant, processingFeePercent);
     const whyDirectItems = useMemo(() => {
         const base = hideAtlasBranding ? WHY_DIRECT_ITEMS_TENANT : WHY_DIRECT_ITEMS_ATLAS;
         return base.map((item) =>

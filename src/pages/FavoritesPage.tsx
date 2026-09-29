@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../hooks/useTenantProcessingFee";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FaHeart } from "react-icons/fa";
@@ -18,6 +19,7 @@ import { useGuestAuth } from "../contexts/GuestAuthContext";
 export default function FavoritesPage() {
   const brandName = getTenantBrandName();
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
+  const processingFeePercent = useTenantProcessingFee();
   const { getListingPricing: getDailyListingPricing } = useDailyPricingSummary();
   const estimateNights = estimateStayNights(null, null);
   const [all, setAll] = useState<PublicListing[]>([]);
@@ -260,7 +262,7 @@ export default function FavoritesPage() {
                           displayedPrice,
                           estimateNights,
                           formatDisplayCurrency,
-                          3,
+                          processingFeePercent,
                           l.isGstRegistered,
                         )}
                       </p>

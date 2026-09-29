@@ -1,3 +1,4 @@
+import { feeAmount, paymentFeeCopy } from "../../utils/paymentFeeCopy";
 /**
  * TASK-2612: GuestDetailsPage — step 2 of the two-step booking flow.
  *
@@ -542,6 +543,9 @@ const GuestDetailsPage: React.FC = () => {
   const baseAmount = priceBreakdown?.baseAmount ?? 0;
   const globalDiscountAmount = priceBreakdown?.discountAmount ?? 0;
   const convenienceFeeAmount = priceBreakdown?.convenienceFeeAmount ?? 0;
+  // The widget's legacy estimate fallback may retain a positive fee for an absorbed hold.
+  // Raw hold metadata drives only visible rows; total/payment calculation stays unchanged.
+  const displayedFeeAmount = feeAmount(priceBreakdown?.paymentFeeDisplay?.amount) ?? convenienceFeeAmount;
   const nights = priceBreakdown?.nights ?? 0;
 
   const addOnsTotal = useMemo(
@@ -594,7 +598,7 @@ const GuestDetailsPage: React.FC = () => {
   // applies. Plug row reconciles them by construction (positive = discount,
   // negative = Total carries what rows do not show).
   const discountPlug = discountPlugRow(
-    baseAmount + cleaningFeeAmount + touristTaxAmount + convenienceFeeAmount,
+    baseAmount + cleaningFeeAmount + touristTaxAmount + displayedFeeAmount,
     addOnsTotal - confirmedPromoDiscount - referralDiscountAmount,
     displayTotal,
   );
@@ -2202,6 +2206,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (mobile only — desktop in aside) */}
           <TrustBand
+            feeCopy={paymentFeeCopy(priceBreakdown?.paymentFeeDisplay ?? { percent: null, amount: priceBreakdown?.convenienceFeeAmount })}
             freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
@@ -2287,7 +2292,7 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="num">{displayPrice(touristTaxAmount)}</span>
               </div>
             )}
-            {convenienceFeeAmount > 0 && (
+            {displayedFeeAmount > 0 && (
               <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not a platform markup.">
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   Payment processing
@@ -2295,7 +2300,7 @@ const GuestDetailsPage: React.FC = () => {
                       The row `title` is kept as a native-hover fallback. */}
                   <FeeInfoTip fee="paymentProcessing" label="Payment processing" testId="fee-info-payment-processing" />
                 </span>
-                <span className="num">{displayPrice(convenienceFeeAmount)}</span>
+                <span className="num">{displayPrice(displayedFeeAmount)}</span>
               </div>
             )}
             {/* TASK-102392: plug row so the visible lines sum exactly to the Total.
@@ -2413,6 +2418,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (desktop) */}
           <TrustBand
+            feeCopy={paymentFeeCopy(priceBreakdown?.paymentFeeDisplay ?? { percent: null, amount: priceBreakdown?.convenienceFeeAmount })}
             freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
@@ -2463,12 +2469,13 @@ const GuestDetailsPage: React.FC = () => {
 
 // ── TrustBand atom ────────────────────────────────────────────────────────────
 interface TrustBandProps {
+  feeCopy: string;
   freeCancellationCopy: FreeCancellationTrustCopy | null;
   brandName: string;
   whatsappNumber: string;
   className?: string;
 }
-const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, whatsappNumber, className }) => (
+const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, whatsappNumber, className, feeCopy }) => (
   <div className={`gd-trust${className ? ` ${className}` : ''}`}>
     <div className="gd-trust-row">
       <IconCheck size={14}/>
@@ -2501,10 +2508,10 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
     </div>
     <div className="gd-trust-row">
       <IconLock size={14}/>
-      {/* TASK-7428: Razorpay / 3% copy only when an online payment provider is configured. */}
+      {/* TASK-7428: Payment copy only when an online payment provider is configured. */}
       <span>
         {hasOnlinePaymentRail()
-          ? <>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · 3% payment processing at checkout</>
+          ? <>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · {feeCopy}</>
           : <>Direct booking with the host · <b>no OTA fee</b></>}
       </span>
     </div>

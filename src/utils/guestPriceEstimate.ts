@@ -1,3 +1,4 @@
+import { feePercent } from './paymentFeeCopy';
 /** TASK-2903 / TASK-2870: shared GST + est-total for guest pricing surfaces. */
 
 export const ACCOMMODATION_GST_THRESHOLD_INR = 7500;
@@ -154,7 +155,7 @@ export function estimateStayNights(checkIn: Date | null, checkOut: Date | null):
 export function estTotal(
   perNight: number,
   nights: number,
-  convenienceFeePercent: number = 3,
+  convenienceFeePercent: number,
 ): number {
   const stayNights = Math.max(1, nights);
   const baseTotal = perNight * stayNights;
@@ -166,12 +167,13 @@ export function formatEstTotal(
   perNight: number,
   nights: number,
   formatCurrency: (amount: number, options?: { maximumFractionDigits?: number }) => string,
-  convenienceFeePercent: number = 3,
+  convenienceFeePercent: number | null = null,
 ): string {
+  if (feePercent(convenienceFeePercent) === null) return "Total confirmed after choosing dates.";
   const stayNights = Math.max(1, nights);
-  const total = estTotal(perNight, stayNights, convenienceFeePercent);
+  const total = estTotal(perNight, stayNights, convenienceFeePercent!);
   const nightLabel = stayNights === 1 ? '1 night' : `${stayNights} nights`;
-  const feeLabel = convenienceFeePercent > 0 ? `${convenienceFeePercent}% payment processing ` : '';
+  const feeLabel = convenienceFeePercent! > 0 ? `${convenienceFeePercent}% payment processing ` : '';
   return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${feeLabel}(${nightLabel})`.trim();
 }
 
@@ -198,7 +200,7 @@ export function discountPlugRow(grossRows: number, netAdjustRows: number, displa
 export function estTotalInclGst(
   perNight: number,
   nights: number,
-  convenienceFeePercent: number = 3,
+  convenienceFeePercent: number,
   _isGstRegistered: boolean = true,
   _chargedPerNight: number = perNight,
 ): number {
@@ -209,7 +211,7 @@ export function formatEstTotalInclGst(
   perNight: number,
   nights: number,
   formatCurrency: (amount: number, options?: { maximumFractionDigits?: number }) => string,
-  convenienceFeePercent: number = 3,
+  convenienceFeePercent: number | null = null,
   _isGstRegistered: boolean = true,
   _chargedPerNight: number = perNight,
 ): string {

@@ -1,8 +1,11 @@
+import type { PaymentFeeDisplay } from "../utils/paymentFeeCopy";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { CancellationTier } from '@/utils/cancellationPolicy';
 
 /** Price breakdown forwarded from the widget to GuestDetailsPage (session-only, not persisted). */
 export type BookingPriceBreakdown = {
+  /** Fee wording from the hold response; independent of existing total calculation fallbacks. */
+  paymentFeeDisplay?: PaymentFeeDisplay;
   baseAmount: number;
   discountAmount: number;
   convenienceFeeAmount: number;

@@ -105,7 +105,7 @@ describe('MKT-001: marketplace card fee honesty', () => {
     expect(screen.getByText(/3% payment processing/)).toBeInTheDocument();
   });
 
-  it('an item with no fee fields yet (API not deployed) falls back to today\'s flat 3%', async () => {
+  it('an item with no fee metadata keeps the total unknown instead of inventing a percentage', async () => {
     stubMarketplaceListings([
       {
         id: 2,
@@ -123,7 +123,8 @@ describe('MKT-001: marketplace card fee honesty', () => {
     renderPage();
     await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
 
-    expect(screen.getByText(/3% payment processing/)).toBeInTheDocument();
+    expect(screen.getByText('Total confirmed after choosing dates.')).toBeInTheDocument();
+    expect(screen.queryByText(/3% payment processing/)).not.toBeInTheDocument();
   });
 });
 
