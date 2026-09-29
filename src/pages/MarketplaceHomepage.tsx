@@ -102,6 +102,10 @@ export default function MarketplaceHomepage() {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // TASK-102711: a failed fetch used to fall into the "No stays match these filters" empty state,
+  // telling a guest the marketplace was empty during an API blip. Track it separately + retry.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // TASK-101491: server-reported total + progressive paging state. Before this, the component
   // fetched page 1 only and rendered no pager, so with 27 marketplace-visible listings the last 7
   // were unreachable by any in-page route - silently, with no truncation notice.
@@ -185,11 +189,13 @@ export default function MarketplaceHomepage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     setPage(1);
     fetch(buildApiUrl(buildPagePath(1)))
-      .then(async (r) =>
-        r.ok ? ((await r.json()) as ApiResponse) : { items: [] as MarketplaceItem[], total: 0 },
-      )
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`marketplace listings ${r.status}`);
+        return (await r.json()) as ApiResponse;
+      })
       .then(async (data) => {
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
         if (cancelled) return;
@@ -204,6 +210,7 @@ export default function MarketplaceHomepage() {
         if (!cancelled) {
           setItems([]);
           setTotal(0);
+          setLoadError(true);
         }
       })
       .finally(() => {
@@ -212,7 +219,7 @@ export default function MarketplaceHomepage() {
     return () => {
       cancelled = true;
     };
-  }, [buildPagePath]);
+  }, [buildPagePath, reloadKey]);
 
   // TASK-101491: everything the server said exists but we have not fetched yet.
   const hasMore = !loading && items.length < total;
@@ -621,7 +628,25 @@ export default function MarketplaceHomepage() {
       {/* TASK-4309: explicit empty state so a filter/search with no matches shows a
           message instead of a blank gap between the filter bar and the footer.
           TASK-4413: also covers a price filter that narrows the grid to zero results. */}
-      {!loading && visibleItems.length === 0 && (
+      {!loading && loadError && (
+        <div
+          role="alert"
+          data-testid="marketplace-load-error"
+          className="mt-8 rounded-2xl border border-border bg-bg-surface p-10 text-center"
+        >
+          <p className="text-base font-semibold text-text-primary">We couldn’t load stays right now</p>
+          <p className="mt-1 text-sm text-text-muted">This is a problem on our side, not your filters.</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-4 min-h-[44px] rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-muted"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && visibleItems.length === 0 && (
         <div
           data-testid="marketplace-empty"
           className="mt-8 rounded-2xl border border-dashed border-border bg-bg-surface p-10 text-center"
