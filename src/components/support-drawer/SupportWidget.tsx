@@ -14,6 +14,7 @@ import SupportActionGrid from "./SupportActionGrid";
 import { SupportDrawerFlagsProvider, useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
 import SupportDrawer, { useSupportDrawerView } from "./SupportDrawer";
 import SupportWidgetTrigger from "./SupportWidgetTrigger";
+import StayIssueActions from "./StayIssueActions";
 import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types";
 
 const SCROLL_BUFFER_PX = 320;
@@ -27,6 +28,7 @@ const SupportWidgetContent = () => {
   const listingId = matchPropertyDetails?.params?.id ?? null;
 
   const [isOpen, setIsOpen] = useState(false);
+  const [messageComposerVisible, setMessageComposerVisible] = useState(false);
   const [pageUrl, setPageUrl] = useState("");
   const [footerOffset, setFooterOffset] = useState(0);
   const [callbackPhone, setCallbackPhone] = useState("");
@@ -57,6 +59,27 @@ const SupportWidgetContent = () => {
     }
     wasOpenRef.current = isOpen;
   }, [isOpen]);
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    let composer: Element | null = null;
+    const visibility = new IntersectionObserver((entries) => {
+      setMessageComposerVisible(entries.some((entry) => entry.isIntersecting));
+    }, { rootMargin: '0px 0px 96px 0px' });
+    const syncComposer = () => {
+      const next = document.querySelector('[data-testid="guest-message-composer"]');
+      if (next === composer) return;
+      visibility.disconnect();
+      composer = next;
+      setMessageComposerVisible(false);
+      if (composer) visibility.observe(composer);
+    };
+    // The booking page loads asynchronously and its composer remounts when the
+    // booking token changes. Observe the current element, never a stale node.
+    const changes = new MutationObserver(syncComposer);
+    changes.observe(document.body, { childList: true, subtree: true });
+    syncComposer();
+    return () => { changes.disconnect(); visibility.disconnect(); };
+  }, []);
   /** Lift floating trigger on `/` so it clears the hero date widget on phones (E2E mobile-viewport). */
   const [narrowViewport, setNarrowViewport] = useState(false);
   const routePath = location?.pathname ?? "";
@@ -83,7 +106,11 @@ const SupportWidgetContent = () => {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setPageUrl(window.location.href);
+    // The booking token belongs only on internal booking/message links, never in
+    // external WhatsApp prefills or generic callback notes.
+    const publicPageUrl = new URL(window.location.href);
+    publicPageUrl.searchParams.delete('t');
+    setPageUrl(publicPageUrl.toString());
   }, [location.key]);
 
   useEffect(() => {
@@ -226,6 +253,7 @@ const SupportWidgetContent = () => {
         />
 
         <div className="flex flex-col gap-[var(--drawer-section-gap,0.75rem)] px-[var(--drawer-card-padding-inline,1rem)] pb-[calc(var(--drawer-card-padding-block,0.75rem)+0.25rem)]">
+          <StayIssueActions onSelect={handleClose} />
           {isCallbackExpanded ? (
             <CallbackRequestForm
               callbackError={callbackError}
@@ -259,7 +287,7 @@ const SupportWidgetContent = () => {
 
   return (
     <>
-      {!isOpen ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
+      {!isOpen && !messageComposerVisible ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
 
       {isOpen ? (
         <>

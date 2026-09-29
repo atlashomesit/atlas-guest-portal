@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantListingAddress, getTenantOverrides } from "../tenant/tenantOverrides";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useLocation, useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import SEO from "../components/SEO";
 import WeatherWidget from "../components/WeatherWidget";
@@ -293,6 +293,7 @@ type ApiErrorEnvelope = ApiErrorResponse & {
 };
 
 export default function BookingConfirmationPage() {
+  const location = useLocation();
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("t");
@@ -1303,7 +1304,7 @@ export default function BookingConfirmationPage() {
 
         {/* TASK-4333: guest-facing messages thread — read + reply to host */}
         {bookingId && token && (
-          <GuestMessageThread bookingId={Number(bookingId)} token={token} />
+          <GuestMessageThread bookingId={Number(bookingId)} token={token} issueCategory={searchParams.get('issue')} issueRequestKey={location.key} />
         )}
 
         {/* TASK-4415: guest self-serve FAQ — same as listing detail page */}
