@@ -669,7 +669,7 @@
 
 .rb-badge--primary {
   background: var(--cta-primary);
-  color: white;
+  color: var(--text-on-cta, #fff);
 }
 
 .rb-badge--secondary {
