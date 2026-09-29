@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { matchPath, useLocation } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
+import { getApiHeaders } from "../../api/client";
 import { getFeatureFlags } from "../../config/featureFlags";
 import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
 import { trackEvent } from "../../utils/analytics";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
 import { getTenantBrandName } from "../../tenant/displayBrand";
+import { getTenantContext } from "../../tenant/tenantContext";
 import { submitCallbackRequest } from "../support/callbackService";
 import CallbackRequestForm from "./CallbackRequestForm";
 import ChatbotPlaceholder from "./ChatbotPlaceholder";
@@ -25,7 +27,12 @@ const SupportWidgetContent = () => {
   const location = useLocation();
   const matchPropertyDetails =
     matchPath("/property_details/:id", location.pathname) ?? matchPath("/properties/:id", location.pathname);
-  const listingId = matchPropertyDetails?.params?.id ?? null;
+  const matchHomeUnit = matchPath("/homes/:propertySlug/:unitSlug", location.pathname);
+  const listingId = matchHomeUnit?.params?.unitSlug && /^\d+$/.test(matchHomeUnit.params.unitSlug)
+    ? matchHomeUnit.params.unitSlug
+    : matchPropertyDetails?.params?.id ?? null;
+  const assistantTenant = getApiHeaders()['X-Tenant-Slug'] ?? getTenantContext()?.slug ?? '';
+  const assistantContextKey = `${assistantTenant}:${listingId ?? ''}`;
 
   const [isOpen, setIsOpen] = useState(false);
   const [messageComposerVisible, setMessageComposerVisible] = useState(false);
@@ -39,7 +46,6 @@ const SupportWidgetContent = () => {
     enableSupportCtaHierarchy,
     enableSupportLayoutVariants,
     enableChatbotPlaceholder,
-    enableHideUnfinishedChatbot,
     enableRevealCallbackOnClickOnly,
     enableRecommendedWhatsAppPrimary,
     enableCloseReassurance,
@@ -267,10 +273,7 @@ const SupportWidgetContent = () => {
           ) : null}
 
           {enableChatbotPlaceholder ? (
-            <ChatbotPlaceholder
-              enableHideUnfinishedChatbot={enableHideUnfinishedChatbot}
-              listingId={listingId}
-            />
+            <ChatbotPlaceholder />
           ) : null}
         </div>
       </>
@@ -304,6 +307,8 @@ const SupportWidgetContent = () => {
           {/* Enable layoutVariants + ctaHierarchy (e.g., ?ff=layoutVariants,compactDrawer,ctaHierarchy)
               to trial the compact drawer and CTA priority without changing the default experience. */}
           <SupportDrawer
+            assistantContextKey={assistantContextKey}
+            assistantListingId={listingId}
             bottomSpacing={bottomSpacing}
             layoutVariant={
               enableSupportLayoutVariants
