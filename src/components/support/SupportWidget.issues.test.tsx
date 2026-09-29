@@ -46,12 +46,35 @@ describe('GUEST-006 drawer issue entry', () => {
     render(<MemoryRouter><SupportWidget /><div data-testid="guest-message-composer"><textarea aria-label="Compose" /><button type="button">Send message</button></div><button type="button">Outside message</button></MemoryRouter>);
     expect(screen.getByRole('button', { name: /chat with us/i })).toBeVisible();
     expect(observe).toHaveBeenCalledWith(screen.getByTestId('guest-message-composer'));
-    act(() => reportVisibility([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
+    act(() => reportVisibility([{ target: screen.getByTestId('guest-message-composer'), isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
     act(() => screen.getByRole('textbox', { name: 'Compose' }).focus());
     expect(screen.queryByRole('button', { name: /chat with us/i })).not.toBeInTheDocument();
     act(() => screen.getByRole('button', { name: 'Outside message' }).focus());
     expect(screen.queryByRole('button', { name: /chat with us/i })).not.toBeInTheDocument();
-    act(() => reportVisibility([{ isIntersecting: false } as IntersectionObserverEntry], {} as IntersectionObserver));
+    act(() => reportVisibility([{ target: screen.getByTestId('guest-message-composer'), isIntersecting: false } as IntersectionObserverEntry], {} as IntersectionObserver));
+    expect(screen.getByRole('button', { name: /chat with us/i })).toBeVisible();
+  });
+  test('GUEST-005 protects both the checkout briefing and composer until both leave the viewport', () => {
+    let reportVisibility!: IntersectionObserverCallback;
+    const observe = vi.fn();
+    vi.stubGlobal('IntersectionObserver', class {
+      constructor(callback: IntersectionObserverCallback) { reportVisibility = callback; }
+      observe = observe;
+      disconnect = vi.fn();
+    });
+    render(<MemoryRouter><SupportWidget /><section data-testid="checkout-briefing">Return the keys.</section><div data-testid="guest-message-composer">Composer</div></MemoryRouter>);
+    const briefing = screen.getByTestId('checkout-briefing');
+    const composer = screen.getByTestId('guest-message-composer');
+    expect(observe).toHaveBeenCalledWith(briefing);
+    expect(observe).toHaveBeenCalledWith(composer);
+    const report = (target: Element, isIntersecting: boolean) => act(() => reportVisibility([{ target, isIntersecting } as IntersectionObserverEntry], {} as IntersectionObserver));
+    report(briefing, true);
+    report(composer, false);
+    expect(screen.queryByRole('button', { name: /chat with us/i })).not.toBeInTheDocument();
+    report(composer, true);
+    report(briefing, false);
+    expect(screen.queryByRole('button', { name: /chat with us/i })).not.toBeInTheDocument();
+    report(composer, false);
     expect(screen.getByRole('button', { name: /chat with us/i })).toBeVisible();
   });
 });

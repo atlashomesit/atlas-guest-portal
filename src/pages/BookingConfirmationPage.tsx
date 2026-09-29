@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DoorOpen } from 'lucide-react';
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantListingAddress, getTenantOverrides } from "../tenant/tenantOverrides";
@@ -189,6 +190,8 @@ interface BookingSummary {
   gstInvoiceTotal?: number | null;
   /** TASK-1888: server-computed; show pre-arrival checklist when true. */
   preArrivalBriefingVisible?: boolean;
+  /** GUEST-005: server owns the near-checkout timing policy; absent means hidden. */
+  checkoutBriefingVisible?: boolean;
   hoursUntilCheckin?: number;
   checkInTime?: string;
   checkOutTime?: string;
@@ -677,6 +680,10 @@ export default function BookingConfirmationPage() {
   // TASK-2071: pick language strings from guest profile preference
   const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
   const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
+  const checkoutInstructions = booking.guidebookCheckoutChecklistText?.trim();
+  const checkoutBriefingVisible = booking.checkoutBriefingVisible === true
+    && (booking.status === 'Confirmed' || booking.status === 'CheckedIn')
+    && !!checkoutInstructions;
   const hasRealHostPhone = !!booking.propertyPhone?.trim();
   // getContactPhone() now returns "" for white-label tenants with no configured number —
   // never build a tel: or wa.me link with an empty number (cross-tenant leak guard).
@@ -1102,6 +1109,36 @@ export default function BookingConfirmationPage() {
             </div>
           )}
         </div>
+
+        {checkoutBriefingVisible && (
+          <section
+            aria-labelledby="checkout-briefing-title"
+            data-testid="checkout-briefing"
+            className="rounded-2xl border border-[color-mix(in_srgb,var(--cta-primary)_30%,var(--border-subtle))] bg-bg-surface p-5 shadow-level1 space-y-4"
+          >
+            <div className="flex items-start gap-3">
+              {/* A door (departure), not a checkmark: nothing here is marked complete for the guest. */}
+              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--cta-primary)_10%,var(--bg-surface))] text-brand-primary">
+                <DoorOpen className="h-5 w-5" strokeWidth={1.75} />
+              </span>
+              <div className="min-w-0 space-y-1">
+                <h2 id="checkout-briefing-title" className="text-base font-semibold text-text-primary">Before you check out</h2>
+                <p className="text-sm text-text-secondary">Please follow your host’s checkout instructions before leaving.</p>
+              </div>
+            </div>
+            {(booking.checkoutDate?.trim() || booking.checkOutTime?.trim()) && (
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-border-subtle py-3 text-sm">
+                {booking.checkoutDate?.trim() && <span className="font-medium text-text-primary">{booking.checkoutDate}</span>}
+                {booking.checkOutTime?.trim() && <span className="text-text-secondary">Check-out by {booking.checkOutTime}</span>}
+              </div>
+            )}
+            {/* Host's own words: a calm quote treatment tinted from the tenant brand, so the most-read text sits on the quietest surface. */}
+            <div className="rounded-r-xl border-l-4 border-[var(--cta-primary)] bg-[color-mix(in_srgb,var(--cta-primary)_5%,var(--bg-surface))] py-4 pl-4 pr-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">From your host</p>
+              <p data-testid="checkout-briefing-instructions" className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">{checkoutInstructions}</p>
+            </div>
+          </section>
+        )}
 
         {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity
             TASK-4437: only show QR once the rotating qrToken is available; show loading state until then */}
