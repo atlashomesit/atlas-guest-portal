@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FaHeart } from "react-icons/fa";
 import SEO from "../components/SEO";
@@ -12,6 +12,8 @@ import { useCurrency } from "../contexts/CurrencyContext";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 import SavedHomeCover from "../components/SavedHomeCover";
+import SavedHomesReminder from "../components/SavedHomesReminder";
+import { useGuestAuth } from "../contexts/GuestAuthContext";
 
 export default function FavoritesPage() {
   const brandName = getTenantBrandName();
@@ -33,13 +35,11 @@ export default function FavoritesPage() {
     try { return atob(token).split(",").map(Number).filter(Boolean); } catch { return null; }
   }, [searchParams]);
 
-  // TASK-1709: reminder email capture
-  const [reminderEmail, setReminderEmail] = useState("");
-  const [reminderState, setReminderState] = useState<"idle" | "busy" | "done" | "error" | "invalid">("idle");
-  const [hasStoredEmail, setHasStoredEmail] = useState(() => {
-    try { return !!localStorage.getItem("atlas_guest_email"); } catch { return false; }
-  });
-  const reminderInputRef = useRef<HTMLInputElement>(null);
+  const { auth, isLoading: authLoading } = useGuestAuth();
+  const knownEmail = auth.isAuthenticated ? (auth.email?.trim() ?? "") : "";
+  const reminderTenant = getApiHeaders()["X-Tenant-Slug"];
+  // Reset typed addresses, progress and success immediately at an account/tenant boundary.
+  const reminderScope = JSON.stringify([reminderTenant, auth.isAuthenticated, auth.guestId, knownEmail.toLowerCase()]);
 
   const loadListings = React.useCallback(() => {
     let cancelled = false;
@@ -99,58 +99,6 @@ export default function FavoritesPage() {
     if (sharedWishlistIds) return all.filter((l) => sharedWishlistIds.includes(l.id));
     return all.filter((l) => favIds.has(l.id));
   }, [all, favIds, sharedWishlistIds]);
-
-  const handleReminderSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = reminderEmail.trim().toLowerCase();
-    // TASK-4968: this regex is stricter than the browser's native `type="email"` check
-    // (e.g. it rejects `me@localhost`), so a rejection here must surface feedback via
-    // the existing error-state UI instead of silently no-opping.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setReminderState("invalid");
-      return;
-    }
-    setReminderState("busy");
-    try {
-      const ids = getFavoriteIds();
-      const results = await Promise.allSettled(
-        ids.map((listingId) =>
-          fetch(buildApiUrl("/api/saved-listings"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...getApiHeaders() },
-            body: JSON.stringify({ guestEmail: email, listingId }),
-          })
-        )
-      );
-      // TASK-4526: Count successes and failures separately; only proceed if ALL succeeded
-      const successful = results.filter(
-        (r) => r.status === "fulfilled" && r.value.ok
-      ).length;
-      const failed = ids.length - successful;
-
-      if (successful === 0) {
-        setReminderState("error");
-        return;
-      }
-
-      // If any failed, show a partial-failure message via error state
-      if (failed > 0) {
-        // Store the email anyway (guest will get reminders for the successful ones)
-        localStorage.setItem("atlas_guest_email", email);
-        setHasStoredEmail(true);
-        // Show error state but include success count context
-        alert(`Reminder set for ${successful} of ${ids.length} homes. Please check your email.`);
-        setReminderState("done");
-        return;
-      }
-
-      localStorage.setItem("atlas_guest_email", email);
-      setHasStoredEmail(true);
-      setReminderState("done");
-    } catch {
-      setReminderState("error");
-    }
-  };
 
   const listingPath = (l: PublicListing) =>
     buildHomeUnitPath(getPropertySlug({ name: l.name, property_name: l.propertyName }), l.id);
@@ -248,47 +196,13 @@ export default function FavoritesPage() {
         </div>
       ) : (
         <>
-        {/* TASK-1709: email capture for saved-listing T+7 reminders */}
-        {!hasStoredEmail && favorites.length > 0 && reminderState !== "done" && (
-          <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-4">
-            <p className="text-sm font-medium text-text-primary mb-1">Get reminded about these homes</p>
-            <p id="reminder-email-description" className="text-xs text-text-secondary mb-3">
-              Enter your email and we'll send you a one-time reminder in 7 days if you haven't booked yet.
-            </p>
-            <form onSubmit={handleReminderSubmit} className="flex gap-2 flex-wrap">
-              <input
-                ref={reminderInputRef}
-                type="email"
-                required
-                placeholder="your@email.com"
-                aria-label="Reminder email address"
-                aria-describedby="reminder-email-description"
-                value={reminderEmail}
-                onChange={(e) => setReminderEmail(e.target.value)}
-                className="flex-1 min-w-0 rounded-lg border border-border-subtle px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              />
-              <button
-                type="submit"
-                disabled={reminderState === "busy"}
-                className="rounded-lg bg-brand-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50 min-h-11"
-              >
-                {reminderState === "busy" ? "Saving…" : "Remind me"}
-              </button>
-            </form>
-            {reminderState === "error" && (
-              <p className="text-xs text-red-600 mt-2" role="alert">
-                We couldn&apos;t save your reminder for every saved home. Please try again in a moment.
-              </p>
-            )}
-            {reminderState === "invalid" && (
-              <p className="text-xs text-red-600 mt-2" role="alert">
-                Please enter a valid email address.
-              </p>
-            )}
-          </div>
-        )}
-        {reminderState === "done" && (
-          <p className="text-sm text-green-700 font-medium">✓ We'll remind you in 7 days if you haven't booked.</p>
+        {!authLoading && !sharedWishlistIds && (
+          <SavedHomesReminder
+            key={reminderScope}
+            initialEmail={knownEmail}
+            tenantSlug={reminderTenant}
+            listingIds={favorites.map((listing) => listing.id)}
+          />
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {favorites.map((l) => {
