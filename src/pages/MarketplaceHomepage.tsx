@@ -347,7 +347,9 @@ export default function MarketplaceHomepage() {
         siteName={MARKETPLACE_BRAND_BASELINE}
       />
       <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
-      <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
+      {/* TASK-101317 / MKT-002: no verification is required to list here, so never claim "verified hosts".
+          Matches the SEO description, which MKT-002 already corrected. */}
+      <p className="mt-2 text-text-body">Discover homes and rooms across India. Book direct with the owner.</p>
 
       {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
       {!loading && items.length > 0 && (

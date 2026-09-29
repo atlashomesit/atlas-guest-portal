@@ -155,7 +155,21 @@ describe("Slider hero search", () => {
     expect(overlay).toBeInTheDocument();
     expect(overlay.style.backgroundImage).toMatch(/linear-gradient|linear-gradient-overlay/i);
     expect(screen.getByRole("heading", { name: /Thoughtfully curated stays/i })).toBeInTheDocument();
-    expect(screen.getByText(/Verified homes/i)).toBeInTheDocument();
+    // TASK-101317: no home verification exists (MKT-002 found none ever recorded), so the hero never claims it.
+    expect(screen.queryByText(/Verified homes/i)).not.toBeInTheDocument();
+  });
+
+  it.each([
+    [{ slug: "online-host", bookingMode: "ONLINE", paymentProvider: "RAZORPAY" }, true],
+    [{ slug: "whatsapp-host", bookingMode: "WHATSAPP", paymentProvider: null }, false],
+    [{ slug: "manual-host", bookingMode: "MANUAL", paymentProvider: null }, false],
+    [null, false],
+  ])("claims instant confirmation only when the tenant takes online payment (%j)", (tenant, shown) => {
+    vi.mocked(getTenantContext).mockReturnValue(tenant as never);
+    renderSlider();
+    const guarantees = screen.getByRole("list", { name: "Booking guarantees" });
+    if (shown) expect(within(guarantees).getByText("Instant confirmation")).toBeInTheDocument();
+    else expect(within(guarantees).queryByText("Instant confirmation")).not.toBeInTheDocument();
   });
 
   it("shows Check availability CTA button (Browse all apartments link removed — Home v2 Gap 3)", () => {
@@ -185,8 +199,8 @@ describe("Slider hero search", () => {
     // /policies; assert unconditional refund *processing* (within 24 hours) instead.
     const trustStrip = screen.getByRole("list", { name: /booking guarantees/i });
     expect(trustStrip).toBeInTheDocument();
-    expect(within(trustStrip).getByText(/instant confirmation/i)).toBeInTheDocument();
-    expect(within(trustStrip).getByText(/verified homes/i)).toBeInTheDocument();
+    // TASK-101317: no "Verified homes" claim; "Instant confirmation" depends on the payment rail (tested above).
+    expect(within(trustStrip).queryByText(/verified homes/i)).not.toBeInTheDocument();
     expect(within(trustStrip).getByTestId("hero-refund-processing-chip")).toHaveTextContent(
       /refunds approved within 24 hours/i,
     );
