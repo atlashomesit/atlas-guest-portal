@@ -9,7 +9,8 @@ import type { PublicListing } from "@/api/listingClient";
 vi.mock("@/api/listingClient", () => ({
   fetchPublicListings: vi.fn(),
 }));
-vi.mock("@/api/client", () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
+// ListingCard reads the tenant processing fee (GUEST-003), which sends the tenant headers.
+vi.mock("@/api/client", () => ({ buildApiUrl: (p: string) => `https://api.test${p}`, getApiHeaders: () => ({}) }));
 
 import { fetchPublicListings } from "@/api/listingClient";
 import { _resetTenantResolutionForTests, setMarketplaceMode } from "@/tenant/tenantResolver";

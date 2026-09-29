@@ -35,7 +35,7 @@ const SupportWidgetContent = () => {
   const assistantContextKey = `${assistantTenant}:${listingId ?? ''}`;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [messageComposerVisible, setMessageComposerVisible] = useState(false);
+  const [bookingContentVisible, setBookingContentVisible] = useState(false);
   const [pageUrl, setPageUrl] = useState("");
   const [footerOffset, setFooterOffset] = useState(0);
   const [callbackPhone, setCallbackPhone] = useState("");
@@ -67,23 +67,27 @@ const SupportWidgetContent = () => {
   }, [isOpen]);
   useEffect(() => {
     if (typeof IntersectionObserver === 'undefined') return;
-    let composer: Element | null = null;
+    let visibleByElement = new Map<Element, boolean>();
     const visibility = new IntersectionObserver((entries) => {
-      setMessageComposerVisible(entries.some((entry) => entry.isIntersecting));
+      for (const entry of entries) {
+        if (visibleByElement.has(entry.target)) visibleByElement.set(entry.target, entry.isIntersecting);
+      }
+      setBookingContentVisible([...visibleByElement.values()].some(Boolean));
     }, { rootMargin: '0px 0px 96px 0px' });
-    const syncComposer = () => {
-      const next = document.querySelector('[data-testid="guest-message-composer"]');
-      if (next === composer) return;
+    const syncBookingContent = () => {
+      const next = [...document.querySelectorAll('[data-testid="guest-message-composer"], [data-testid="checkout-briefing"]')];
+      if (next.length === visibleByElement.size && next.every((element) => visibleByElement.has(element))) return;
       visibility.disconnect();
-      composer = next;
-      setMessageComposerVisible(false);
-      if (composer) visibility.observe(composer);
+      visibleByElement = new Map(next.map((element) => [element, visibleByElement.get(element) ?? false]));
+      setBookingContentVisible([...visibleByElement.values()].some(Boolean));
+      next.forEach((element) => visibility.observe(element));
     };
-    // The booking page loads asynchronously and its composer remounts when the
-    // booking token changes. Observe the current element, never a stale node.
-    const changes = new MutationObserver(syncComposer);
+    // Keep the floating pill clear of host checkout instructions and the message
+    // composer. Both load asynchronously and can remount for a different booking.
+    // Observer callbacks contain only changed targets, so retain each target's state.
+    const changes = new MutationObserver(syncBookingContent);
     changes.observe(document.body, { childList: true, subtree: true });
-    syncComposer();
+    syncBookingContent();
     return () => { changes.disconnect(); visibility.disconnect(); };
   }, []);
   /** Lift floating trigger on `/` so it clears the hero date widget on phones (E2E mobile-viewport). */
@@ -290,7 +294,7 @@ const SupportWidgetContent = () => {
 
   return (
     <>
-      {!isOpen && !messageComposerVisible ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
+      {!isOpen && !bookingContentVisible ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
 
       {isOpen ? (
         <>
