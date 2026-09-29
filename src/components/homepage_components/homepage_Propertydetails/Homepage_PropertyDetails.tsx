@@ -1,4 +1,6 @@
 import './Homepage_PropertyDetails.css';
+import RatingDistribution from '../../property/RatingDistribution';
+import { starDistribution } from '../../property/starDistribution';
 import React from 'react';
 import { toast } from 'react-toastify'; // TASK-4288: share fallback feedback
 import { getListingDisplayName } from '@/lib/listingDisplayName';
@@ -2258,6 +2260,9 @@ useEffect(() => {
                               : `${count} ${count === 1 ? 'review' : 'reviews'}`}
                           </div>
                         </div>
+                        <div className="pp-v2-reviews-detail">
+                        {/* TASK-101380: per-star distribution from this site's complete review list. */}
+                        <RatingDistribution ratings={api.reviews.map((r) => Number(r.rating))} totalCount={api.totalCount} otherSourcesCount={externalReviewsFromApi.length} />
                         {/* Sub-rating bars derived from API reviews if available */}
                         {api.reviews.length > 0 && (() => {
                           const rs = api.reviews.filter((r) => r.rating > 0);
@@ -2276,6 +2281,8 @@ useEffect(() => {
                             { label: 'Value', v: value },
                           ].filter(b => b.v != null);
                           if (bars.length === 0) {
+                            // The distribution already states the count and source; do not repeat it.
+                            if (starDistribution(api.reviews.map((r) => Number(r.rating)), api.totalCount)) return null;
                             return (
                               <div style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', lineHeight: 1.6 }}>
                                 <p style={{ margin: '0 0 4px', fontWeight: 600, color: 'var(--text-primary, #4a3535)' }}>Overall rating</p>
@@ -2304,6 +2311,7 @@ useEffect(() => {
                             </>
                           );
                         })()}
+                        </div>
                       </div>
 
                       {ppMergedReviews.length > 0 ? (
