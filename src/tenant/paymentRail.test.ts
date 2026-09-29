@@ -67,10 +67,14 @@ describe('TASK-7428: hasOnlinePaymentRail', () => {
 });
 
 describe('TASK-8055: directBookingPriceClaim', () => {
-  it('ONLINE includes the 3% payment-processing fee claim', () => {
-    expect(directBookingPriceClaim(tenant({ bookingMode: 'ONLINE' }))).toContain(
-      '3% payment-processing fee',
-    );
+  it('ONLINE has no numeric fee claim without a confirmed setting', () => {
+    expect(directBookingPriceClaim(tenant({ bookingMode: 'ONLINE' }))).not.toMatch(/\d%/);
+    expect(directBookingPriceClaim(tenant({ bookingMode: 'ONLINE' }))).toContain('shown before payment');
+  });
+
+  it('preserves the configured percentage, including decimals and zero', () => {
+    expect(directBookingPriceClaim(tenant({ bookingMode: 'ONLINE' }), 1.25)).toContain('1.25%');
+    expect(directBookingPriceClaim(tenant({ bookingMode: 'ONLINE' }), 0)).toContain('No payment-processing fee');
   });
 
   it('WHATSAPP omits any percentage fee string', () => {

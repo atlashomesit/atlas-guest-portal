@@ -1,52 +1,21 @@
+import { useTenantProcessingFee } from "../hooks/useTenantProcessingFee";
 import { getTenantBrandName } from "../tenant/displayBrand";
-import { hasOnlinePaymentRail } from "../tenant/paymentRail";
-
-/**
- * TASK-1705: Owner-share trust badge.
- *
- * Shows "0% commission — book direct" trust signal on listing cards and detail pages.
- * Highlights that unlike OTA platforms (which keep 15–20%), direct bookings via Atlas
- * go entirely to the host.
- *
- * Optional `nightlyPrice` prop: when provided, shows the amount in ₹ that the host
- * receives (e.g. "₹3,800 to host" for a ₹4,000/night listing, assuming ~5% payment
- * processing).
- */
+import { paymentFeeCopy } from "../utils/paymentFeeCopy";
 
 interface OwnerShareBadgeProps {
-  /** If provided, shows the estimated ₹ amount going to the host. */
+  /** Retained for callers; a room tariff cannot establish the host's actual settlement. */
   nightlyPrice?: number | null;
-  /** Additional CSS class names. */
   className?: string;
+  /** Marketplace callers must supply the listing's own fee, never the platform tenant's fee. */
+  processingFeePercent?: number | null;
 }
 
-const PLATFORM_SHARE = 0.95; // conservative host share (accounts for ~5% payment processing)
-
-const formatINR = (n: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
-
-export default function OwnerShareBadge({ nightlyPrice, className = "" }: OwnerShareBadgeProps) {
+export default function OwnerShareBadge({ className = "", processingFeePercent }: OwnerShareBadgeProps) {
   const brandName = getTenantBrandName();
-  const showProcessingFee = hasOnlinePaymentRail();
-  const hostAmount =
-    nightlyPrice != null && nightlyPrice > 0
-      ? Math.round(nightlyPrice * (showProcessingFee ? PLATFORM_SHARE : 1))
-      : null;
-
-  const label = hostAmount != null
-    ? `${formatINR(hostAmount)} to host (0% OTA commission)`
-    : "Book direct — host keeps more";
-
-  const tooltip =
-    `Booking direct via ${brandName} means your host keeps significantly more. ` +
-    "OTA platforms (marketplaces) typically charge 15–20% commission. " +
-    (showProcessingFee
-      ? "Direct bookings have 0% platform commission — only a 3% payment-processing fee (Razorpay pass-through)."
-      : "Direct bookings have 0% platform commission — you pay the host's price with no invented processing fee.");
+  const tenantFee = useTenantProcessingFee(processingFeePercent === undefined);
+  const percent = processingFeePercent === undefined ? tenantFee : processingFeePercent;
+  const label = "Book direct — host keeps more";
+  const tooltip = `Direct booking via ${brandName} has no OTA commission. ${paymentFeeCopy({ percent })}`;
 
   return (
     <span

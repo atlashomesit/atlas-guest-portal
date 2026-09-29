@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 /**
  * TASK-4914 / ADR-0081 D8 — "heritage" layout theme's Home page.
  *
@@ -80,7 +81,8 @@ const HeritageHome = () => {
     const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
     /** TASK-5194 / TASK-7428: white-label — no Atlas verification claim, no invented 3% fee. */
     /** TASK-8055: fee claim follows payment rail, not white-label branding alone. */
-    const payDirectBody = directBookingPriceClaim(tenant);
+    const processingFeePercent = useTenantProcessingFee();
+    const payDirectBody = directBookingPriceClaim(tenant, processingFeePercent);
     const whyDirectItems = useMemo(() => {
         const items = hideAtlasBranding
             ? WHY_DIRECT_ITEMS.filter((item) => item.heading !== "We verify every home")

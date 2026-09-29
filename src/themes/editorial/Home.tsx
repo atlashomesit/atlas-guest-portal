@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 /**
  * TASK-4924 / ADR-0081 D8 — "editorial" layout theme's Home page ("editorial magazine").
  *
@@ -25,7 +26,7 @@ import { useEffect, useMemo } from 'react';
 import { useTenantListings } from '../../hooks/useTenantListings';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../tenant/tenantOverrides';
 import { getTenantContext } from '../../tenant/tenantContext';
-import { hasOnlinePaymentRail } from '../../tenant/paymentRail';
+import { directBookingPriceClaim } from '../../tenant/paymentRail';
 import { getFaqHighlights } from '../../content/faqHighlights';
 import { trackEvent } from '../../utils/analytics';
 import ServicesSection from '../../components/home/ServicesSection';
@@ -68,7 +69,8 @@ const EditorialHome = () => {
     // same rule every other layout's hero follows).
     const showAtlasContent = !hideAtlasBranding;
     /** TASK-8055: fee claim follows payment rail, not Atlas branding alone. */
-    const showProcessingFee = hasOnlinePaymentRail(tenant);
+    const processingFeePercent = useTenantProcessingFee();
+    const feeClaim = directBookingPriceClaim(tenant, processingFeePercent);
     const heroImageUrl = showAtlasContent
         ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
         : '';
@@ -188,19 +190,11 @@ const EditorialHome = () => {
                         </h2>
                         <p className="editorial-narrative-p">
                             {showAtlasContent
-                                ? (showProcessingFee
-                                    ? "Every address on this page is one we own and operate ourselves — nothing staged, nothing borrowed, no third-party listing dressed up for a photograph. The rooms you see are the rooms you'll walk into. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee — no hidden charges."
-                                    : "Every address on this page is one we own and operate ourselves — nothing staged, nothing borrowed, no third-party listing dressed up for a photograph. The rooms you see are the rooms you'll walk into. Price shown is what you pay: room rate and applicable GST — no hidden charges.")
-                                : `Book directly with ${schemaBrandName}. The total shown at checkout is what you pay — no surprise OTA markups.`}
+                                ? `Every address on this page is one we own and operate ourselves — nothing staged, nothing borrowed, no third-party listing dressed up for a photograph. The rooms you see are the rooms you'll walk into. ${feeClaim}`
+                                : `Book directly with ${schemaBrandName}. ${feeClaim}`}
                         </p>
                         <EditorialPullQuote
-                            quote={
-                              showAtlasContent
-                                ? (showProcessingFee
-                                    ? "Book direct — the host keeps more. Price shown is what you pay: room rate, GST, and a 3% payment-processing fee."
-                                    : "Book direct — the host keeps more. Price shown is what you pay: room rate and applicable GST.")
-                                : `Book direct with ${schemaBrandName}. The total shown at checkout is what you pay.`
-                            }
+                            quote={feeClaim}
                             attribution={showAtlasContent ? `${schemaBrandName}, on transparent pricing` : undefined}
                         />
                         <p className="editorial-narrative-p">

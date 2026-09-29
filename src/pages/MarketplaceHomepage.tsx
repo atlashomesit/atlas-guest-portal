@@ -1,3 +1,4 @@
+import { feePercent } from "../utils/paymentFeeCopy";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
@@ -55,8 +56,7 @@ type MarketplaceItem = {
   verifiedStayCount?: number | null;
   externalReviewCount?: number | null;
   // MKT-001: server-derived per-tenant payment routing (TenantsController/IPaymentRoutingService).
-  // Not yet deployed on GET /marketplace/listings — undefined falls back to today's behaviour
-  // (see the `?? 3` fallback below) until the API half ships.
+  // Missing metadata must remain unknown, without a platform-wide percentage fallback.
   chargesOnlinePaymentFee?: boolean;
   convenienceFeePercent?: number;
 };
@@ -367,7 +367,7 @@ export default function MarketplaceHomepage() {
           {hasOnlinePaymentRail() ? (
             <>
               <span aria-hidden>·</span>
-              <span>Price shown: room + GST + 3% payment-processing fee</span>
+              <span>Any payment-processing fee is shown before payment</span>
             </>
           ) : null}
         </div>
@@ -575,8 +575,8 @@ export default function MarketplaceHomepage() {
                       // MKT-001 / TASK-7428 "no processor, no fee": a WHATSAPP-tenant listing
                       // takes no online payment and must not be quoted a processing fee. The
                       // fields are not deployed on the API yet, so `chargesOnlinePaymentFee`
-                      // undefined preserves today's flat-3% behaviour via the `?? 3` fallback.
-                      item.chargesOnlinePaymentFee === false ? 0 : (item.convenienceFeePercent ?? 3),
+                      // Missing row metadata stays unknown until the guest receives a quote.
+                      item.chargesOnlinePaymentFee === false ? 0 : feePercent(item.convenienceFeePercent),
                       item.isGstRegistered,
                       item.pricePerNight,
                     )}
@@ -584,7 +584,7 @@ export default function MarketplaceHomepage() {
 
                   {/* TASK-4511: Owner-share trust badge — no nightlyPrice prop (matches SearchPage.tsx's
                       BUG-7 fix; avoids leaking a fabricated host payout figure). */}
-                  <OwnerShareBadge className="self-start" />
+                  <OwnerShareBadge className="self-start" processingFeePercent={item.chargesOnlinePaymentFee === false ? 0 : feePercent(item.convenienceFeePercent)} />
 
                   <Link
                     className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
