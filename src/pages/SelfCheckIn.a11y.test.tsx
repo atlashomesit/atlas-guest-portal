@@ -3,10 +3,11 @@
  * associated label (WCAG 1.3.1 / 4.1.2) and validation errors must be linked
  * to their inputs via aria-describedby (WCAG 3.3.2).
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, test, vi, type Mock } from "vitest";
 import SelfCheckIn from "./SelfCheckIn";
+import { settle } from "../test/settle";
 
 vi.mock("../components/SEO", () => ({ default: () => null }));
 
@@ -58,7 +59,8 @@ describe("SelfCheckIn auth step a11y", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
-    const alert = await screen.findByRole("alert");
+    await settle();
+    const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent(/booking reference and last name/i);
 
     const ref = screen.getByLabelText("Booking reference");
@@ -90,10 +92,12 @@ describe("SelfCheckIn ID step a11y", () => {
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     // summary step → ID step
-    await waitFor(() => expect(screen.getByText("Atlas Stay")).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText("Atlas Stay")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
-    const idType = await screen.findByLabelText("ID type");
+    await settle();
+    const idType = screen.getByLabelText("ID type");
     expect(idType).toHaveAccessibleName("ID type");
     expect(screen.getByLabelText("ID number")).toHaveAccessibleName("ID number");
     const idPhoto = screen.getByLabelText(/id photo/i);

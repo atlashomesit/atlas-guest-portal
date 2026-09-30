@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
 import { BookingProvider } from '@/contexts/BookingContext';
@@ -8,6 +8,7 @@ import UnitBookingWidget from '@/components/availability/UnitBookingWidget';
 import GuestDetailsPage from './GuestDetailsPage';
 import { toISODate } from '@/utils/dateRange';
 import { getIstStartOfDay } from '@/utils/date';
+import { settle } from '../../test/settle';
 
 // TASK-102017: Proving integration test that widget -> details navigation on a ?tenant= URL
 // carries the host tenant in both the route query string and BookingContext, ensuring that
@@ -191,20 +192,24 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
     );
 
     // Reserve button in widget
-    const reserveButton = await screen.findByTestId('guest-booking-submit');
-    await waitFor(() => expect(reserveButton).toBeEnabled());
+    await settle();
+    const reserveButton = screen.getByTestId('guest-booking-submit');
+    await settle();
+    expect(reserveButton).toBeEnabled();
 
     await act(async () => {
       fireEvent.click(reserveButton);
     });
 
     // 1. Assert init-hold call occurred and sent X-Tenant-Slug: qa-bot-c59de6
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(1);
     const initHoldHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
     expect(initHoldHeaders['X-Tenant-Slug']).toBe(tenantSlug);
 
     // 2. Assert navigation transitioned to GuestDetailsPage
-    await waitFor(() => expect(screen.getByTestId('guest-booking-name')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('guest-booking-name')).toBeInTheDocument();
 
     // Fill in guest details
     fireEvent.change(screen.getByTestId('guest-booking-name'), { target: { value: 'Jane Doe' } });
@@ -222,7 +227,8 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
     });
 
     // 3. Assert final-charge call occurred and ALSO sent X-Tenant-Slug: qa-bot-c59de6!
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(2));
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(2);
     const finalChargeHeaders = postSpy.mock.calls[1][2]?.headers as Record<string, string>;
     expect(finalChargeHeaders['X-Tenant-Slug']).toBe(tenantSlug);
   });
@@ -280,7 +286,8 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
       </BookingProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('guest-booking-name')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('guest-booking-name')).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('guest-booking-name'), { target: { value: 'Jane Doe' } });
     fireEvent.change(screen.getByTestId('guest-booking-email'), { target: { value: 'jane@example.com' } });
@@ -292,7 +299,8 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
       fireEvent.click(payButton);
     });
 
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(1);
     const finalChargeHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
     expect(finalChargeHeaders['X-Tenant-Slug']).toBe(tenantSlug);
   });

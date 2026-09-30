@@ -4,12 +4,13 @@
  * see the second describe block below.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import { CurrencyProvider } from '../contexts/CurrencyContext';
 import SearchPage from '../pages/SearchPage';
+import { settle } from '../test/settle';
 
 const mockFetchPublicListings = vi.fn();
 vi.mock('../api/listingClient', () => ({
@@ -77,12 +78,8 @@ describe('SearchPage — empty state (TASK-1451)', () => {
       </CurrencyProvider>,
     );
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('search-empty-state')).toBeInTheDocument();
-      },
-      { timeout: 15_000 },
-    );
+    await settle();
+    expect(screen.getByTestId('search-empty-state')).toBeInTheDocument();
 
     expect(screen.getByRole('heading', { name: /no homestays match your filters/i })).toBeInTheDocument();
     expect(screen.getByText(/try adjusting dates, price range, or guest count/i)).toBeInTheDocument();
@@ -93,12 +90,8 @@ describe('SearchPage — empty state (TASK-1451)', () => {
 
     fireEvent.click(screen.getByTestId('search-empty-clear-filters'));
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('guest-search-results')).toBeInTheDocument();
-      },
-      { timeout: 15_000 },
-    );
+    await settle();
+    expect(screen.getByTestId('guest-search-results')).toBeInTheDocument();
     expect(screen.queryByTestId('search-empty-state')).not.toBeInTheDocument();
   });
 });
@@ -129,7 +122,8 @@ describe('SearchPage — load failure must not claim zero results (TASK-7195)', 
       </CurrencyProvider>,
     );
 
-    expect(await screen.findByTestId('search-load-error')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId('search-load-error')).toBeInTheDocument();
     expect(screen.queryByTestId('search-empty-state')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /no homestays match your filters/i })).not.toBeInTheDocument();
   });
@@ -145,7 +139,8 @@ describe('SearchPage — load failure must not claim zero results (TASK-7195)', 
       </CurrencyProvider>,
     );
 
-    expect(await screen.findByTestId('search-empty-state')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId('search-empty-state')).toBeInTheDocument();
     expect(screen.queryByTestId('search-load-error')).not.toBeInTheDocument();
   });
 });

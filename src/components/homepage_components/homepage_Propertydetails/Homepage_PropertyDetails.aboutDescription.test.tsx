@@ -11,11 +11,12 @@
  * src/themes/heritage/PropertyDetails.aboutDescription.test.tsx (kept in a separate file: rendering
  * both layouts in one run exhausts the worker heap, see ac7-layout-theme-switch.test.tsx).
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Suspense } from 'react';
 import Homepage_PropertyDetails from './Homepage_PropertyDetails';
+import { settle } from '../../../test/settle';
 
 vi.mock('@/components/availability/UnitBookingWidget', () => ({
   __esModule: true,
@@ -126,7 +127,8 @@ describe('Listing page "About this home" shows the host description from Rooms &
 
     render(page());
 
-    const about = await screen.findByTestId('property-about-description');
+    await settle();
+    const about = screen.getByTestId('property-about-description');
     expect(about.className).toContain('whitespace-pre-wrap');
     expect(about.textContent).toContain('\n\n✨ Highlights\n\n🏡 Entire private 2BHK');
     expect(about.textContent).toMatch(/…$/);
@@ -142,7 +144,8 @@ describe('Listing page "About this home" shows the host description from Rooms &
 
     render(page());
 
-    const about = await screen.findByTestId('property-about-description');
+    await settle();
+    const about = screen.getByTestId('property-about-description');
     expect(about.textContent).toBe('Stylish 2BHK near UB City.');
     expect(screen.queryByRole('button', { name: /read more/i })).not.toBeInTheDocument();
   });
@@ -153,12 +156,14 @@ describe('Listing page "About this home" shows the host description from Rooms &
 
     render(page());
 
-    await screen.findByTestId('property-about-section');
+    await settle();
+    screen.getByTestId('property-about-section');
     expect(screen.queryByTestId('property-about-ask-host')).not.toBeInTheDocument();
 
     answer({ id: 637, longDescription: null, shortDescription: null });
 
-    expect(await screen.findByTestId('property-about-ask-host')).toHaveTextContent(/hasn.t added a description yet/i);
+    await settle();
+    expect(screen.getByTestId('property-about-ask-host')).toHaveTextContent(/hasn.t added a description yet/i);
     expect(screen.queryByTestId('property-about-description')).not.toBeInTheDocument();
   });
 
@@ -168,13 +173,15 @@ describe('Listing page "About this home" shows the host description from Rooms &
     mockFetchListingById.mockResolvedValue({ id: 637, longDescription: 'Host-written description.' });
 
     const { rerender } = render(page());
-    expect(await screen.findByTestId('property-about-description')).toHaveTextContent('Host-written description.');
+    await settle();
+    expect(screen.getByTestId('property-about-description')).toHaveTextContent('Host-written description.');
 
     // …then GET /listings/public lands and the page row is rebuilt from it (no description there).
     mockUseTenantListings.mockReturnValue(listState([{ ...LIST_ROW }]));
     rerender(page());
 
-    await waitFor(() => expect(screen.getAllByTestId('property-check-in-time').length).toBeGreaterThan(0));
+    await settle();
+    expect(screen.getAllByTestId('property-check-in-time').length).toBeGreaterThan(0);
     expect(screen.getByTestId('property-about-description')).toHaveTextContent('Host-written description.');
     expect(screen.queryByTestId('property-about-ask-host')).not.toBeInTheDocument();
   });

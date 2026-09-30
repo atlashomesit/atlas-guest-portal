@@ -3,11 +3,12 @@
  * online payment rail exists. On the TASK-8048 WhatsApp-handoff branch (no gateway) the
  * SSL/RBI/instant-confirmation claims would be false, so they must never appear there.
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingProvider } from "@/contexts/BookingContext";
 import GuestDetailsPage from "./GuestDetailsPage";
+import { settle } from "../../test/settle";
 
 vi.mock("@/lib/events", () => ({ track: vi.fn(), TerminalCheckoutOutcomeEvents: {} }));
 
@@ -45,7 +46,8 @@ async function renderPage() {
     </MemoryRouter>,
   );
   // wait for hold rehydration → form render
-  await waitFor(() => expect(document.getElementById("gd-details-form")).toBeInTheDocument());
+  await settle();
+  expect(document.getElementById("gd-details-form")).toBeInTheDocument();
 }
 
 beforeEach(() => {

@@ -1,7 +1,8 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import BookingConfirmationPage from "./BookingConfirmationPage";
+import { settle } from "../test/settle";
 
 vi.mock("../lib/events", () => ({ track: vi.fn() }));
 vi.mock("../components/SEO", () => ({ default: () => null }));
@@ -113,7 +114,8 @@ describe("BookingConfirmationPage payment polling", () => {
     });
 
     renderPage();
-    expect(await screen.findByTestId("payment-failed-card")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId("payment-failed-card")).toBeInTheDocument();
     const beforeManual = paymentCalls;
 
     fireEvent.click(screen.getByTestId("check-payment-status-btn"));
@@ -121,7 +123,8 @@ describe("BookingConfirmationPage payment polling", () => {
     expect(paymentCalls).toBe(beforeManual + 1);
 
     releaseManualCheck?.();
-    await waitFor(() => expect(screen.queryByText("Checking...")).not.toBeInTheDocument());
+    await settle();
+    expect(screen.queryByText("Checking...")).not.toBeInTheDocument();
   });
 
   test("reload uses cached success status and skips polling", async () => {
@@ -141,7 +144,8 @@ describe("BookingConfirmationPage payment polling", () => {
     });
 
     renderPage();
-    expect(await screen.findByTestId("booking-confirmation-page")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId("booking-confirmation-page")).toBeInTheDocument();
     expect(paymentStatusCalls).toBe(0);
     expect(screen.queryByTestId("payment-polling-status")).not.toBeInTheDocument();
   });
@@ -177,7 +181,8 @@ describe("BookingConfirmationPage TASK-5178 add-on upsell", () => {
     });
 
     renderPage();
-    expect(await screen.findByTestId("booking-confirmation-page")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId("booking-confirmation-page")).toBeInTheDocument();
     expect(screen.queryByText(/Make your stay even better/i)).not.toBeInTheDocument();
   });
 });

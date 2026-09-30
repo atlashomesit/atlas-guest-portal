@@ -2,12 +2,13 @@
  * TASK-1457: List / Map toggle on SearchPage (map chunk mocked — real map uses Leaflet context).
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import { CurrencyProvider } from '../contexts/CurrencyContext';
 import SearchPage from '../pages/SearchPage';
+import { settle } from '../test/settle';
 
 vi.mock('../api/listingClient', () => ({
   fetchPublicListings: vi.fn(() => Promise.reject(new Error('network'))),
@@ -50,26 +51,20 @@ describe('SearchPage — map view (TASK-1457)', () => {
       </CurrencyProvider>,
     );
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('guest-search-results')).toBeInTheDocument();
-      },
-      { timeout: 15_000 },
-    );
+    await settle();
+    expect(screen.getByTestId('guest-search-results')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('search-view-map'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('search-results-map')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId('search-results-map')).toBeInTheDocument();
 
     expect(screen.getByTestId('mock-leaflet-map')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('search-view-list'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('guest-search-results')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId('guest-search-results')).toBeInTheDocument();
     expect(screen.queryByTestId('search-results-map')).not.toBeInTheDocument();
   });
 });

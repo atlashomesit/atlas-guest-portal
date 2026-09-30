@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, format, startOfDay } from 'date-fns';
+import { settle } from '../../test/settle';
 
 /**
  * TASK-7491 (Rate Sync Authority opt-out — guest-portal slice): verifies the guest booking
@@ -185,11 +186,13 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
         />
       </MemoryRouter>,
     );
-    const trigger = await screen.findByLabelText('Select check-in date');
+    await settle();
+    const trigger = screen.getByLabelText('Select check-in date');
     await act(async () => {
       fireEvent.click(trigger);
     });
-    await screen.findByRole('dialog', { name: 'Select dates' });
+    await settle();
+    screen.getByRole('dialog', { name: 'Select dates' });
   };
 
   const findDayCell = async (date: Date): Promise<HTMLElement> => {
@@ -197,16 +200,16 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
     // aria-label is `${d MMMM}` optionally followed by `, ₹price` (DayCell in
     // AtlasBookingCalendar.tsx) — match the date prefix regardless of the price suffix.
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return screen.findByRole('gridcell', { name: new RegExp(`^${escaped}(,|$)`) });
+    await settle();
+    return screen.getByRole('gridcell', { name: new RegExp(`^${escaped}(,|$)`) });
   };
 
   it('renders a bookable:false day unavailable: disabled, unselectable, no price ever shown', async () => {
     await renderWidgetAndOpenCalendar();
 
     const cell = await findDayCell(unusableDate);
-    await waitFor(() => {
-      expect(cell).toBeDisabled();
-    });
+    await settle();
+    expect(cell).toBeDisabled();
     expect(cell.className).toContain('bc-unavail');
     // No price span at all for this cell — never a guessed/invented price.
     expect(cell.querySelector('.bc-price')).toBeNull();
@@ -224,9 +227,8 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
     await renderWidgetAndOpenCalendar();
 
     const cell = await findDayCell(carriedForwardDate);
-    await waitFor(() => {
-      expect(cell.querySelector('.bc-price')).not.toBeNull();
-    });
+    await settle();
+    expect(cell.querySelector('.bc-price')).not.toBeNull();
     expect(cell).not.toBeDisabled();
     expect(cell.className).not.toContain('bc-unavail');
     const priceText = cell.querySelector('.bc-price')?.textContent?.replace(/[^0-9]/g, '');
@@ -237,9 +239,8 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
     await renderWidgetAndOpenCalendar();
 
     const cell = await findDayCell(normalDate);
-    await waitFor(() => {
-      expect(cell.querySelector('.bc-price')).not.toBeNull();
-    });
+    await settle();
+    expect(cell.querySelector('.bc-price')).not.toBeNull();
     expect(cell).not.toBeDisabled();
     expect(cell.className).not.toContain('bc-unavail');
     const priceText = cell.querySelector('.bc-price')?.textContent?.replace(/[^0-9]/g, '');

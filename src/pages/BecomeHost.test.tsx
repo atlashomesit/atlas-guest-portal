@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // TASK-7490: BecomeHost's "Import from Airbnb" prefill was broken end-to-end — the request body
@@ -17,6 +17,7 @@ vi.mock("react-toastify", () => ({
 
 import { toast } from "react-toastify";
 import BecomeHost from "./BecomeHost";
+import { settle } from "../test/settle";
 
 const AIRBNB_URL = "https://www.airbnb.com/rooms/12345";
 
@@ -97,7 +98,8 @@ describe("BecomeHost — Airbnb prefill (TASK-7490)", () => {
     fireEvent.change(screen.getByLabelText("Airbnb listing URL"), { target: { value: AIRBNB_URL } });
     fireEvent.click(screen.getByRole("button", { name: "Import listing" }));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await settle();
+    expect(fetchMock).toHaveBeenCalled();
 
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toContain("/onboarding/airbnb/prefill");
@@ -121,7 +123,8 @@ describe("BecomeHost — Airbnb prefill (TASK-7490)", () => {
 
     // "propertyType" is rendered (via `key.replace(/([A-Z])/g, " $1")`) as the literal text
     // "property Type" inside the "Imported fields" box.
-    await waitFor(() => expect(screen.getByText("property Type")).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText("property Type")).toBeInTheDocument();
     expect(screen.getByText("Villa", { selector: "span" })).toBeInTheDocument();
 
     // None of the fields the real API never returns were read into the prefilled set.
@@ -146,7 +149,8 @@ describe("BecomeHost — Airbnb prefill (TASK-7490)", () => {
     fireEvent.click(importButton);
 
     // Wait for the async handler to settle (button leaves its "Importing..." loading state).
-    await waitFor(() => expect(screen.getByRole("button", { name: "Import listing" })).not.toBeDisabled());
+    await settle();
+    expect(screen.getByRole("button", { name: "Import listing" })).not.toBeDisabled();
 
     // TASK-7490: a 200 response that extracted nothing must not claim success.
     expect(toast.success).not.toHaveBeenCalled();
@@ -176,7 +180,8 @@ describe("BecomeHost — Airbnb prefill (TASK-7490)", () => {
     fireEvent.change(screen.getByLabelText("Airbnb listing URL"), { target: { value: AIRBNB_URL } });
     fireEvent.click(screen.getByRole("button", { name: "Import listing" }));
 
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Listing details imported!"));
+    await settle();
+    expect(toast.success).toHaveBeenCalledWith("Listing details imported!");
     expect(toast.info).toHaveBeenCalledWith(
       "Photos were skipped — paste the listing text for richer import",
     );

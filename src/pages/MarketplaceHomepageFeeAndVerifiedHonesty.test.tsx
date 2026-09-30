@@ -8,7 +8,7 @@
 // (`Listings.PhotosVerifiedAt` unset on 0 of 136 prod listings). RED before the fix: the trust
 // strip always rendered "0 Verified homes" rather than omitting the claim.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -26,6 +26,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 }));
 
 import MarketplaceHomepage from './MarketplaceHomepage';
+import { settle } from '../test/settle';
 
 function stubMarketplaceListings(items: unknown[]) {
   vi.stubGlobal(
@@ -75,7 +76,8 @@ describe('MKT-001: marketplace card fee honesty', () => {
     ]);
 
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
 
     expect(screen.queryByText(/payment processing/i)).not.toBeInTheDocument();
     // Base ₹5,000 × 2 nights, no GST (unregistered), no fee — total must equal base×nights exactly.
@@ -100,7 +102,8 @@ describe('MKT-001: marketplace card fee honesty', () => {
     ]);
 
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
 
     expect(screen.getByText(/3% payment processing/)).toBeInTheDocument();
   });
@@ -121,7 +124,8 @@ describe('MKT-001: marketplace card fee honesty', () => {
     ]);
 
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
 
     expect(screen.getByText('Total confirmed after choosing dates.')).toBeInTheDocument();
     expect(screen.queryByText(/3% payment processing/)).not.toBeInTheDocument();
@@ -145,7 +149,8 @@ describe('MKT-002: marketplace verified-homes trust strip honesty', () => {
     ]);
 
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument();
 
     expect(screen.queryByText(/Verified homes/)).not.toBeInTheDocument();
   });
@@ -166,7 +171,8 @@ describe('MKT-002: marketplace verified-homes trust strip honesty', () => {
     ]);
 
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument();
 
     expect(screen.getByText(/1 Verified homes/)).toBeInTheDocument();
   });
@@ -180,7 +186,8 @@ describe('TASK-101317: the marketplace never calls every host verified', () => {
       { id: 1, tenantSlug: 'atlas', tenantName: 'Atlas', title: 'Any listing', city: 'Goa', pricePerNight: 5000, maxGuests: 2, slug: '1', hasVerifiedPhotos: false },
     ]);
     renderPage();
-    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Atlastays Marketplace' })).toBeInTheDocument());
+    await settle();
+    expect(screen.getByRole('heading', { level: 1, name: 'Atlastays Marketplace' })).toBeInTheDocument();
     expect(screen.queryByText(/verified hosts/i)).not.toBeInTheDocument();
     expect(screen.getByText('Discover homes and rooms across India. Book direct with the owner.')).toBeInTheDocument();
   });

@@ -5,7 +5,7 @@
 // city/checkIn/checkOut/guests — SearchPage already propagates its full querySuffix,
 // the homepage grid does not.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -23,6 +23,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 }));
 
 import MarketplaceHomepage from './MarketplaceHomepage';
+import { settle } from '../test/settle';
 
 function listing(id: number) {
   return {
@@ -66,7 +67,8 @@ describe('TASK-102058 marketplace card links preserve search criteria', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Listing 1')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText('Listing 1')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /view home/i });
     const href = link.getAttribute('href') ?? '';
     const query = href.split('?')[1] ?? '';

@@ -22,12 +22,13 @@
  *   `discountAmount` (the tenant GLOBAL discount) is applied AFTER `BaseAmount` is fixed.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
 import { toISODate } from '@/utils/dateRange';
 import { getIstStartOfDay } from '@/utils/date';
 import type { GuestPriceBreakdown } from '@/api/pricingClient';
+import { settle } from '../../test/settle';
 
 const mocks = vi.hoisted(() => ({
   fetchCalendarPricing: vi.fn(),
@@ -133,9 +134,11 @@ async function renderBreakdown(scenario: Scenario) {
     );
   });
 
-  const totalLabel = await screen.findByText('Total');
+  await settle();
+  const totalLabel = screen.getByText('Total');
   const totalRow = totalLabel.closest('.lv-price-row') as HTMLElement;
-  await waitFor(() => expect(money(totalRow.querySelector('.lv-num')?.textContent)).toBeGreaterThan(1));
+  await settle();
+  expect(money(totalRow.querySelector('.lv-num')?.textContent)).toBeGreaterThan(1);
 
   const rowsContainer = totalRow.parentElement as HTMLElement;
   const allRows = Array.from(rowsContainer.querySelectorAll<HTMLElement>('.lv-price-row'));

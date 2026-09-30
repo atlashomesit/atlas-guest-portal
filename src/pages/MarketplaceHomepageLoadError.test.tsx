@@ -2,7 +2,7 @@
 // state, so an API blip told the guest "No stays match these filters yet — try a different city".
 // RED before the fix: both a thrown fetch and a 5xx render `marketplace-empty` and no alert.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -20,6 +20,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 }));
 
 import MarketplaceHomepage from './MarketplaceHomepage';
+import { settle } from '../test/settle';
 
 const listing = {
   id: 1,
@@ -77,7 +78,8 @@ describe('MarketplaceHomepage load failure (TASK-102711)', () => {
     stubFetch([failure]);
     renderPage();
 
-    const alert = await screen.findByTestId('marketplace-load-error');
+    await settle();
+    const alert = screen.getByTestId('marketplace-load-error');
     expect(alert.getAttribute('role')).toBe('alert');
     expect(screen.queryByTestId('marketplace-empty')).toBeNull();
   });
@@ -86,9 +88,11 @@ describe('MarketplaceHomepage load failure (TASK-102711)', () => {
     const listingsFetch = stubFetch([serverError, ok]);
     renderPage();
 
-    fireEvent.click(await screen.findByRole('button', { name: /try again/i }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
 
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
     expect(screen.queryByTestId('marketplace-load-error')).toBeNull();
     expect(listingsFetch).toHaveBeenCalledTimes(2);
   });

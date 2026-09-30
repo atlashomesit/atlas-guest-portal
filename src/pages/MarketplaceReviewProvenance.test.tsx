@@ -7,7 +7,7 @@
 // generic sentiment chip — so an external-only listing is indistinguishable from
 // a natively-reviewed one.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -26,6 +26,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 
 import MarketplaceHomepage from './MarketplaceHomepage';
 import { formatExternalReviewsLabel, formatVerifiedStaysLabel } from './MarketplaceHomepage';
+import { settle } from '../test/settle';
 
 function listing(id: number, extra: Record<string, unknown> = {}) {
   return {
@@ -77,7 +78,8 @@ const renderPage = () =>
 describe('TASK-10089 marketplace review provenance labels', () => {
   it('native-only card renders verified stays and no Google label', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4);
     const cards = screen.getAllByTestId('marketplace-card');
     const native = within(cards[0]);
     expect(native.getByText('2 verified stays')).toBeInTheDocument();
@@ -86,7 +88,8 @@ describe('TASK-10089 marketplace review provenance labels', () => {
 
   it('external-only card renders Google reviews and never claims verified', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4);
     const cards = screen.getAllByTestId('marketplace-card');
     const external = within(cards[1]);
     expect(external.getByText('3 Google reviews')).toBeInTheDocument();
@@ -95,7 +98,8 @@ describe('TASK-10089 marketplace review provenance labels', () => {
 
   it('mixed card renders both labels', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4);
     const cards = screen.getAllByTestId('marketplace-card');
     const mixed = within(cards[2]);
     expect(mixed.getByText('1 verified stay')).toBeInTheDocument();
@@ -104,7 +108,8 @@ describe('TASK-10089 marketplace review provenance labels', () => {
 
   it('card with neither source renders no provenance row (no fabricated proof)', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4);
     const cards = screen.getAllByTestId('marketplace-card');
     expect(within(cards[3]).queryByTestId('marketplace-review-provenance')).not.toBeInTheDocument();
     expect(screen.getAllByTestId('marketplace-review-provenance')).toHaveLength(3);

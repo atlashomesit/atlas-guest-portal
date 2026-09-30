@@ -1,10 +1,11 @@
 /** @vitest-environment jsdom */
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import HouseRulesAcceptPage from './HouseRulesAcceptPage';
+import { settle } from '../test/settle';
 
 vi.mock('../api/client', () => ({
   buildApiUrl: (path: string) => `https://api.example.test${path}`,
@@ -48,12 +49,14 @@ describe('HouseRulesAcceptPage', () => {
 
     renderPage();
 
-    const acceptButton = await screen.findByTestId('house-rules-accept');
+    await settle();
+    const acceptButton = screen.getByTestId('house-rules-accept');
     expect(screen.getByText(/No loud music after 10pm/)).toBeInTheDocument();
 
     fireEvent.click(acceptButton);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't record your acceptance/i);
+    await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent(/couldn't record your acceptance/i);
 
     // The defect: this used to be entirely gone from the document at this point.
     expect(screen.getByTestId('house-rules-accept')).toBeInTheDocument();
@@ -68,7 +71,8 @@ describe('HouseRulesAcceptPage', () => {
       return new Response(JSON.stringify(pendingNotYetAccepted), { status: 200 });
     }));
     fireEvent.click(screen.getByTestId('house-rules-accept'));
-    expect(await screen.findByRole('status')).toHaveTextContent(/accepted the House Rules/i);
+    await settle();
+    expect(screen.getByRole('status')).toHaveTextContent(/accepted the House Rules/i);
   });
 
   // TASK-10174 a11y half: WCAG 4.1.3 -- swapping in the confirmation used to be a plain <div>
@@ -84,13 +88,16 @@ describe('HouseRulesAcceptPage', () => {
 
     renderPage();
 
-    fireEvent.click(await screen.findByTestId('house-rules-accept'));
+    await settle();
+    fireEvent.click(screen.getByTestId('house-rules-accept'));
 
-    const status = await screen.findByRole('status');
+    await settle();
+    const status = screen.getByRole('status');
     expect(status).toHaveTextContent(/accepted the House Rules/i);
     // The focus move runs in a passive useEffect after the commit that mounts the banner, and
     // findByRole can resolve on that commit's DOM mutation before React flushes the effect
     // (seen under load on the 2026-09-28 release gate: focus still on <body>). Wait for it.
-    await waitFor(() => expect(status).toHaveFocus());
+    await settle();
+    expect(status).toHaveFocus();
   });
 });

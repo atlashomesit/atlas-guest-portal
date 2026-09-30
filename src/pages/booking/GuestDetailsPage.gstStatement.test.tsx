@@ -1,9 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingProvider } from "@/contexts/BookingContext";
 import GuestDetailsPage from "./GuestDetailsPage";
 import { _setTenantContextForTests } from "@/tenant/tenantContext";
+import { settle } from "../../test/settle";
 
 vi.mock("@/lib/events", () => ({ track: vi.fn() }));
 
@@ -54,12 +55,11 @@ describe("TASK-102021: Guest checkout GST statement", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      const gstNote = screen.getByTestId("checkout-total-gst-note");
-      expect(gstNote).toBeInTheDocument();
-      expect(gstNote.textContent).toBe("INR");
-      expect(gstNote.textContent).not.toContain("Includes GST");
-    });
+    await settle();
+    const gstNote = screen.getByTestId("checkout-total-gst-note");
+    expect(gstNote).toBeInTheDocument();
+    expect(gstNote.textContent).toBe("INR");
+    expect(gstNote.textContent).not.toContain("Includes GST");
   });
 
   it("states total without GST claim ('INR') for unregistered host with gstAmount: 0", async () => {
@@ -94,12 +94,11 @@ describe("TASK-102021: Guest checkout GST statement", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      const gstNote = screen.getByTestId("checkout-total-gst-note");
-      expect(gstNote).toBeInTheDocument();
-      expect(gstNote.textContent).toBe("INR");
-      expect(gstNote.textContent).not.toContain("Includes GST");
-    });
+    await settle();
+    const gstNote = screen.getByTestId("checkout-total-gst-note");
+    expect(gstNote).toBeInTheDocument();
+    expect(gstNote.textContent).toBe("INR");
+    expect(gstNote.textContent).not.toContain("Includes GST");
   });
 });
 
@@ -118,7 +117,8 @@ describe("TASK-102661 checkout fee copy", () => {
         finalAmount: 7000, nights: 2, paymentFeeDisplay: { percent: 3, amount: 0 } },
     }));
     const view = render(<MemoryRouter><BookingProvider><GuestDetailsPage /></BookingProvider></MemoryRouter>);
-    await waitFor(() => expect(view.container.textContent).toContain('No payment-processing fee.'));
+    await settle();
+    expect(view.container.textContent).toContain('No payment-processing fee.');
     expect(screen.queryByTestId('fee-info-payment-processing')).not.toBeInTheDocument();
     expect(screen.queryByTestId('price-line-discount-plug')).not.toBeInTheDocument();
     expect(view.container.querySelector('.gd-price-total .num')?.textContent).toContain('7,000');
@@ -141,7 +141,8 @@ describe("TASK-102661 checkout fee copy", () => {
         finalAmount: paymentFeeDisplay.amount === 0 ? 7000 : 7087.5, nights: 2, paymentFeeDisplay },
     }));
     const view = render(<MemoryRouter><BookingProvider><GuestDetailsPage /></BookingProvider></MemoryRouter>);
-    await waitFor(() => expect(view.container.querySelector('.gd-trust-row:last-of-type')?.parentElement?.textContent ?? view.container.textContent).toContain(expected));
+    await settle();
+    expect(view.container.querySelector('.gd-trust-row:last-of-type')?.parentElement?.textContent ?? view.container.textContent).toContain(expected);
     expect(view.container.textContent).not.toContain('3% payment processing');
     if (paymentFeeDisplay.amount === null) expect(screen.getByTestId('fee-info-payment-processing')).toBeInTheDocument();
     cleanup();

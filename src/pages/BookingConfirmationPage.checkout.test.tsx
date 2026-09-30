@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import BookingConfirmationPage from './BookingConfirmationPage';
+import { settle } from '../test/settle';
 
 vi.mock('../lib/events', () => ({ track: vi.fn() }));
 vi.mock('../components/SEO', () => ({ default: () => null }));
@@ -29,7 +30,8 @@ async function renderBooking(overrides: Record<string, unknown> = {}) {
   render(<MemoryRouter initialEntries={['/booking/9001?t=synthetic-token']}>
     <Routes><Route path="/booking/:bookingId" element={<BookingConfirmationPage />} /></Routes>
   </MemoryRouter>);
-  await screen.findByTestId('booking-confirmation-page');
+  await settle();
+  screen.getByTestId('booking-confirmation-page');
 }
 
 afterEach(() => { vi.restoreAllMocks(); window.sessionStorage.clear(); });

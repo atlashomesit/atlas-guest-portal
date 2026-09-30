@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import * as featureFlags from '../../config/featureFlags';
 import SupportWidget from './SupportWidget';
+import { settle } from '../../test/settle';
 
 const ChangeListing = () => {
   const navigate = useNavigate();
@@ -49,7 +50,8 @@ describe('GUEST-004 Stay assistant', () => {
     expect(init.headers).toMatchObject({ 'X-Tenant-Slug': 'quiet-house' });
     expect(JSON.parse(init.body as string)).toEqual({ listingId: 271, message: 'Parking?' });
     resolve({ ok: true, json: async () => ({ reply: 'Parking is available.', source: 'faq' }) } as Response);
-    expect(await screen.findByText('Parking is available.')).toBeVisible();
+    await settle();
+    expect(screen.getByText('Parking is available.')).toBeVisible();
     expect(screen.getByText(/FAQ answer/i)).toBeVisible();
   });
 
@@ -60,7 +62,8 @@ describe('GUEST-004 Stay assistant', () => {
     const input = screen.getByRole('textbox', { name: /ask the stay assistant/i });
     fireEvent.change(input, { target: { value: 'Can I check in early?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/could not get an answer/i));
+    await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not get an answer/i);
     expect(input).toHaveValue('Can I check in early?');
     expect(input).toBeEnabled();
     expect(input).toHaveFocus();
@@ -122,7 +125,8 @@ describe('GUEST-004 Stay assistant', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/2,000 characters/i);
     fireEvent.change(input, { target: { value: 'Hello' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-    expect(await screen.findByText('Help')).toBeVisible();
+    await settle();
+    expect(screen.getByText('Help')).toBeVisible();
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ listingId: null, message: 'Hello' });
   });
 
@@ -135,7 +139,8 @@ describe('GUEST-004 Stay assistant', () => {
     fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
     fireEvent.change(screen.getByRole('textbox', { name: /ask the stay assistant/i }), { target: { value: 'Question?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
-    expect(await screen.findByText('Please check with the host.')).toBeVisible();
+    await settle();
+    expect(screen.getByText('Please check with the host.')).toBeVisible();
     expect(screen.getByText(label)).toBeVisible();
   });
 });

@@ -1,7 +1,8 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import GuestMessageThread from './GuestMessageThread';
 import { fetchGuestMessages, fetchGuestTypingState, sendGuestMessage, sendGuestTypingHeartbeat } from '@/api/guestMessagesClient';
+import { settle } from '../../test/settle';
 
 vi.mock('@/api/guestMessagesClient', () => ({
   fetchGuestMessages: vi.fn(), fetchGuestTypingState: vi.fn(),
@@ -27,31 +28,38 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 describe('GUEST-006 categorized stay messages', () => {
   test.each(['Maintenance', 'Cleanliness', 'Access', 'Noise', 'Other'])('%s only prefixes an explicitly sent message', async (label) => {
     render(<GuestMessageThread bookingId={41} token="private-booking-token" issueCategory={label.toLowerCase()} issueRequestKey="one" />);
-    await waitFor(() => expect(category()).toHaveValue(label.toLowerCase()));
+    await settle();
+    expect(category()).toHaveValue(label.toLowerCase());
     expect(send).not.toHaveBeenCalled();
     fireEvent.change(input(), { target: { value: 'Please help with this issue.' } });
     fireEvent.click(button());
-    await waitFor(() => expect(send).toHaveBeenCalledWith(41, 'private-booking-token', `[${label}] Please help with this issue.`));
-    await waitFor(() => expect(input()).toHaveValue(''));
+    await settle();
+    expect(send).toHaveBeenCalledWith(41, 'private-booking-token', `[${label}] Please help with this issue.`);
+    expect(input()).toHaveValue('');
     expect(category()).toHaveValue('');
   });
 
   test('an unknown category leaves ordinary messages unchanged', async () => {
     render(<GuestMessageThread bookingId={41} token="t" issueCategory="injected-category" />);
-    await screen.findByTestId('guest-messages-empty');
+    await settle();
+    screen.getByTestId('guest-messages-empty');
     fireEvent.change(input(), { target: { value: '  A normal question  ' } });
     fireEvent.click(button());
-    await waitFor(() => expect(send).toHaveBeenCalledWith(41, 't', 'A normal question'));
+    await settle();
+    expect(send).toHaveBeenCalledWith(41, 't', 'A normal question');
   });
 
   test('a new drawer request can select the same category again after sending', async () => {
     const view = render(<GuestMessageThread bookingId={41} token="t" issueCategory="other" issueRequestKey="one" />);
-    await waitFor(() => expect(category()).toHaveValue('other'));
+    await settle();
+    expect(category()).toHaveValue('other');
     fireEvent.change(input(), { target: { value: 'First issue' } });
     fireEvent.click(button());
-    await waitFor(() => expect(category()).toHaveValue(''));
+    await settle();
+    expect(category()).toHaveValue('');
     view.rerender(<GuestMessageThread bookingId={41} token="t" issueCategory="other" issueRequestKey="two" />);
-    await waitFor(() => expect(category()).toHaveValue('other'));
+    await settle();
+    expect(category()).toHaveValue('other');
     expect(send).toHaveBeenCalledTimes(1);
   });
 
@@ -59,7 +67,8 @@ describe('GUEST-006 categorized stay messages', () => {
     let rejectSend!: (error: Error) => void;
     send.mockImplementation(() => new Promise((_, reject) => { rejectSend = reject; }));
     render(<GuestMessageThread bookingId={41} token="t" issueCategory="access" />);
-    await waitFor(() => expect(category()).toHaveValue('access'));
+    await settle();
+    expect(category()).toHaveValue('access');
     fireEvent.change(input(), { target: { value: 'The key is not working.' } });
     act(() => {
       fireEvent.keyDown(input(), { key: 'Enter' });
@@ -68,14 +77,16 @@ describe('GUEST-006 categorized stay messages', () => {
     });
     expect(send).toHaveBeenCalledTimes(1);
     await act(async () => rejectSend(new Error('Network unavailable')));
-    expect(await screen.findByTestId('guest-message-send-error')).toBeVisible();
+    await settle();
+    expect(screen.getByTestId('guest-message-send-error')).toBeVisible();
     expect(input()).toHaveValue('The key is not working.');
     expect(category()).toHaveValue('access');
   });
 
   test('the 2000 character body limit includes the category without truncating an existing draft', async () => {
     render(<GuestMessageThread bookingId={41} token="t" />);
-    await screen.findByTestId('guest-messages-empty');
+    await settle();
+    screen.getByTestId('guest-messages-empty');
     fireEvent.change(input(), { target: { value: 'x'.repeat(2000) } });
     fireEvent.change(category(), { target: { value: 'maintenance' } });
     expect(input()).toHaveValue('x'.repeat(2000));
@@ -84,7 +95,8 @@ describe('GUEST-006 categorized stay messages', () => {
     expect(send).not.toHaveBeenCalled();
     fireEvent.change(input(), { target: { value: 'x'.repeat(1986) } });
     fireEvent.click(button());
-    await waitFor(() => expect(send).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0][2]).toHaveLength(2000);
   });
 
@@ -92,11 +104,13 @@ describe('GUEST-006 categorized stay messages', () => {
     let resolveSend!: (value: ReturnType<typeof result>) => void;
     send.mockImplementation(() => new Promise((resolve) => { resolveSend = resolve; }));
     const view = render(<GuestMessageThread bookingId={41} token="t" issueCategory="noise" />);
-    await waitFor(() => expect(category()).toHaveValue('noise'));
+    await settle();
+    expect(category()).toHaveValue('noise');
     fireEvent.change(input(), { target: { value: 'Private old stay issue' } });
     fireEvent.click(button());
     view.rerender(<GuestMessageThread {...next} />);
-    await screen.findByTestId('guest-messages-empty');
+    await settle();
+    screen.getByTestId('guest-messages-empty');
     expect(input()).toHaveValue('');
     expect(category()).toHaveValue('');
     await act(async () => resolveSend(result('Private old stay issue')));

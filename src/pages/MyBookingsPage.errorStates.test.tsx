@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import MyBookingsPage from "./MyBookingsPage";
 import { GuestAuthProvider, useGuestAuth } from "../contexts/GuestAuthContext";
+import { settle } from "../test/settle";
 
 // TASK-6056: a signed-in guest whose JWT had simply expired was shown "Bookings not found" —
 // indistinguishable from an actually-empty account — because the error screen picked its
@@ -67,7 +68,8 @@ describe("MyBookingsPage — TASK-6056 error-kind-driven messaging (signed-in gu
 
     renderAuthed();
 
-    const state = await screen.findByTestId("my-bookings-error-state");
+    await settle();
+    const state = screen.getByTestId("my-bookings-error-state");
     expect(within(state).getByText("Your session expired")).toBeInTheDocument();
     expect(state.textContent?.toLowerCase()).not.toContain("not found");
 
@@ -84,7 +86,8 @@ describe("MyBookingsPage — TASK-6056 error-kind-driven messaging (signed-in gu
 
     renderAuthed();
 
-    const state = await screen.findByTestId("my-bookings-error-state");
+    await settle();
+    const state = screen.getByTestId("my-bookings-error-state");
     expect(within(state).getByText("We couldn't load your bookings")).toBeInTheDocument();
     expect(state.textContent?.toLowerCase()).not.toContain("not found");
     expect(within(state).getByRole("button", { name: "Try again" })).toBeInTheDocument();
@@ -99,7 +102,8 @@ describe("MyBookingsPage — TASK-6056 error-kind-driven messaging (signed-in gu
 
     renderAuthed();
 
-    const state = await screen.findByTestId("my-bookings-error-state");
+    await settle();
+    const state = screen.getByTestId("my-bookings-error-state");
     // Must render the same "load failed" headline as the 500 case above, not a bespoke
     // "bookings not found"/"no bookings for your account" message.
     expect(within(state).getByText("We couldn't load your bookings")).toBeInTheDocument();
@@ -113,7 +117,8 @@ describe("MyBookingsPage — TASK-6056 error-kind-driven messaging (signed-in gu
       throw new Error(`Unexpected fetch: ${url}`);
     });
     renderAuthed();
-    const expiredState = await screen.findByTestId("my-bookings-error-state");
+    await settle();
+    const expiredState = screen.getByTestId("my-bookings-error-state");
     const expiredTitle = within(expiredState).getByRole("heading").textContent;
     cleanup();
     vi.restoreAllMocks();
@@ -124,7 +129,8 @@ describe("MyBookingsPage — TASK-6056 error-kind-driven messaging (signed-in gu
       throw new Error(`Unexpected fetch: ${url}`);
     });
     renderAuthed();
-    const failedState = await screen.findByTestId("my-bookings-error-state");
+    await settle();
+    const failedState = screen.getByTestId("my-bookings-error-state");
     const failedTitle = within(failedState).getByRole("heading").textContent;
 
     expect(expiredTitle).not.toBe(failedTitle);
@@ -139,9 +145,8 @@ describe("MyBookingsPage — TASK-6056 error-kind-driven messaging (signed-in gu
 
     renderAuthed();
 
-    await waitFor(() => {
-      expect(screen.getByTestId("my-bookings-empty-state")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("my-bookings-empty-state")).toBeInTheDocument();
     expect(screen.queryByTestId("my-bookings-error-state")).not.toBeInTheDocument();
   });
 });

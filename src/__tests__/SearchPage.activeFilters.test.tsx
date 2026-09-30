@@ -2,12 +2,13 @@
  * TASK-1456: Active filter chips + badge on SearchPage.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import { CurrencyProvider } from '../contexts/CurrencyContext';
 import SearchPage from '../pages/SearchPage';
+import { settle } from '../test/settle';
 
 vi.mock('../api/listingClient', () => ({
   fetchPublicListings: vi.fn(() => Promise.reject(new Error('network'))),
@@ -40,12 +41,8 @@ describe('SearchPage — active filter chips (TASK-1456)', () => {
       </CurrencyProvider>,
     );
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
-      },
-      { timeout: 15_000 },
-    );
+    await settle();
+    expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
 
     const chipStrip = screen.getByTestId('search-active-filter-chips');
     expect(chipStrip).toBeInTheDocument();
@@ -55,9 +52,8 @@ describe('SearchPage — active filter chips (TASK-1456)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Remove filter WiFi$/i }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('2');
-    });
+    await settle();
+    expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('2');
     expect(screen.getByTestId('search-active-filter-chips')).not.toHaveTextContent('WiFi');
   });
 
@@ -70,19 +66,14 @@ describe('SearchPage — active filter chips (TASK-1456)', () => {
       </CurrencyProvider>,
     );
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
-      },
-      { timeout: 15_000 },
-    );
+    await settle();
+    expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
 
     fireEvent.click(screen.getByRole('button', { name: /^clear filters$/i }));
 
     // Single click clears all: badge + chip strip disappear together.
-    await waitFor(() => {
-      expect(screen.queryByTestId('search-active-filter-badge')).not.toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.queryByTestId('search-active-filter-badge')).not.toBeInTheDocument();
     expect(screen.queryByTestId('search-active-filter-chips')).not.toBeInTheDocument();
   });
 });

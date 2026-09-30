@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, format, startOfDay } from 'date-fns';
+import { settle } from '../../test/settle';
 
 /**
  * REGRESSION: the booking calendar's availability gate must evaluate the SAME night the guest
@@ -222,11 +223,13 @@ describe('UnitBookingWidget — the gated night is the night the guest sees (eas
         />
       </MemoryRouter>,
     );
-    const trigger = await screen.findByLabelText('Select check-in date');
+    await settle();
+    const trigger = screen.getByLabelText('Select check-in date');
     await act(async () => {
       fireEvent.click(trigger);
     });
-    await screen.findByRole('dialog', { name: 'Select dates' });
+    await settle();
+    screen.getByRole('dialog', { name: 'Select dates' });
   };
 
   // The cell is located the way a GUEST identifies it: by the date printed on it (DayCell's
@@ -235,7 +238,8 @@ describe('UnitBookingWidget — the gated night is the night the guest sees (eas
   const findDayCell = async (date: Date): Promise<HTMLElement> => {
     const label = format(date, 'd MMMM');
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return screen.findByRole('gridcell', { name: new RegExp(`^${escaped}(,|$)`) });
+    await settle();
+    return screen.getByRole('gridcell', { name: new RegExp(`^${escaped}(,|$)`) });
   };
 
   // PROVING CASE. Verified red against the pre-fix components in this zone:
@@ -244,9 +248,8 @@ describe('UnitBookingWidget — the gated night is the night the guest sees (eas
     await renderWidgetAndOpenCalendar();
 
     const blockedCell = await findDayCell(blockedDay);
-    await waitFor(() => {
-      expect(blockedCell).toBeDisabled();
-    });
+    await settle();
+    expect(blockedCell).toBeDisabled();
     expect(blockedCell.className).toContain('bc-unavail');
   });
 
@@ -262,9 +265,8 @@ describe('UnitBookingWidget — the gated night is the night the guest sees (eas
     fireEvent.click(openCell);
     // The trigger shows the date the guest actually clicked — the selection was keyed to the
     // visible cell, not silently shifted a day.
-    await waitFor(() => {
-      expect(screen.getByLabelText('Select check-in date').textContent).not.toContain('Add date');
-    });
+    await settle();
+    expect(screen.getByLabelText('Select check-in date').textContent).not.toContain('Add date');
     expect(screen.getByLabelText('Select check-in date').textContent).toContain(
       format(dayAfterBlocked, 'd'),
     );
@@ -274,9 +276,8 @@ describe('UnitBookingWidget — the gated night is the night the guest sees (eas
     await renderWidgetAndOpenCalendar();
 
     const neighbourCell = await findDayCell(neighbourBefore);
-    await waitFor(() => {
-      expect(screen.getByLabelText('Select check-in date')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByLabelText('Select check-in date')).toBeInTheDocument();
     expect(neighbourCell).not.toBeDisabled();
     expect(neighbourCell.className).not.toContain('bc-unavail');
   });

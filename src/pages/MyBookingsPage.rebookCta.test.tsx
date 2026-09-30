@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import MyBookingsPage from "./MyBookingsPage";
 import { GuestAuthProvider } from "../contexts/GuestAuthContext";
+import { settle } from "../test/settle";
 
 // TASK-10091: a completed (Past, non-cancelled) stay gets a "Book this home again" CTA that
 // coexists with — never replaces — the TASK-4360 review CTA/badge, links to the plain current
@@ -89,16 +90,19 @@ describe("MyBookingsPage — TASK-10091 rebook CTA", () => {
 
   test("no rebook CTA on the Upcoming tab", async () => {
     renderPage();
-    await screen.findByRole("tab", { name: "Past" });
+    await settle();
+    screen.getByRole("tab", { name: "Past" });
     expect(screen.getByText("Hilltop Cabin")).toBeInTheDocument();
     expect(screen.queryByTestId("my-bookings-rebook-cta")).not.toBeInTheDocument();
   });
 
   test("Past tab: rebook CTA links to the plain current listing route with no query params, and coexists with the Reviewed badge", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("tab", { name: "Past" }));
+    await settle();
+    fireEvent.click(screen.getByRole("tab", { name: "Past" }));
 
-    const ctas = await screen.findAllByTestId("my-bookings-rebook-cta");
+    await settle();
+    const ctas = screen.getAllByTestId("my-bookings-rebook-cta");
     // Only the booking with a server-supplied listingId (id 1) offers the CTA.
     expect(ctas).toHaveLength(1);
     expect(ctas[0]).toHaveTextContent("Book this home again");
@@ -116,11 +120,13 @@ describe("MyBookingsPage — TASK-10091 rebook CTA", () => {
 
   test("Past tab: rebook CTA is suppressed when the server has no public listing to link to", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("tab", { name: "Past" }));
+    await settle();
+    fireEvent.click(screen.getByRole("tab", { name: "Past" }));
 
     // Booking 2 (no listingId) still renders normally, including its own review CTA — just
     // without a rebook link to a dead route.
-    await screen.findByText("Garden Suite");
+    await settle();
+    screen.getByText("Garden Suite");
     const reviewCtas = screen.getAllByTestId("my-bookings-review-cta");
     expect(reviewCtas).toHaveLength(1);
     expect(reviewCtas[0].getAttribute("href")).toContain("/review/2");
