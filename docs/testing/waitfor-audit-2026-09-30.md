@@ -5,11 +5,13 @@ helper and rule shape from here (section 9).
 
 ## 1. Result
 
-1. **Two independent causes** produce the gate's "`expected null to be X`, after two waits of about 1 s" red. Both are
-   reproduced on demand (section 2): a **wall-clock race** in `waitFor`/`findBy*` (the mechanism the entry filed), and a
-   **shared-worker state leak** (a test file that leaves `document.visibilityState = "hidden"` behind, found while
-   converting). `settle()` fixes the first and does **not** fix the second, so the `40645f7f` fix alone would not have
-   prevented the second.
+1. **Three independent causes** turn guest STEP 1 vitest red, and only the first is the entry's. (A) a **wall-clock
+   race** in `waitFor`/`findBy*` (the mechanism the entry filed); (B) a **shared-worker state leak** (a test file that
+   leaves `document.visibilityState = "hidden"` behind), which produces the same "`expected null to be X` after two waits
+   of about 1 s" signature; (C) **cross-file leaks in the gate's `test:gate` batch pool** (a reused thread), which fail
+   different files with non-timing messages. A and B are reproduced on demand (section 2). `settle()` fixes A only, so the
+   `40645f7f` fix alone would not have prevented B. **C is not fixed here** and is the largest remaining source of STEP 1
+   noise: gate-mode shard runs still fail in roughly half of runs on a lightly loaded box (section 2.4), before and after this work.
 2. **Fixed for the guest suite:** 331 waits in 70 files converted to a deterministic drain, the leak fixed at its source
    and guarded per file, and a lint rule (with a shrink-only baseline) that stops the class coming back.
 3. **Not decided:** which of the two causes hit gate run 7. That needs one bounded `grep` on the run-7 guest log
@@ -130,6 +132,38 @@ grep -n -E "abandonOnDeparture|useTenantProcessingFee" atlas-gate-guest-20260930
 If `abandonOnDeparture` completed **before** `useTenantProcessingFee` there (and after it, or in another worker, in the
 green runs 3, 5 and 8), cause B was the failure and the `40645f7f` fix only passed run 8 by ordering. If it did not,
 cause A stands. I could not run it: the four logs named for this task were not found at the exact paths given.
+
+### 2.4 Cause C: cross-file leaks in the gate's batch pool (found by a control run; NOT fixed here)
+
+`npm run test:gate` (what STEP 1 runs) sets `ATLAS_VITEST_GATE_BATCH=1`, which runs the `mocked-isolated` project through
+`scripts/vitest-isolated-batch-pool.mjs`: one reused worker thread, with `isolate: true` forced per message so Vitest
+resets modules and mocks before every file. In normal mode that project uses fresh workers, and no normal-mode
+run of mine showed an unexplained red: every one was traced to my own conversion (fixed before committing) or to Cause B.
+
+In gate mode the same suite fails intermittently. Same command each time, 16-core box with two other agents lightly active, `--shard=1/2 --maxWorkers=2`
+(`ATLAS_VITEST_GATE_BATCH=1 node node_modules/vitest/vitest.mjs run --shard=1/2 --maxWorkers=2`):
+
+| Tree | Runs | Red runs | Failing files (one entry per red run) |
+|---|---|---|---|
+| test files as of `40645f7f`, plus the new setup guard | 5 | 3 | `UnitBookingWidgetReserveIdempotencyKey` + `MyBookingsPage.rebookCta`; `orderRequestHeaders`; the first pair again |
+| this branch's tip | 7 | 3 | `orderRequestHeaders` (twice); `MyBookingsPage.rebookCta` |
+
+Signatures, none of them a timeout:
+
+- `tests/orderRequestHeaders.test.ts` (suite fails to load): `No "CORS_ALLOWED_REQUEST_HEADERS" export is defined on the
+  "@/api/client" mock`. The file imports the real module; it received another file's `vi.mock('@/api/client', ...)`.
+- `UnitBookingWidgetReserveIdempotencyKey`: `navigate` called with `/book/atlas501-ph/ph/details?tenant=qa-bot-c59de6`
+  instead of `.../details`. That tenant slug appears only in `GuestCheckoutTenantSlugParity.test.tsx` and `ShortLinkRedirect.task102019.test.tsx`, never in
+  the victim, so one of those files' state reached it.
+- `MyBookingsPage.rebookCta`: the page renders its error state (`my-bookings-error-state`) so the "Past" tab never
+  exists, i.e. the test's fetch stub was not the one the page used. Same message at `40645f7f` and on the tip, so
+  `settle()` neither causes nor cures it.
+
+So the guest's STEP 1 reds are not mostly load: on a lightly loaded box this topology is red about half the time, decided by
+which files the reused thread ran before the victim, and that order moves with load. I did not find the leaking
+mechanism (a per-file reset that sometimes does not reset). It reproduces with the command above in a few runs.
+Fixing it is a separate task: either make the batch pool's reset complete for mocks, globals and the jsdom URL, or stop
+reusing the thread for mocked files. Until then, expect intermittent reds here that no wait-style change will remove.
 
 ## 3. Inventory
 
@@ -324,6 +358,7 @@ or adding a file is a two-file, reviewable edit. Today's baseline is the three n
 | Item 6 ledger lines | not this worktree |
 | Admin portal | later dispatch |
 | Broader shared-worker hygiene (DOM residue, storage) | not scanned; only global overrides were |
+| Cause C, gate-mode batch-pool leaks (section 2.4) | **not fixed, not root-caused**; reproduces in a few runs of the command in 2.4. Needs its own task |
 
 ## 9. Hand-offs
 
