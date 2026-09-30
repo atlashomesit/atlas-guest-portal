@@ -2,18 +2,10 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { _setTenantContextForTests } from '../tenant/tenantContext';
 import { setDomainResolvedSlug } from '../tenant/tenantResolver';
+import { settle } from '../test/settle';
 import { useTenantProcessingFee } from './useTenantProcessingFee';
 
 let sequence = 0;
-/**
- * Drains the mocked fetch chain deterministically. Every step of it (fetch, response.json(), setResolved) is an
- * already-resolved promise, so one macrotask tick inside act() runs all of them and lets React commit the result.
- * This replaces waitFor's default 1,000 ms wall-clock poll, which a starved worker (a gate's STEP 1 runs this
- * suite beside the API compile) can miss even though nothing is wrong: the hook then still reads null.
- */
-async function settle() {
-  await act(async () => { await new Promise<void>((resolve) => { setTimeout(resolve, 0); }); });
-}
 function tenant(slug: string, bookingMode: 'ONLINE' | 'WHATSAPP' = 'ONLINE') {
   setDomainResolvedSlug(slug);
   _setTenantContextForTests({ slug, name: slug, bookingMode });
