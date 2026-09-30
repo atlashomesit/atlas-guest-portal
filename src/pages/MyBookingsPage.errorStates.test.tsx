@@ -57,6 +57,11 @@ describe("MyBookingsPage — TASK-6056 error-kind-driven messaging (signed-in gu
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    // TASK-102734: AuthedBookingsPage logs in through the real GuestAuthProvider, which persists the session
+    // (`atlas_guest_auth`) in localStorage. On the gate's batch pool the next file on the thread inherits it:
+    // MyBookingsPage.rebookCta then started as a signed-in guest with this file's stale JWT and rendered its error
+    // state instead of the Past tab. Remove it here; src/test/sharedWorkerHygiene.ts clears storage for every file too.
+    window.localStorage.clear();
   });
 
   test("401 (expired session) shows session-expired copy, offers re-authentication, and never says 'not found'", async () => {

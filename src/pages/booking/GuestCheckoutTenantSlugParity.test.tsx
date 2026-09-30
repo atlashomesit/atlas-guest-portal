@@ -95,11 +95,23 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    // beforeEach stubs `fetch` with vi.stubGlobal, which restoreAllMocks does not undo.
+    vi.unstubAllGlobals();
     Object.defineProperty(window, 'location', {
       value: originalLocation,
       writable: true,
       configurable: true,
     });
+    // TASK-102734: this file drives the whole checkout, so it ends with state a REUSED worker would hand to the next
+    // file: the checkout page rewrites the jsdom URL to `?tenant=qa-bot-c59de6` (history.replaceState), the hold and
+    // search draft sit in web storage, and `window.Razorpay` is a mock. Measured on the gate's batch pool: the next
+    // file got `navigate('/book/.../details?tenant=qa-bot-c59de6')` (UnitBookingWidgetReserveIdempotencyKey) or found
+    // the Razorpay SDK "already loaded" (GuestDetailsPage.razorpayPreload). Put all three back here, at the source;
+    // src/test/sharedWorkerHygiene.ts does the same for every file so the next leaker cannot bring it back.
+    window.history.replaceState(null, '', '/');
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    delete (window as { Razorpay?: unknown }).Razorpay;
   });
 
   it('drives widget -> details navigation on a ?tenant= URL and asserts the final-charge header matches the hold tenant', async () => {

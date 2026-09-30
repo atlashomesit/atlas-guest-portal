@@ -7,7 +7,6 @@ import { _resetTenantContextForTests } from "../tenant/tenantContext";
 import { _resetAvailabilityCalendarCacheForTests } from "../api/availabilityCalendarClient";
 import { _resetDedupedJsonFetchForTests } from "../api/dedupedJsonFetch";
 import { _resetCurrentLayoutThemeIdForTests } from "../themes/registry";
-import { restoreDocumentVisibility } from "./sharedWorkerHygiene";
 
 // Re-arm the real jsdom `window` if a previous test file in this worker replaced
 // the global and leaked it (e.g. `Object.defineProperty(global, "window", ...)`
@@ -45,8 +44,9 @@ _resetTenantContextForTests();
 _resetAvailabilityCalendarCacheForTests();
 _resetDedupedJsonFetchForTests();
 _resetCurrentLayoutThemeIdForTests();
-// A previous file in this shared worker may have pinned document.visibilityState (TASK-102734, see sharedWorkerHygiene.ts).
-restoreDocumentVisibility();
+// The jsdom side of this (URL, storage, cookies, head/body, window stubs, document.visibilityState) is reset by
+// src/test/sharedWorkerResetSetup.ts, which vitest.config.ts lists BEFORE this file so it runs before any of the
+// imports above are evaluated (TASK-102734, see sharedWorkerHygiene.ts).
 
 // The shared-fast project runs with `isolate: false` (see vitest.config.ts). With a
 // shared module graph, @testing-library/react's built-in auto-cleanup registers its
