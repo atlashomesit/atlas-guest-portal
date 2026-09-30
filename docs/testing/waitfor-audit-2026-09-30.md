@@ -10,8 +10,10 @@ helper and rule shape from here (section 9).
    leaves `document.visibilityState = "hidden"` behind), which produces the same "`expected null to be X` after two waits
    of about 1 s" signature; (C) **cross-file leaks in the gate's `test:gate` batch pool** (a reused thread), which fail
    different files with non-timing messages. A and B are reproduced on demand (section 2). `settle()` fixes A only, so the
-   `40645f7f` fix alone would not have prevented B. **C is not fixed here** and is the largest remaining source of STEP 1
-   noise: gate-mode shard runs still fail in roughly half of runs on a lightly loaded box (section 2.4), before and after this work.
+   `40645f7f` fix alone would not have prevented B. **C was the largest source of STEP 1
+   noise** (gate-mode shard runs failed in roughly half of runs on a lightly loaded box before this work) and is **root-caused and
+   fixed in the second dispatch** (section 2.4): five leaks across files on the reused batch thread, a per-file reset in the shared
+   setup, and a guard chained into `npm run test:gate`.
 2. **Fixed for the guest suite:** 331 waits in 70 files converted to a deterministic drain, the leak fixed at its source
    and guarded per file, and a lint rule (with a shrink-only baseline) that stops the class coming back.
 3. **Not decided:** which of the two causes hit gate run 7. That needs one bounded `grep` on the run-7 guest log
@@ -20,7 +22,7 @@ helper and rule shape from here (section 9).
 4. **Deferred by instruction:** the quiet-box measured column, the real-load repro, item 5 (where should guest vitest
    run), and all admin work.
 
-## 2. Root cause: two mechanisms, not one
+## 2. Root cause: three mechanisms, not one
 
 ### 2.1 Cause A: the wall-clock race (the entry's mechanism, confirmed and refined)
 
@@ -133,37 +135,89 @@ If `abandonOnDeparture` completed **before** `useTenantProcessingFee` there (and
 green runs 3, 5 and 8), cause B was the failure and the `40645f7f` fix only passed run 8 by ordering. If it did not,
 cause A stands. I could not run it: the four logs named for this task were not found at the exact paths given.
 
-### 2.4 Cause C: cross-file leaks in the gate's batch pool (found by a control run; NOT fixed here)
+### 2.4 Cause C: cross-file leaks in the gate's batch pool (root-caused and fixed in the second dispatch, `a782d379`, `e254b835`)
 
-`npm run test:gate` (what STEP 1 runs) sets `ATLAS_VITEST_GATE_BATCH=1`, which runs the `mocked-isolated` project through
-`scripts/vitest-isolated-batch-pool.mjs`: one reused worker thread, with `isolate: true` forced per message so Vitest
-resets modules and mocks before every file. In normal mode that project uses fresh workers, and no normal-mode
-run of mine showed an unexplained red: every one was traced to my own conversion (fixed before committing) or to Cause B.
+**What was observed** (first dispatch). `npm run test:gate` (what STEP 1 runs) sets `ATLAS_VITEST_GATE_BATCH=1`, which runs the
+`mocked-isolated` project through `scripts/vitest-isolated-batch-pool.mjs`. On a lightly loaded box the same suite failed
+in 3 of 5 shard runs on the pre-change tests and 3 of 7 on the tip, while normal mode showed nothing. The failures were
+not timeouts: `orderRequestHeaders` received another file's `@/api/client` mock, `UnitBookingWidgetReserveIdempotencyKey`
+navigated to `.../details?tenant=qa-bot-c59de6`, and `MyBookingsPage.rebookCta` rendered its error state.
 
-In gate mode the same suite fails intermittently. Same command each time, 16-core box with two other agents lightly active, `--shard=1/2 --maxWorkers=2`
-(`ATLAS_VITEST_GATE_BATCH=1 node node_modules/vitest/vitest.mjs run --shard=1/2 --maxWorkers=2`):
+**Mechanism.** In gate mode all ~100 mocked files of the project run one after another on ONE reused thread (measured:
+55 of 55 files of a shard, 101 of 101 of a full run). The adapter forces `isolate: true` into every message, and in
+Vitest 4.1.11 that makes the worker's `run()` do exactly two things before each file: `moduleRunner.mocker.reset()` and
+`resetModules(...)`. The jsdom environment is built once, at the worker's `start` message. So a file inherits the previous
+file's `window`, `document`, URL, `localStorage`/`sessionStorage`, cookies, `head`/`body`, window stubs and every timer, and
+two things that live OUTSIDE the registry: `BareModuleMocker.pendingIds` (a STATIC list of `vi.mock`/`vi.doMock` calls that are only
+queued, flushed by the next module fetch) and dynamic imports still in flight. Which file runs just before the victim is
+decided by the default sequencer (failed first, then longest cached duration), so it moves with load and after every red
+run. That is why it read as a load flake and why it correlated with nothing else.
 
-| Tree | Runs | Red runs | Failing files (one entry per red run) |
-|---|---|---|---|
-| test files as of `40645f7f`, plus the new setup guard | 5 | 3 | `UnitBookingWidgetReserveIdempotencyKey` + `MyBookingsPage.rebookCta`; `orderRequestHeaders`; the first pair again |
-| this branch's tip | 7 | 3 | `orderRequestHeaders` (twice); `MyBookingsPage.rebookCta` |
+**Reproduced deterministically.** The order was pinned with a `BaseSequencer` subclass that sorts by an explicit list, on the
+single batch thread (`ATLAS_VITEST_GATE_BATCH=1 --maxWorkers=1`, leaker then victim). All five reproduce on the unmodified
+tree (`5f554bfe`); the fifth is a race, so it is run repeatedly.
 
-Signatures, none of them a timeout:
+| # | Leaker (runs first) | Victim | State that crossed | Tip `5f554bfe` | Fixed |
+|---|---|---|---|---|---|
+| 1 | `pages/__tests__/favorites-sync-and-reminder` | `tests/orderRequestHeaders` | four hoisted `vi.mock`s in a file that imports nothing stay on the static pending list and are registered in the NEXT file's registry (`No "CORS_ALLOWED_REQUEST_HEADERS" export is defined on the "@/api/client" mock`) | RED | GREEN |
+| 2 | `pages/booking/GuestCheckoutTenantSlugParity` | `UnitBookingWidgetReserveIdempotencyKey` | the checkout page's `history.replaceState` leaves the jsdom URL at `?tenant=qa-bot-c59de6`; the widget navigates to `window.location.search` | RED | GREEN |
+| 3 | `pages/booking/GuestCheckoutTenantSlugParity` | `GuestDetailsPage.razorpayPreload` | `window.Razorpay` left assigned, so the SDK is "already loaded" | RED | GREEN |
+| 4 | `pages/MyBookingsPage.errorStates` | `MyBookingsPage.rebookCta` | a real `login()` persists `atlas_guest_auth` in `localStorage`; `guestAuthStorage` reads it when the next file imports it | RED | GREEN |
+| 5 | `tests/smokeBookingFlow` | `UnitBookingWidgetPriceLinesSum` | a whole-`App` render ends with `React.lazy` route imports in flight; they finish inside the next file's registry before its `vi.mock`s exist and cache REAL modules (`hasOnlinePaymentRail()` bound to the real tenant context, so the 3% fee row is gone: `expected 21000 to be 21630`) | RED 1 run in 2; 4 of 4 with the reset off | GREEN 5 of 5 |
 
-- `tests/orderRequestHeaders.test.ts` (suite fails to load): `No "CORS_ALLOWED_REQUEST_HEADERS" export is defined on the
-  "@/api/client" mock`. The file imports the real module; it received another file's `vi.mock('@/api/client', ...)`.
-- `UnitBookingWidgetReserveIdempotencyKey`: `navigate` called with `/book/atlas501-ph/ph/details?tenant=qa-bot-c59de6`
-  instead of `.../details`. That tenant slug appears only in `GuestCheckoutTenantSlugParity.test.tsx` and `ShortLinkRedirect.task102019.test.tsx`, never in
-  the victim, so one of those files' state reached it.
-- `MyBookingsPage.rebookCta`: the page renders its error state (`my-bookings-error-state`) so the "Past" tab never
-  exists, i.e. the test's fetch stub was not the one the page used. Same message at `40645f7f` and on the tip, so
-  `settle()` neither causes nor cures it.
+Delta-debugging the failing full-run order (33 predecessors) did NOT reproduce #5: it is a race between the stale import and the
+next file's mock registration, so a fixed order alone is not enough there. The probe that found the inventory (a temporary
+setup file that snapshots location, storage, cookies, head/body, window stubs, listeners, timers, prototypes and the mock
+queue at the start and end of every file) is not committed.
 
-So the guest's STEP 1 reds are not mostly load: on a lightly loaded box this topology is red about half the time, decided by
-which files the reused thread ran before the victim, and that order moves with load. I did not find the leaking
-mechanism (a per-file reset that sometimes does not reset). It reproduces with the command above in a few runs.
-Fixing it is a separate task: either make the batch pool's reset complete for mocks, globals and the jsdom URL, or stop
-reusing the thread for mocked files. Until then, expect intermittent reds here that no wait-style change will remove.
+**Attribution** (one mechanism removed at a time, pinned pairs): reset off + source fixes on: #2, #3, #4 green, #1 red, #5 red (4 of 4);
+reset on + source fixes reverted: #1 to #4 green; drain without the mock flush: #1 red only; drain without
+`dynamicImportSettled`: #5 red only (4 of 4); nothing: all red.
+
+**Fix** (in the order of preference).
+1. The two files that own a leak clean up after themselves: `GuestCheckoutTenantSlugParity` (URL, storage, `Razorpay`,
+   `unstubAllGlobals`) and `MyBookingsPage.errorStates` (`localStorage`).
+2. `src/test/sharedWorkerHygiene.ts`, wired as the FIRST `setupFiles` entry (`src/test/sharedWorkerResetSetup.ts`, ahead of
+   `setup.ts` because modules that read the URL or storage while being evaluated, e.g. `guestAuthStorage`, re-run per file
+   under the batch pool and `setup.ts` imports a dozen of them before its body runs):
+   `resetSharedWorkerState()` at the start of every file (URL, web storage, cookies, page-level head tags, stray body nodes,
+   html/body attributes, `document.visibilityState`, replaced window properties, SDK globals, fake timers,
+   `stubGlobal`/`stubEnv`), and `drainCrossFileAsyncState()` in `afterAll` (`vi.dynamicImportSettled()`, then
+   `mocker.resolveMocks()`); the two things it drains are flushed by the next file's first fetch, before any setup file
+   runs, so the start of the next file is too late. `shared-fast` gets the same reset.
+3. The batch pool, the gate topology, worker counts, timeouts and isolation flags are unchanged.
+
+**Guard.** `scripts/vitest-gate-batch-hygiene.self-test.mjs`, chained into `npm run test:gate` right after the pool protocol
+self-test (about 7 s): a dirty fixture then a clean fixture on one reused batch thread, through
+`vitest.gate-batch-hygiene.config.ts`, which takes the production `mocked-isolated` project verbatim and pins itself to one
+worker. The clean fixture also fails if it did not run on the same thread. `npm run test:gate:hygiene-negative-control`
+removes the reset and requires all eight deterministic cases to go red (9 of 10 go red; the last one is a race there, so
+it is reported but not required, and the control is not in `test:gate`). Two of the guard's own defects were found by
+running it, not by reading it: the first `doMock` fixture was vacuous (its own `import()` flushed the queue; now asserted),
+and it inherited `ATLAS_GUEST_VITEST_MAX_WORKERS=3` and split its pair across threads. Unit tests pin each reset step and
+are a canary for the Vitest internals the drain uses (`__vitest_mocker__`, `resolveMocks`, `pendingIds`), in plain `npm test` too.
+
+**Measured** (16-core box shared with two other agents; `Test Files` / `Tests`):
+
+| Run | Result |
+|---|---|
+| gate-batch, full, `--maxWorkers=3` (one batch thread), 5 consecutive at `a782d379` | 273 / 1,755 passed, 5 of 5 (142, 130, 125, 126, 126 s); no `Unhandled` in any log |
+| gate-batch, full, `ATLAS_GUEST_VITEST_MAX_WORKERS=3` (three batch threads), at `e254b835` | 273 / 1,755 passed, 3 of 3, one of them through `npm run test:gate` (self-tests included), about 57 s |
+| gate-batch `--shard=1/2 --maxWorkers=2`, 3 runs | 137 files / 944 tests passed, 3 of 3 |
+| gate-batch `--shard=2/2 --maxWorkers=2`, 3 runs | 136 files / 811 tests passed, 3 of 3 |
+| normal mode `npx vitest run --maxWorkers=2` | 273 / 1,755 passed |
+| before, at `5f554bfe`, with the temporary probe attached | shard 1/2: 1 of 1 red; full `--maxWorkers=3`: 2 of 2 red (`rebookCta` + `razorpayPreload`; `PriceLinesSum` + `ReserveIdempotencyKey`) |
+
+**Left over, measured and NOT fixed** (none of these failed a run, all are leaks of the same class): live timers (a payment-expiry
+`setInterval` from `GuestDetailsPage` survives `GuestCheckoutTenantSlugParity`; a 500 ms timeout from `SelfCheckIn.multiGuest`; a
+10 s timeout from `abandonOnDeparture`), `document` listeners added by module instances and never removed (`visibilitychange`
+from seven theme/homepage files, `selectionchange`), stubs assigned on DOM prototypes (`scrollIntoView` in at least eight files,
+`scrollHeight`/`clientHeight` in `AtlasBookingCalendar`), `history.length`, and `<style>` nodes injected by libraries. They are
+left because a blanket clear would also kill timers and listeners owned by externalised libraries that are evaluated once per
+thread (react-dom's scheduler captures `setTimeout`; React registers `selectionchange` once per document) and wedge them for every
+later file. The structural alternative is to rebuild the jsdom environment per file inside the reused thread; it would end this
+whole class at the cost of a jsdom construction per file, and it changes the gate-speed trade-off that batch mode exists for, so it
+is left as an explicit decision.
 
 ## 3. Inventory
 
@@ -307,6 +361,8 @@ The per-call-site table is in Appendix A.
 3. `eslint-rules/no-wall-clock-wait.cjs` (+ RuleTester harness, baseline JSON, baseline ratchet test) and
    `eslint.config.js`.
 4. This document.
+5. Second dispatch, on `p0d/task-102734-guest-batch` (based on `5f554bfe`): `a782d379` (per-file reset as the first setup file,
+   end-of-file drain, the two source fixes, the guard, unit tests) and `e254b835` (guard pinned to one worker).
 
 ## 6. Proof
 
@@ -330,6 +386,8 @@ The per-call-site table is in Appendix A.
 - **Lint guard is falsifiable:** with `await waitFor(() => expect(first.result.current).toBe(1.25))` put back into
   `useTenantProcessingFee.test.tsx`, `eslint` exits 1 pointing at that line; removed, it exits 0.
 - **Leak guard is falsifiable:** section 2.2 table (fails with the leaker first, passes with the fix).
+- **Cause C** (section 2.4): five pinned-order repros RED on the tip and GREEN with the fix, each mechanism ablated on its own, 5 consecutive
+  full gate-batch runs green, both shards 3 of 3, normal mode green, and a negative control for the guard.
 
 ## 7. The guard (spec)
 
@@ -358,7 +416,7 @@ or adding a file is a two-file, reviewable edit. Today's baseline is the three n
 | Item 6 ledger lines | not this worktree |
 | Admin portal | later dispatch |
 | Broader shared-worker hygiene (DOM residue, storage) | not scanned; only global overrides were |
-| Cause C, gate-mode batch-pool leaks (section 2.4) | **not fixed, not root-caused**; reproduces in a few runs of the command in 2.4. Needs its own task |
+| Cause C, gate-mode batch-pool leaks (section 2.4) | **fixed and guarded** in the second dispatch. Measured and NOT fixed: live timers, `document` listeners and prototype stubs left by earlier files (listed at the end of 2.4); rebuilding the jsdom per file is the structural alternative and is left as a decision |
 
 ## 9. Hand-offs
 
