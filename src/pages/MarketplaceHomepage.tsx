@@ -1,3 +1,4 @@
+import { feePercent } from "../utils/paymentFeeCopy";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
@@ -10,6 +11,7 @@ import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
 import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
+import MobileMarketplaceNav from '@/components/marketplace/MobileMarketplaceNav'; // TASK-102165
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
@@ -54,8 +56,7 @@ type MarketplaceItem = {
   verifiedStayCount?: number | null;
   externalReviewCount?: number | null;
   // MKT-001: server-derived per-tenant payment routing (TenantsController/IPaymentRoutingService).
-  // Not yet deployed on GET /marketplace/listings — undefined falls back to today's behaviour
-  // (see the `?? 3` fallback below) until the API half ships.
+  // Missing metadata must remain unknown, without a platform-wide percentage fallback.
   chargesOnlinePaymentFee?: boolean;
   convenienceFeePercent?: number;
 };
@@ -101,6 +102,10 @@ export default function MarketplaceHomepage() {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // TASK-102711: a failed fetch used to fall into the "No stays match these filters" empty state,
+  // telling a guest the marketplace was empty during an API blip. Track it separately + retry.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // TASK-101491: server-reported total + progressive paging state. Before this, the component
   // fetched page 1 only and rendered no pager, so with 27 marketplace-visible listings the last 7
   // were unreachable by any in-page route - silently, with no truncation notice.
@@ -184,11 +189,13 @@ export default function MarketplaceHomepage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     setPage(1);
     fetch(buildApiUrl(buildPagePath(1)))
-      .then(async (r) =>
-        r.ok ? ((await r.json()) as ApiResponse) : { items: [] as MarketplaceItem[], total: 0 },
-      )
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`marketplace listings ${r.status}`);
+        return (await r.json()) as ApiResponse;
+      })
       .then(async (data) => {
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
         if (cancelled) return;
@@ -203,6 +210,7 @@ export default function MarketplaceHomepage() {
         if (!cancelled) {
           setItems([]);
           setTotal(0);
+          setLoadError(true);
         }
       })
       .finally(() => {
@@ -211,7 +219,7 @@ export default function MarketplaceHomepage() {
     return () => {
       cancelled = true;
     };
-  }, [buildPagePath]);
+  }, [buildPagePath, reloadKey]);
 
   // TASK-101491: everything the server said exists but we have not fetched yet.
   const hasMore = !loading && items.length < total;
@@ -324,6 +332,7 @@ export default function MarketplaceHomepage() {
   }, [marketplaceProperties, searchSuffix]);
 
   return (
+    <>
     <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
       {/* TASK-1876: SEO meta for marketplace homepage.
           TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
@@ -338,7 +347,9 @@ export default function MarketplaceHomepage() {
         siteName={MARKETPLACE_BRAND_BASELINE}
       />
       <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
-      <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
+      {/* TASK-101317 / MKT-002: no verification is required to list here, so never claim "verified hosts".
+          Matches the SEO description, which MKT-002 already corrected. */}
+      <p className="mt-2 text-text-body">Discover homes and rooms across India. Book direct with the owner.</p>
 
       {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
       {!loading && items.length > 0 && (
@@ -365,7 +376,7 @@ export default function MarketplaceHomepage() {
           {hasOnlinePaymentRail() ? (
             <>
               <span aria-hidden>·</span>
-              <span>Price shown: room + GST + 3% payment-processing fee</span>
+              <span>Any payment-processing fee is shown before payment</span>
             </>
           ) : null}
         </div>
@@ -573,8 +584,8 @@ export default function MarketplaceHomepage() {
                       // MKT-001 / TASK-7428 "no processor, no fee": a WHATSAPP-tenant listing
                       // takes no online payment and must not be quoted a processing fee. The
                       // fields are not deployed on the API yet, so `chargesOnlinePaymentFee`
-                      // undefined preserves today's flat-3% behaviour via the `?? 3` fallback.
-                      item.chargesOnlinePaymentFee === false ? 0 : (item.convenienceFeePercent ?? 3),
+                      // Missing row metadata stays unknown until the guest receives a quote.
+                      item.chargesOnlinePaymentFee === false ? 0 : feePercent(item.convenienceFeePercent),
                       item.isGstRegistered,
                       item.pricePerNight,
                     )}
@@ -582,7 +593,7 @@ export default function MarketplaceHomepage() {
 
                   {/* TASK-4511: Owner-share trust badge — no nightlyPrice prop (matches SearchPage.tsx's
                       BUG-7 fix; avoids leaking a fabricated host payout figure). */}
-                  <OwnerShareBadge className="self-start" />
+                  <OwnerShareBadge className="self-start" processingFeePercent={item.chargesOnlinePaymentFee === false ? 0 : feePercent(item.convenienceFeePercent)} />
 
                   <Link
                     className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
@@ -619,7 +630,25 @@ export default function MarketplaceHomepage() {
       {/* TASK-4309: explicit empty state so a filter/search with no matches shows a
           message instead of a blank gap between the filter bar and the footer.
           TASK-4413: also covers a price filter that narrows the grid to zero results. */}
-      {!loading && visibleItems.length === 0 && (
+      {!loading && loadError && (
+        <div
+          role="alert"
+          data-testid="marketplace-load-error"
+          className="mt-8 rounded-2xl border border-border bg-bg-surface p-10 text-center"
+        >
+          <p className="text-base font-semibold text-text-primary">We couldn’t load stays right now</p>
+          <p className="mt-1 text-sm text-text-muted">This is a problem on our side, not your filters.</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-4 min-h-[44px] rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-muted"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && visibleItems.length === 0 && (
         <div
           data-testid="marketplace-empty"
           className="mt-8 rounded-2xl border border-dashed border-border bg-bg-surface p-10 text-center"
@@ -631,5 +660,8 @@ export default function MarketplaceHomepage() {
         </div>
       )}
     </section>
+    {/* TASK-102165: mobile bottom nav (Explore, Wishlists, Bookings, Support). */}
+    <MobileMarketplaceNav />
+    </>
   );
 }

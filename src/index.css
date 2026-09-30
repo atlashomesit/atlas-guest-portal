@@ -445,7 +445,7 @@
 .rdrSelected ~ .rdrDayNumber span,
 .rdrDaySelected ~ .rdrDayNumber span {
   background: var(--cta-primary, #b8472f) !important;
-  color: white !important;
+  color: var(--text-on-cta, #fff) !important;
   font-weight: 600 !important;
   border: none !important;
   border-radius: 50% !important;

@@ -1,3 +1,5 @@
+import { useTenantProcessingFee } from "../hooks/useTenantProcessingFee";
+import { paymentFeeCopy } from "../utils/paymentFeeCopy";
 /**
  * RA-006/TASK-2335: Runtime JSON-LD injection for tenant-aware schema.org metadata.
  * TASK-4058: Enhanced with ContactPoint (via contact.ts), hreflang alternates (via i18n).
@@ -41,6 +43,7 @@ function appendJsonLdScript(
 }
 
 export const TenantJsonLd: React.FC = () => {
+  const processingFeePercent = useTenantProcessingFee();
   useEffect(() => {
     const tenantInfo = getTenantContext();
     if (!tenantInfo) {
@@ -127,7 +130,7 @@ export const TenantJsonLd: React.FC = () => {
         name: `Is there a booking fee at ${brandName}?`,
         acceptedAnswer: {
           '@type': 'Answer',
-          text: `Direct booking — no OTA commission. You pay the nightly rate, applicable GST, and a 3% Razorpay payment-processing fee shown at checkout.`,
+          text: `Direct booking — no OTA commission. ${paymentFeeCopy({ percent: processingFeePercent })}`,
         },
       });
       faqEntities.push({
@@ -199,7 +202,7 @@ export const TenantJsonLd: React.FC = () => {
       defaultLink.href = defaultUrl.toString();
       document.head.appendChild(defaultLink);
     }
-  }, []);
+  }, [processingFeePercent]);
 
   return null;
 };

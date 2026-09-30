@@ -803,6 +803,10 @@
   border-radius: 999px;
 }
 .pp-v2-rating-bar-val { color: #1a1a2e; font-weight: 600; font-size: 12px; }
+/* TASK-101380: star distribution stacked above the category bars in the summary's right column. */
+.pp-v2-reviews-detail { display: grid; gap: 18px; min-width: 0; }
+.pp-rating-distribution-caption { font-size: 12px; font-weight: 600; color: #1a1a2e; margin: 0 0 8px; }
+.pp-rating-distribution-source { font-weight: 400; color: #64748b; }
 
 /* ---- v2 booking widget styles (lv- prefix, scoped inside pp-root) ------- */
 .pp-root .lv-booking {

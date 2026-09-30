@@ -105,7 +105,7 @@ describe('MKT-001: marketplace card fee honesty', () => {
     expect(screen.getByText(/3% payment processing/)).toBeInTheDocument();
   });
 
-  it('an item with no fee fields yet (API not deployed) falls back to today\'s flat 3%', async () => {
+  it('an item with no fee metadata keeps the total unknown instead of inventing a percentage', async () => {
     stubMarketplaceListings([
       {
         id: 2,
@@ -123,7 +123,8 @@ describe('MKT-001: marketplace card fee honesty', () => {
     renderPage();
     await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
 
-    expect(screen.getByText(/3% payment processing/)).toBeInTheDocument();
+    expect(screen.getByText('Total confirmed after choosing dates.')).toBeInTheDocument();
+    expect(screen.queryByText(/3% payment processing/)).not.toBeInTheDocument();
   });
 });
 
@@ -168,5 +169,19 @@ describe('MKT-002: marketplace verified-homes trust strip honesty', () => {
     await waitFor(() => expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument());
 
     expect(screen.getByText(/1 Verified homes/)).toBeInTheDocument();
+  });
+});
+
+describe('TASK-101317: the marketplace never calls every host verified', () => {
+  it('describes the marketplace without a blanket "verified hosts" claim', async () => {
+    // No verification is required to list on the marketplace, and host identity checks are not
+    // exposed per listing, so the page cannot say its hosts are verified.
+    stubMarketplaceListings([
+      { id: 1, tenantSlug: 'atlas', tenantName: 'Atlas', title: 'Any listing', city: 'Goa', pricePerNight: 5000, maxGuests: 2, slug: '1', hasVerifiedPhotos: false },
+    ]);
+    renderPage();
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Atlastays Marketplace' })).toBeInTheDocument());
+    expect(screen.queryByText(/verified hosts/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Discover homes and rooms across India. Book direct with the owner.')).toBeInTheDocument();
   });
 });

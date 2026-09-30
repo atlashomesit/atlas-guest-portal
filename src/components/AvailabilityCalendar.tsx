@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
 import { dedupedAvailabilityCalendarFetch } from '../api/availabilityCalendarClient';
 import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
@@ -60,6 +60,8 @@ function formatHoldCountdown(remainingMs: number): string {
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAY_LABELS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const FULL_DATE = new Intl.DateTimeFormat('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
 export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry }: Props) {
   const { booking, updateBooking } = useBooking();
@@ -70,6 +72,9 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryNonce, setRetryNonce] = useState(0);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [focusedDate, setFocusedDate] = useState<string | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const keyboardHintId = useId();
 
   const holdBookingId = booking.paymentHoldBookingId;
   const holdToken = booking.paymentHoldToken;
@@ -190,7 +195,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
         return r.json();
       })
       .then((items: unknown) => {
-        if (!Array.isArray(items)) return;
+        if (!Array.isArray(items)) throw new Error('Availability temporarily unavailable.');
         const map = new Map<string, DayEntry['status']>();
         (items as DayEntry[]).forEach(({ date, status }) => map.set(date, status));
         setCalData(map);
@@ -208,6 +213,55 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listingId, retryNonce]);
 
+  // One keyboard entry point across both months. Data changes choose a new tab stop
+  // without moving DOM focus away from whatever the guest is currently using.
+  const selectableDates = useMemo(() => {
+    const dates = new Set<string>();
+    if (loading || loadError || holdActive || !onDateSelect) return dates;
+    const end = addMonths(monthStart, 2);
+    for (const day = new Date(today); day < end; day.setDate(day.getDate() + 1)) {
+      const iso = formatYmd(day);
+      const status = calData.get(iso) ?? 'available';
+      if (status === 'available' || status === 'turnover') dates.add(iso);
+    }
+    return dates;
+  }, [loading, loadError, holdActive, onDateSelect, monthStart, today, calData]);
+  const tabStopDate = focusedDate && selectableDates.has(focusedDate)
+    ? focusedDate
+    : selectableDates.values().next().value;
+
+  const selectDate = (iso: string) => {
+    if (!selectableDates.has(iso)) return;
+    setFocusedDate(iso);
+    onDateSelect?.(iso);
+  };
+
+  const handleGridKeyDown = (iso: string, event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!selectableDates.has(iso)) return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Enter', ' '].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Enter' || event.key === ' ') {
+      selectDate(iso);
+      return;
+    }
+    const [year, month, day] = iso.split('-').map(Number);
+    const target = new Date(year, month - 1, day);
+    const mondayIndex = (target.getDay() + 6) % 7;
+    const steps: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+    const step = steps[event.key] ?? 0;
+    target.setDate(target.getDate() + (step || (event.key === 'Home' ? -mondayIndex : 6 - mondayIndex)));
+    let targetIso = formatYmd(target);
+    // Follow the checkout calendar's skip behavior, within this grid's two-month window.
+    // Home/End stay put if the Monday/Sunday boundary is unavailable.
+    while (step && targetIso >= fromStr && targetIso < toStr && !selectableDates.has(targetIso)) {
+      target.setDate(target.getDate() + step);
+      targetIso = formatYmd(target);
+    }
+    if (!selectableDates.has(targetIso)) return;
+    setFocusedDate(targetIso);
+    calendarRef.current?.querySelector<HTMLButtonElement>(`[data-calendar-date="${targetIso}"]`)?.focus();
+  };
+
   const renderMonth = (monthOffset: number) => {
     const base = addMonths(monthStart, monthOffset);
     const year = base.getFullYear();
@@ -217,7 +271,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
 
     const cells: React.ReactNode[] = [];
     for (let i = 0; i < startWd; i++) {
-      cells.push(<div key={`e-${i}`} />);
+      cells.push(<div key={`e-${i}`} role="presentation" />);
     }
     for (let d = 1; d <= totalDays; d++) {
       const ymd = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -246,24 +300,30 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
         text = 'text-amber-800';
       }
 
-      const dayClickable =
-        !holdActive && !isPast && (status === 'available' || status === 'turnover') && Boolean(onDateSelect);
+      const dayClickable = selectableDates.has(ymd);
+      const statusLabel = holdActive ? 'Dates locked while payment completes'
+        : loading ? 'Loading availability'
+          : isPast ? 'Past date'
+            : status === 'available' ? 'Available for check-in'
+              : status === 'turnover' ? 'Turnover, check-in allowed'
+                : status === 'booked' ? 'Booked, unavailable'
+                  : status === 'blocked' ? 'Blocked, unavailable'
+                    : status === 'hold' ? 'On hold, unavailable' : 'Unavailable';
 
       cells.push(
-        <div
+        <button
           key={ymd}
-          role="button"
-          tabIndex={dayClickable ? 0 : -1}
-          onClick={() => {
-            if (dayClickable) onDateSelect!(ymd);
-          }}
-          onKeyDown={(e) => {
-            if (!dayClickable) return;
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onDateSelect!(ymd);
-            }
-          }}
+          type="button"
+          role="gridcell"
+          data-calendar-date={ymd}
+          disabled={!dayClickable}
+          tabIndex={dayClickable && ymd === tabStopDate ? 0 : -1}
+          aria-label={`${FULL_DATE.format(cellDate)}: ${statusLabel}`}
+          aria-colindex={((startWd + d - 1) % 7) + 1}
+          aria-current={formatYmd(today) === ymd ? 'date' : undefined}
+          onFocus={() => setFocusedDate(ymd)}
+          onClick={() => selectDate(ymd)}
+          onKeyDown={(event) => handleGridKeyDown(ymd, event)}
           title={
             holdActive
               ? 'Dates locked while payment completes'
@@ -273,12 +333,12 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
                   ? `Check in ${ymd}`
                   : 'Unavailable'
           }
-          className={`flex items-center justify-center rounded-lg border text-xs font-medium h-8 ${bg} ${text} ${extra} ${
+          className={`flex items-center justify-center rounded-lg border text-xs font-medium h-8 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary ${bg} ${text} ${extra} ${
             holdActive ? 'pointer-events-none opacity-60' : ''
           }`}
         >
           {d}
-        </div>,
+        </button>,
       );
     }
 
@@ -287,15 +347,21 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
         <p className="text-sm font-semibold text-text-primary mb-2">
           {MONTH_NAMES[month]} {year}
         </p>
-        <div className="grid grid-cols-7 gap-0.5 mb-1">
-          {DAY_LABELS.map((l) => (
-            <div key={l} className="text-center text-xs text-text-muted font-medium py-0.5">
-              {l}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-0.5">
-          {cells}
+        <div role="grid" aria-label={`${base.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })} availability`} aria-describedby={keyboardHintId} aria-busy={loading}>
+          <div role="row" className="grid grid-cols-7 gap-0.5 mb-1">
+            {DAY_LABELS.map((label, index) => (
+              <div role="columnheader" aria-label={DAY_NAMES[index]} key={label} className="text-center text-xs text-text-muted font-medium py-0.5">
+                {label}
+              </div>
+            ))}
+          </div>
+          <div className="space-y-0.5">
+            {Array.from({ length: Math.ceil(cells.length / 7) }, (_, week) => (
+              <div role="row" className="grid grid-cols-7 gap-0.5" key={week}>
+                {cells.slice(week * 7, week * 7 + 7)}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -320,7 +386,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
   };
 
   return (
-    <div className="py-4 border-t border-border-subtle relative">
+    <div ref={calendarRef} className="py-4 border-t border-border-subtle relative" data-testid="listing-availability-calendar">
       {holdActive && countdownLabel && (
         <div
           className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950"
@@ -333,6 +399,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
         </div>
       )}
       <h3 className="text-base font-semibold text-text-primary mb-3">Availability</h3>
+      <p id={keyboardHintId} className="sr-only">Use arrow keys to move by day or week, Home and End for Monday and Sunday, and Enter or Space to select check-in. Unavailable dates are skipped.</p>
       {/* TASK-102485: fail CLOSED — on a terminal fetch failure render the error + retry UI
           instead of the grid, whose empty map would otherwise read as all-available. */}
       {loadError && !loading ? (
@@ -353,7 +420,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
           </button>
         </div>
       ) : (
-      <div className={`relative flex flex-col sm:flex-row gap-6 ${holdActive ? 'pointer-events-none select-none' : ''}`}>
+      <div className={`relative flex flex-col sm:flex-row flex-wrap gap-6 ${holdActive ? 'pointer-events-none select-none' : ''}`}>
         {holdActive && (
           <div
             className="absolute inset-0 z-10 rounded-lg bg-bg-surface/40 backdrop-blur-[1px]"
@@ -365,7 +432,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
         {renderMonth(1)}
       </div>
       )}
-      <div className="flex items-center gap-4 mt-3 text-xs text-text-muted">
+      <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-text-muted">
         <span className="flex items-center gap-1">
           <span className="inline-block w-3 h-3 rounded bg-white border border-green-200" /> Available
         </span>

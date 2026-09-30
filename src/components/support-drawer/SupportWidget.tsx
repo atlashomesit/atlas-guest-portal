@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { matchPath, useLocation } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
+import { getApiHeaders } from "../../api/client";
 import { getFeatureFlags } from "../../config/featureFlags";
 import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
 import { trackEvent } from "../../utils/analytics";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
 import { getTenantBrandName } from "../../tenant/displayBrand";
+import { getTenantContext } from "../../tenant/tenantContext";
 import { submitCallbackRequest } from "../support/callbackService";
 import CallbackRequestForm from "./CallbackRequestForm";
 import ChatbotPlaceholder from "./ChatbotPlaceholder";
@@ -14,6 +16,7 @@ import SupportActionGrid from "./SupportActionGrid";
 import { SupportDrawerFlagsProvider, useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
 import SupportDrawer, { useSupportDrawerView } from "./SupportDrawer";
 import SupportWidgetTrigger from "./SupportWidgetTrigger";
+import StayIssueActions from "./StayIssueActions";
 import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types";
 
 const SCROLL_BUFFER_PX = 320;
@@ -24,9 +27,15 @@ const SupportWidgetContent = () => {
   const location = useLocation();
   const matchPropertyDetails =
     matchPath("/property_details/:id", location.pathname) ?? matchPath("/properties/:id", location.pathname);
-  const listingId = matchPropertyDetails?.params?.id ?? null;
+  const matchHomeUnit = matchPath("/homes/:propertySlug/:unitSlug", location.pathname);
+  const listingId = matchHomeUnit?.params?.unitSlug && /^\d+$/.test(matchHomeUnit.params.unitSlug)
+    ? matchHomeUnit.params.unitSlug
+    : matchPropertyDetails?.params?.id ?? null;
+  const assistantTenant = getApiHeaders()['X-Tenant-Slug'] ?? getTenantContext()?.slug ?? '';
+  const assistantContextKey = `${assistantTenant}:${listingId ?? ''}`;
 
   const [isOpen, setIsOpen] = useState(false);
+  const [bookingContentVisible, setBookingContentVisible] = useState(false);
   const [pageUrl, setPageUrl] = useState("");
   const [footerOffset, setFooterOffset] = useState(0);
   const [callbackPhone, setCallbackPhone] = useState("");
@@ -37,7 +46,6 @@ const SupportWidgetContent = () => {
     enableSupportCtaHierarchy,
     enableSupportLayoutVariants,
     enableChatbotPlaceholder,
-    enableHideUnfinishedChatbot,
     enableRevealCallbackOnClickOnly,
     enableRecommendedWhatsAppPrimary,
     enableCloseReassurance,
@@ -57,6 +65,31 @@ const SupportWidgetContent = () => {
     }
     wasOpenRef.current = isOpen;
   }, [isOpen]);
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    let visibleByElement = new Map<Element, boolean>();
+    const visibility = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (visibleByElement.has(entry.target)) visibleByElement.set(entry.target, entry.isIntersecting);
+      }
+      setBookingContentVisible([...visibleByElement.values()].some(Boolean));
+    }, { rootMargin: '0px 0px 96px 0px' });
+    const syncBookingContent = () => {
+      const next = [...document.querySelectorAll('[data-testid="guest-message-composer"], [data-testid="checkout-briefing"]')];
+      if (next.length === visibleByElement.size && next.every((element) => visibleByElement.has(element))) return;
+      visibility.disconnect();
+      visibleByElement = new Map(next.map((element) => [element, visibleByElement.get(element) ?? false]));
+      setBookingContentVisible([...visibleByElement.values()].some(Boolean));
+      next.forEach((element) => visibility.observe(element));
+    };
+    // Keep the floating pill clear of host checkout instructions and the message
+    // composer. Both load asynchronously and can remount for a different booking.
+    // Observer callbacks contain only changed targets, so retain each target's state.
+    const changes = new MutationObserver(syncBookingContent);
+    changes.observe(document.body, { childList: true, subtree: true });
+    syncBookingContent();
+    return () => { changes.disconnect(); visibility.disconnect(); };
+  }, []);
   /** Lift floating trigger on `/` so it clears the hero date widget on phones (E2E mobile-viewport). */
   const [narrowViewport, setNarrowViewport] = useState(false);
   const routePath = location?.pathname ?? "";
@@ -83,7 +116,11 @@ const SupportWidgetContent = () => {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setPageUrl(window.location.href);
+    // The booking token belongs only on internal booking/message links, never in
+    // external WhatsApp prefills or generic callback notes.
+    const publicPageUrl = new URL(window.location.href);
+    publicPageUrl.searchParams.delete('t');
+    setPageUrl(publicPageUrl.toString());
   }, [location.key]);
 
   useEffect(() => {
@@ -226,6 +263,7 @@ const SupportWidgetContent = () => {
         />
 
         <div className="flex flex-col gap-[var(--drawer-section-gap,0.75rem)] px-[var(--drawer-card-padding-inline,1rem)] pb-[calc(var(--drawer-card-padding-block,0.75rem)+0.25rem)]">
+          <StayIssueActions onSelect={handleClose} />
           {isCallbackExpanded ? (
             <CallbackRequestForm
               callbackError={callbackError}
@@ -239,10 +277,7 @@ const SupportWidgetContent = () => {
           ) : null}
 
           {enableChatbotPlaceholder ? (
-            <ChatbotPlaceholder
-              enableHideUnfinishedChatbot={enableHideUnfinishedChatbot}
-              listingId={listingId}
-            />
+            <ChatbotPlaceholder />
           ) : null}
         </div>
       </>
@@ -259,7 +294,7 @@ const SupportWidgetContent = () => {
 
   return (
     <>
-      {!isOpen ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
+      {!isOpen && !bookingContentVisible ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
 
       {isOpen ? (
         <>
@@ -276,6 +311,8 @@ const SupportWidgetContent = () => {
           {/* Enable layoutVariants + ctaHierarchy (e.g., ?ff=layoutVariants,compactDrawer,ctaHierarchy)
               to trial the compact drawer and CTA priority without changing the default experience. */}
           <SupportDrawer
+            assistantContextKey={assistantContextKey}
+            assistantListingId={listingId}
             bottomSpacing={bottomSpacing}
             layoutVariant={
               enableSupportLayoutVariants

@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 /**
  * TASK-4906 / ADR-0081 D8 — "noir" layout theme's Home page.
  *
@@ -87,7 +88,8 @@ const NoirHome = () => {
     // Slider follows).
     const showAtlasContent = !hideAtlasBranding;
     /** TASK-8055: fee claim follows payment rail, not white-label branding alone. */
-    const payDirectBody = directBookingPriceClaim(tenant);
+    const processingFeePercent = useTenantProcessingFee();
+    const payDirectBody = directBookingPriceClaim(tenant, processingFeePercent);
     const noirValueItems = useMemo(() => {
         const items = hideAtlasBranding
             ? NOIR_VALUE_ITEMS.filter((item) => item.heading !== 'Every address, verified')

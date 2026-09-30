@@ -220,7 +220,7 @@ describe("Atlas direct-booking hosts: canonical + og:url before JS (TASK-101940)
     expect(new URL(head.canonical, url).host).toContain(new URL(url).host);
     // Atlas hosts never trigger the tenant-site-meta round-trip, and keep Atlas's own tags.
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(head.title).toBe("Atlastays — Book direct with verified hosts");
+    expect(head.title).toBe("Atlastays — Book direct with the owner");
     expectFrameProtected(response);
   });
 

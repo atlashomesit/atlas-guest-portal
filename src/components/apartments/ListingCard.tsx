@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 import React, { useMemo, useState } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
 import { priceDisplayConfig } from "../../config/priceDisplay.config";
@@ -88,6 +89,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   cancellationTier = null,
   onClick,
 }) => {
+  const processingFeePercent = useTenantProcessingFee();
   const cancellationChip = resolveListingCardCancellationChip(cancellationTier);
   // TASK-101158: never claim "Secure Razorpay payments" on a tenant with no online rail
   // (bookingMode WHATSAPP/MANUAL or paymentProvider null) — omit the chip, don't reword it.
@@ -315,12 +317,12 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     </span>
                   )}
                   <div className="text-2xl font-bold leading-tight text-cta-primary">
-                    {showTotal ? (
+                    {showTotal && processingFeePercent !== null ? (
                       <>
                         {/* TASK-4832: use the same est-total helper/inputs as the collapsed
                             estimate so the toggle never shows two different money totals
                             (previously omitted the 3% fee and the GST-registration flag). */}
-                        {formatCurrency(estTotalInclGst(finalPrice, estimateNights, 3, isGstRegistered))}
+                        {formatCurrency(estTotalInclGst(finalPrice, estimateNights, processingFeePercent, isGstRegistered))}
                         <span className="ml-1 text-sm font-semibold text-text-muted">total</span>
                       </>
                     ) : (
@@ -332,7 +334,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   </div>
                 </div>
                 {/* TASK-4013: Toggle link for total with taxes; TASK-1645 / TASK-2871: Indian accommodation GST — 5% for ≤₹7,500/night, 18% above (eff. 22 Sep 2025) */}
-                {showTotal ? (
+                {showTotal && processingFeePercent !== null ? (
                   <button
                     type="button"
                     onClick={() => setShowTotal(false)}
@@ -343,15 +345,15 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 ) : (
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-text-muted">
-                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency, 3, isGstRegistered)}
+                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency, processingFeePercent, isGstRegistered)}
                     </span>
-                    <button
+                    {processingFeePercent !== null && <button
                       type="button"
                       onClick={() => setShowTotal(true)}
                       className="text-xs text-cta-primary hover:underline font-semibold self-start"
                     >
                       See total ↓
-                    </button>
+                    </button>}
                   </div>
                 )}
                 {showDiscount && savingsAmount > 0 && (

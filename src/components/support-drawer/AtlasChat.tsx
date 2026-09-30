@@ -1,167 +1,177 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, Mic, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Mic, Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
-import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
-import { getTenantBrandName } from '@/tenant/displayBrand';
+import { SUPPORT_DRAWER_COPY } from '@/config/supportDrawerCopy';
 
-type AtlasChatProps = {
-  onClose?: (e: React.MouseEvent) => void;
-  /** When set (e.g. on listing detail), FAQ-backed chat can match property questions. */
-  listingId?: string | null;
+type ChatReply = { reply?: unknown; source?: unknown };
+type ChatMessage = { question: string; reply: string; source: 'faq' | 'ai' | 'fallback' };
+
+const sourceLabel = (source: ChatMessage['source']) => {
+  if (source === 'faq') return SUPPORT_DRAWER_COPY.assistant.faqSource;
+  if (source === 'ai') return SUPPORT_DRAWER_COPY.assistant.aiSource;
+  return SUPPORT_DRAWER_COPY.assistant.fallbackSource;
 };
 
-const AtlasChat = ({ onClose, listingId = null }: AtlasChatProps) => {
-  const brandName = getTenantBrandName();
-  const [isOpen, setIsOpen] = useState(true); // 🔴 control visibility
-  const [messages, setMessages] = useState([
-    { role: 'assistant', content: `Welcome to ${brandName}. How can I help you today?` }
-  ]);
+const AtlasChat = ({ listingId, onBack }: { listingId?: string | null; onBack: () => void }) => {
   const [input, setInput] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const [listening, setListening] = useState(false);
+  const inFlight = useRef(false);
+  const requestRef = useRef<AbortController | null>(null);
+  const speechRef = useRef<SpeechRecognition | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const transcriptRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = async (overrideInput?: string) => {
-    const text = overrideInput || input;
-    if (!text.trim()) return;
+  useEffect(() => () => {
+    requestRef.current?.abort();
+    const recognition = speechRef.current;
+    speechRef.current = null;
+    recognition?.stop();
+  }, []);
+  useEffect(() => {
+    if (!sending) inputRef.current?.focus();
+  }, [sending]);
+  useEffect(() => {
+    if (transcriptRef.current) transcriptRef.current.scrollTop = transcriptRef.current.scrollHeight;
+  }, [messages]);
 
-    setMessages(prev => [...prev, { role: 'user', content: text }]);
-    setInput('');
-
+  const send = async (spoken?: string) => {
+    const question = (spoken ?? input).trim();
+    if (!question || inFlight.current) return;
+    if (question.length > 2000) {
+      setError(SUPPORT_DRAWER_COPY.assistant.tooLong);
+      return;
+    }
+    inFlight.current = true;
+    const recognition = speechRef.current;
+    speechRef.current = null;
+    recognition?.stop();
+    setListening(false);
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setSending(true);
+    setError(null);
     try {
-      const listingNum =
-        listingId != null && listingId !== '' && !Number.isNaN(Number(listingId))
-          ? Number(listingId)
-          : null;
-      const res = await fetch(buildApiUrl('/api/public/chat'), {
+      const parsedId = listingId && /^\d+$/.test(listingId) ? Number(listingId) : null;
+      const numericId = parsedId !== null && Number.isSafeInteger(parsedId) && parsedId > 0 ? parsedId : null;
+      const response = await fetch(buildApiUrl('/api/public/chat'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getApiHeaders(),
-        },
-        body: JSON.stringify({ listingId: listingNum, message: text }),
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', ...getApiHeaders() },
+        body: JSON.stringify({ listingId: numericId, message: question }),
       });
-
-      if (!res.ok) {
-        throw new Error(await messageFromApiResponse(res));
-      }
-
-      const data = (await res.json()) as { reply?: string };
-      const reply =
-        typeof data.reply === 'string' && data.reply.trim()
-          ? data.reply.trim()
-          : 'No reply from the assistant. Please try again.';
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : 'We could not reach the chat service. Please check your connection and try again.';
-      setMessages(prev => [...prev, { role: 'assistant', content: message }]);
+      if (!response.ok) throw new Error('request failed');
+      const data = await response.json() as ChatReply;
+      if (controller.signal.aborted) return;
+      if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('empty reply');
+      const source = data.source === 'faq' || data.source === 'ai' ? data.source : 'fallback';
+      setMessages((previous) => [...previous, { question, reply: data.reply as string, source }]);
+      setInput((current) => current.trim() === question ? '' : current);
+    } catch {
+      if (controller.signal.aborted) return;
+      setError(SUPPORT_DRAWER_COPY.assistant.error);
+      setInput((current) => current || question);
+    } finally {
+      inFlight.current = false;
+      if (requestRef.current === controller) requestRef.current = null;
+      if (!controller.signal.aborted) setSending(false);
     }
   };
 
   const startSpeechToText = () => {
-    const SpeechRecognition =
-      (window as Window & { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition }).SpeechRecognition ||
-      (window as Window & { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) return alert('Voice not supported');
-
-    const recognition = new SpeechRecognition();
+    if (inFlight.current) return;
+    if (speechRef.current) {
+      const recognition = speechRef.current;
+      speechRef.current = null;
+      recognition.stop();
+      setListening(false);
+      return;
+    }
+    const recognitionConstructor = (window as Window & { SpeechRecognition?: typeof window.SpeechRecognition; webkitSpeechRecognition?: typeof window.SpeechRecognition }).SpeechRecognition ||
+      (window as Window & { webkitSpeechRecognition?: typeof window.SpeechRecognition }).webkitSpeechRecognition;
+    if (!recognitionConstructor) {
+      setError(SUPPORT_DRAWER_COPY.assistant.voiceUnavailable);
+      return;
+    }
+    const recognition = new recognitionConstructor();
+    speechRef.current = recognition;
     recognition.lang = 'en-IN';
-
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
-
-    recognition.onresult = (e: SpeechRecognitionEvent) => {
-      handleSend(e.results[0][0].transcript);
+    recognition.onstart = () => {
+      if (speechRef.current === recognition) setListening(true);
     };
-
-    recognition.start();
+    recognition.onend = () => {
+      if (speechRef.current !== recognition) return;
+      speechRef.current = null;
+      setListening(false);
+    };
+    recognition.onerror = () => {
+      if (speechRef.current !== recognition) return;
+      speechRef.current = null;
+      setListening(false);
+      setError(SUPPORT_DRAWER_COPY.assistant.voiceUnavailable);
+    };
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      if (inFlight.current || speechRef.current !== recognition) return;
+      const transcript = event.results[0]?.[0]?.transcript?.slice(0, 2000) ?? '';
+      setInput(transcript);
+    };
+    try {
+      recognition.start();
+    } catch {
+      speechRef.current = null;
+      setListening(false);
+      setError(SUPPORT_DRAWER_COPY.assistant.voiceUnavailable);
+    }
   };
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // 🔴 CLOSE CHAT COMPLETELY
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed bottom-4 right-4 w-[300px] h-[320px] bg-bg-surface border border-border-subtle rounded-lg shadow-lg flex flex-col z-[999] overflow-hidden">
-
-      {/* Header */}
-      {/* TASK-4969: use the theme tokens every sibling support-drawer component uses
-          (--cta-primary / --text-on-cta / --bg-surface) instead of hardcoded navy. */}
-      <div className="p-1.5 bg-cta-primary text-[var(--text-on-cta)] flex justify-between items-center border-b border-border-subtle">
-        <div className="flex items-center gap-2">
-          <h2 className="font-medium text-xs">{`${brandName} Concierge`}</h2>
-          <span className="text-xs opacity-80">•</span>
-          <p className="text-xs opacity-90">24/7</p>
+    <section className="flex min-h-0 flex-col gap-3 px-4 pb-4" aria-label={SUPPORT_DRAWER_COPY.assistant.entryLabel}>
+      <div className="flex items-center justify-between gap-3 border-b border-border-subtle py-3">
+        <div>
+          <h2 className="text-base font-semibold text-text-primary">{SUPPORT_DRAWER_COPY.assistant.entryLabel}</h2>
+          <p className="text-xs text-text-muted">{SUPPORT_DRAWER_COPY.assistant.disclosure}</p>
         </div>
-
-        {/* ❌ CROSS BUTTON */}
-        <button
-          onClick={onClose || (() => setIsOpen(false))}
-          aria-label="Close"
-          className="p-0.5 rounded-full hover:bg-[color-mix(in_srgb,var(--text-on-cta)_20%,transparent)] transition text-[color-mix(in_srgb,var(--text-on-cta)_80%,transparent)] hover:text-[var(--text-on-cta)]"
-        >
-          <X size={16} aria-hidden="true" />
+        <button type="button" onClick={onBack} className="min-h-11 shrink-0 rounded-lg px-2 py-2 text-xs font-semibold text-cta-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-cta-primary">
+          {SUPPORT_DRAWER_COPY.assistant.backLabel}
         </button>
       </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-1.5 space-y-1 bg-bg-surface text-xs">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[92%] px-2 py-0.5 rounded text-xs leading-tight shadow-xs
-                ${
-                  m.role === 'user'
-                    ? 'bg-cta-primary text-[var(--text-on-cta)]'
-                    : 'bg-bg-muted text-text-primary border border-border-subtle'
-                }`}
-            >
-              <ReactMarkdown>{m.content}</ReactMarkdown>
+      <div ref={transcriptRef} role="log" aria-label="Stay assistant answers" className="max-h-[min(40vh,320px)] space-y-3 overflow-y-auto" aria-live="polite">
+        {messages.map((message, index) => (
+          <div key={index} className="rounded-xl border border-border-subtle bg-bg-muted p-3 text-sm">
+            <p className="mb-2 font-medium text-text-primary">{message.question}</p>
+            <p className="mb-1 text-[11px] font-semibold text-text-muted">{sourceLabel(message.source)}</p>
+            <div className="break-words text-text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5">
+              <ReactMarkdown allowedElements={['p', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'code', 'br']} unwrapDisallowed components={{ a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{message.reply}</ReactMarkdown>
             </div>
           </div>
         ))}
-        <div ref={chatEndRef} />
       </div>
-
-      {/* Input */}
-      <div className="p-1.5 bg-bg-surface border-t border-border-subtle flex items-center gap-1">
-        <button
-          onClick={startSpeechToText}
-          aria-label="Start voice input"
-          className={`p-1 rounded-full text-[11px] ${
-            isListening ? 'bg-[var(--support-error)] text-[var(--text-on-cta)]' : 'bg-bg-muted text-text-muted hover:bg-[color-mix(in_srgb,var(--bg-muted)_60%,var(--text-muted)_10%)]'
-          }`}
-        >
+      {error && <p role="alert" className="text-sm text-[var(--support-error)]">{error}</p>}
+      <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void send(); }}>
+        <input
+          ref={inputRef}
+          aria-label="Ask the Stay assistant"
+          value={input}
+          disabled={sending}
+          maxLength={2000}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder={SUPPORT_DRAWER_COPY.assistant.inputPlaceholder}
+          className="min-h-11 min-w-0 flex-1 rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:border-accent-primary"
+        />
+        <button type="button" onClick={startSpeechToText} disabled={sending} aria-label="Start voice input" aria-pressed={listening} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg text-text-muted disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cta-primary">
           <Mic size={18} aria-hidden="true" />
         </button>
-
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          placeholder="Type your message..."
-          className="flex-1 bg-bg-surface border border-border-subtle rounded text-[11px] px-2 py-1 text-text-primary outline-none focus:border-accent-primary"
-        />
-
-        <button
-          onClick={() => handleSend()}
-          aria-label="Send message"
-          className="p-1 rounded-full bg-cta-primary text-[var(--text-on-cta)] text-[11px]"
-        >
+        <button type="submit" aria-label="Send message" disabled={!input.trim() || sending} className="flex min-h-11 min-w-11 items-center justify-center rounded-lg bg-cta-primary text-[var(--text-on-cta)] disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cta-primary">
           <Send size={18} aria-hidden="true" />
         </button>
-      </div>
-    </div>
+      </form>
+      {listening && <p role="status" className="text-xs text-text-muted">Listening… select the microphone to stop.</p>}
+      {sending && <p role="status" className="text-xs text-text-muted">Getting an answer…</p>}
+      <p className="text-[11px] text-text-muted">{SUPPORT_DRAWER_COPY.assistant.humanHelp}</p>
+    </section>
   );
 };
 

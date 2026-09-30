@@ -6,6 +6,7 @@ import {
   sendGuestTypingHeartbeat,
   type GuestConversationMessage,
 } from "@/api/guestMessagesClient";
+import { parseStayIssueCategory, STAY_ISSUE_CATEGORIES, stayIssuePrefix } from './stayIssueCategories';
 
 /** TASK-4333: polling cadence for the guest message thread (matches admin ConversationsPage.tsx). */
 const POLL_INTERVAL_MS = 30_000;
@@ -87,11 +88,25 @@ function receiptClassName(state: ReceiptState): string {
  * TASK-10088: polite live-region announcement for a newly polled host reply; never auto-focus
  * and never pull a composing / manually-scrolled guest to the bottom.
  */
-export default function GuestMessageThread({ bookingId, token }: { bookingId: number; token: string }) {
+interface GuestMessageThreadProps {
+  bookingId: number;
+  token: string;
+  issueCategory?: string | null;
+  issueRequestKey?: string;
+}
+
+export default function GuestMessageThread(props: GuestMessageThreadProps) {
+  // A different booking/link must never inherit another stay's draft, messages,
+  // or a late response from its in-flight send.
+  return <BookingMessageThread key={`${props.bookingId}:${props.token}`} {...props} />;
+}
+
+function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey }: GuestMessageThreadProps) {
   const [messages, setMessages] = useState<GuestConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [category, setCategory] = useState(() => parseStayIssueCategory(issueCategory));
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
@@ -109,6 +124,19 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
   const isComposingRef = useRef(false);
   const stickToBottomRef = useRef(true);
   const pendingGuestSendRef = useRef(false);
+  const sendingRef = useRef(false);
+  const selectedIssue = parseStayIssueCategory(issueCategory);
+  const prefix = stayIssuePrefix(category);
+  const messageTooLong = prefix.length + draft.trim().length > MAX_MESSAGE_LENGTH;
+
+  useEffect(() => {
+    if (!selectedIssue || loading) return;
+    setCategory(selectedIssue);
+    // Run after drawer-close focus restoration, and only for a requested issue
+    // deep link. Ordinary polling must never take focus from another control.
+    const frame = requestAnimationFrame(() => textareaRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [selectedIssue, issueRequestKey, loading]);
 
   const noteHostReplies = useCallback((incoming: GuestConversationMessage[]) => {
     const unseenHost = incoming.filter(
@@ -225,25 +253,28 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
 
   const handleSend = async () => {
     const trimmed = draft.trim();
-    if (!trimmed || sending) return;
+    if (!trimmed || sendingRef.current || prefix.length + trimmed.length > MAX_MESSAGE_LENGTH) return;
+    sendingRef.current = true;
     setSending(true);
     setSendError(null);
     try {
-      const sent = await sendGuestMessage(bookingId, token, trimmed);
+      const sent = await sendGuestMessage(bookingId, token, `${prefix}${trimmed}`);
       pendingGuestSendRef.current = true;
       stickToBottomRef.current = true;
       setMessages((prev) => [...prev, sent]);
       setDraft("");
+      setCategory('');
     } catch (err) {
       console.error("Failed to send guest message:", err);
       setSendError("Couldn't send your message. Please try again.");
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   };
 
   return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="guest-message-thread">
+    <div id="guest-messages" className="scroll-mt-24 rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="guest-message-thread">
       <div
         role="status"
         aria-live="polite"
@@ -339,7 +370,18 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
         </p>
       )}
 
-      <div className="flex gap-2">
+      <div className="space-y-3" data-testid="guest-message-composer">
+      <div className="space-y-1">
+        <label htmlFor="guest-message-category" className="block text-sm font-medium">Message category</label>
+        <select id="guest-message-category" value={category} disabled={sending}
+          onChange={(event) => setCategory(parseStayIssueCategory(event.target.value))}
+          className="min-h-11 w-full rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm">
+          <option value="">General message</option>
+          {STAY_ISSUE_CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select>
+        {category && <p className="text-xs text-text-secondary">Your message will start with {prefix.trim()}. It is sent when you choose Send.</p>}
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2">
         <textarea
           ref={textareaRef}
           value={draft}
@@ -351,26 +393,33 @@ export default function GuestMessageThread({ bookingId, token }: { bookingId: nu
             isComposingRef.current = false;
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              void handleSend();
+              if (!e.repeat) void handleSend();
             }
           }}
           placeholder="Type a message to your host…"
+          aria-label="Message to your host"
+          aria-describedby="guest-message-length"
+          disabled={sending}
           rows={2}
-          maxLength={MAX_MESSAGE_LENGTH}
-          className="flex-1 rounded-lg border border-border-subtle px-3 py-2 text-sm resize-none"
+          maxLength={MAX_MESSAGE_LENGTH - prefix.length}
+          className="min-w-0 flex-1 rounded-lg border border-border-subtle px-3 py-2 text-sm resize-none"
           data-testid="guest-message-input"
         />
         <button
           type="button"
-          disabled={sending || !draft.trim()}
+          disabled={sending || !draft.trim() || messageTooLong}
           onClick={() => void handleSend()}
-          className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2 hover:bg-brand-primary/90 transition-colors disabled:opacity-50 self-end"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2 hover:bg-brand-primary/90 transition-colors disabled:opacity-50 sm:self-end"
           data-testid="guest-message-send"
         >
           {sending ? "Sending…" : "Send"}
         </button>
+      </div>
+      <p id="guest-message-length" className={`text-xs ${messageTooLong ? 'text-red-600' : 'text-text-muted'}`} role={messageTooLong ? 'alert' : undefined}>
+        {messageTooLong ? 'Shorten your message to send. ' : ''}{prefix.length + draft.length}/{MAX_MESSAGE_LENGTH} characters including category. Shift+Enter adds a new line.
+      </p>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../hooks/useTenantProcessingFee";
 import { lazy, Suspense, useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Briefcase, CalendarDays, CalendarRange, Wifi } from "lucide-react";
@@ -262,6 +263,7 @@ function availabilityChip(
 
 const SearchPage = () => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
+  const processingFeePercent = useTenantProcessingFee();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMarketplaceSearch = isMarketplaceMode() && isAtlastaysMarketplaceSurface();
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
@@ -1480,7 +1482,7 @@ const SearchPage = () => {
                                   suggestDisplayedPrice,
                                   estimateNights,
                                   formatDisplayCurrency,
-                                  3,
+                                  processingFeePercent,
                                   unit.isGstRegistered,
                                 )}
                               </p>
@@ -1763,7 +1765,7 @@ const SearchPage = () => {
                       )}
                       <p className="mt-0.5 text-sm text-text-muted">per night</p>
                       <p className="text-xs text-text-muted">
-                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, 3, unit.isGstRegistered)}
+                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, processingFeePercent, unit.isGstRegistered)}
                       </p>
                       {longStay && (
                         <LongStayCalculator

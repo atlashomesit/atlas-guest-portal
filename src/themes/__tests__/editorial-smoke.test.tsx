@@ -25,6 +25,8 @@ import {
   resolveLayoutThemeId,
   themeRegistry,
 } from "../registry";
+import { getTenantContext } from "@/tenant/tenantContext";
+import { directBookingPriceClaim } from "@/tenant/paymentRail";
 
 // ---- Home.tsx's dependency surface ----
 vi.mock("@/components/home/ServicesSection", () => ({
@@ -166,9 +168,12 @@ describe("AC5/AC13 — editorial's Home renders the founder-specified text-forwa
 
     // Pull-quote-style callout — the founder-specified "pull-quote-style callouts".
     expect(screen.getByTestId("editorial-pull-quote")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Book direct.*host keeps more/i),
-    ).toBeInTheDocument();
+    // The callout carries the single-source direct-booking claim. GUEST-003 made that claim
+    // depend on whether the tenant really has an online payment rail, so assert the shared
+    // copy rather than a hardcoded "host keeps more" string that is untrue without one.
+    expect(screen.getByTestId("editorial-pull-quote")).toHaveTextContent(
+      directBookingPriceClaim(getTenantContext(), null),
+    );
 
     // Story-flow featured stays — the layout's largest structural divergence (vertical,
     // alternating feature spreads, not a grid or carousel).

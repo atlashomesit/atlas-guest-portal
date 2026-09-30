@@ -317,6 +317,45 @@
 }
 .bc-sw-selected { background: var(--brand-primary, #b8472f); }
 
+/* === Booking-widget availability legend (under the dates + guests card) ====
+   Three equal columns, always Available → Turnover → Unavailable: swatch + label on top,
+   description beneath. Reuses the .bc-sw-* swatches above so it matches the day cells. */
+.bw-legend {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.bw-legend-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bw-legend-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary, #3b1f1e);
+}
+.bw-legend-label .bc-sw { flex-shrink: 0; }
+.bw-legend-desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted, #6b5a55);
+}
+/* Phones: ~90px columns — a notch smaller keeps every description to two lines. */
+@media (max-width: 480px) {
+  .bw-legend { gap: 8px; }
+  .bw-legend-label,
+  .bw-legend-desc { font-size: 11px; }
+}
+
 /* === Popover wrapper =================================================== */
 .bc-popover-overlay {
   position: fixed;

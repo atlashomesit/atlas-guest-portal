@@ -23,7 +23,7 @@ describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
   });
 
   it('formats est-total without GST added on top and includes 3% payment processing fee (TASK-102037)', () => {
-    const label = formatEstTotalInclGst(8000, 2, (n) => `₹${n}`);
+    const label = formatEstTotalInclGst(8000, 2, (n) => `₹${n}`, 3);
     expect(label).not.toContain('GST');
     expect(label).toContain('2 nights');
     expect(label).toContain('3% payment processing');
@@ -143,10 +143,10 @@ describe('accommodationGstSlabPercentForChargedRate — TASK-7011/TASK-7543 mirr
 
 describe('estTotalInclGst / formatEstTotalInclGst — TASK-7543 search-card estimator bands off the CHARGED rate, agreeing with the server', () => {
   it('a nil-rated (<=1,000/night) stay is never labelled "incl. 5% GST"', () => {
-    const label = formatEstTotalInclGst(600, 1, (n) => `₹${n}`);
+    const label = formatEstTotalInclGst(600, 1, (n) => `₹${n}`, 3);
     expect(label).not.toContain('GST');
     // base 600 + 3% fee (18, rounded) = 618, no GST line.
-    expect(estTotalInclGst(600, 1)).toBe(618);
+    expect(estTotalInclGst(600, 1, 3)).toBe(618);
   });
 
   it('TASK-102037 (ADR-0107): estimator computes clean total with zero GST added on top', () => {
@@ -159,7 +159,7 @@ describe('estTotalInclGst / formatEstTotalInclGst — TASK-7543 search-card esti
 
   it('defaults chargedPerNight to perNight for callers with no separate override (backward compatible)', () => {
     expect(estTotalInclGst(8000, 2, 3, true)).toBe(estTotalInclGst(8000, 2, 3, true, 8000));
-    expect(formatEstTotalInclGst(8000, 2, (n) => `₹${n}`)).toBe(
+    expect(formatEstTotalInclGst(8000, 2, (n) => `₹${n}`, 3)).toBe(
       formatEstTotalInclGst(8000, 2, (n) => `₹${n}`, 3, true, 8000),
     );
   });
