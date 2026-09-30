@@ -1,0 +1,8 @@
+{
+  "_note": "TASK-102734 ratchet for atlas/no-wall-clock-wait. Per file: how many UNJUSTIFIED default-timeout waitFor/findBy* calls are tolerated. Numbers may only go DOWN (the rule fails on a stale, too-high entry and on any excess); a new file is not listed and so starts at zero. Never raise a number and never add a file: drain with settle() (src/test/settle.ts) or justify with an explicit timeout plus a '// wall-clock: <why>' comment. The three files below are the heavyRouteSmokes that vitest.config.ts removes from every run, so their waits cannot be converted or verified; they leave this list when those files are revived or deleted.",
+  "files": {
+    "src/App.a11y.test.tsx": 2,
+    "tests/PropertyDetailsMedia.test.tsx": 2,
+    "tests/propertyDetailsRouteSmoke.test.tsx": 4
+  }
+}
