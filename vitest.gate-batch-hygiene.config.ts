@@ -32,16 +32,23 @@ const setupFiles: string[] = production.test.setupFiles.filter(
   (f: string) => !(withoutReset && f.includes("sharedWorkerResetSetup")),
 );
 
+// The pair MUST share one thread and run in order, whatever ATLAS_GUEST_VITEST_MAX_WORKERS says: the release gate may set
+// it to 3, which gives the production project three batch threads and parallel files (the first version of this guard
+// inherited that and its own same-thread check refused to pass).
+const oneThread = { maxWorkers: 1, fileParallelism: false };
+
 export default {
   ...anyBase,
   test: {
     ...anyBase.test,
+    ...oneThread,
     sequence: { ...(anyBase.test.sequence ?? {}), sequencer: FixtureOrderSequencer },
     projects: [
       {
         ...production,
         test: {
           ...production.test,
+          ...oneThread,
           include: ["src/test/fixtures/gate-batch-hygiene/*.fixture.ts"],
           setupFiles,
         },

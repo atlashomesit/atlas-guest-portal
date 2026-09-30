@@ -42,7 +42,7 @@ function runFixtures(label, extraEnv) {
   const child = spawnSync(
     process.execPath,
     ["node_modules/vitest/vitest.mjs", "run", "--config", "vitest.gate-batch-hygiene.config.ts", "--reporter=json", `--outputFile=${outFile}`],
-    { cwd: root, encoding: "utf8", env: { ...process.env, ATLAS_VITEST_GATE_BATCH: "1", ...extraEnv }, maxBuffer: 1 << 26 },
+    { cwd: root, encoding: "utf8", env: { ...process.env, ATLAS_VITEST_GATE_BATCH: "1", ATLAS_GUEST_VITEST_MAX_WORKERS: "1", ...extraEnv }, maxBuffer: 1 << 26 },
   );
   let report;
   try {
