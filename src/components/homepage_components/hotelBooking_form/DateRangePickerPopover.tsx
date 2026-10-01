@@ -67,40 +67,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
     }
   };
 
-  useEffect(() => {
-    if (!open || !isMobile || typeof document === 'undefined' || typeof window === 'undefined') return;
-
-    const body = document.body;
-    const previousStyles = {
-      overflow: body.style.overflow,
-      paddingRight: body.style.paddingRight,
-      position: body.style.position,
-      top: body.style.top,
-      width: body.style.width,
-    };
-
-    const previousScrollTop = window.scrollY;
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-    const computedPaddingRight = Number.parseFloat(getComputedStyle(body).paddingRight) || 0;
-
-    body.style.overflow = 'hidden';
-    body.style.position = 'fixed';
-    body.style.top = `-${previousScrollTop}px`;
-    body.style.width = '100%';
-
-    if (scrollbarWidth > 0) {
-      body.style.paddingRight = `${computedPaddingRight + scrollbarWidth}px`;
-    }
-
-    return () => {
-      body.style.overflow = previousStyles.overflow;
-      body.style.paddingRight = previousStyles.paddingRight;
-      body.style.position = previousStyles.position;
-      body.style.top = previousStyles.top;
-      body.style.width = previousStyles.width;
-      window.scrollTo({ top: previousScrollTop, left: 0 });
-    };
-  }, [open, isMobile]);
+  // Body scroll locking removed to allow natural page movement and avoid stuck behavior
 
   const portalTarget = useMemo(() => (typeof document !== 'undefined' ? document.body : null), []);
 
@@ -123,14 +90,14 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           aria-labelledby={labelId}
           id={contentId}
           tabIndex={-1}
-          className={`booking-calendar-popover${popoverClassName ? ` ${popoverClassName}` : ''} fixed inset-x-0 bottom-0 z-[95] max-h-[80vh] rounded-t-[24px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_16px_48px_rgba(15,23,42,0.12)]`}
+          className={`booking-calendar-popover${popoverClassName ? ` ${popoverClassName}` : ''} flex flex-col fixed inset-x-0 bottom-0 z-[95] max-h-[80vh] rounded-t-[24px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_16px_48px_rgba(15,23,42,0.12)]`}
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex justify-center pt-3 pb-2">
+          <div className="flex justify-center pt-3 pb-2 flex-none">
             <div className="w-12 h-1 rounded-full bg-[var(--border-strong)]" aria-hidden />
           </div>
 
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--bg-muted)] bg-[var(--bg-surface)]">
+          <div className="flex flex-none items-center justify-between px-4 py-3 border-b border-[var(--bg-muted)] bg-[var(--bg-surface)]">
             <div className="flex items-center gap-2">
               <p id={labelId} className="text-[15px] font-semibold text-[var(--text-primary)]">
                 {heading}
@@ -158,7 +125,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
             </button>
           </div>
 
-          <div className="overflow-y-auto overflow-x-hidden p-3" style={{ pointerEvents: 'auto' }}>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-3" style={{ pointerEvents: 'auto' }}>
             {children}
             <p className="sr-only" aria-live="polite">
               {loadingLabel}
