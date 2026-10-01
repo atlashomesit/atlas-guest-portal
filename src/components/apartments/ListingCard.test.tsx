@@ -6,7 +6,7 @@
  */
 
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { TenantInfo } from '@/tenant/tenantContext';
 import { CurrencyProvider } from '../../contexts/CurrencyContext';
 import { BookingProvider } from '../../contexts/BookingContext';
@@ -28,11 +28,12 @@ const baseTenant = (over: Partial<TenantInfo>): TenantInfo => ({
   ...over,
 });
 
-const renderCard = () =>
+const renderCard = (onClick?: () => void) =>
   render(
     <CurrencyProvider>
       <BookingProvider>
         <ListingCard
+          onClick={onClick}
           id="1"
           name="Sunrise Villa"
           location="Hyderabad"
@@ -73,5 +74,32 @@ describe('TASK-101158: ListingCard Razorpay chip is gated by hasOnlinePaymentRai
     renderCard();
 
     expect(screen.getByText(/secure razorpay payments/i)).toBeInTheDocument();
+  });
+});
+
+
+describe('ListingCard independent controls', () => {
+  afterEach(cleanup);
+  it('keeps review keyboard events independent of opening the room', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    const openRoom = vi.fn();
+    const { container } = renderCard(openRoom);
+    const reviews = screen.getByRole('link', { name: 'View guest reviews' });
+    fireEvent.keyDown(reviews, { key: 'Enter' });
+    expect(openRoom).not.toHaveBeenCalled();
+    expect(container.querySelector('article')).not.toHaveAttribute('role', 'button');
+    expect(reviews).toHaveAttribute('href', '/property/1#reviews');
+  });
+  it('toggles total without opening the room and opens once from its CTA', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    const openRoom = vi.fn();
+    renderCard(openRoom);
+    fireEvent.click(screen.getByRole('button', { name: /See total/ }));
+    expect(screen.getByRole('button', { name: 'Hide total' })).toBeInTheDocument();
+    expect(openRoom).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide total' }));
+    expect(openRoom).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'View room Sunrise Villa' }));
+    expect(openRoom).toHaveBeenCalledTimes(1);
   });
 });

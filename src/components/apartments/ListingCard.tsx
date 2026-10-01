@@ -187,18 +187,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
   return (
     <article
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1 md:"
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick?.();
-        }
-      }}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1"
     >
-      <div className="relative h-56 w-full overflow-hidden">
+      <button type="button" onClick={onClick} aria-label={`View photos and room ${name}`} className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]">
         <OptimizedImage
           src={image?.trim() ? image : getPropertyDesignImage(id)}
           alt={name}
@@ -209,12 +200,12 @@ const ListingCard: React.FC<ListingCardProps> = ({
         <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary">
           {propertyType}
         </span>
-      </div>
+      </button>
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-semibold text-text-primary">{name}</h3>
+            <h3 className="text-lg font-semibold text-text-primary"><button type="button" onClick={onClick} className="min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">{name}</button></h3>
             <p className="text-sm text-text-muted">{location}</p>
             {neighborhoods.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-2">
@@ -238,7 +229,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                 }}
-                className="inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100 transition-colors"
+                className="inline-flex min-h-11 items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100 transition-colors"
                 aria-label="View guest reviews"
               >
                 <span aria-hidden>★</span>
@@ -251,7 +242,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                 }}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-text-primary hover:opacity-80 transition-opacity"
+                className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-text-primary hover:opacity-80 transition-opacity"
                 aria-label="View guest reviews"
               >
                 <span aria-hidden>★</span>
@@ -338,7 +329,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowTotal(false)}
-                    className="text-xs text-cta-primary hover:underline font-semibold self-start"
+                    className="min-h-11 text-xs text-cta-primary hover:underline font-semibold self-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]"
                   >
                     Hide total
                   </button>
@@ -350,7 +341,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     {processingFeePercent !== null && <button
                       type="button"
                       onClick={() => setShowTotal(true)}
-                      className="text-xs text-cta-primary hover:underline font-semibold self-start"
+                      className="min-h-11 text-xs text-cta-primary hover:underline font-semibold self-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]"
                     >
                       See total ↓
                     </button>}
