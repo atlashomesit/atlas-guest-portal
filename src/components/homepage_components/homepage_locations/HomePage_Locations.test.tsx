@@ -1,7 +1,8 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import HomePage_Locations from './HomePage_Locations';
+import { settle } from '../../../test/settle';
 
 const listingsWithGaps = [
   undefined,
@@ -46,12 +47,14 @@ describe('HomePage_Locations', () => {
     );
 
     // Gap 4b: listing cards now show human display names (SKU→human mapping applied)
-    expect(await screen.findByText('Studio 101')).toBeInTheDocument();
-    await waitFor(() => expect(trackEventMock).toHaveBeenCalledWith(
+    await settle();
+    expect(screen.getByText('Studio 101')).toBeInTheDocument();
+    await settle();
+    expect(trackEventMock).toHaveBeenCalledWith(
       'listings_browse',
       expect.objectContaining({ surface: 'home_locations' }),
       expect.anything(),
-    ));
+    );
   });
 
   it('emits listings browse analytics with query context', async () => {
@@ -63,17 +66,16 @@ describe('HomePage_Locations', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(trackEventMock).toHaveBeenCalledWith(
-        'listings_browse',
-        expect.objectContaining({
-          surface: 'home_locations',
-          checkIn: expect.stringContaining('2025-01-01'),
-          guests: 2,
-        }),
-        { route: '/?checkIn=2025-01-01T00%3A00%3A00.000Z&guests=2#our-homes' },
-      );
-    });
+    await settle();
+    expect(trackEventMock).toHaveBeenCalledWith(
+      'listings_browse',
+      expect.objectContaining({
+        surface: 'home_locations',
+        checkIn: expect.stringContaining('2025-01-01'),
+        guests: 2,
+      }),
+      { route: '/?checkIn=2025-01-01T00%3A00%3A00.000Z&guests=2#our-homes' },
+    );
   });
 
   it('preserves search params when navigating from listing CTAs', async () => {
@@ -86,7 +88,8 @@ describe('HomePage_Locations', () => {
     );
 
     // Guest-home v2: each card is a single tap target with a "See the home" link CTA
-    const cta = await screen.findAllByText(/see the (home|apartment|room|unit|property)/i);
+    await settle();
+    const cta = screen.getAllByText(/see the (home|apartment|room|unit|property)/i);
     fireEvent.click(cta[0]);
 
     const [navigateArgs] = navigateMock.mock.calls[0] ?? [];
@@ -99,11 +102,10 @@ describe('HomePage_Locations', () => {
     expect(decodeURIComponent(navigateArgs.search)).toContain('checkOut=2025-02-05T00:00:00.000Z');
     expect(decodeURIComponent(navigateArgs.search)).toContain('guests=4');
 
-    await waitFor(() => {
-      const selectionEvent = trackEventMock.mock.calls.find(([eventName]) => eventName === 'listing_selected');
-      expect(selectionEvent?.[1]).toEqual(
-        expect.objectContaining({ surface: 'home_locations', guests: 4 }),
-      );
-    });
+    await settle();
+    const selectionEvent = trackEventMock.mock.calls.find(([eventName]) => eventName === 'listing_selected');
+    expect(selectionEvent?.[1]).toEqual(
+      expect.objectContaining({ surface: 'home_locations', guests: 4 }),
+    );
   });
 });

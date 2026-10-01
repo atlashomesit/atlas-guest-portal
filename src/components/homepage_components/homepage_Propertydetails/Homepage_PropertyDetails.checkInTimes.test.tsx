@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Suspense } from 'react';
 import Homepage_PropertyDetails from './Homepage_PropertyDetails';
 import { resolveEffectiveListingAddress } from '../../../utils/listingAddress';
+import { settle } from '../../../test/settle';
 
 vi.mock('@/components/availability/UnitBookingWidget', () => ({
   __esModule: true,
@@ -115,15 +116,14 @@ describe('TASK-102020: Property page check-in / check-out time rendering', () =>
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      const checkInEls = screen.getAllByTestId('property-check-in-time');
-      expect(checkInEls.length).toBeGreaterThan(0);
-      expect(checkInEls[0].textContent).toContain('14:00');
+    await settle();
+    const checkInEls = screen.getAllByTestId('property-check-in-time');
+    expect(checkInEls.length).toBeGreaterThan(0);
+    expect(checkInEls[0].textContent).toContain('14:00');
 
-      const checkOutEl = screen.getByTestId('property-check-out-time');
-      expect(checkOutEl).toBeInTheDocument();
-      expect(checkOutEl.textContent).toBe('11:00');
-    });
+    const checkOutEl = screen.getByTestId('property-check-out-time');
+    expect(checkOutEl).toBeInTheDocument();
+    expect(checkOutEl.textContent).toBe('11:00');
   });
 
   it('renders check-in and check-out times when resolved via GET /listings/{id} API fallback', async () => {
@@ -157,14 +157,13 @@ describe('TASK-102020: Property page check-in / check-out time rendering', () =>
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      const checkInEls = screen.getAllByTestId('property-check-in-time');
-      expect(checkInEls.length).toBeGreaterThan(0);
-      expect(checkInEls[0].textContent).toContain('14:00');
+    await settle();
+    const checkInEls = screen.getAllByTestId('property-check-in-time');
+    expect(checkInEls.length).toBeGreaterThan(0);
+    expect(checkInEls[0].textContent).toContain('14:00');
 
-      const checkOutEl = screen.getByTestId('property-check-out-time');
-      expect(checkOutEl).toBeInTheDocument();
-      expect(checkOutEl.textContent).toBe('11:00');
-    });
+    const checkOutEl = screen.getByTestId('property-check-out-time');
+    expect(checkOutEl).toBeInTheDocument();
+    expect(checkOutEl.textContent).toBe('11:00');
   });
 });

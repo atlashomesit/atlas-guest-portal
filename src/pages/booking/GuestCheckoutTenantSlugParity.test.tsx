@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
 import { BookingProvider } from '@/contexts/BookingContext';
@@ -8,6 +8,7 @@ import UnitBookingWidget from '@/components/availability/UnitBookingWidget';
 import GuestDetailsPage from './GuestDetailsPage';
 import { toISODate } from '@/utils/dateRange';
 import { getIstStartOfDay } from '@/utils/date';
+import { settle } from '../../test/settle';
 
 // TASK-102017: Proving integration test that widget -> details navigation on a ?tenant= URL
 // carries the host tenant in both the route query string and BookingContext, ensuring that
@@ -94,11 +95,23 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    // beforeEach stubs `fetch` with vi.stubGlobal, which restoreAllMocks does not undo.
+    vi.unstubAllGlobals();
     Object.defineProperty(window, 'location', {
       value: originalLocation,
       writable: true,
       configurable: true,
     });
+    // TASK-102734: this file drives the whole checkout, so it ends with state a REUSED worker would hand to the next
+    // file: the checkout page rewrites the jsdom URL to `?tenant=qa-bot-c59de6` (history.replaceState), the hold and
+    // search draft sit in web storage, and `window.Razorpay` is a mock. Measured on the gate's batch pool: the next
+    // file got `navigate('/book/.../details?tenant=qa-bot-c59de6')` (UnitBookingWidgetReserveIdempotencyKey) or found
+    // the Razorpay SDK "already loaded" (GuestDetailsPage.razorpayPreload). Put all three back here, at the source;
+    // src/test/sharedWorkerHygiene.ts does the same for every file so the next leaker cannot bring it back.
+    window.history.replaceState(null, '', '/');
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    delete (window as { Razorpay?: unknown }).Razorpay;
   });
 
   it('drives widget -> details navigation on a ?tenant= URL and asserts the final-charge header matches the hold tenant', async () => {
@@ -191,20 +204,24 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
     );
 
     // Reserve button in widget
-    const reserveButton = await screen.findByTestId('guest-booking-submit');
-    await waitFor(() => expect(reserveButton).toBeEnabled());
+    await settle();
+    const reserveButton = screen.getByTestId('guest-booking-submit');
+    await settle();
+    expect(reserveButton).toBeEnabled();
 
     await act(async () => {
       fireEvent.click(reserveButton);
     });
 
     // 1. Assert init-hold call occurred and sent X-Tenant-Slug: qa-bot-c59de6
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(1);
     const initHoldHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
     expect(initHoldHeaders['X-Tenant-Slug']).toBe(tenantSlug);
 
     // 2. Assert navigation transitioned to GuestDetailsPage
-    await waitFor(() => expect(screen.getByTestId('guest-booking-name')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('guest-booking-name')).toBeInTheDocument();
 
     // Fill in guest details
     fireEvent.change(screen.getByTestId('guest-booking-name'), { target: { value: 'Jane Doe' } });
@@ -222,7 +239,8 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
     });
 
     // 3. Assert final-charge call occurred and ALSO sent X-Tenant-Slug: qa-bot-c59de6!
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(2));
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(2);
     const finalChargeHeaders = postSpy.mock.calls[1][2]?.headers as Record<string, string>;
     expect(finalChargeHeaders['X-Tenant-Slug']).toBe(tenantSlug);
   });
@@ -280,7 +298,8 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
       </BookingProvider>,
     );
 
-    await waitFor(() => expect(screen.getByTestId('guest-booking-name')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('guest-booking-name')).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('guest-booking-name'), { target: { value: 'Jane Doe' } });
     fireEvent.change(screen.getByTestId('guest-booking-email'), { target: { value: 'jane@example.com' } });
@@ -292,7 +311,8 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
       fireEvent.click(payButton);
     });
 
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(1);
     const finalChargeHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
     expect(finalChargeHeaders['X-Tenant-Slug']).toBe(tenantSlug);
   });

@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
 import { BookingProvider } from "../../../contexts/BookingContext";
 import Home from "../Home";
+import { settle } from "../../../test/settle";
 
 vi.mock("../../../tenant/tenantContext", () => ({
   getTenantContext: vi.fn(() => ({ slug: "atlas", isMarketplaceRoot: true })),
@@ -106,7 +107,8 @@ describe("Home", () => {
     const timedFindByText = async (label: string, matcher: RegExp) => {
       const started = performance.now();
       try {
-        return await screen.findByText(matcher);
+        await settle();
+        return screen.getByText(matcher);
       } finally {
         console.info(
           `[TASK-101855] ${label} findByText settled in ${(performance.now() - started).toFixed(0)}ms`,

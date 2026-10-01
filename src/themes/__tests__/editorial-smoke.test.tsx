@@ -17,7 +17,7 @@
  * other layout.
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   layoutThemeIds,
@@ -27,6 +27,7 @@ import {
 } from "../registry";
 import { getTenantContext } from "@/tenant/tenantContext";
 import { directBookingPriceClaim } from "@/tenant/paymentRail";
+import { settle } from "../../test/settle";
 
 // ---- Home.tsx's dependency surface ----
 vi.mock("@/components/home/ServicesSection", () => ({
@@ -153,9 +154,8 @@ describe("AC5/AC13 — editorial's Home renders the founder-specified text-forwa
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("editorial-home")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("editorial-home")).toBeInTheDocument();
 
     // Text-led masthead hero, inset (not full-bleed) media panel.
     expect(screen.getByTestId("editorial-hero")).toBeInTheDocument();

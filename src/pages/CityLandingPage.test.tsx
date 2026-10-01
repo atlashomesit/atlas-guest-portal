@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
@@ -15,6 +15,7 @@ vi.mock("@/api/client", () => ({ buildApiUrl: (p: string) => `https://api.test${
 import { fetchPublicListings } from "@/api/listingClient";
 import { _resetTenantResolutionForTests, setMarketplaceMode } from "@/tenant/tenantResolver";
 import CityLandingPage from "./CityLandingPage";
+import { settle } from "../test/settle";
 
 const goaListing = {
   id: 501,
@@ -48,13 +49,13 @@ describe("CityLandingPage", () => {
       </MemoryRouter>,
     );
 
+    await settle();
     expect(
-      await screen.findByRole("heading", { level: 1, name: /Homestays in Goa/i }),
+      screen.getByRole("heading", { level: 1, name: /Homestays in Goa/i }),
     ).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(screen.getByTestId("city-landing-listings")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("city-landing-listings")).toBeInTheDocument();
 
     expect(screen.getByText(/Garden-view room/i)).toBeInTheDocument();
     expect(fetchPublicListings).toHaveBeenCalledTimes(1);
@@ -107,13 +108,13 @@ describe("CityLandingPage", () => {
         </MemoryRouter>,
       );
 
+      await settle();
       expect(
-        await screen.findByRole("heading", { level: 1, name: /Homestays in Goa/i }),
+        screen.getByRole("heading", { level: 1, name: /Homestays in Goa/i }),
       ).toBeInTheDocument();
 
-      await waitFor(() => {
-        expect(screen.getByTestId("city-landing-listings")).toBeInTheDocument();
-      });
+      await settle();
+      expect(screen.getByTestId("city-landing-listings")).toBeInTheDocument();
 
       expect(screen.getByText(/Calangute Beach Villa/i)).toBeInTheDocument();
       // The tenant-scoped path must never be used on the marketplace host.

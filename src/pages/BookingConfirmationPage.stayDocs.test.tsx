@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import BookingConfirmationPage from "./BookingConfirmationPage";
+import { settle } from "../test/settle";
 
 vi.mock("../lib/events", () => ({ track: vi.fn() }));
 vi.mock("../components/SEO", () => ({ default: () => null }));
@@ -77,7 +78,8 @@ describe("BookingConfirmationPage TASK-102057 stay documents", () => {
     window.sessionStorage.setItem("booking_102057_payment_status", "success");
     mockSummaryFetch();
     renderPage();
-    expect(await screen.findByTestId("booking-confirmation-page")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId("booking-confirmation-page")).toBeInTheDocument();
     expect(screen.getByTestId("download-receipt-btn")).toBeInTheDocument();
     expect(screen.getByTestId("download-stay-guide-btn")).toBeInTheDocument();
   });
@@ -102,7 +104,8 @@ describe("BookingConfirmationPage TASK-102057 stay documents", () => {
     vi.spyOn(window, "open").mockImplementation(openMock);
 
     renderPage();
-    const btn = await screen.findByTestId("download-receipt-btn");
+    await settle();
+    const btn = screen.getByTestId("download-receipt-btn");
     fireEvent.click(btn);
 
     expect(openMock).toHaveBeenCalledTimes(1);
@@ -134,7 +137,8 @@ describe("BookingConfirmationPage TASK-102057 stay documents", () => {
     vi.spyOn(window, "open").mockImplementation(openMock);
 
     renderPage();
-    const btn = await screen.findByTestId("download-stay-guide-btn");
+    await settle();
+    const btn = screen.getByTestId("download-stay-guide-btn");
     fireEvent.click(btn);
 
     expect(openMock).toHaveBeenCalledTimes(1);
@@ -160,7 +164,8 @@ describe("BookingConfirmationPage TASK-102057 stay documents", () => {
     });
 
     renderPage();
-    await waitFor(() => expect(screen.queryByTestId("download-receipt-btn")).not.toBeInTheDocument());
+    await settle();
+    expect(screen.queryByTestId("download-receipt-btn")).not.toBeInTheDocument();
     expect(screen.queryByTestId("download-stay-guide-btn")).not.toBeInTheDocument();
   });
 });

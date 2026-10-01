@@ -4,11 +4,12 @@
  * state conveyed non-colour-only, and validation errors linked via
  * aria-describedby (WCAG 3.3.2).
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BookingProvider } from "@/contexts/BookingContext";
 import GuestDetailsPage from "./GuestDetailsPage";
+import { settle } from "../../test/settle";
 
 vi.mock("@/lib/events", () => ({ track: vi.fn() }));
 
@@ -42,7 +43,8 @@ async function renderPage() {
     </MemoryRouter>,
   );
   // wait for hold rehydration → form render
-  await waitFor(() => expect(document.getElementById("gd-details-form")).toBeInTheDocument());
+  await settle();
+  expect(document.getElementById("gd-details-form")).toBeInTheDocument();
   return result;
 }
 
@@ -91,9 +93,8 @@ describe("GuestDetailsPage form a11y", () => {
 
     fireEvent.submit(document.getElementById("gd-details-form")!);
 
-    await waitFor(() => {
-      expect(screen.getAllByRole("alert").length).toBeGreaterThanOrEqual(3);
-    });
+    await settle();
+    expect(screen.getAllByRole("alert").length).toBeGreaterThanOrEqual(3);
 
     const name = screen.getByLabelText(/full name/i);
     const email = screen.getByLabelText(/email/i);

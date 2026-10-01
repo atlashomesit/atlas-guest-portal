@@ -2,11 +2,12 @@
  * TASK-102395 — consent rows are full-card tap targets (≥48px), and clicking the
  * label text toggles the checkbox (no 12px-hitbox trap).
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BookingProvider } from "@/contexts/BookingContext";
 import GuestDetailsPage from "./GuestDetailsPage";
+import { settle } from "../../test/settle";
 
 vi.mock("@/lib/events", () => ({ track: vi.fn() }));
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -44,20 +45,23 @@ async function renderPage() {
       </BookingProvider>
     </MemoryRouter>,
   );
-  await waitFor(() => expect(document.getElementById("gd-details-form")).toBeInTheDocument());
+  await settle();
+  expect(document.getElementById("gd-details-form")).toBeInTheDocument();
 }
 
 describe("GuestDetailsPage consent hitbox (TASK-102395)", () => {
   test("consent row guarantees a 48px minimum touch target", async () => {
     await renderPage();
-    const row = await screen.findByTestId("guest-booking-consent-row");
+    await settle();
+    const row = screen.getByTestId("guest-booking-consent-row");
     const style = window.getComputedStyle(row);
     expect(parseFloat(style.minHeight)).toBeGreaterThanOrEqual(48);
   });
 
   test("clicking the label text toggles consent", async () => {
     await renderPage();
-    const row = await screen.findByTestId("guest-booking-consent-row");
+    await settle();
+    const row = screen.getByTestId("guest-booking-consent-row");
     expect(row).toHaveAttribute("aria-checked", "false");
     fireEvent.click(screen.getByText(/collecting and using my name/i));
     expect(row).toHaveAttribute("aria-checked", "true");

@@ -6,6 +6,7 @@ import tseslint from 'typescript-eslint'
 import noAtlasStringLeak from './eslint-rules/no-atlas-string-leak.js'
 import noCoerceNumericOnchange from './eslint-rules/no-coerce-numeric-onchange.cjs'
 import noUtcToday from './eslint-rules/no-utc-today.cjs'
+import noWallClockWait from './eslint-rules/no-wall-clock-wait.cjs'
 import requireErrorBeforeEmptyState from './eslint-rules/require-error-before-empty-state.cjs'
 
 export default tseslint.config(
@@ -26,6 +27,7 @@ export default tseslint.config(
         rules: {
           'no-coerce-numeric-onchange': noCoerceNumericOnchange,
           'no-utc-today': noUtcToday,
+          'no-wall-clock-wait': noWallClockWait,
           'require-error-before-empty-state': requireErrorBeforeEmptyState,
         },
       },
@@ -74,6 +76,11 @@ export default tseslint.config(
       'atlas/no-coerce-numeric-onchange': 'off',
       'atlas/no-utc-today': 'off',
       'atlas/require-error-before-empty-state': 'off',
+      // TASK-102734: the opposite of the exemptions above - tests are the ONLY place this rule applies. A default-timeout
+      // waitFor/findBy* polls a 1,000 ms wall-clock window that a starved worker can miss; drain with settle() from
+      // src/test/settle.ts instead. Existing uses are ratcheted per file in eslint-rules/no-wall-clock-wait.baseline.json
+      // (may only shrink; a new file starts at zero).
+      'atlas/no-wall-clock-wait': 'error',
     },
   },
   {

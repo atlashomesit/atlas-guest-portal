@@ -12,6 +12,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getIstCalendarDate } from '@/utils/date';
 import EmbedPage from './EmbedPage';
+import { settle } from '../test/settle';
 
 vi.mock('@/runtime-config', () => ({ getApiBaseUrl: () => 'https://api.example.test' }));
 vi.mock('@/api/client', () => ({
@@ -66,13 +67,16 @@ describe('TASK-102074: embed checkout trust badges', () => {
     ));
 
     renderEmbed('/embed/demo');
-    await screen.findByTestId('embed-date-guest');
+    await settle();
+    screen.getByTestId('embed-date-guest');
 
     fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
     fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Check pricing' }));
 
-    await screen.findByTestId('embed-guest-details');
+    await settle();
+    screen.getByTestId('embed-guest-details');
     expect(screen.getByRole('button', { name: 'Pay & book' })).toBeInTheDocument();
 
     const badgeRow = screen.getByTestId('embed-trust-badges');

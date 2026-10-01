@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ShortLinkRedirect from "./ShortLinkRedirect";
+import { settle } from "../test/settle";
 
 vi.mock("../tenant/displayBrand", () => ({
   getTenantBrandName: () => "Atlas",
@@ -30,7 +31,8 @@ describe("TASK-102019: ShortLinkRedirect tenant slug resolution", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText(/Taking you to Atlas Room 501/i)).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText(/Taking you to Atlas Room 501/i)).toBeInTheDocument();
     expect(screen.getByText("/property_details/atlas-homes-room-501?tenant=atlas")).toBeInTheDocument();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -63,9 +65,11 @@ describe("TASK-102019: ShortLinkRedirect tenant slug resolution", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText(/Taking you to Atlas/i)).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText(/Taking you to Atlas/i)).toBeInTheDocument();
+    await settle();
     expect(
-      await screen.findByText("/homes/qa-bot-homestay/637?tenant=qa-bot-c59de6")
+      screen.getByText("/homes/qa-bot-homestay/637?tenant=qa-bot-c59de6")
     ).toBeInTheDocument();
     expect(screen.queryByText("Link not found")).not.toBeInTheDocument();
   });
@@ -98,7 +102,8 @@ describe("TASK-102019: ShortLinkRedirect tenant slug resolution", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("/?tenant=fresh-host")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText("/?tenant=fresh-host")).toBeInTheDocument();
     expect(screen.queryByText("Link not found")).not.toBeInTheDocument();
   });
 
@@ -115,6 +120,7 @@ describe("TASK-102019: ShortLinkRedirect tenant slug resolution", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText("Link not found")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText("Link not found")).toBeInTheDocument();
   });
 });

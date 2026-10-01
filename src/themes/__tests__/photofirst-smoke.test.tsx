@@ -15,7 +15,7 @@
  * other layout.
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   DEFAULT_LAYOUT_THEME_ID,
@@ -24,6 +24,7 @@ import {
   resolveLayoutThemeId,
   themeRegistry,
 } from "../registry";
+import { settle } from "../../test/settle";
 
 // ---- Home.tsx's dependency surface (shared by classic/heritage/noir/coastal/photoFirst Home) ----
 vi.mock("@/components/home/ServicesSection", () => ({
@@ -134,9 +135,8 @@ describe("TASK-4925 — photoFirst's Home renders the founder-specified near-zer
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("photofirst-home")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("photofirst-home")).toBeInTheDocument();
     expect(screen.getByTestId("photofirst-hero")).toBeInTheDocument();
     expect(screen.getByTestId("photofirst-hero-scrim")).toBeInTheDocument();
     // noir's eyebrow badge / glass hero-widget card are not part of photoFirst's near-zero-chrome
@@ -152,9 +152,8 @@ describe("TASK-4925 — photoFirst's Home renders the founder-specified near-zer
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("photofirst-listings-stack")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("photofirst-listings-stack")).toBeInTheDocument();
     expect(screen.getByTestId("photofirst-stack-frame")).toBeInTheDocument();
     expect(screen.getByRole("list", { name: /available to book/i })).toBeInTheDocument();
     // getListingDisplayName() maps property id 202 -> "Suite 202" (SKU/floor-id display-name
@@ -171,9 +170,8 @@ describe("TASK-4925 — photoFirst's Home renders the founder-specified near-zer
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("photofirst-sticky-booking-bar")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("photofirst-sticky-booking-bar")).toBeInTheDocument();
     expect(screen.getByText("SearchAvailabilityWidget stub")).toBeInTheDocument();
     // The widget's mount point keeps the shared `id="search-form"` anchor id every other
     // layout's hero widget already uses, so the shared "scroll to booking" behavior still works.

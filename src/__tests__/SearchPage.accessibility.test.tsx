@@ -4,13 +4,14 @@
  * without it and are never labelled accessible.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import { CurrencyProvider } from '../contexts/CurrencyContext';
 import SearchPage from '../pages/SearchPage';
 import type { PublicListing } from '../api/listingClient';
+import { settle } from '../test/settle';
 
 const declared: PublicListing = {
   id: 100861,
@@ -69,9 +70,8 @@ describe('SearchPage — accessibility needs filter (TASK-10086)', () => {
   it('renders the Accessibility needs group with the v1 trio', async () => {
     renderSearch('/search');
 
-    const group = await screen.findByTestId('search-accessibility-filters', undefined, {
-      timeout: 15_000,
-    });
+    await settle();
+    const group = screen.getByTestId('search-accessibility-filters');
     expect(group).toHaveTextContent(/accessibility needs/i);
     expect(group).toHaveTextContent(/step-free entrance/i);
     expect(group).toHaveTextContent(/lift\/elevator access/i);
@@ -81,9 +81,8 @@ describe('SearchPage — accessibility needs filter (TASK-10086)', () => {
   it('shows both listings without the filter and never labels the undeclared one accessible', async () => {
     renderSearch('/search');
 
-    const cards = await screen.findAllByTestId('guest-listing-card', undefined, {
-      timeout: 15_000,
-    });
+    await settle();
+    const cards = screen.getAllByTestId('guest-listing-card');
     expect(cards).toHaveLength(2);
     expect(screen.getByText('Step-Free Villa')).toBeInTheDocument();
     expect(screen.getByText('Standard Room')).toBeInTheDocument();
@@ -94,12 +93,8 @@ describe('SearchPage — accessibility needs filter (TASK-10086)', () => {
   it('returns only declared listings when the filter is URL-selected', async () => {
     renderSearch('/search?amenities=step-free-entrance');
 
-    await waitFor(
-      () => {
-        expect(screen.getAllByTestId('guest-listing-card')).toHaveLength(1);
-      },
-      { timeout: 15_000 },
-    );
+    await settle();
+    expect(screen.getAllByTestId('guest-listing-card')).toHaveLength(1);
     expect(screen.getByText('Step-Free Villa')).toBeInTheDocument();
     expect(screen.queryByText('Standard Room')).not.toBeInTheDocument();
     expect(screen.getByTestId('search-active-filter-chips')).toHaveTextContent(/step-free entrance/i);
@@ -108,12 +103,12 @@ describe('SearchPage — accessibility needs filter (TASK-10086)', () => {
   it('toggling a chip keeps the URL-backed filter state in sync', async () => {
     renderSearch('/search');
 
-    await screen.findAllByTestId('guest-listing-card', undefined, { timeout: 15_000 });
+    await settle();
+    screen.getAllByTestId('guest-listing-card');
     fireEvent.click(screen.getByRole('button', { name: /accessible parking/i }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('1');
-    });
+    await settle();
+    expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('1');
     expect(screen.getByTestId('search-active-filter-chips')).toHaveTextContent(/accessible parking/i);
     expect(screen.queryByTestId('guest-listing-card')).not.toBeInTheDocument();
   });

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import AvailabilityCalendar from './AvailabilityCalendar';
+import { settle } from '../test/settle';
 
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), booking: {} as Record<string, unknown> }));
 vi.mock('@/api/client', () => ({ buildApiUrl: (path: string) => `http://localhost:5120${path}`, getApiHeaders: () => ({}) }));
@@ -24,8 +25,10 @@ describe('GUEST-011 listing calendar keyboard navigation', () => {
     render(<><button>Before calendar</button><AvailabilityCalendar listingId={7} onDateSelect={select} /><button>After calendar</button></>);
     const before = screen.getByRole('button', { name: 'Before calendar' });
     before.focus();
-    const grid = await screen.findByRole('grid', { name: 'September 2026 availability' });
-    await waitFor(() => expect(dateCell(28)).toHaveAttribute('tabindex', '0'));
+    await settle();
+    const grid = screen.getByRole('grid', { name: 'September 2026 availability' });
+    await settle();
+    expect(dateCell(28)).toHaveAttribute('tabindex', '0');
     expect(before).toHaveFocus();
     expect(screen.getAllByRole('grid')).toHaveLength(2);
     expect(within(grid).getAllByRole('columnheader')[0]).toHaveAccessibleName('Monday');
@@ -44,7 +47,8 @@ describe('GUEST-011 listing calendar keyboard navigation', () => {
     ]));
     const select = vi.fn();
     render(<AvailabilityCalendar listingId={7} onDateSelect={select} />);
-    await waitFor(() => expect(dateCell(28)).toBeEnabled());
+    await settle();
+    expect(dateCell(28)).toBeEnabled();
     dateCell(28).focus();
     fireEvent.keyDown(dateCell(28), { key: 'ArrowRight' });
     expect(dateCell(2, 'October')).toHaveFocus();
@@ -61,7 +65,8 @@ describe('GUEST-011 listing calendar keyboard navigation', () => {
 
   it('uses Monday/Sunday week boundaries and seven-day navigation, clamped to the displayed months', async () => {
     render(<AvailabilityCalendar listingId={7} onDateSelect={vi.fn()} />);
-    await waitFor(() => expect(dateCell(28)).toBeEnabled());
+    await settle();
+    expect(dateCell(28)).toBeEnabled();
     dateCell(28).focus();
     fireEvent.keyDown(dateCell(28), { key: 'ArrowDown' });
     expect(dateCell(5, 'October')).toHaveFocus();
@@ -86,7 +91,8 @@ describe('GUEST-011 listing calendar keyboard navigation', () => {
     expect(dateCell(28)).toBeDisabled();
     expect(document.querySelectorAll('[data-calendar-date][tabindex="0"]')).toHaveLength(0);
     resolve(response([]));
-    await waitFor(() => expect(dateCell(28)).toBeEnabled());
+    await settle();
+    expect(dateCell(28)).toBeEnabled();
     mocks.booking = { paymentHoldBookingId: 42, paymentHoldToken: 'synthetic', holdExpiresAt: new Date(Date.now() + 900_000).toISOString() };
     view.rerender(<AvailabilityCalendar listingId={7} onDateSelect={select} />);
     expect(dateCell(28)).toBeDisabled();
@@ -99,7 +105,8 @@ describe('GUEST-011 listing calendar keyboard navigation', () => {
   it('does not expose selectable dates after a malformed availability response', async () => {
     mocks.fetch.mockResolvedValue(response({ unexpected: 'not a calendar' }));
     render(<AvailabilityCalendar listingId={7} onDateSelect={vi.fn()} />);
-    await screen.findByTestId('availability-calendar-error');
+    await settle();
+    screen.getByTestId('availability-calendar-error');
     expect(screen.queryByRole('grid')).not.toBeInTheDocument();
   });
 });

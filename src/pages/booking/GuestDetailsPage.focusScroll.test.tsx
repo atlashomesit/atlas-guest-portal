@@ -1,11 +1,12 @@
 /**
  * TASK-102394 — focused checkout fields scroll into view above the mobile keyboard.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BookingProvider } from "@/contexts/BookingContext";
 import GuestDetailsPage from "./GuestDetailsPage";
+import { settle } from "../../test/settle";
 
 vi.mock("@/lib/events", () => ({ track: vi.fn() }));
 
@@ -49,9 +50,11 @@ describe("GuestDetailsPage focus scroll (TASK-102394)", () => {
           </BookingProvider>
         </MemoryRouter>,
       );
-      const input = await screen.findByTestId(testid);
+      await settle();
+      const input = screen.getByTestId(testid);
       fireEvent.focus(input);
-      await waitFor(() => expect(scrollSpy).toHaveBeenCalled());
+      await settle();
+      expect(scrollSpy).toHaveBeenCalled();
       expect(scrollSpy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
     },
   );

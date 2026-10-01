@@ -196,10 +196,17 @@ const workerCap =
       ? { maxWorkers: 2 }
       : {};
 
+// Setup files are re-executed for EVERY test file in every project. The reset file goes FIRST (TASK-102734): a worker
+// that is reused across files (`shared-fast`, and `mocked-isolated` under the gate's batch pool) keeps its jsdom, so the
+// URL, web storage, cookies, window stubs, queued `vi.mock`s and in-flight route imports of the previous file are still
+// there, and modules that read them while being evaluated must see them reset. See src/test/sharedWorkerHygiene.ts for
+// the measured victims and scripts/vitest-gate-batch-hygiene.self-test.mjs (run by `npm run test:gate`) for the guard.
+const sharedWorkerSetupFiles = ["./src/test/sharedWorkerResetSetup.ts", "./src/test/setup.ts"];
+
 const baseTest = {
   environment: "jsdom" as const,
   globals: true,
-  setupFiles: ["./src/test/setup.ts"],
+  setupFiles: sharedWorkerSetupFiles,
   deps: {
     inline: ["react-router", "react-router-dom"],
   },

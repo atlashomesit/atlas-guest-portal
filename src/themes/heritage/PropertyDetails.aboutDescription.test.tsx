@@ -5,11 +5,12 @@
  * exists. Kept in its own file — rendering both layouts in one run exhausts the worker heap (see
  * ac7-layout-theme-switch.test.tsx).
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Suspense } from 'react';
 import HeritagePropertyDetails from './PropertyDetails';
+import { settle } from '../../test/settle';
 
 vi.mock('@/components/availability/UnitBookingWidget', () => ({
   __esModule: true,
@@ -120,7 +121,8 @@ describe('Heritage listing page "About this home" shows the host description fro
 
     render(page());
 
-    const about = await screen.findByTestId('property-about-description');
+    await settle();
+    const about = screen.getByTestId('property-about-description');
     expect(about.className).toContain('whitespace-pre-wrap');
     expect(about.textContent).toContain('\n\n✨ Highlights\n\n🏡 Entire private 2BHK');
     expect(about.textContent).toMatch(/…$/);
@@ -135,7 +137,8 @@ describe('Heritage listing page "About this home" shows the host description fro
 
     render(page());
 
-    expect(await screen.findByTestId('property-about-description')).toHaveTextContent('Stylish 2BHK near UB City.');
+    await settle();
+    expect(screen.getByTestId('property-about-description')).toHaveTextContent('Stylish 2BHK near UB City.');
   });
 
   it('shows "Ask them about this home" only once GET /listings/{id} confirms the host wrote neither', async () => {
@@ -144,12 +147,14 @@ describe('Heritage listing page "About this home" shows the host description fro
 
     render(page());
 
-    await screen.findByTestId('property-about-section');
+    await settle();
+    screen.getByTestId('property-about-section');
     expect(screen.queryByTestId('property-about-ask-host')).not.toBeInTheDocument();
 
     answer({ id: 637, longDescription: null, shortDescription: null });
 
-    expect(await screen.findByTestId('property-about-ask-host')).toHaveTextContent(/hasn.t added a description yet/i);
+    await settle();
+    expect(screen.getByTestId('property-about-ask-host')).toHaveTextContent(/hasn.t added a description yet/i);
   });
 
   it('keeps the description when the list re-resolve replaces the page row', async () => {
@@ -157,12 +162,14 @@ describe('Heritage listing page "About this home" shows the host description fro
     mockFetchListingById.mockResolvedValue({ id: 637, longDescription: 'Host-written description.' });
 
     const { rerender } = render(page());
-    expect(await screen.findByTestId('property-about-description')).toHaveTextContent('Host-written description.');
+    await settle();
+    expect(screen.getByTestId('property-about-description')).toHaveTextContent('Host-written description.');
 
     mockUseTenantListings.mockReturnValue(listState([{ ...LIST_ROW }]));
     rerender(page());
 
-    await waitFor(() => expect(screen.getAllByTestId('property-check-in-time').length).toBeGreaterThan(0));
+    await settle();
+    expect(screen.getAllByTestId('property-check-in-time').length).toBeGreaterThan(0);
     expect(screen.getByTestId('property-about-description')).toHaveTextContent('Host-written description.');
   });
 });

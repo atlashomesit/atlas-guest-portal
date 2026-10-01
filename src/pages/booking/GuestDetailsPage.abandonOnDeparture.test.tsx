@@ -6,11 +6,13 @@
  * abandon-checkout POST on a live hold is its own defect, so these tests pin idempotency
  * across every combination, not just that a call happens.
  */
-import { act, cleanup, render, waitFor } from '@testing-library/react';
+import { act, cleanup, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingProvider } from '@/contexts/BookingContext';
 import GuestDetailsPage from './GuestDetailsPage';
+import { settle } from '../../test/settle';
+import { restoreDocumentVisibility } from '../../test/sharedWorkerHygiene';
 
 // jsdom doesn't implement scrollIntoView (used by the page's focus-first-error handler)
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -43,7 +45,8 @@ async function renderPage() {
       </BookingProvider>
     </MemoryRouter>,
   );
-  await waitFor(() => expect(document.getElementById('gd-details-form')).toBeInTheDocument());
+  await settle();
+  expect(document.getElementById('gd-details-form')).toBeInTheDocument();
   return result;
 }
 
@@ -69,6 +72,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.useRealTimers();
+  // setVisibility() pins the property on the shared jsdom document; without this the next file this worker runs
+  // starts with a hidden tab (TASK-102734 - it made useTenantProcessingFee.test.tsx read null forever).
+  restoreDocumentVisibility();
 });
 
 describe('GuestDetailsPage TASK-8219 abandon-on-departure', () => {
@@ -79,7 +85,8 @@ describe('GuestDetailsPage TASK-8219 abandon-on-departure', () => {
       window.dispatchEvent(new Event('pagehide'));
     });
 
-    await waitFor(() => expect(abandonCalls().length).toBe(1));
+    await settle();
+    expect(abandonCalls().length).toBe(1);
     const [url] = abandonCalls()[0]!;
     expect(String(url)).toContain('/bookings/42/abandon-checkout');
     expect(String(url)).toContain('t=hold-token-42');
@@ -91,7 +98,8 @@ describe('GuestDetailsPage TASK-8219 abandon-on-departure', () => {
     act(() => {
       window.dispatchEvent(new Event('pagehide'));
     });
-    await waitFor(() => expect(abandonCalls().length).toBe(1));
+    await settle();
+    expect(abandonCalls().length).toBe(1);
 
     unmount();
 
@@ -114,7 +122,8 @@ describe('GuestDetailsPage TASK-8219 abandon-on-departure', () => {
       window.dispatchEvent(new Event('pagehide'));
     });
 
-    await waitFor(() => expect(abandonCalls().length).toBe(1));
+    await settle();
+    expect(abandonCalls().length).toBe(1);
   });
 
   it('debounces visibilitychange so a quick tab switch does not abandon the hold', async () => {

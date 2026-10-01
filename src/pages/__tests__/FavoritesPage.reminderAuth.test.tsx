@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GuestAuthContext, type GuestAuthState } from '@/contexts/GuestAuthContext';
 import { getTenantSlug, setDomainResolvedSlug } from '@/tenant/tenantResolver';
 import FavoritesPage from '../FavoritesPage';
+import { settle } from '../../test/settle';
 
 vi.mock('@/components/SEO', () => ({ default: () => null }));
 vi.mock('@/tenant/displayBrand', () => ({ getTenantBrandName: () => 'Test Stays' }));
@@ -46,11 +47,13 @@ describe('GUEST-010 saved-home reminder account scope', () => {
   it('prefills the signed-in email despite a different legacy stored address, and sends only on explicit submit', async () => {
     localStorage.setItem('atlas_guest_email', 'previous-account@example.test');
     render(page());
-    const input = await screen.findByRole('textbox', { name: 'Reminder email address' });
+    await settle();
+    const input = screen.getByRole('textbox', { name: 'Reminder email address' });
     expect(input).toHaveValue('guest@example.test');
     expect(posts()).toHaveLength(0);
     fireEvent.submit(input.closest('form')!);
-    await screen.findByRole('status');
+    await settle();
+    screen.getByRole('status');
     expect(posts()).toHaveLength(1);
     expect(JSON.parse(posts()[0][1]!.body as string)).toEqual({ guestEmail: 'guest@example.test', listingId: 11 });
     expect(localStorage.getItem('atlas_guest_email')).toBe('previous-account@example.test');
@@ -58,7 +61,8 @@ describe('GUEST-010 saved-home reminder account scope', () => {
 
   it('keeps an edit within the same account and resets it for account, logout, and tenant changes', async () => {
     const view = render(page());
-    const input = await screen.findByRole('textbox', { name: 'Reminder email address' });
+    await settle();
+    const input = screen.getByRole('textbox', { name: 'Reminder email address' });
     fireEvent.change(input, { target: { value: 'travel@example.test' } });
     view.rerender(page({ ...signedIn(), token: 'refreshed-token' }));
     expect(input).toHaveValue('travel@example.test');
@@ -78,7 +82,8 @@ describe('GUEST-010 saved-home reminder account scope', () => {
     fetchMock.mockImplementation(async (_url, options) => options?.method === 'POST'
       ? new Promise<Response>((resolve) => { finish = resolve; }) : ({ ok: true } as Response));
     const view = render(page());
-    const input = await screen.findByRole('textbox', { name: 'Reminder email address' });
+    await settle();
+    const input = screen.getByRole('textbox', { name: 'Reminder email address' });
     fireEvent.submit(input.closest('form')!);
     fireEvent.submit(input.closest('form')!);
     expect(posts()).toHaveLength(1);
@@ -90,7 +95,8 @@ describe('GUEST-010 saved-home reminder account scope', () => {
     expect(screen.getByRole('textbox')).toHaveValue('next@example.test');
     fetchMock.mockResolvedValue({ ok: true } as Response);
     fireEvent.submit(screen.getByRole('textbox').closest('form')!);
-    await screen.findByRole('status');
+    await settle();
+    screen.getByRole('status');
     view.rerender(page(signedOut));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.getByRole('textbox')).toHaveValue('');
@@ -99,19 +105,22 @@ describe('GUEST-010 saved-home reminder account scope', () => {
 
   it('waits for native auth hydration, accepts an edited email, and preserves it for a failed retry', async () => {
     const view = render(page(signedOut, true));
-    await screen.findByText('Garden home');
+    await settle();
+    screen.getByText('Garden home');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     view.rerender(page());
     const input = screen.getByRole('textbox');
     fireEvent.change(input, { target: { value: 'Travel@Example.test' } });
     fetchMock.mockResolvedValue({ ok: false } as Response);
     fireEvent.submit(input.closest('form')!);
-    await screen.findByRole('alert');
+    await settle();
+    screen.getByRole('alert');
     expect(input).toHaveValue('Travel@Example.test');
     expect(screen.getByRole('button', { name: 'Remind me' })).toBeEnabled();
     expect(JSON.parse(posts()[0][1]!.body as string).guestEmail).toBe('travel@example.test');
     fetchMock.mockResolvedValue({ ok: true } as Response);
     fireEvent.submit(input.closest('form')!);
-    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('7 days'));
+    await settle();
+    expect(screen.getByRole('status')).toHaveTextContent('7 days');
   });
 });

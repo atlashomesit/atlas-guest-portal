@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, test, vi, type Mock } from "vitest";
 import SelfCheckIn from "./SelfCheckIn";
+import { settle } from "../test/settle";
 
 vi.mock("../components/SEO", () => ({ default: () => null }));
 
@@ -59,7 +60,8 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     // On summary step
-    await waitFor(() => expect(screen.getByText("Atlas Stay")).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText("Atlas Stay")).toBeInTheDocument();
 
     const guestCountInput = screen.getByLabelText(/number of guests \*/i);
     expect(guestCountInput).toBeInTheDocument();
@@ -70,7 +72,8 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     // Should display error and remain on summary step
-    expect(await screen.findByText(/please enter the number of guests/i)).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText(/please enter the number of guests/i)).toBeInTheDocument();
     expect(screen.queryByText(/government id verification/i)).not.toBeInTheDocument();
   });
 
@@ -93,7 +96,8 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     });
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
-    await waitFor(() => expect(screen.getByText("Atlas Stay")).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText("Atlas Stay")).toBeInTheDocument();
 
     // Enter guest count = 2 and continue
     const guestCountInput = screen.getByLabelText(/number of guests \*/i);
@@ -101,7 +105,8 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     // Verify ID step rendered with 2 guest cards
-    await waitFor(() => expect(screen.getByText(/government id verification/i)).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText(/government id verification/i)).toBeInTheDocument();
     expect(screen.getByTestId("guest-card-0")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /guest 1 \(primary guest\)/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /guest 2/i })).toBeInTheDocument();
@@ -120,7 +125,8 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     // Verify Guest 1 via DigiLocker
     const digilockerBtn = screen.getByTestId("aadhaar-vc-scan-button");
     fireEvent.click(digilockerBtn);
-    expect(await screen.findByText(/aadhaar verified via digilocker/i)).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText(/aadhaar verified via digilocker/i)).toBeInTheDocument();
 
     // Fill Guest 2 details
     const guest2Card = screen.getByTestId("guest-card-1");
@@ -142,7 +148,8 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     const sendOtpBtn = screen.getByRole("button", { name: /send otp/i });
     fireEvent.click(sendOtpBtn);
 
-    expect(await screen.findByText(/otp sent to 9876543210/i)).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText(/otp sent to 9876543210/i)).toBeInTheDocument();
 
     // Enter 6-digit OTP and verify
     const guest2Otp = guest2Card.querySelector("#checkin-otp-1") as HTMLInputElement;
@@ -150,11 +157,13 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     const verifyOtpBtn = screen.getByRole("button", { name: /verify otp/i });
     fireEvent.click(verifyOtpBtn);
 
-    expect(await screen.findByText(/passport verified via otp/i)).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText(/passport verified via otp/i)).toBeInTheDocument();
 
     // Click Continue to proceed to house rules
     fireEvent.click(screen.getByRole("button", { name: /continue →/i }));
-    await waitFor(() => expect(screen.getByRole("heading", { name: /house rules/i })).toBeInTheDocument());
+    await settle();
+    expect(screen.getByRole("heading", { name: /house rules/i })).toBeInTheDocument();
   });
 
   test("supports pasting 6-digit OTP and automatically advances to next step on verification", async () => {
@@ -176,13 +185,15 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     });
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
-    await waitFor(() => expect(screen.getByText("Atlas Stay")).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText("Atlas Stay")).toBeInTheDocument();
 
     // Continue from summary step
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
 
     // On ID step
-    await waitFor(() => expect(screen.getByText(/government id verification/i)).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText(/government id verification/i)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Full name (as on ID) *"), {
       target: { value: "Alice Smith" },
     });
@@ -202,7 +213,8 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     fireEvent.change(phoneInput, { target: { value: "9876543210" } });
     fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
 
-    expect(await screen.findByText(/otp sent to 9876543210/i)).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText(/otp sent to 9876543210/i)).toBeInTheDocument();
 
     // Paste 6-digit OTP
     const otpInput = screen.getByLabelText(/enter or paste 6-digit otp/i);
@@ -213,14 +225,19 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     });
     expect((otpInput as HTMLInputElement).value).toBe("998877");
 
-    // Click verify OTP
-    fireEvent.click(screen.getByRole("button", { name: /verify otp/i }));
-
-    // Auto-advances to house rules
-    await waitFor(
-      () => expect(screen.getByRole("heading", { name: /house rules/i })).toBeInTheDocument(),
-      { timeout: 2000 },
-    );
+    // Click verify OTP. The page advances to house rules from its OWN 500 ms timer (SelfCheckIn.tsx), so the test
+    // owns that clock for this step: fake timers, then advance exactly that delay. (This used to race a 2 s
+    // wall-clock waitFor window, a timeout bump around the same 500 ms timer.)
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(screen.getByRole("button", { name: /verify otp/i }));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(500);
+      });
+      expect(screen.getByRole("heading", { name: /house rules/i })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

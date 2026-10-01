@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 
@@ -30,6 +30,7 @@ vi.mock("../../api/listingClient", async (importOriginal) => {
 
 import Home from "./Home";
 import { BookingProvider } from "../../contexts/BookingContext";
+import { settle } from "../../test/settle";
 
 describe("Homepage layout", () => {
   it(
@@ -45,11 +46,9 @@ describe("Homepage layout", () => {
       );
 
       // HomePage_Locations uses `Our ${unitNoun.capitalPlural}` (e.g. Our Homestays), not the literal "Our Homes".
-      const ourHomesSection = await waitFor(() => {
-        const el = document.querySelector("section.scroll-mt-28#our-homes");
-        if (!el) throw new Error("our-homes section not mounted yet");
-        return el;
-      });
+      await settle();
+      const ourHomesSection = document.querySelector("section.scroll-mt-28#our-homes");
+      if (!ourHomesSection) throw new Error("our-homes section not mounted yet");
       expect(ourHomesSection).toBeInTheDocument();
       expect(
         within(ourHomesSection as HTMLElement).getByRole("heading", { level: 2, name: /^our /i }),

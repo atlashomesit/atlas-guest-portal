@@ -1,10 +1,11 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import axios, { AxiosError } from 'axios';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
 import { toISODate } from '@/utils/dateRange';
 import { getIstStartOfDay } from '@/utils/date';
+import { settle } from '../../test/settle';
 
 // TASK-8218 proving test: handleReserve must hold its Idempotency-Key steady across a retry of
 // the SAME (listingId, checkIn, checkOut, guests) attempt, and must mint a NEW key the moment any
@@ -116,8 +117,10 @@ describe('UnitBookingWidget - TASK-8218: Reserve idempotency key is stable acros
       </MemoryRouter>,
     );
 
-    const reserve = await screen.findByTestId('guest-booking-submit');
-    await waitFor(() => expect(reserve).toBeEnabled());
+    await settle();
+    const reserve = screen.getByTestId('guest-booking-submit');
+    await settle();
+    expect(reserve).toBeEnabled();
     return reserve;
   };
 
@@ -133,12 +136,13 @@ describe('UnitBookingWidget - TASK-8218: Reserve idempotency key is stable acros
     } });
     const reserve = await renderWidget();
     await act(async () => { fireEvent.click(reserve); });
-    await waitFor(() => expect(ctx.updateBooking).toHaveBeenCalledWith(expect.objectContaining({
+    await settle();
+    expect(ctx.updateBooking).toHaveBeenCalledWith(expect.objectContaining({
       holdPriceBreakdown: expect.objectContaining({
         finalAmount: 10125,
         paymentFeeDisplay: { percent: percent ?? null, amount: amount ?? null },
       }),
-    })));
+    }));
   });
 
   it('reuses the SAME Idempotency-Key on a retry after a lost/timed-out response (same listing/dates/guests)', async () => {
@@ -158,13 +162,15 @@ describe('UnitBookingWidget - TASK-8218: Reserve idempotency key is stable acros
       fireEvent.click(reserve);
     });
     // First call failed; the guest is shown an error and Reserve becomes clickable again.
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByTestId('guest-booking-submit')).toBeEnabled());
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
 
     await act(async () => {
       fireEvent.click(reserve);
     });
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(2));
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(2);
 
     const firstHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
     const secondHeaders = postSpy.mock.calls[1][2]?.headers as Record<string, string>;
@@ -175,7 +181,8 @@ describe('UnitBookingWidget - TASK-8218: Reserve idempotency key is stable acros
     expect(secondHeaders['Idempotency-Key']).toBe(firstHeaders['Idempotency-Key']);
 
     // The retry succeeded and the guest proceeded to the details page — never "no longer available".
-    await waitFor(() => expect(navigateSpy).toHaveBeenCalledWith('/book/atlas501-ph/ph/details'));
+    await settle();
+    expect(navigateSpy).toHaveBeenCalledWith('/book/atlas501-ph/ph/details');
     expect(screen.queryByText(/no longer available/i)).toBeNull();
   });
 
@@ -192,8 +199,9 @@ describe('UnitBookingWidget - TASK-8218: Reserve idempotency key is stable acros
     await act(async () => {
       fireEvent.click(reserve);
     });
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(screen.getByTestId('guest-booking-submit')).toBeEnabled());
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
 
     // Guest bumps the guest count before retrying — this is a genuinely different booking
     // attempt and must never be deduped against the failed one's key.
@@ -207,7 +215,8 @@ describe('UnitBookingWidget - TASK-8218: Reserve idempotency key is stable acros
     await act(async () => {
       fireEvent.click(reserve);
     });
-    await waitFor(() => expect(postSpy).toHaveBeenCalledTimes(2));
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(2);
 
     const firstHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
     const secondHeaders = postSpy.mock.calls[1][2]?.headers as Record<string, string>;

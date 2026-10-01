@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import MyDataPage from "./MyDataPage";
+import { settle } from "../test/settle";
 
 vi.mock("../components/SEO", () => ({ default: () => null }));
 vi.mock("@/tenant/displayBrand", () => ({
@@ -53,7 +54,8 @@ describe("MyDataPage — TASK-7204 DPDP export categories", () => {
 
     renderPage();
 
-    await waitFor(() => expect(screen.getByTestId("my-data-export")).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId("my-data-export")).toBeInTheDocument();
     expect(screen.getByTestId("my-data-bookings")).toHaveTextContent("Bookings (1)");
     expect(screen.getByTestId("my-data-communication-logs")).toHaveTextContent("Communication logs (1)");
     expect(screen.getByTestId("my-data-reviews")).toHaveTextContent("Reviews (1)");

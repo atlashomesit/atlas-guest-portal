@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import axios, { AxiosError } from 'axios';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
 import {
@@ -11,6 +11,7 @@ import {
 } from './unitBookingPaymentOrderErrors';
 import { toISODate } from '@/utils/dateRange';
 import { getIstStartOfDay } from '@/utils/date';
+import { settle } from '../../test/settle';
 
 // ---- TASK-4303 render-test mocks (hoisted; only the render suite below imports the widget) ----
 const task4303 = vi.hoisted(() => ({
@@ -584,7 +585,8 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
     );
 
     // While per-date pricing is unresolved: skeletons, and NO Total row / provisional numbers.
-    await screen.findByTestId('bw-price-pending');
+    await settle();
+    screen.getByTestId('bw-price-pending');
     expect(screen.getByTestId('bw-breakdown-pending')).toBeInTheDocument();
     expect(screen.queryByText('Total')).toBeNull();
     // The stale provisional numbers from the base rate (₹6,000 × 2 → ₹12,000 / ₹12,600) must never render.
@@ -600,7 +602,8 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
 
     // Settled: base ₹6,500 × 2 = ₹13,000; GST = ₹0 (ADR-0107); fee 3% × ₹13,000 = ₹390 (base only,
     // TASK-4913 founder-ruled 2026-07-17 option c); Total ₹13,390.
-    const totalLabel = await screen.findByText('Total');
+    await settle();
+    const totalLabel = screen.getByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
     expect(totalValue.replace(/[^0-9]/g, '')).toBe('13390');
     // Headline total matches the breakdown total — the FIRST total ever rendered IS the settled one
@@ -703,7 +706,8 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
     await renderWidget();
 
     // Fail-closed: error surfaced, retry offered, Reserve disabled and labelled "Unavailable".
-    await screen.findByTestId('guest-booking-availability-error');
+    await settle();
+    screen.getByTestId('guest-booking-availability-error');
     expect(screen.getByTestId('guest-booking-availability-retry')).toBeInTheDocument();
     const reserve = screen.getByTestId('guest-booking-submit');
     expect(reserve).toBeDisabled();
@@ -719,7 +723,8 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
 
     await renderWidget();
 
-    const retry = await screen.findByTestId('guest-booking-availability-retry');
+    await settle();
+    const retry = screen.getByTestId('guest-booking-availability-retry');
     expect(screen.getByTestId('guest-booking-submit')).toBeDisabled();
 
     await act(async () => {
@@ -728,9 +733,8 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
 
     // After a successful retry the error clears and — with no blocking date selection — Reserve
     // is enabled again (blank dates stay clickable per TASK-4277; availabilityFailed was the only gate).
-    await waitFor(() => {
-      expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
-    });
+    await settle();
+    expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });
@@ -835,7 +839,8 @@ describe('UnitBookingWidget - TASK-4725: "Extra guest fee" row deleted (server n
       </MemoryRouter>,
     );
 
-    await screen.findByText('Total');
+    await settle();
+    screen.getByText('Total');
     expect(screen.queryByText('Extra guest fee')).toBeNull();
   });
 });
@@ -895,9 +900,8 @@ describe('UnitBookingWidget - TASK-4726: URL-hydrated interior-night overlap dis
     // would be ENABLED here if not for the (still in-flight) availability check — proving that
     // once it later reveals the interior conflict, the disablement is genuinely attributable to
     // the interior-night-overlap logic and not some other unrelated gate.
-    await waitFor(() => {
-      expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
-    });
+    await settle();
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
 
     await act(async () => {
       resolveAvailability(
@@ -911,11 +915,10 @@ describe('UnitBookingWidget - TASK-4726: URL-hydrated interior-night overlap dis
 
     // The regression: without the fix, the URL-hydration effect never re-runs after blockedSet/
     // dateStatusMap populate, so neither the date-error nor the disabled Reserve ever appear.
-    await waitFor(() => {
-      const dateError = screen.queryByTestId('guest-booking-date-error');
-      const reserve = screen.getByTestId('guest-booking-submit');
-      expect(Boolean(dateError) || reserve.hasAttribute('disabled')).toBe(true);
-    });
+    await settle();
+    const dateError = screen.queryByTestId('guest-booking-date-error');
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(Boolean(dateError) || reserve.hasAttribute('disabled')).toBe(true);
   });
 });
 
@@ -956,7 +959,8 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
       fireEvent.click(reserve);
     });
 
-    const error = await screen.findByTestId('guest-booking-date-error');
+    await settle();
+    const error = screen.getByTestId('guest-booking-date-error');
     expect(error.textContent).toContain('Add a check-in date to continue.');
     expect(error).toHaveAttribute('role', 'alert');
 
@@ -994,7 +998,8 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
       fireEvent.click(reserve);
     });
 
-    const error = await screen.findByTestId('guest-booking-date-error');
+    await settle();
+    const error = screen.getByTestId('guest-booking-date-error');
     expect(error.textContent).toContain('Add a check-out date to continue.');
     expect(error).toHaveAttribute('role', 'alert');
 
@@ -1029,7 +1034,8 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
       fireEvent.click(reserve);
     });
 
-    const error = await screen.findByTestId('guest-booking-date-error');
+    await settle();
+    const error = screen.getByTestId('guest-booking-date-error');
     const errorId = error.getAttribute('id');
     expect(errorId).toBeTruthy();
     expect(document.getElementById('unit-booking-dates')).toHaveAttribute('aria-describedby', errorId);
@@ -1077,7 +1083,8 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
     });
 
     // The card must still say "Select dates to see total price" ...
-    expect(await screen.findByText('Select dates to see total price')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText('Select dates to see total price')).toBeInTheDocument();
     // ... and must NEVER show a concrete "Total" row, or any of the partial breakdown rows
     // (Accommodation + Payment processing summing to a total that silently omitted GST) that
     // the TASK-4910 repro captured alongside that same message.
@@ -1105,7 +1112,8 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
 
     await renderWidget();
 
-    const totalLabel = await screen.findByText('Total');
+    await settle();
+    const totalLabel = screen.getByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
     expect(totalValue.replace(/[^0-9]/g, '')).toBe('6180');
 
@@ -1165,7 +1173,8 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
       </MemoryRouter>,
     );
 
-    const totalLabel = await screen.findByText('Total');
+    await settle();
+    const totalLabel = screen.getByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
     // Base ₹6,000 + GST ₹0 = ₹6,000 — no 3% processing fee.
     expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
@@ -1207,7 +1216,8 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
       </MemoryRouter>,
     );
 
-    const totalLabel = await screen.findByText('Total');
+    await settle();
+    const totalLabel = screen.getByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
     expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
     expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
@@ -1273,7 +1283,8 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
 
   it('before any date is picked: prompts for dates and may show the generic grace disclosure', async () => {
     await renderWidget();
-    const strip = await screen.findByTestId('bw-trust-strip-text');
+    await settle();
+    const strip = screen.getByTestId('bw-trust-strip-text');
     expect(strip.textContent).toContain('Select check-in dates');
     // Nothing to void against yet, so the listing-level disclosure is legitimate here.
     expect(screen.getByTestId('bw-grace-window-strip-text').textContent)
@@ -1284,7 +1295,8 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
     await renderWidget();
     await setCheckin(40);
 
-    const strip = await screen.findByTestId('bw-trust-strip-text');
+    await settle();
+    const strip = screen.getByTestId('bw-trust-strip-text');
     // Strict = 168h before check-in, so ~33 days out — a real date, never "48 hours".
     expect(strip.textContent).toMatch(/^Free cancellation until \d{1,2}:\d{2} (?:AM|PM), \d{1,2} \w{3}$/);
     expect(strip.textContent).not.toContain('48');
@@ -1295,7 +1307,8 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
     await renderWidget();
     await setCheckin(0);
 
-    const strip = await screen.findByTestId('bw-trust-strip-text');
+    await settle();
+    const strip = screen.getByTestId('bw-trust-strip-text');
     // The refund the server would actually issue here is nil — the copy must not promise otherwise.
     expect(strip.textContent).toBe('Standard cancellation policy applies for this stay.');
     expect(strip.textContent).not.toMatch(/free cancellation/i);
@@ -1354,9 +1367,8 @@ describe('UnitBookingWidget - TASK-102023: split pricing failure flags', () => {
     );
 
     // Wait for the selected-range fetch to fail and render error affordance
-    await waitFor(() => {
-      expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
 
     // Now resolve the shown-month fetch
     await act(async () => {
@@ -1429,7 +1441,8 @@ describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-clo
   it('fail-closes Reserve with error + retry when lookupFailed and no listingId', async () => {
     await renderWidgetLookup(true);
 
-    await screen.findByTestId('guest-booking-availability-error');
+    await settle();
+    screen.getByTestId('guest-booking-availability-error');
     expect(screen.getByTestId('guest-booking-availability-retry')).toBeInTheDocument();
     const reserve = screen.getByTestId('guest-booking-submit');
     expect(reserve).toBeDisabled();
@@ -1442,9 +1455,8 @@ describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-clo
     await renderWidgetLookup(undefined);
 
     // Resolving ≠ failed: the widget must not show the failure UI …
-    await waitFor(() => {
-      expect(screen.getByTestId('guest-booking-form')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId('guest-booking-form')).toBeInTheDocument();
     expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
     // … and Reserve stays clickable for blank dates (TASK-4277).
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
@@ -1476,7 +1488,8 @@ describe('UnitBookingWidget - availability legend layout (render)', () => {
       </MemoryRouter>,
     );
 
-    const legend = await screen.findByTestId('bw-availability-legend');
+    await settle();
+    const legend = screen.getByTestId('bw-availability-legend');
     const items = Array.from(legend.querySelectorAll('li'));
     expect(items.map((li) => li.querySelector('.bw-legend-label')?.textContent?.trim())).toEqual([
       'Available',

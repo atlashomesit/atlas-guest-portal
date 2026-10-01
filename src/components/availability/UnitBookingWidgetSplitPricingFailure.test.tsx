@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addMonths, format, startOfMonth } from 'date-fns';
+import { settle } from '../../test/settle';
 
 /**
  * TASK-102023: Two pricing fetches race over failure flag.
@@ -136,9 +137,8 @@ describe('UnitBookingWidget - TASK-102023: split pricing failure state', () => {
     });
 
     // Wait for the selected range rejection to take effect
-    await waitFor(() => {
-      expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
 
     // Now resolve the shown-month fetch successfully
     await act(async () => {

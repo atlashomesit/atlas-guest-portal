@@ -17,7 +17,7 @@
  * fork, without paying the heap cost of a full render.
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   DEFAULT_LAYOUT_THEME_ID,
@@ -26,6 +26,7 @@ import {
   resolveLayoutThemeId,
   themeRegistry,
 } from "../registry";
+import { settle } from "../../test/settle";
 
 // ---- Home.tsx's dependency surface ----
 vi.mock("@/components/homepage_components/homepage_locations/HomePage_Locations", () => ({
@@ -136,9 +137,8 @@ describe("TASK-4906 — noir's Home renders the founder-specified full-bleed, mi
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("noir-home")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("noir-home")).toBeInTheDocument();
     expect(screen.getByTestId("noir-hero")).toBeInTheDocument();
     expect(screen.getByTestId("noir-hero-scrim")).toBeInTheDocument();
     expect(screen.getByText("SearchAvailabilityWidget stub")).toBeInTheDocument();

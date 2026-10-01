@@ -23,7 +23,7 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   DEFAULT_LAYOUT_THEME_ID,
@@ -34,6 +34,7 @@ import {
   setCurrentLayoutThemeId,
   themeRegistry,
 } from "../registry";
+import { settle } from "../../test/settle";
 
 // ---- Home.tsx's dependency surface (shared by both classic's and heritage's Home) ----
 vi.mock("@/components/homepage_components/slider/Slider", () => ({
@@ -173,9 +174,8 @@ describe("AC7 — classic and heritage Home render genuinely different compositi
         <Home />
       </MemoryRouter>,
     );
-    await waitFor(() => {
-      expect(screen.getByText(/A note from your host/i)).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByText(/A note from your host/i)).toBeInTheDocument();
   });
 
   it("heritage's Home does NOT render the coral-only 'A note from your host' panel and carries its own testid", async () => {
@@ -185,9 +185,8 @@ describe("AC7 — classic and heritage Home render genuinely different compositi
         <Home />
       </MemoryRouter>,
     );
-    await waitFor(() => {
-      expect(screen.getByTestId("heritage-home")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("heritage-home")).toBeInTheDocument();
     expect(screen.queryByText(/A note from your host/i)).not.toBeInTheDocument();
   });
 });

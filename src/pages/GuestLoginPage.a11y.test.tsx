@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GuestLoginPage from "./GuestLoginPage";
+import { settle } from "../test/settle";
 
 vi.mock("@/api/guestAuthClient", () => ({
   guestAuthClient: {
@@ -65,7 +66,8 @@ describe("GuestLoginPage a11y (TASK-7435)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
 
-    const otp = await screen.findByLabelText("One-Time Password");
+    await settle();
+    const otp = screen.getByLabelText("One-Time Password");
     expect(otp).toHaveAttribute("id", "guest-login-otp");
     expect(otp).toHaveAttribute("placeholder", "000000");
     expect(otp).toHaveAccessibleName("One-Time Password");

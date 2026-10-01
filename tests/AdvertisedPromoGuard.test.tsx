@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OffersPage from "../src/pages/OffersPage";
 import DirectDiscountBanner from "../src/components/DirectDiscountBanner";
+import { settle } from "../src/test/settle";
 
 const refetchMock = vi.fn(async () => {});
 
@@ -47,9 +48,8 @@ describe("TASK-8016 advertised promo choke-point", () => {
 
     render(<OffersPage />);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId("offers-direct5-card")).not.toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.queryByTestId("offers-direct5-card")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/copy DIRECT5 promo code/i)).not.toBeInTheDocument();
   });
 
@@ -66,9 +66,8 @@ describe("TASK-8016 advertised promo choke-point", () => {
 
     render(<OffersPage />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("offers-direct5-card")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("offers-direct5-card")).toBeInTheDocument();
     expect(screen.getByLabelText(/copy DIRECT5 promo code/i)).toBeInTheDocument();
   });
 
@@ -85,8 +84,7 @@ describe("TASK-8016 advertised promo choke-point", () => {
 
     render(<DirectDiscountBanner />);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId("direct-discount-banner")).not.toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.queryByTestId("direct-discount-banner")).not.toBeInTheDocument();
   });
 });

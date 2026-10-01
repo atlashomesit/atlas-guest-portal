@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
 import { BookingProvider } from "../../../contexts/BookingContext";
 import Home from "../Home";
+import { settle } from "../../../test/settle";
 
 vi.mock("../../../tenant/tenantContext", () => ({
   getTenantContext: vi.fn(() => ({ slug: "atlas", isMarketplaceRoot: true })),
@@ -63,11 +64,13 @@ describe("Home per-section Suspense (TASK-101858)", () => {
     // FaqHighlights is suspended forever above; these siblings must still paint.
     // (FooterCtaStrip needs no stub: enableFooterMiniCtaAboveFooter is false,
     // so it never mounts.)
+    await settle();
     expect(
-      await screen.findByText(/Discover Our Exclusive Services/i),
+      screen.getByText(/Discover Our Exclusive Services/i),
     ).toBeInTheDocument();
+    await settle();
     expect(
-      await screen.findByText(/Hear What Our Happy Guests Are Saying/i),
+      screen.getByText(/Hear What Our Happy Guests Are Saying/i),
     ).toBeInTheDocument();
   });
 });

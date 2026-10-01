@@ -44,6 +44,9 @@ _resetTenantContextForTests();
 _resetAvailabilityCalendarCacheForTests();
 _resetDedupedJsonFetchForTests();
 _resetCurrentLayoutThemeIdForTests();
+// The jsdom side of this (URL, storage, cookies, head/body, window stubs, document.visibilityState) is reset by
+// src/test/sharedWorkerResetSetup.ts, which vitest.config.ts lists BEFORE this file so it runs before any of the
+// imports above are evaluated (TASK-102734, see sharedWorkerHygiene.ts).
 
 // The shared-fast project runs with `isolate: false` (see vitest.config.ts). With a
 // shared module graph, @testing-library/react's built-in auto-cleanup registers its

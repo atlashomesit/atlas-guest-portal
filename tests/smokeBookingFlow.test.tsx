@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import App from "../src/App";
+import { settle } from "../src/test/settle";
 
 vi.mock("@fancyapps/ui", () => ({ Fancybox: { bind: vi.fn(), destroy: vi.fn() } }));
 
@@ -49,7 +50,8 @@ describe("booking smoke flows", () => {
   test("home route loads hero search widget after lazy Home resolves", async () => {
     render(<App />);
     // Route-level lazy loading can be slow on CI; Book Now appears once home shell is interactive.
-    expect(await screen.findByRole("button", { name: /book now/i }, { timeout: 30_000 })).toBeInTheDocument();
+    await settle();
+    expect(screen.getByRole("button", { name: /book now/i })).toBeInTheDocument();
   });
 
   test("navbar exposes book now when present", async () => {

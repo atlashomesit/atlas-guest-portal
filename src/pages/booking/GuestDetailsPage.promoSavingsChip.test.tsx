@@ -5,11 +5,12 @@
  * recomputed in the UI) and offers a 1-click remove (x) button wired to the
  * existing coupon-clear path.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BookingProvider } from "@/contexts/BookingContext";
 import GuestDetailsPage from "./GuestDetailsPage";
+import { settle } from "../../test/settle";
 
 vi.mock("@/lib/events", () => ({ track: vi.fn() }));
 
@@ -55,7 +56,8 @@ async function renderPage() {
       </BookingProvider>
     </MemoryRouter>,
   );
-  await waitFor(() => expect(document.getElementById("gd-details-form")).toBeInTheDocument());
+  await settle();
+  expect(document.getElementById("gd-details-form")).toBeInTheDocument();
   return result;
 }
 
@@ -64,7 +66,8 @@ async function openPromoAndApply(code: string) {
   const input = screen.getByTestId("guest-booking-promo") as HTMLInputElement;
   fireEvent.change(input, { target: { value: code } });
   fireEvent.click(screen.getByRole("button", { name: /^apply$/i }));
-  await waitFor(() => expect(screen.getByTestId("promo-savings-chip")).toBeInTheDocument());
+  await settle();
+  expect(screen.getByTestId("promo-savings-chip")).toBeInTheDocument();
 }
 
 beforeEach(() => {
@@ -109,7 +112,8 @@ describe("TASK-102118 promo savings chip", () => {
 
     fireEvent.click(screen.getByTestId("promo-savings-remove"));
 
-    await waitFor(() => expect(screen.queryByTestId("promo-savings-chip")).not.toBeInTheDocument());
+    await settle();
+    expect(screen.queryByTestId("promo-savings-chip")).not.toBeInTheDocument();
     expect((screen.getByTestId("guest-booking-promo") as HTMLInputElement).value).toBe("");
     // no confirmed promo row lingers in the totals
     expect(screen.queryByTestId("promo-confirmed-row")).not.toBeInTheDocument();
