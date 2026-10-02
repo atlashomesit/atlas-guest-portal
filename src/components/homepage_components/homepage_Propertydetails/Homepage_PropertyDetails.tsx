@@ -1360,7 +1360,7 @@ useEffect(() => {
                 '@context': 'https://schema.org',
                 '@type': 'LodgingBusiness',
                 name: getListingDisplayName(data.id, data.property_name),
-                description: data.property_description?.trim().slice(0, 300) || undefined,
+                description: (hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
                 image: primaryImageForLd,
                 url: pageUrlForLd,
                 address: {
@@ -1412,7 +1412,7 @@ useEffect(() => {
                           '@context': 'https://schema.org',
                           '@type': 'Place',
                           name: getListingDisplayName(data.id, data.property_name),
-                          description: data.property_description?.trim().slice(0, 300) || undefined,
+                          description: (hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
                           url: pageUrlForLd,
                       },
                   ]
