@@ -20,7 +20,13 @@ import { starDistribution } from '../../components/property/starDistribution';
 import React from 'react';
 import { toast } from 'react-toastify'; // TASK-4288: share fallback feedback
 import { getListingDisplayName } from '@/lib/listingDisplayName';
-import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
+import {
+  getTenantContext as _getTenantCtx,
+  fetchListingTenantContext,
+  getCachedListingTenantContext,
+  type TenantInfo,
+} from '@/tenant/tenantContext';
+import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { getTenantBrandName } from '@/tenant/displayBrand';
@@ -567,6 +573,33 @@ const PropertyDetails = () => {
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
     const [searchParams] = useSearchParams();
+    const tenantSlugFromUrl = searchParams.get('tenant')?.trim() || null;
+    const isMarketplaceHost = Boolean(_getTenantCtx()?.isMarketplaceRoot) || isMarketplaceMode() || isMarketplaceHostname();
+    const isNonAtlasMarketplaceListing = Boolean(isMarketplaceHost && tenantSlugFromUrl && tenantSlugFromUrl.toLowerCase() !== 'atlas');
+
+    const [listingTenantCtx, setListingTenantCtx] = useState<TenantInfo | null>(() => {
+      if (tenantSlugFromUrl) {
+        const cached = getCachedListingTenantContext(tenantSlugFromUrl);
+        if (cached !== undefined) return cached;
+      }
+      return null;
+    });
+
+    useEffect(() => {
+      if (!isNonAtlasMarketplaceListing || !tenantSlugFromUrl) {
+        setListingTenantCtx(null);
+        return;
+      }
+      let active = true;
+      fetchListingTenantContext(tenantSlugFromUrl).then((ctx) => {
+        if (active && ctx) {
+          setListingTenantCtx(ctx);
+        }
+      });
+      return () => {
+        active = false;
+      };
+    }, [isNonAtlasMarketplaceListing, tenantSlugFromUrl]);
     // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
     const backToResultsHref = useMemo(() => {
         const searchKeys = ["checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
@@ -1535,20 +1568,23 @@ useEffect(() => {
 
     // ---- hi-fi design derived values ----------------------------------------
     const ppTenantCtx = _getTenantCtx();
-    const ppTenantOverrides = getTenantOverrides(ppTenantCtx?.slug ?? '');
+    const effectiveTenantCtx = isNonAtlasMarketplaceListing ? (listingTenantCtx ?? null) : ppTenantCtx;
+    const ppTenantOverrides = getTenantOverrides(effectiveTenantCtx?.slug ?? ppTenantCtx?.slug ?? '');
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
     const ppHasRealHost = !!data.hostName?.trim();
     const ppHostAbout = data.hostAbout?.trim() ?? '';
-    // TASK-4311: On the marketplace, check for ?tenant=TenantName query param to show the actual listing's tenant
-    const tenantNameFromUrl = searchParams.get('tenant')?.trim();
+    // MKT-011: On marketplace, show actual host brand name from tenantName / listing tenant context, never the raw slug
+    const effectiveTenantBrand = effectiveTenantCtx?.brandName || effectiveTenantCtx?.name || ppTenantCtx?.brandName || ppTenantCtx?.name;
     const ppHostDisplayName = ppHasRealHost
       ? data.hostName!.trim()
-      : tenantNameFromUrl ? `Listed by ${tenantNameFromUrl}` : `Listed by ${ppBrandName}`;
+      : effectiveTenantBrand
+        ? `Listed by ${effectiveTenantBrand}`
+        : `Listed by ${ppBrandName}`;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
-    // TASK-7428: one shared predicate for "an online gateway will actually charge this guest" —
-    // drives both the cancellation copy and the Razorpay payment-rail claim below.
-    const ppHasOnlinePayment = hasOnlinePaymentRail(ppTenantCtx);
+    // TASK-7428 / MKT-011: shared predicate for "an online gateway will actually charge this guest" —
+    // uses effectiveTenantCtx so marketplace listings use the listing host's real bookingMode.
+    const ppHasOnlinePayment = hasOnlinePaymentRail(effectiveTenantCtx);
     const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
       fallbackText: _resolvedCancellationText,
       hasOnlinePayment: ppHasOnlinePayment,
@@ -1558,9 +1594,18 @@ useEffect(() => {
         mapSrcTrimmed.length > 0 ||
         useMultiPin ||
         (mapLocation != null && typeof mapLocation.lat === 'number' && Number.isFinite(mapLocation.lat));
-    // TASK-7192: guest-facing phone precedence — WhatsApp/booking number wins over listing hostPhone.
+    // TASK-7192 / MKT-011: guest-facing phone precedence — on marketplace, the listing host's
+    // whatsappBookingPhone / contactPhone wins over the host platform phone (Atlas).
     const listingHostDigits = (data.hostPhone?.replace(/\D/g, '') || '').trim();
-    const ppHostPhone = getGuestFacingPhone('business') || listingHostDigits;
+    const listingTenantPhone = (
+      effectiveTenantCtx?.whatsappBookingPhone ||
+      effectiveTenantCtx?.legalContactPack?.contactPhone ||
+      effectiveTenantCtx?.legalContactPack?.ownerPhone ||
+      ''
+    ).replace(/\D/g, '').trim();
+    const ppHostPhone = isNonAtlasMarketplaceListing
+      ? (listingTenantPhone || listingHostDigits)
+      : (getGuestFacingPhone('business') || listingHostDigits);
     const ppHasHostPhone = ppHostPhone.length > 0;
     const ppWaDigits = ppHostPhone.length === 10 ? `91${ppHostPhone}` : ppHostPhone;
     const ppWaBookingUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}` : '';
@@ -2587,6 +2632,7 @@ useEffect(() => {
                         cancellationWindowHours={data.cancellationWindowHours ?? null}
                         graceHours={data.graceHours ?? null}
                         onStickySummaryChange={setStickyBookingSummary}
+                        tenantContext={effectiveTenantCtx}
                       />
                     </Suspense>
 
