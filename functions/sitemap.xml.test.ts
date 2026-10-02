@@ -26,7 +26,9 @@ describe('sitemap.xml', () => {
   });
 
   it('includes city landing pages for all city slugs in the full marketplace sitemap', () => {
-    const cityLandingSlugs = ["goa", "coorg", "hyderabad", "manali"];
+    // MKT-014: include the four new city slugs (bengaluru, gurugram, nashik, guwahati) that the
+    // CityLandingPage now serves alongside the original four.
+    const cityLandingSlugs = ["goa", "coorg", "hyderabad", "manali", "bengaluru", "gurugram", "nashik", "guwahati"];
     const expectedPaths = cityLandingSlugs.map((slug) => `/homestays-in-${slug}`);
 
     expectedPaths.forEach((path) => {

@@ -1,0 +1,77 @@
+{
+  "slug": "bengaluru",
+  "cityName": "Bengaluru",
+  "h1": "Homestays in Bengaluru — Indiranagar weekends and Whitefield work weeks",
+  "metaTitle": "Bengaluru homestays | Indiranagar, Koramangala & Whitefield | {{TENANT_BRAND}}",
+  "metaDescription": "Find Bengaluru homestays near Indiranagar, Koramangala, Whitefield, and HSR. Quiet homes with reliable WiFi—book direct on {{TENANT_BRAND}}.",
+  "listingKeywords": [
+    "bengaluru",
+    "bangalore",
+    "indiranagar",
+    "koramangala",
+    "whitefield",
+    "hsr layout",
+    "hsr",
+    "marathahalli",
+    "bellandur",
+    "sarjapur",
+    "jp nagar",
+    "jayanagar",
+    "malleshwaram",
+    "mg road",
+    "brigade road",
+    "electronic city",
+    "hebbal",
+    "yelahanka"
+  ],
+  "introParagraphs": [
+    "Bengaluru blends leafy residential pockets and a busy tech belt. Homestays give relocating engineers and visiting families a quieter base than hotels—faster fibre, dedicated desks, and hosts who know the traffic windows.",
+    "Pick your micro-area before comparing nightly rates. Indiranagar and Koramangala suit evenings around pubs and cafés; Whitefield and Marathahalli shorten commutes to tech parks; Malleshwaram and Jayanagar work for family visits and traditional food trails.",
+    "{{TENANT_BRAND}} focuses on transparent nightly pricing and clear booking confirmations. The cards below filter live listings whose addresses reference Bengaluru or its suburbs—verify pin codes and landmarks on the listing page before you pay.",
+    "Traffic is the variable you plan around. Build buffer into airport runs and avoid peak-hour meetings at the other end of town. Hosts familiar with ORR timing can advise realistic drive estimates.",
+    "Food spans legendary filter coffee, Kannada thalis, and experimental chef tables. Ask your host for vetted breakfast spots and late-night kitchens if your work hours stretch past standard mealtimes."
+  ],
+  "areasTitle": "Top areas in Bengaluru for homestay guests",
+  "areas": [
+    {
+      "title": "Indiranagar and Koramangala",
+      "body": "Walkable lanes lined with cafés, pubs, and indie shopping. Ideal for first-time visitors who want dining and social life within short distances. Listings often advertise fibre WiFi and quiet hours."
+    },
+    {
+      "title": "Whitefield, Marathahalli, and Sarjapur",
+      "body": "Closer to the tech parks on the Outer Ring Road. Long-stay guests and corporate blocks work well here—confirm desk setups and backup power if your work depends on uptime."
+    },
+    {
+      "title": "Malleshwaram, Jayanagar, and JP Nagar",
+      "body": "Traditional neighbourhoods with markets and temples, suited to family visits and slow weekends. Listings here tend to be quieter and offer kitchens suited to home-cooked meals."
+    }
+  ],
+  "seasonTitle": "Best time to visit Bengaluru",
+  "seasonParagraphs": [
+    "October to February brings cooler evenings and clearer air—pleasant for brewery hops and outdoor seating.",
+    "March to May is dry; prioritise listings with reliable AC and backup power if your work is heat-sensitive.",
+    "July to September brings monsoon showers that cool the city down. Plan airport runs with extra buffer and confirm inverter/backup expectations during this window."
+  ],
+  "faq": [
+    {
+      "question": "Are Bengaluru homestays suited to month-long remote work?",
+      "answer": "Many hosts offer weekly or monthly discounts when configured. Confirm desk ergonomics, WiFi speeds, and cleaning cadence in writing before extending."
+    },
+    {
+      "question": "How do I pick between Indiranagar and Whitefield homestays?",
+      "answer": "Indiranagar suits shorter trips with a social focus; Whitefield shortens commutes to tech parks. Drive-time from your meeting locations should drive the choice more than the nightly rate."
+    },
+    {
+      "question": "Is parking available at Bengaluru homestays?",
+      "answer": "Varies by lane. Ask the host whether sedan or SUV height fits the gated ramp and whether street parking needs a pass."
+    },
+    {
+      "question": "Can hosts arrange airport pickup?",
+      "answer": "Some do via trusted drivers. Confirm rates, luggage capacity, and midnight surcharges through booking messaging rather than informal quotes."
+    },
+    {
+      "question": "Why book Bengaluru stays direct on {{TENANT_BRAND}}?",
+      "answer": "Direct booking keeps communication transparent and shows cancellation tiers when configured. Confirmations anchor support if plans change."
+    }
+  ]
+}
