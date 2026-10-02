@@ -1224,6 +1224,55 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
     expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
   });
 
+  it('MKT-011: tenantContext prop with bookingMode WHATSAPP overrides global ONLINE context', async () => {
+    // Global context is ONLINE (e.g. apex marketplace host atlas)
+    tenantCtxMock.getTenantContext.mockReturnValue({
+      slug: 'atlas',
+      name: 'Atlas Homes',
+      paymentProvider: 'RAZORPAY',
+      bookingMode: 'ONLINE' as const,
+    });
+
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    const checkout = addDays(checkin, 1);
+    const nightIso = toISODate(checkin);
+    task4303.booking.checkIn = toISODate(checkin);
+    task4303.booking.checkOut = toISODate(checkout);
+    task4303.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[nightIso, 6000]]),
+      convenienceFeePercent: 3,
+    });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6480 });
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Comfort Cove"
+          propertySlug="comfort-cove"
+          unitSlug="cove"
+          tenantContext={{
+            slug: 'mitali-saikia',
+            name: 'Mitali Saikia',
+            bookingMode: 'WHATSAPP',
+            whatsappBookingPhone: '919435508028',
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const totalLabel = screen.getByText('Total');
+    const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
+    // Base ₹6,000 + GST ₹0 = ₹6,000 — no 3% processing fee
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
+    expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
+    expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
+    expect(screen.queryByText(/Payment processing/i)).toBeNull();
+  });
+
   // Delegation ratchet (not a copy of the predicate): the widget must keep asking the shared
   // `hasOnlinePaymentRail` gate rather than re-deriving its own tenant-payment condition, and must
   // keep both the fee row and the pay rail behind it. Asserting the predicate's text here would
@@ -1231,7 +1280,7 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
   it('source: delegates the gate to hasOnlinePaymentRail and keeps both surfaces behind it', () => {
     const content = readFileSync(resolve(__dirname, './UnitBookingWidget.tsx'), 'utf-8');
     expect(content).toContain("from '@/tenant/paymentRail'");
-    expect(content).toContain('const showOnlinePaymentProcessing = hasOnlinePaymentRail()');
+    expect(content).toContain('const showOnlinePaymentProcessing = hasOnlinePaymentRail(');
     expect(content).toContain('{showOnlinePaymentProcessing && (');
     // The fee must never be re-derived from a locally reinvented tenant-payment condition.
     expect(content).not.toContain("bookingMode !== 'WHATSAPP'");
