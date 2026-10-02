@@ -1359,13 +1359,13 @@ useEffect(() => {
             {
                 '@context': 'https://schema.org',
                 '@type': 'LodgingBusiness',
-                name: data.property_name,
-                description: data.property_description?.slice(0, 300),
+                name: getListingDisplayName(data.id, data.property_name),
+                description: data.property_description?.trim().slice(0, 300) || undefined,
                 image: primaryImageForLd,
                 url: pageUrlForLd,
                 address: {
                     '@type': 'PostalAddress',
-                    addressLocality: data.property_location || undefined,
+                    streetAddress: data.property_location || undefined,
                     addressRegion: 'Telangana',
                     addressCountry: 'IN',
                 },
@@ -1411,8 +1411,8 @@ useEffect(() => {
                       {
                           '@context': 'https://schema.org',
                           '@type': 'Place',
-                          name: data.property_name,
-                          description: data.property_description?.slice(0, 300),
+                          name: getListingDisplayName(data.id, data.property_name),
+                          description: data.property_description?.trim().slice(0, 300) || undefined,
                           url: pageUrlForLd,
                       },
                   ]
