@@ -90,7 +90,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           aria-labelledby={labelId}
           id={contentId}
           tabIndex={-1}
-          className={`booking-calendar-popover${popoverClassName ? ` ${popoverClassName}` : ''} flex flex-col fixed inset-x-0 bottom-0 z-[95] max-h-[80vh] rounded-t-[24px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_16px_48px_rgba(15,23,42,0.12)]`}
+          className={`booking-calendar-popover${popoverClassName ? ` ${popoverClassName}` : ''} flex flex-col fixed inset-x-0 bottom-0 z-[95] h-[90vh] rounded-t-[24px] border border-[var(--border-subtle)] bg-[var(--bg-surface)] shadow-[0_16px_48px_rgba(15,23,42,0.12)]`}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="flex justify-center pt-3 pb-2 flex-none">
