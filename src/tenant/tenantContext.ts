@@ -115,6 +115,15 @@ export interface TenantInfo {
   guestCommsBrandingMode?: 'Platform' | 'Neutral';
   /** TASK-1715: Premium search-by-image feature flag from tenant bootstrap API. */
   searchByImageEnabled?: boolean;
+  /** GUEST-008: Custom tenant FAQ entries from API. */
+  faq?: Array<{ id: string; question: string; answer: string }>;
+  /** GUEST-008: Custom cookie consent banner from API. */
+  cookieBanner?: {
+    title?: string;
+    text: string;
+    privacyUrl: string;
+    privacyLinkLabel?: string;
+  };
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -123,6 +132,8 @@ export interface TenantLegalContactPack {
   displayName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  /** GUEST-008: Owner / escalation contact phone. */
+  ownerPhone?: string;
   registeredAddress?: string;
   city?: string;
   state?: string;
@@ -150,6 +161,7 @@ export function parseLegalContactPack(data: Record<string, unknown>): TenantLega
     displayName: typeof pack.displayName === 'string' ? pack.displayName : undefined,
     contactEmail: typeof pack.contactEmail === 'string' ? pack.contactEmail : undefined,
     contactPhone: typeof pack.contactPhone === 'string' ? pack.contactPhone : undefined,
+    ownerPhone: typeof pack.ownerPhone === 'string' ? pack.ownerPhone : undefined,
     registeredAddress: typeof pack.registeredAddress === 'string' ? pack.registeredAddress : undefined,
     city: typeof pack.city === 'string' ? pack.city : undefined,
     state: typeof pack.state === 'string' ? pack.state : undefined,
@@ -333,6 +345,15 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
           ? data.guestCommsBrandingMode
           : undefined,
       searchByImageEnabled: Boolean(data.searchByImageEnabled),
+      faq: Array.isArray(data.faq) ? data.faq : undefined,
+      cookieBanner: data.cookieBanner && typeof data.cookieBanner.text === 'string'
+        ? {
+            title: typeof data.cookieBanner.title === 'string' ? data.cookieBanner.title : undefined,
+            text: data.cookieBanner.text,
+            privacyUrl: typeof data.cookieBanner.privacyUrl === 'string' ? data.cookieBanner.privacyUrl : '/privacy',
+            privacyLinkLabel: typeof data.cookieBanner.privacyLinkLabel === 'string' ? data.cookieBanner.privacyLinkLabel : undefined,
+          }
+        : undefined,
     };
     return tenantInfo;
   } catch (error) {

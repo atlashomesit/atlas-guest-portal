@@ -39,22 +39,22 @@ const CookieConsentBanner = ({ inline = false }: { inline?: boolean }) => {
   const onAccept = () => setRecord(setCookieConsent("accepted"));
   const onReject = () => setRecord(setCookieConsent("rejected"));
 
-  // TASK-1877: resolve per-tenant banner copy and privacy link
-  const tenantSlug = getTenantContext()?.slug;
-  const tenantOverrides = getTenantOverrides(tenantSlug);
-  const cookieBannerOverride = tenantOverrides.cookieBanner;
+  // GUEST-008: resolve per-tenant banner copy and privacy link from API context, then overrides
+  const tenantCtx = getTenantContext();
+  const tenantOverrides = getTenantOverrides(tenantCtx?.slug);
+  const cookieBannerConfig = tenantCtx?.cookieBanner ?? tenantOverrides.cookieBanner;
 
-  const bannerTitle = cookieBannerOverride?.title ?? "Your privacy choice";
+  const bannerTitle = cookieBannerConfig?.title ?? "Your privacy choice";
   // Marketplace apex resolves to "Atlastays" (full brand baseline post-2026-05 rebrand);
   // white-label tenants use legal/long brand from context. Aligns with
   // cookie-consent-compliance.e2e.spec.ts which asserts banner copy starts with
   // "Atlastays uses" on the marketplace and "Star Guest House uses" on tenant subdomains.
-  const bannerText = cookieBannerOverride?.text ??
+  const bannerText = cookieBannerConfig?.text ??
     `${getGuestDataProcessingEntityName()} uses strictly necessary cookies to make this site work, and optional analytics cookies ` +
     "to understand how it is used. Under India’s DPDP Act 2023 we ask for your consent " +
     "before loading anything non-essential. Read our";
-  const privacyUrl = cookieBannerOverride?.privacyUrl ?? "/privacy";
-  const privacyLinkLabel = cookieBannerOverride?.privacyLinkLabel ?? "privacy notice";
+  const privacyUrl = cookieBannerConfig?.privacyUrl ?? "/privacy";
+  const privacyLinkLabel = cookieBannerConfig?.privacyLinkLabel ?? "privacy notice";
 
   return (
     <div
