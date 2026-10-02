@@ -2,6 +2,7 @@ import { resolveTenantSlugFromDomain } from "./_lib/tenantSlug";
 import { isAtlasDirectBookingHost, isMarketplaceHost } from "./_lib/tenantSiteMeta";
 import { isNoindexHost } from "./_lib/noindexHosts";
 import { textMatchesCityKeywords } from "./_lib/cityKeywordMatch";
+import { buildHomeUnitPath, getPropertySlug } from "../src/utils/navigation";
 import goaCityContent from "../src/content/cities/goa.json";
 import coorgCityContent from "../src/content/cities/coorg.json";
 import hyderabadCityContent from "../src/content/cities/hyderabad.json";
@@ -90,16 +91,21 @@ export async function fetchAllMarketplaceListings(
  * `MarketplaceHomepage.tsx`'s `marketplaceListingPath` links to and the listing detail page
  * declares as its own canonical (`?tenant=` tells the detail page which tenant's listing to
  * resolve on the shared marketplace host).
+ *
+ * MKT-010: the property slug MUST match the marketplace card's link exactly. The card uses
+ * `getPropertySlug({ property_name: item.title })` and `buildHomeUnitPath(...)` from
+ * `src/utils/navigation.ts`. We import and call the same helpers here rather than re-implement
+ * them — `listingPathSlug` (used by per-tenant sitemaps below) was over-preferring the API's
+ * `slug` field, which `/marketplace/listings` sets to `String(id)` on 28/28 rows today, so
+ * every sitemap `/homes/` URL resolved to a soft-404.
  */
 export function marketplaceListingPath(
   listing: SitemapMarketplaceListingRow,
-  opts: { allowAtlasHomesFallback: boolean },
+  _opts: { allowAtlasHomesFallback: boolean },
 ): string {
-  const propertySlug = listingPathSlug(
-    { id: listing.id, slug: listing.slug, propertyName: listing.title },
-    opts,
-  );
-  return `/homes/${propertySlug}/${listing.id}?tenant=${encodeURIComponent(listing.tenantSlug)}`;
+  const propertySlug = getPropertySlug({ property_name: listing.title });
+  const base = buildHomeUnitPath(propertySlug, listing.id);
+  return `${base}?tenant=${encodeURIComponent(listing.tenantSlug)}`;
 }
 
 const SHARED_CORE_PATHS = [

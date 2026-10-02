@@ -10,6 +10,9 @@ import {
   SITEMAP_PATHS,
 } from './sitemap.xml';
 import { _resetTenantSlugCacheForTests } from './_lib/tenantSlug';
+// MKT-010: assert against the SAME helpers the marketplace card calls (src/utils/navigation.ts),
+// not a hand-typed literal — that way the sitemap path cannot drift from the card path again.
+import { buildHomeUnitPath, getPropertySlug } from '../src/utils/navigation';
 
 describe('sitemap.xml', () => {
   afterEach(() => {
@@ -118,6 +121,20 @@ describe('sitemap.xml', () => {
       { allowAtlasHomesFallback: true },
     );
     expect(path).toBe('/homes/elsiya-loft/191?tenant=staybycf');
+  });
+
+  // MKT-010: when /marketplace/listings returns slug == String(id) (the current bug — 28/28 rows),
+  // the sitemap URL must still point at the title slug the marketplace card emits, so the soft-404
+  // /homes/<id>/<id> URL stops being handed to Google. Asserted against the card helpers
+  // (getPropertySlug + buildHomeUnitPath), NOT a hand-typed literal — the whole point of the
+  // import-the-same-helper fix is that these cannot drift apart.
+  it('MKT-010: marketplaceListingPath uses the title slug, not the API slug field', () => {
+    const row = { id: 676, tenantSlug: 'grove-and-co', title: 'The Estate by Grove & Co.', slug: '676' };
+    const path = marketplaceListingPath(row, { allowAtlasHomesFallback: true });
+    const expectedCardPath = `${buildHomeUnitPath(getPropertySlug({ property_name: row.title }), row.id)}?tenant=${encodeURIComponent(row.tenantSlug)}`;
+    expect(path).toBe(expectedCardPath);
+    expect(path).toBe('/homes/the-estate-by-grove-co/676?tenant=grove-and-co');
+    expect(path).not.toContain('/homes/676/');
   });
 
   // MKT-006: the marketplace host previously advertised 0 /homes/ URLs and offered

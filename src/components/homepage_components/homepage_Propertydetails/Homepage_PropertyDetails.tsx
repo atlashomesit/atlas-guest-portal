@@ -1442,15 +1442,26 @@ useEffect(() => {
             );
         }
         if (notFound) {
+            // MKT-010: a "Home not found" page must noindex so search engines do not index a
+            // soft-404 as if it were a real listing page. If a future sitemap/canonical change
+            // re-introduces a /homes/<x>/<y> URL that doesn't resolve, the noindex tag keeps
+            // it out of the index until the mismatch is fixed. seo-only side effect; SEO returns null.
             return (
-                <StateMessage
-                    data-testid="listing-not-found-homepage"
-                    icon="🏠"
-                    title="Home not found"
-                    message={`Please check the link and try again, or return to browse available homes on ${getTenantBrandName()}.`}
-                    primaryAction={{ label: "Browse available homes", to: "/" }}
-                    secondaryActions={[{ label: "Go back", onClick: () => window.history.back() }]}
-                />
+                <>
+                    <SEO
+                        title={`Home not found | ${getTenantBrandName()}`}
+                        description={`The home you were looking for could not be found. Browse available homes on ${getTenantBrandName()}.`}
+                        robots="noindex, nofollow"
+                    />
+                    <StateMessage
+                        data-testid="listing-not-found-homepage"
+                        icon="🏠"
+                        title="Home not found"
+                        message={`Please check the link and try again, or return to browse available homes on ${getTenantBrandName()}.`}
+                        primaryAction={{ label: "Browse available homes", to: "/" }}
+                        secondaryActions={[{ label: "Go back", onClick: () => window.history.back() }]}
+                    />
+                </>
             );
         }
         return <PropertyDetailsSkeleton />;
