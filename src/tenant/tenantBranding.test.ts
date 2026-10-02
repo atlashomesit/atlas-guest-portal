@@ -1,7 +1,7 @@
 /**
  * Per-tenant brand-asset scoping (Stay by City Focus).
  *
- * Repo-shipped artwork in TENANT_OVERRIDES[slug] must apply ONLY to that slug:
+ * API-configured artwork must apply only to its tenant:
  * the staybycf branded subdomain gets its logo/favicon, while every other
  * tenant (incl. the atlastays.com marketplace apex) keeps API values or the
  * brand-neutral defaults.
@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyTenantBranding } from './tenantBranding';
 import type { TenantInfo } from './tenantContext';
 
-const STAYBYCF_LOGO = '/images/stay-bycityfocus-logo.png';
 const STATIC_FAVICON = '/favicon.ico';
 
 function makeTenant(overrides: Partial<TenantInfo> & Pick<TenantInfo, 'slug'>): TenantInfo {
@@ -43,23 +42,19 @@ describe('applyTenantBranding — per-tenant brand assets', () => {
     vi.unstubAllGlobals();
   });
 
-  it('applies the Stay by City Focus logo + favicon for the staybycf slug only', () => {
-    applyTenantBranding(makeTenant({ slug: 'staybycf', name: 'Stay by City Focus' }));
-
-    expect(faviconHref()).toBe(STAYBYCF_LOGO);
-    expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toContain(
-      'stay-bycityfocus',
-    );
-  });
-
-  it('applies the Goan Hideaway logo + favicon for the goan-hideaway slug', () => {
-    applyTenantBranding(makeTenant({ slug: 'goan-hideaway', name: 'Goan Hideaway' }));
-
-    expect(faviconHref()).toBe('/images/goan-hideaway-logo.png');
-    expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toContain(
-      'goan-hideaway-logo',
-    );
-  });
+  // Tenant assets migrated out of slug overrides: the DTO is now the source of truth.
+  for (const slug of ['staybycf', 'goan-hideaway']) {
+    it(`keeps ${slug} neutral when no brand assets are configured`, () => {
+      applyTenantBranding(makeTenant({ slug }));
+      expect(faviconHref()).toBe(STATIC_FAVICON);
+      expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toBe('');
+    });
+    it(`uses configured assets for ${slug}`, () => {
+      applyTenantBranding(makeTenant({ slug, logoUrl: '/synthetic/logo.png', faviconUrl: '/synthetic/icon.png' }));
+      expect(faviconHref()).toBe('/synthetic/icon.png');
+      expect(document.documentElement.style.getPropertyValue('--brand-logo-url')).toContain('/synthetic/logo.png');
+    });
+  }
 
   it('leaves other tenants on the neutral static favicon with no logo var', () => {
     applyTenantBranding(makeTenant({ slug: 'some-other-tenant' }));

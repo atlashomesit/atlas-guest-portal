@@ -64,7 +64,7 @@ describe("GuestDetailsPage form a11y", () => {
     await renderPage();
 
     const name = screen.getByLabelText(/full name/i);
-    const email = screen.getByLabelText(/email/i);
+    const email = screen.getByRole("textbox", { name: /^email/i });
     const phone = screen.getByLabelText(/^phone/i);
 
     expect(name).toHaveAttribute("id", "gd-name");
@@ -97,7 +97,7 @@ describe("GuestDetailsPage form a11y", () => {
     expect(screen.getAllByRole("alert").length).toBeGreaterThanOrEqual(3);
 
     const name = screen.getByLabelText(/full name/i);
-    const email = screen.getByLabelText(/email/i);
+    const email = screen.getByRole("textbox", { name: /^email/i });
     const phone = screen.getByLabelText(/^phone/i);
 
     expect(name).toHaveAttribute("aria-invalid", "true");
@@ -109,3 +109,4 @@ describe("GuestDetailsPage form a11y", () => {
     expect(phone).toHaveAccessibleDescription(/phone number is required/i);
   });
 });
+

@@ -16,7 +16,7 @@
   margin: 0 0.5rem;
   border-radius: var(--radius-pill, 999px);
   border: 1px solid var(--navbar-search-pill-border, rgba(220, 210, 200, 0.55));
-  background: var(--navbar-search-pill-bg, rgba(255, 250, 245, 0.95));
+  background: var(--navbar-search-pill-bg, var(--bg-muted, #fffaf5));
   color: inherit;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -372,7 +372,7 @@
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: var(--radius-lg, 0.75rem);
-  background: var(--gradient-cta, var(--cta-primary, #c04528));
+  background: var(--cta-primary, #c04528);
   color: var(--text-on-cta, #fff);
   font-family: var(--font-family-base, sans-serif);
   font-size: 1rem;

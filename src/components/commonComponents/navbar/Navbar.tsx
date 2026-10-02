@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import './navbar.css';
 import './mobile-search.css';
@@ -20,6 +20,16 @@ import { useTranslation } from '../../../hooks/useTranslation';
 import { LANGUAGE_SWITCHER_ENABLED } from '../../../i18n/i18n'; // TASK-4517
 
 const Navbar = () => {
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header || typeof ResizeObserver === 'undefined') return;
+    const measure = () => document.documentElement.style.setProperty('--measured-nav-height', `${header.getBoundingClientRect().height}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => { observer.disconnect(); document.documentElement.style.removeProperty('--measured-nav-height'); };
+  }, []);
   const tenant = getTenantContext();
   // When /tenants/from-domain fails locally, tenant context is null — still honour
   // runtime config tenantKey so the marketplace lockup (and other atlas overrides) apply.
@@ -160,7 +170,7 @@ const Navbar = () => {
   }, [location.pathname]);
 
   return (
-    <header className={`navbar-container${isTenantHome ? ' navbar-home' : ''}`} id="navbar_container">
+    <header ref={headerRef} className={`navbar-container${isTenantHome ? ' navbar-home' : ''}`} id="navbar_container">
       {/* Slim utility bar — Home v2 design §1: dark strip above main header */}
       <div className="util-bar" aria-hidden="false">
         <div className="util-bar-inner">
@@ -181,8 +191,10 @@ const Navbar = () => {
             ) : null}
           </div>
           <div className="util-bar-right">
-            <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>
-            <span className="util-bar-sep" aria-hidden="true" />
+            {telLink && formatDisplayNumber() && <>
+              <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>
+              <span className="util-bar-sep" aria-hidden="true" />
+            </>}
             {/* TASK-4018: Language switcher — TASK-8103: enabled for all 7 locales (English fallback for mr/bn/ta/kn) */}
             {LANGUAGE_SWITCHER_ENABLED && (
               <div className="relative">

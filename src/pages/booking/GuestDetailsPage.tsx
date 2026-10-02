@@ -755,7 +755,7 @@ const GuestDetailsPage: React.FC = () => {
         }
         if (!consentAccepted) {
           consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          consentRowRef.current?.focus();
+          consentRowRef.current?.querySelector('input')?.focus();
         }
       });
     }
@@ -1634,7 +1634,7 @@ const GuestDetailsPage: React.FC = () => {
 
               <div className="gd-field">
                 <label className="gd-field-label" htmlFor="gd-name">
-                  <span>Full name <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                  <span>Full name <span aria-hidden="true" style={{ color: 'var(--gd-accent-text)', marginLeft: 4 }}>*</span></span>
                 </label>
                 <input
                   id="gd-name"
@@ -1646,7 +1646,7 @@ const GuestDetailsPage: React.FC = () => {
                   className={`gd-input${formErrors.name ? ' gd-input--error' : ''}`}
                   placeholder="As on a government ID"
                   value={formData.name}
-                  onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, name: e.target.value })); setFormErrors((p) => ({ ...p, name: '' })); }}
                   onFocus={scrollFieldIntoView}
                   data-testid="guest-booking-name"
                 />
@@ -1655,7 +1655,7 @@ const GuestDetailsPage: React.FC = () => {
 
               <div className="gd-field">
                 <label className="gd-field-label" htmlFor="gd-email">
-                  <span>Email <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                  <span>Email <span aria-hidden="true" style={{ color: 'var(--gd-accent-text)', marginLeft: 4 }}>*</span></span>
                 </label>
                 <input
                   id="gd-email"
@@ -1667,7 +1667,7 @@ const GuestDetailsPage: React.FC = () => {
                   className={`gd-input${formErrors.email ? ' gd-input--error' : ''}`}
                   placeholder="you@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, email: e.target.value })); setFormErrors((p) => ({ ...p, email: '' })); }}
                   onFocus={scrollFieldIntoView}
                   data-testid="guest-booking-email"
                 />
@@ -1677,7 +1677,7 @@ const GuestDetailsPage: React.FC = () => {
 
               <div className="gd-field">
                 <label className="gd-field-label" htmlFor="gd-phone">
-                  <span>Phone <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                  <span>Phone <span aria-hidden="true" style={{ color: 'var(--gd-accent-text)', marginLeft: 4 }}>*</span></span>
                 </label>
                 <div className={`gd-row${formErrors.phone ? ' gd-input--error-wrap' : ''}`}>
                   <div className="gd-dial">
@@ -1709,6 +1709,7 @@ const GuestDetailsPage: React.FC = () => {
                     maxLength={getGuestDialOption(phoneDialCode).maxDigits}
                     value={formData.phone}
                     onChange={(e) => {
+                      setFormErrors((p) => ({ ...p, phone: '' }));
                       const dial = getGuestDialOption(phoneDialCode);
                       setFormData((p) => ({
                         ...p,
@@ -1729,11 +1730,13 @@ const GuestDetailsPage: React.FC = () => {
 
               <div className="gd-field">
                 <div className="gd-field-label">
-                  <span>Nationality <span style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                  <span>Nationality <span style={{ color: 'var(--gd-accent-text)', marginLeft: 4 }}>*</span></span>
                 </div>
                 <div className="gd-dial">
                   <select
                     id="gd-nationality"
+                    aria-label="Nationality"
+                    aria-required="true"
                     value={formData.nationality}
                     onChange={(e) => setFormData((p) => ({ ...p, nationality: e.target.value }))}
                     data-testid="guest-booking-nationality"
@@ -1766,7 +1769,7 @@ const GuestDetailsPage: React.FC = () => {
                     onClick={() => setPromoOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ color: 'var(--gd-coral)' }}><IconTag size={14}/></span>
+                      <span style={{ color: 'var(--gd-accent-text)' }}><IconTag size={14}/></span>
                       Promo code
                       {promoValidating && (
                         <span className="gd-pill">Checking code…</span>
@@ -1846,7 +1849,7 @@ const GuestDetailsPage: React.FC = () => {
                     onClick={() => setReferralOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ color: 'var(--gd-coral)' }}><IconGift size={14}/></span>
+                      <span style={{ color: 'var(--gd-accent-text)' }}><IconGift size={14}/></span>
                       Referral code
                       {appliedReferralCode && referralDiscountAmount > 0 && (
                         <span className="gd-pill">−{displayPrice(referralDiscountAmount)} applied</span>
@@ -1906,7 +1909,7 @@ const GuestDetailsPage: React.FC = () => {
                       onClick={() => setAddOnsOpen((v) => !v)}
                     >
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ color: 'var(--gd-coral)' }}><IconSparkles size={14}/></span>
+                        <span style={{ color: 'var(--gd-accent-text)' }}><IconSparkles size={14}/></span>
                         Add-on services
                         {addOnsTotal > 0 && (
                           <span className="gd-pill">+{displayPrice(addOnsTotal)}</span>
@@ -1977,7 +1980,7 @@ const GuestDetailsPage: React.FC = () => {
                     onClick={() => setNotesOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ color: 'var(--gd-coral)' }}><IconNote size={14}/></span>
+                      <span style={{ color: 'var(--gd-accent-text)' }}><IconNote size={14}/></span>
                       Notes or special requests
                     </span>
                     <span className="gd-disc-side">
@@ -2002,87 +2005,32 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Consent block */}
+            {/* Native consent controls keep one focus stop per choice and independent policy links. */}
             <div className="gd-consent">
-              {/* DPDP required consent */}
-              <div
-                ref={consentRowRef}
-                className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`}
-                onClick={() => { setConsentAccepted((v) => !v); if (!consentAccepted) setConsentError(''); }}
-                role="checkbox"
-                aria-checked={consentAccepted}
-                tabIndex={0}
-                onKeyDown={(e) => e.key === ' ' && setConsentAccepted((v) => { if (!v) setConsentError(''); return !v; })}
-                data-testid="guest-booking-consent-row"
-              >
-                <span className={`gd-check${consentAccepted ? ' checked' : ''}`}>
-                  <IconCheck size={14}/>
-                </span>
+              <div ref={consentRowRef} className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`} data-testid="guest-booking-consent-row">
+                <input id="gd-consent" type="checkbox" checked={consentAccepted}
+                  onChange={(e) => { setConsentAccepted(e.target.checked); if (e.target.checked) setConsentError(''); }}
+                  aria-invalid={Boolean(consentError)} aria-describedby={consentError ? 'gd-consent-error' : undefined}
+                  data-testid="guest-booking-consent" />
                 <div className="gd-consent-body">
-                  I consent to <b>{consentEntityName}</b> collecting and using my name, phone, and email to process this booking and send booking-related communications.{' '}
-                  <Link to="/privacy" className="gd-consent-link" onClick={(e) => e.stopPropagation()}>Privacy Policy</Link>
-                  {' '}&amp;{' '}
-                  <Link to="/terms" className="gd-consent-link" onClick={(e) => e.stopPropagation()}>Guest Terms</Link>.
+                  <label htmlFor="gd-consent">I consent to <b>{consentEntityName}</b> collecting and using my name, phone, and email to process this booking and send booking-related communications.</label>{' '}
+                  <Link to="/privacy" className="gd-consent-link">Privacy Policy</Link>{' '}&amp;{' '}
+                  <Link to="/terms" className="gd-consent-link">Guest Terms</Link>.
                   <span className="gd-consent-tag">Required · booking &amp; contact · DPDP Act, 2023</span>
-                  {/* Hidden native checkbox for testid compatibility */}
-                  <input
-                    type="checkbox"
-                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-                    checked={consentAccepted}
-                    onChange={(e) => { setConsentAccepted(e.target.checked); if (e.target.checked) setConsentError(''); }}
-                    aria-invalid={Boolean(consentError)}
-                    data-testid="guest-booking-consent"
-                    tabIndex={-1}
-                  />
                 </div>
               </div>
-              {consentError && <div className="gd-input-help error" role="alert">{consentError}</div>}
-
-              {/* WhatsApp opt-in — TASK-10050: unchecked by default, explicit opt-in required */}
-              <div
-                className={`gd-consent-row${whatsappOptIn ? ' checked' : ''}`}
-                onClick={() => setWhatsappOptIn((v) => !v)}
-                role="checkbox"
-                aria-checked={whatsappOptIn}
-                aria-label="Send my booking updates on WhatsApp"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === ' ' && setWhatsappOptIn((v) => !v)}
-                data-testid="guest-booking-whatsapp-consent-row"
-              >
-                <span className={`gd-check${whatsappOptIn ? ' checked' : ''}`}>
-                  <IconCheck size={14}/>
-                </span>
-                <div className="gd-consent-body">
-                  Send my booking updates on <b>WhatsApp</b> — confirmations, directions, host messages.{' '}
+              {consentError && <div id="gd-consent-error" className="gd-input-help error" role="alert">{consentError}</div>}
+              <div className={`gd-consent-row${whatsappOptIn ? ' checked' : ''}`} data-testid="guest-booking-whatsapp-consent-row">
+                <input id="gd-whatsapp-consent" type="checkbox" checked={whatsappOptIn} onChange={(e) => setWhatsappOptIn(e.target.checked)} data-testid="guest-booking-whatsapp-consent" />
+                <label htmlFor="gd-whatsapp-consent" className="gd-consent-body">Send my booking updates on <b>WhatsApp</b> — confirmations, directions, host messages.{' '}
                   <span style={{ color: 'var(--gd-faint)' }}>(Optional — requires your explicit consent.)</span>
-                </div>
-                <input
-                  type="checkbox"
-                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-                  checked={whatsappOptIn}
-                  onChange={(e) => setWhatsappOptIn(e.target.checked)}
-                  data-testid="guest-booking-whatsapp-consent"
-                  tabIndex={-1}
-                />
+                </label>
               </div>
-
-              {/* Marketing opt-in — optional, separate purpose (TASK-5137) */}
-              <div
-                className={`gd-consent-row${marketingOptIn ? ' checked' : ''}`}
-                onClick={() => setMarketingOptIn((v) => !v)}
-                role="checkbox"
-                aria-checked={marketingOptIn}
-                tabIndex={0}
-                onKeyDown={(e) => e.key === ' ' && setMarketingOptIn((v) => !v)}
-                data-testid="guest-booking-marketing-consent-row"
-              >
-                <span className={`gd-check${marketingOptIn ? ' checked' : ''}`}>
-                  <IconCheck size={14}/>
-                </span>
-                <div className="gd-consent-body">
-                  Send me promotional offers and deals from <b>{consentEntityName}</b>.{' '}
+              <div className={`gd-consent-row${marketingOptIn ? ' checked' : ''}`} data-testid="guest-booking-marketing-consent-row">
+                <input id="gd-marketing-consent" type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} data-testid="guest-booking-marketing-consent" />
+                <label htmlFor="gd-marketing-consent" className="gd-consent-body">Send me promotional offers and deals from <b>{consentEntityName}</b>.{' '}
                   <span style={{ color: 'var(--gd-faint)' }}>(Optional — you can withdraw anytime from your preferences link.)</span>
-                </div>
+                </label>
               </div>
             </div>
 
@@ -2176,7 +2124,7 @@ const GuestDetailsPage: React.FC = () => {
                 <div>
                   <b style={{ color: 'var(--gd-ink)' }}>Payment cancelled — no money taken.</b><br/>
                   Your dates are still held for{' '}
-                  <b style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--gd-coral)', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}>{countdown}</b>.
+                  <b style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--gd-accent-text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}>{countdown}</b>.
                   {' '}Ready to try again?
                   {razorpayOrderId && (
                     <span>
@@ -2569,6 +2517,7 @@ const gdStyles = `
   --gd-line: rgba(59, 31, 30, 0.12);
   --gd-line-strong: rgba(59, 31, 30, 0.20);
   --gd-coral: var(--cta-primary, #c04528);
+  --gd-accent-text: #a83c22;
   --gd-coral-dark: var(--cta-primary-hover, #a83c22);
   --gd-amber: #d4724e;
   --gd-success: #157046;
@@ -2667,7 +2616,7 @@ const gdStyles = `
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-weight: 700;
   font-size: 13.5px;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
@@ -2705,7 +2654,7 @@ const gdStyles = `
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 16px;
   font-weight: 700;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
   flex-shrink: 0;
@@ -2742,13 +2691,14 @@ const gdStyles = `
   width: 44px; height: 44px;
   border-radius: 12px;
   background: var(--gd-peach);
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
 }
 .gd-modal h3 {
+  color: var(--gd-ink);
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500;
   font-size: 24px;
@@ -2766,7 +2716,7 @@ const gdStyles = `
   display: block;
   width: 100%;
   background: var(--gd-coral);
-  color: #fff;
+  color: var(--text-on-cta, #fff);
   border: 0;
   border-radius: 12px;
   padding: 14px 18px;
@@ -2885,7 +2835,7 @@ const gdStyles = `
   gap: 8px;
 }
 .gd-recap-edit-link {
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-weight: 600;
   text-decoration: none;
   font-size: 12px;
@@ -2907,6 +2857,7 @@ const gdStyles = `
   margin-bottom: 14px;
 }
 .gd-fset-head h3 {
+  color: var(--gd-ink);
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500;
   font-size: 22px;
@@ -2944,10 +2895,10 @@ const gdStyles = `
 }
 .gd-input::placeholder { color: #aaa097; }
 .gd-input:focus {
-  border-color: var(--gd-coral);
+  border-color: var(--gd-accent-text);
   box-shadow: 0 0 0 4px rgba(196, 90, 63,0.12);
 }
-.gd-input--error { border-color: var(--gd-coral) !important; }
+.gd-input--error { border-color: var(--gd-danger) !important; }
 .gd-input-help {
   font-size: 11.5px;
   color: var(--gd-faint);
@@ -2960,7 +2911,7 @@ const gdStyles = `
 /* Phone row */
 .gd-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; }
 .gd-input--error-wrap .gd-dial select,
-.gd-input--error-wrap .gd-input { border-color: var(--gd-coral); }
+.gd-input--error-wrap .gd-input { border-color: var(--gd-accent-text); }
 
 .gd-dial { position: relative; }
 .gd-dial select {
@@ -2980,7 +2931,7 @@ const gdStyles = `
   box-sizing: border-box;
 }
 .gd-dial select:focus {
-  border-color: var(--gd-coral);
+  border-color: var(--gd-accent-text);
   box-shadow: 0 0 0 4px rgba(196, 90, 63,0.12);
 }
 .gd-dial::after {
@@ -3040,7 +2991,7 @@ const gdStyles = `
 /* Pill badge */
 .gd-pill {
   background: var(--gd-peach);
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-size: 11px;
   font-weight: 700;
   padding: 3px 8px;
@@ -3187,7 +3138,7 @@ const gdStyles = `
 .gd-check.checked {
   background: var(--gd-coral);
   border-color: var(--gd-coral);
-  color: #fff;
+  color: var(--text-on-cta, #fff);
 }
 .gd-check svg { opacity: 0; }
 .gd-check.checked svg { opacity: 1; }
@@ -3210,7 +3161,10 @@ const gdStyles = `
   transition: border-color .18s ease;
   position: relative;
 }
-.gd-consent-row.required { border-color: var(--gd-coral); background: #fff8f2; }
+.gd-consent-row input { width: 22px; height: 22px; accent-color: var(--gd-coral); cursor: pointer; }
+.gd-consent-row label { cursor: pointer; display: inline-block; min-height: 44px; align-content: center; }
+.gd-consent-row:focus-within { outline: 2px solid var(--gd-ink); outline-offset: 3px; }
+.gd-consent-row.required { border-color: var(--gd-accent-text); background: #fff8f2; }
 .gd-consent-row.checked { border-color: var(--gd-success); background: var(--gd-success-bg); }
 .gd-consent-flash { animation: gd-consent-flash 1.2s ease-out; }
 @keyframes gd-consent-flash {
@@ -3220,13 +3174,13 @@ const gdStyles = `
 }
 .gd-consent-body { font-size: 13px; color: var(--gd-ink-soft); line-height: 1.5; }
 .gd-consent-body b { color: var(--gd-ink); font-weight: 600; }
-.gd-consent-link { color: var(--gd-coral); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.gd-consent-link { color: var(--gd-accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .gd-consent-tag {
   display: inline-flex;
   align-items: center;
   font-size: 10px;
   font-weight: 700;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-left: 6px;
@@ -3273,6 +3227,7 @@ const gdStyles = `
   line-height: 1;
 }
 .gd-aside-stay-name {
+  color: var(--gd-ink);
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500;
   font-size: 17px;
@@ -3328,7 +3283,7 @@ const gdStyles = `
   letter-spacing: 0.02em;
 }
 
-/* Pay CTA */
+/* Pay CTA — use tenant fill/label together; neutral body and error text stay readable. */
 .gd-pay {
   display: flex;
   align-items: center;
@@ -3350,7 +3305,7 @@ const gdStyles = `
   transition: all .2s ease;
 }
 .gd-pay:hover:not(:disabled) { background: var(--gd-coral-dark); }
-.gd-pay[disabled] { background: #d4c6b8; color: #fff; cursor: not-allowed; box-shadow: none; }
+.gd-pay[disabled] { background: #d4c6b8; color: #493a32; cursor: not-allowed; box-shadow: none; }
 .gd-pay .num { font-variant-numeric: tabular-nums; }
 .gd-pay-microcopy {
   margin-top: 12px;
@@ -3380,7 +3335,7 @@ const gdStyles = `
 }
 .gd-trust-row svg { color: var(--gd-success); flex-shrink: 0; margin-top: 2px; }
 .gd-trust-row b { color: var(--gd-ink); font-weight: 600; }
-.gd-trust-row a { color: var(--gd-coral); font-weight: 600; text-decoration: none; }
+.gd-trust-row a { color: var(--gd-accent-text); font-weight: 600; text-decoration: none; }
 .gd-trust--mobile { display: none; }
 @media (max-width: 1023px) { .gd-trust--mobile { display: grid; } }
 
@@ -3397,7 +3352,7 @@ const gdStyles = `
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #94755b;
+  color: #765b45;
 }
 .gd-sec-row {
   display: flex;
@@ -3441,7 +3396,7 @@ const gdStyles = `
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #94755b;
+  color: #765b45;
 }
 .gd-pay-mark {
   display: inline-flex;
@@ -3483,7 +3438,7 @@ const gdStyles = `
 .gd-resume-btn {
   background: none;
   border: none;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -3518,7 +3473,7 @@ const gdStyles = `
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-weight: 700;
   font-size: 15px;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -3533,7 +3488,7 @@ const gdStyles = `
 }
 .gd-mobile-bar-cta {
   background: var(--gd-coral);
-  color: #fff;
+  color: var(--text-on-cta, #fff);
   border: 0;
   border-radius: 12px;
   padding: 14px 16px;
@@ -3547,7 +3502,7 @@ const gdStyles = `
   gap: 6px;
   box-shadow: 0 4px 12px rgba(196, 90, 63,0.28);
 }
-.gd-mobile-bar-cta[disabled] { background: #d4c6b8; box-shadow: none; cursor: not-allowed; }
+.gd-mobile-bar-cta[disabled] { background: #d4c6b8; color: #493a32; box-shadow: none; cursor: not-allowed; }
 .gd-mobile-bar-cta .num { font-variant-numeric: tabular-nums; }
 `;
 
