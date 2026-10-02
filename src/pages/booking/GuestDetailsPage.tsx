@@ -2568,8 +2568,8 @@ const gdStyles = `
   --gd-peach: #f5c8b0;
   --gd-line: rgba(59, 31, 30, 0.12);
   --gd-line-strong: rgba(59, 31, 30, 0.20);
-  --gd-coral: #c04528;
-  --gd-coral-dark: #a83c22;
+  --gd-coral: var(--cta-primary, #c04528);
+  --gd-coral-dark: var(--cta-primary-hover, #a83c22);
   --gd-amber: #d4724e;
   --gd-success: #157046;
   --gd-success-bg: #e9f5ef;
@@ -3337,7 +3337,7 @@ const gdStyles = `
   width: 100%;
   margin-top: 20px;
   background: var(--gd-coral);
-  color: #fff;
+  color: var(--text-on-cta, #fff);
   border: 0;
   border-radius: 14px;
   padding: 16px 20px;
