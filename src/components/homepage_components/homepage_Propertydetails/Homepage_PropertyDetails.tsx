@@ -5,6 +5,7 @@ import React from 'react';
 import { toast } from 'react-toastify'; // TASK-4288: share fallback feedback
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
+import { useListingTenantName } from '@/hooks/useListingTenantName';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantListingAddress, getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
@@ -558,6 +559,8 @@ const PropertyDetails = () => {
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
     const { setProperty, updateBooking } = useBooking();
     const [searchParams] = useSearchParams();
+    const isMarketplaceDetail = !!_getTenantCtx()?.isMarketplaceRoot;
+    const listingTenantName = useListingTenantName(isMarketplaceDetail ? searchParams.get('tenant')?.trim() || null : null);
     // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
     const backToResultsHref = useMemo(() => {
         const searchKeys = ["checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
@@ -1557,11 +1560,9 @@ useEffect(() => {
     const ppBrandName = getTenantBrandName();
     const ppHasRealHost = !!data.hostName?.trim();
     const ppHostAbout = data.hostAbout?.trim() ?? '';
-    // TASK-4311: On the marketplace, check for ?tenant=TenantName query param to show the actual listing's tenant
-    const tenantNameFromUrl = searchParams.get('tenant')?.trim();
     const ppHostDisplayName = ppHasRealHost
       ? data.hostName!.trim()
-      : tenantNameFromUrl ? `Listed by ${tenantNameFromUrl}` : `Listed by ${ppBrandName}`;
+      : isMarketplaceDetail ? (listingTenantName ? `Listed by ${listingTenantName}` : 'Your host') : `Listed by ${ppBrandName}`;
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
     // TASK-7428: one shared predicate for "an online gateway will actually charge this guest" —
     // drives both the cancellation copy and the Razorpay payment-rail claim below.
@@ -1577,7 +1578,8 @@ useEffect(() => {
         (mapLocation != null && typeof mapLocation.lat === 'number' && Number.isFinite(mapLocation.lat));
     // TASK-7192: guest-facing phone precedence — WhatsApp/booking number wins over listing hostPhone.
     const listingHostDigits = (data.hostPhone?.replace(/\D/g, '') || '').trim();
-    const ppHostPhone = getGuestFacingPhone('business') || listingHostDigits;
+    // MKT-011: the marketplace's own contact must never replace a listing host.
+    const ppHostPhone = isMarketplaceDetail ? listingHostDigits : getGuestFacingPhone('business') || listingHostDigits;
     const ppHasHostPhone = ppHostPhone.length > 0;
     const ppWaDigits = ppHostPhone.length === 10 ? `91${ppHostPhone}` : ppHostPhone;
     const ppWaBookingUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}` : '';
@@ -2003,7 +2005,7 @@ useEffect(() => {
                         {ppHostDisplayName}
                       </div>
                       <div className="pp-host-sub">
-                        Hosted directly · Responds on WhatsApp · Direct booking
+                        {isMarketplaceDetail && !ppHasHostPhone ? 'Hosted directly · Contact details unavailable' : 'Hosted directly · Responds on WhatsApp · Direct booking'}
                         {responseTimeBadge ? ` · ${responseTimeBadge}` : ''}
                         {reviewReplyRateBadge ? ` · ${reviewReplyRateBadge}` : ''}
                       </div>
@@ -2015,6 +2017,7 @@ useEffect(() => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="pp-btn pp-btn-whatsapp pp-btn-sm"
+                          style={{ minHeight: 44 }}
                           data-testid="chat-with-host-btn"
                           aria-label={`Message host about ${data.property_name} on WhatsApp`}
                           onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
@@ -2028,6 +2031,7 @@ useEffect(() => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`pp-btn pp-btn-sm${ppIsDraft ? ' pp-btn-whatsapp' : ' pp-btn-ghost'}`}
+                          style={{ minHeight: 44 }}
                           aria-label="Ask host a question on WhatsApp"
                           data-testid={ppIsDraft ? 'draft-listing-ask-host' : undefined}
                         >
