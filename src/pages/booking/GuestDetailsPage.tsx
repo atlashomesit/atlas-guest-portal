@@ -1646,7 +1646,7 @@ const GuestDetailsPage: React.FC = () => {
                   className={`gd-input${formErrors.name ? ' gd-input--error' : ''}`}
                   placeholder="As on a government ID"
                   value={formData.name}
-                  onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, name: e.target.value })); setFormErrors((p) => ({ ...p, name: '' })); }}
                   onFocus={scrollFieldIntoView}
                   data-testid="guest-booking-name"
                 />
@@ -1667,7 +1667,7 @@ const GuestDetailsPage: React.FC = () => {
                   className={`gd-input${formErrors.email ? ' gd-input--error' : ''}`}
                   placeholder="you@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, email: e.target.value })); setFormErrors((p) => ({ ...p, email: '' })); }}
                   onFocus={scrollFieldIntoView}
                   data-testid="guest-booking-email"
                 />
@@ -1709,6 +1709,7 @@ const GuestDetailsPage: React.FC = () => {
                     maxLength={getGuestDialOption(phoneDialCode).maxDigits}
                     value={formData.phone}
                     onChange={(e) => {
+                      setFormErrors((p) => ({ ...p, phone: '' }));
                       const dial = getGuestDialOption(phoneDialCode);
                       setFormData((p) => ({
                         ...p,
@@ -3226,6 +3227,7 @@ const gdStyles = `
   line-height: 1;
 }
 .gd-aside-stay-name {
+  color: var(--gd-ink);
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500;
   font-size: 17px;
