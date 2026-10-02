@@ -224,7 +224,7 @@ export default function FavoritesPage() {
                 className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow"
               >
                 <div className="relative">
-                  <Link to={path} className="block">
+                  <Link to={path} className="block" aria-label={`View ${l.name || 'saved home'}`}>
                     <SavedHomeCover src={l.coverPhotoUrl} alt={l.name ?? "Home"} />
                   </Link>
                   {/* TASK-4297: in a SHARED wishlist view the listing isn't the viewer's own save —

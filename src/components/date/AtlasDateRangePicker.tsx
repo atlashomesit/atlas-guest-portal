@@ -553,6 +553,7 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
             shownDate={normalizeToStartOfMonth(internalShownDate)}
             onShownDateChange={handleShownDateChange}
             rangeColors={rangeColors}
+            ariaLabels={{ prevButton: 'Previous month', nextButton: 'Next month', monthPicker: 'Month', yearPicker: 'Year' }}
             {...dateRangeProps}
             onChange={handleRangeChange}
           />

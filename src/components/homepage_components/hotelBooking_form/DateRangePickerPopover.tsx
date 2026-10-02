@@ -119,6 +119,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
               type="button"
               onClick={onClose}
               aria-label="Close date picker"
+              style={{ minWidth: 44, minHeight: 44 }}
               className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-base font-semibold text-[var(--text-primary)] shadow-sm"
             >
               ×
