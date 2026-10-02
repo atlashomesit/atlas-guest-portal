@@ -359,10 +359,12 @@ const MonthGrid: React.FC<MonthProps> = ({
           <div key={d} className="bc-dow">{d}</div>
         ))}
       </div>
-      <div className="bc-grid" role="grid">
-        {cells.map((d, i) => {
+      <div className="bc-grid" role="grid" aria-label={`${MONTH_NAMES[month]} ${year}`} >
+        {Array.from({ length: cells.length / 7 }, (_, week) => <div role="row" key={week} style={{ display: 'contents' }}>
+        {cells.slice(week * 7, week * 7 + 7).map((d, dayIndex) => {
+          const i = week * 7 + dayIndex;
           if (d === null) {
-            return <div key={i} className="bc-cell-wrap bc-empty" />;
+            return <div key={i} className="bc-cell-wrap bc-empty" role="gridcell" />;
           }
           const date = new Date(year, month, d);
           date.setHours(0, 0, 0, 0);
@@ -421,6 +423,7 @@ const MonthGrid: React.FC<MonthProps> = ({
             />
           );
         })}
+        </div>)}
       </div>
     </div>
   );

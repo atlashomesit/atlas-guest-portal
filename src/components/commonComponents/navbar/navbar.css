@@ -631,3 +631,5 @@
     display: flex !important;
   }
 }
+/* The neutral fallback artwork uses dark strokes; keep it visible on dark tenant headers. */
+.navbar-logo[src$="tenant-logo-placeholder.svg"] { background: #fefcf9; border-radius: 8px; padding: 4px; }

@@ -11,7 +11,6 @@ import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
 import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
-import MobileMarketplaceNav from '@/components/marketplace/MobileMarketplaceNav'; // TASK-102165
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
@@ -660,8 +659,6 @@ export default function MarketplaceHomepage() {
         </div>
       )}
     </section>
-    {/* TASK-102165: mobile bottom nav (Explore, Wishlists, Bookings, Support). */}
-    <MobileMarketplaceNav />
     </>
   );
 }

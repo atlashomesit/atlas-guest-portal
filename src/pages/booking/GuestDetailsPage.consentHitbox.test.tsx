@@ -61,9 +61,9 @@ describe("GuestDetailsPage consent hitbox (TASK-102395)", () => {
   test("clicking the label text toggles consent", async () => {
     await renderPage();
     await settle();
-    const row = screen.getByTestId("guest-booking-consent-row");
-    expect(row).toHaveAttribute("aria-checked", "false");
+    const checkbox = screen.getByRole("checkbox", { name: /collecting and using my name/i });
+    expect(checkbox).not.toBeChecked();
     fireEvent.click(screen.getByText(/collecting and using my name/i));
-    expect(row).toHaveAttribute("aria-checked", "true");
+    expect(checkbox).toBeChecked();
   });
 });

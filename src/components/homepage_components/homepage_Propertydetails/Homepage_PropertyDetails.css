@@ -95,10 +95,10 @@
   text-decoration: none;
 }
 .pp-btn-primary {
-  background: #c04528; color: #fff;
+  background: var(--cta-primary, #c04528); color: var(--text-on-cta, #fff);
   box-shadow: 0 2px 8px rgba(196, 90, 63,.22), 0 1px 2px rgba(196, 90, 63,.12);
 }
-.pp-btn-primary:hover { background: #a83c22; box-shadow: 0 4px 12px rgba(196, 90, 63,.28); }
+.pp-btn-primary:hover { background: var(--cta-primary-hover, #a83c22); box-shadow: 0 4px 12px rgba(196, 90, 63,.28); }
 .pp-btn-secondary { background: #fff; color: #3b1f1e; border-color: #e5d9ce; }
 .pp-btn-secondary:hover { border-color: #c04528; color: #c04528; }
 .pp-btn-ghost { background: transparent; color: #3b1f1e; border-color: #f0ddd0; }
