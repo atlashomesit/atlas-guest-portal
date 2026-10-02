@@ -37,6 +37,10 @@ describe('AtlasDateRangePicker - Navigation Buttons', () => {
 
   it('should render navigation buttons', () => {
     render(<AtlasDateRangePicker {...defaultProps} />);
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Next month')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Month' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Year' })).toBeInTheDocument();
     
     const navButtons = document.querySelectorAll('.rdrNextPrevButton');
     expect(navButtons.length).toBeGreaterThanOrEqual(2);
@@ -248,4 +252,5 @@ describe('AtlasDateRangePicker - Navigation Buttons', () => {
     });
   });
 });
+
 

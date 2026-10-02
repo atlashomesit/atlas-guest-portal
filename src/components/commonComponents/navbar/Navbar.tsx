@@ -79,7 +79,7 @@ const Navbar = () => {
   }, [location.pathname]);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `nav-link ${isActive ? 'text-white' : ''}`;
+    `nav-link ${isActive ? 'font-semibold underline underline-offset-4' : ''}`;
 
   const closeMobile = () => {
     setIsMenuOpen(false);

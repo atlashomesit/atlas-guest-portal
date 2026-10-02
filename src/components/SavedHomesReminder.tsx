@@ -14,6 +14,10 @@ export default function SavedHomesReminder({ initialEmail, listingIds, tenantSlu
   const [partialCount, setPartialCount] = useState(0);
   const active = useRef(true);
   const request = useRef<AbortController | null>(null);
+  const confirmation = useRef<HTMLParagraphElement | null>(null);
+  useEffect(() => {
+    if (state === 'done') confirmation.current?.focus();
+  }, [state]);
 
   useEffect(() => {
     active.current = true;
@@ -53,17 +57,16 @@ export default function SavedHomesReminder({ initialEmail, listingIds, tenantSlu
     }
   };
 
-  if (state === 'done') {
-    return <p role="status" className="text-sm text-green-700 font-medium">✓ We'll remind you in 7 days if you haven't booked.</p>;
-  }
-
   return (
     <section aria-labelledby="saved-home-reminder-title" className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-4">
       <h2 id="saved-home-reminder-title" className="text-sm font-medium text-text-primary mb-1">Get reminded about these homes</h2>
       <p id="reminder-email-description" className="text-xs text-text-secondary mb-3">
         We'll send a one-time reminder in 7 days if you haven't booked yet. You can use a different email.
       </p>
-      <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
+      <p ref={confirmation} role="status" aria-live="polite" tabIndex={-1} className="text-sm text-green-700 font-medium focus:outline-2 focus:outline-offset-2">
+        {state === 'done' ? "✓ We'll remind you in 7 days if you haven't booked." : ''}
+      </p>
+      {state !== 'done' && <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
         <label htmlFor="saved-home-reminder-email" className="sr-only">Reminder email address</label>
         <input
           id="saved-home-reminder-email"
@@ -78,17 +81,17 @@ export default function SavedHomesReminder({ initialEmail, listingIds, tenantSlu
           onChange={(event) => { setEmail(event.target.value); setState('idle'); }}
           className="flex-1 min-w-0 rounded-lg border border-border-subtle px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary"
         />
-        <button type="submit" disabled={state === 'busy'} className="rounded-lg bg-brand-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50 min-h-11">
+        <button type="submit" disabled={state === 'busy'} className="rounded-lg bg-brand-primary px-4 py-3 text-sm font-semibold text-white hover:underline transition disabled:opacity-50 min-h-11">
           {state === 'busy' ? 'Saving…' : 'Remind me'}
         </button>
-      </form>
+      </form>}
       {state === 'error' && (
-        <p className="text-xs text-red-600 mt-2" role="alert">
+        <p className="text-xs text-red-700 mt-2" role="alert">
           {partialCount > 0 ? `Reminder set for ${partialCount} of ${listingIds.length} homes. ` : ''}
           We couldn't save your reminder for every saved home. Please try again in a moment.
         </p>
       )}
-      {state === 'invalid' && <p className="text-xs text-red-600 mt-2" role="alert">Please enter a valid email address.</p>}
+      {state === 'invalid' && <p className="text-xs text-red-700 mt-2" role="alert">Please enter a valid email address.</p>}
     </section>
   );
 }
