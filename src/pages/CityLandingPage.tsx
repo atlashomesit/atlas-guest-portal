@@ -91,6 +91,8 @@ function toListingCardModel(listing: PublicListing) {
     cancellationTier: listing.cancellationTier ?? null,
     // MKT-004: undefined on tenant-scoped sites — same-tenant navigation needs no ?tenant= hint.
     tenantSlug: undefined as string | undefined,
+    hostIdentityVerified: false,
+    marketplace: false,
   };
 }
 
@@ -98,6 +100,7 @@ type CityLandingCard = ReturnType<typeof toListingCardModel>;
 
 /** MKT-004: subset of `MarketplaceListingDto` (`GET /marketplace/listings`) this page needs. */
 type MarketplaceCityListingRow = {
+  hostIdentityVerified?: unknown;
   id: number;
   tenantSlug: string;
   title: string;
@@ -174,6 +177,8 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     // MKT-004: cross-tenant card — navigation must carry the owning tenant so the detail page
     // resolves the right listing instead of defaulting to the marketplace host's own tenant.
     tenantSlug: item.tenantSlug,
+    hostIdentityVerified: item.hostIdentityVerified === true,
+    marketplace: true,
   };
 }
 
@@ -340,6 +345,8 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
               return (
                 <ListingCard
                   key={c.id}
+                  marketplace={c.marketplace}
+                  hostIdentityVerified={c.hostIdentityVerified}
                   id={c.id}
                   name={c.name}
                   location={c.location}

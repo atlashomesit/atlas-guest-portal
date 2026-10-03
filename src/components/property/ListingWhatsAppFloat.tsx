@@ -85,7 +85,7 @@ export const ListingWhatsAppFloat: React.FC<ListingWhatsAppFloatProps> = ({
           { surface: "listing_float", listingId: listingId ?? undefined },
         )
       }
-      className="fixed right-4 md:right-5 bottom-[8.5rem] md:bottom-24 z-[var(--z-floating)] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-level3 transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
+      className="fixed left-4 md:left-5 bottom-[8.5rem] md:bottom-24 z-[var(--z-floating)] flex h-14 w-14 items-center justify-center rounded-full text-white shadow-level3 transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-primary"
       style={{ backgroundColor: "#075e54" }}
     >
       <WhatsAppGlyph />

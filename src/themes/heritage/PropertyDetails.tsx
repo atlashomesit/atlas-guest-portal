@@ -1,3 +1,4 @@
+import MarketplaceHostIdentity from '@/components/property/MarketplaceHostIdentity';
 /**
  * TASK-4914 / ADR-0081 D8 — "heritage" layout theme's PropertyDetails page.
  *
@@ -2008,6 +2009,7 @@ useEffect(() => {
 
                 {/* Host strip + trust panel */}
                 <section className="pp-section" style={{ paddingTop: 28 }} aria-label="About the host">
+                  <MarketplaceHostIdentity marketplace={isMarketplaceHost} listingId={resolvedListingId} />
                   <div className="pp-host">
                     <div className="pp-host-avatar" aria-hidden="true">{ppHostInitial}</div>
                     <div>

@@ -1,3 +1,4 @@
+import MarketplaceHostIdentity from '@/components/property/MarketplaceHostIdentity';
 import './Homepage_PropertyDetails.css';
 import RatingDistribution from '../../property/RatingDistribution';
 import { starDistribution } from '../../property/starDistribution';
@@ -2044,6 +2045,7 @@ useEffect(() => {
 
                 {/* Host strip + trust panel */}
                 <section className="pp-section" style={{ paddingTop: 28 }} aria-label="About the host">
+                  <MarketplaceHostIdentity marketplace={isMarketplaceDetail} listingId={resolvedListingId} />
                   <div className="pp-host">
                     <div className="pp-host-avatar" aria-hidden="true">{ppHostInitial}</div>
                     <div>
