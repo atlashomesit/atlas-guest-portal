@@ -1,3 +1,4 @@
+import HostIdentityLabel from '@/components/property/HostIdentityLabel';
 import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 import React, { useMemo, useState } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
@@ -17,6 +18,8 @@ import {
 import { hasOnlinePaymentRail } from "../../tenant/paymentRail";
 
 type ListingCardProps = {
+  hostIdentityVerified?: unknown;
+  marketplace?: boolean;
   id: string;
   name: string;
   location: string;
@@ -71,6 +74,8 @@ type ListingCardProps = {
 
 const ListingCard: React.FC<ListingCardProps> = ({
   id,
+  hostIdentityVerified,
+  marketplace = false,
   name,
   location,
   neighborhoods = [],
@@ -296,6 +301,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
             )}
           </div>
         </div>
+
+        <HostIdentityLabel marketplace={marketplace} verified={hostIdentityVerified} />
 
         {/* TASK-1360: Last-booked social-proof badge */}
         {lastBookedLabel && (

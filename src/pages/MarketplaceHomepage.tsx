@@ -1,3 +1,4 @@
+import HostIdentityLabel from '@/components/property/HostIdentityLabel';
 import { feePercent } from "../utils/paymentFeeCopy";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -33,6 +34,7 @@ type MarketplacePropertyApi = {
 };
 
 type MarketplaceItem = {
+  hostIdentityVerified?: unknown;
   id: number;
   tenantSlug: string;
   tenantName: string;
@@ -508,7 +510,7 @@ export default function MarketplaceHomepage() {
                 <button
                   type="button"
                   aria-label={isFav ? 'Remove from saved' : 'Save listing'}
-                  className="absolute right-2 top-2 z-10 rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
+                  className="absolute right-2 top-2 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
                   onClick={() => {
                     toggleFavorite(item.id);
                     setFavEpoch((e) => e + 1);
@@ -522,6 +524,7 @@ export default function MarketplaceHomepage() {
                 <div className="flex flex-1 flex-col gap-2 p-4">
                   <div className="text-xs uppercase tracking-wide text-text-muted">{item.tenantName}</div>
                   <h2 className="text-base font-semibold text-text-primary leading-snug">{item.title}</h2>
+                  <HostIdentityLabel marketplace verified={item.hostIdentityVerified} />
 
                   {/* TASK-4511: Trust signal badges */}
                   {(item.hasVerifiedPhotos || item.isGstRegistered) && (
@@ -616,7 +619,7 @@ export default function MarketplaceHomepage() {
                   <OwnerShareBadge className="self-start" processingFeePercent={item.chargesOnlinePaymentFee === false ? 0 : feePercent(item.convenienceFeePercent)} />
 
                   <Link
-                    className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
+                    className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
                     to={marketplaceListingPath(item, searchSuffix)}
                   >
                     View home
