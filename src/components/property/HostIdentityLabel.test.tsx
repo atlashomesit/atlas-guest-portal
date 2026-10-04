@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import HostIdentityLabel from './HostIdentityLabel';
 import MarketplaceHostIdentity from './MarketplaceHostIdentity';
+import { settle } from '../../test/settle';
 vi.mock('@/api/client', () => ({ buildApiUrl: (path: string) => `/api${path}` }));
 afterEach(() => vi.unstubAllGlobals());
 
@@ -29,16 +30,19 @@ describe('marketplace identity fact', () => {
     const fetch = vi.fn().mockResolvedValueOnce({ ok: true, json: async () => ({ listingId: 9001, hostIdentityVerified: true }) }).mockResolvedValue({ ok: false });
     vi.stubGlobal('fetch', fetch);
     const { rerender } = render(<MarketplaceHostIdentity marketplace listingId={9001} />);
-    await screen.findByText('ID-verified host');
+    await settle();
+    expect(screen.getByText('ID-verified host')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/marketplace/properties/9001', expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }));
     rerender(<MarketplaceHostIdentity marketplace listingId={9002} />);
     expect(screen.queryByText('ID-verified host')).not.toBeInTheDocument();
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    await settle();
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
   it.each([{ listingId: 9002, hostIdentityVerified: true }, { listingId: 9001, hostIdentityVerified: 'true' }])('refuses mismatched or malformed DTOs', async payload => {
     const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => payload }); vi.stubGlobal('fetch', fetch);
     render(<MarketplaceHostIdentity marketplace listingId={9001} />);
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    await settle();
+    expect(fetch).toHaveBeenCalled();
     expect(screen.queryByText('ID-verified host')).not.toBeInTheDocument();
   });
 });
