@@ -1,0 +1,71 @@
+{
+  "slug": "nashik",
+  "cityName": "Nashik",
+  "h1": "Homestays in Nashik — vineyard weekends and Trimbakeshwar temple circuits",
+  "metaTitle": "Nashik homestays | Vineyards, Panchavati & Trimbakeshwar | {{TENANT_BRAND}}",
+  "metaDescription": "Find Nashik homestays near Sula vineyards, Panchavati, and Trimbakeshwar. Quiet homes with reliable WiFi—book direct on {{TENANT_BRAND}}.",
+  "listingKeywords": [
+    "nashik",
+    "sula",
+    "sula vineyards",
+    "panchavati",
+    "trimbakeshwar",
+    "trimbak",
+    "gangapur",
+    "igatpuri",
+    "dindori",
+    "ojhar",
+    "sinnar",
+    "tapovan"
+  ],
+  "introParagraphs": [
+    "Nashik balances pilgrim circuits with a quieter wine-country weekend. Homestays give visiting families and friends a base close to vineyards without the price tag or formality of full resort bookings—kitchens for early breakfasts before darshan, gardens for evening sit-outs.",
+    "Pick your anchor before booking. Panchavati suits temple-circuit visitors; the Sula-Yorke belt suits leisure trips and tastings; Trimbakeshwar and Igatpuri work for off-grid weekends and short treks.",
+    "{{TENANT_BRAND}} focuses on transparent nightly pricing and structured booking confirmations. The cards below filter live listings whose addresses reference Nashik or its surrounding areas—verify pin codes and landmarks on the listing page before you pay.",
+    "Kumbh Mela years and major festivals move demand quickly. If your dates flex, mid-week stays outside festival windows price softer and offer more host availability.",
+    "Food is varied: traditional Maharashtrian thalis, vineyard-side European, and Punjabi dhabas along the highway. Ask your host for vetted dining options that match your pace."
+  ],
+  "areasTitle": "Top areas in Nashik for homestay guests",
+  "areas": [
+    {
+      "title": "Sula vineyards belt",
+        "body": "Cluster of vineyards around Gangapur and the Sula-Yorke roads. Ideal for tasting weekends and relaxed evenings. Listings here tend to advertise gardens, outdoor seating, and quiet hours."
+    },
+    {
+        "title": "Panchavati and central Nashik",
+        "body": "Walking distance to Ramkund, Kalaram, and the main temple circuit. Suited to pilgrim visits and short family trips where proximity to ghats matters more than acreage."
+      },
+      {
+        "title": "Trimbakeshwar and Igatpuri",
+        "body": "Quieter outlying areas suited to off-grid stays, treks, and dam visits. Plan drive times carefully and confirm mobile-network coverage if your work depends on connectivity."
+      }
+    ],
+  "seasonTitle": "Best time to visit Nashik",
+  "seasonParagraphs": [
+    "October to March brings cool mornings and clear evenings—ideal for vineyard visits and temple circuits.",
+    "April to June is hot and dry; the surrounding hills offer some relief but plan indoor activities during midday.",
+    "July to September is the heavy monsoon. Some rural roads become difficult to navigate—confirm access and consider properties on paved routes."
+  ],
+  "faq": [
+    {
+      "question": "Are Nashik homestays suited to family visits?",
+      "answer": "Many hosts welcome families and provide extra mattresses on request. Confirm max guest counts, stair access, and kitchen availability in writing."
+    },
+    {
+      "question": "How do I pick between Panchavati and a vineyard stay?",
+      "answer": "Panchavati suits temple-circuit visitors wanting walking access; vineyard properties suit leisure weekends and tastings. Match your anchor to your itinerary, not your nightly rate."
+    },
+    {
+      "question": "Is parking available at Nashik homestays?",
+      "answer": "Varies by property. Ask the host whether sedan or SUV height fits their driveway and whether self-driving is feasible during the monsoon."
+    },
+    {
+      "question": "Can hosts arrange local transport?",
+      "answer": "Some do via trusted drivers familiar with the temple circuit and the vineyard belt. Confirm rates and pickup points through booking messaging."
+    },
+    {
+      "question": "Why book Nashik stays direct on {{TENANT_BRAND}}?",
+      "answer": "Direct booking keeps communication transparent and shows cancellation tiers when configured. Confirmations anchor support if plans change."
+    }
+  ]
+}

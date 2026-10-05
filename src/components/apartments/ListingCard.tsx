@@ -1,3 +1,4 @@
+import HostIdentityLabel from '@/components/property/HostIdentityLabel';
 import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 import React, { useMemo, useState } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
@@ -17,6 +18,8 @@ import {
 import { hasOnlinePaymentRail } from "../../tenant/paymentRail";
 
 type ListingCardProps = {
+  hostIdentityVerified?: unknown;
+  marketplace?: boolean;
   id: string;
   name: string;
   location: string;
@@ -55,6 +58,15 @@ type ListingCardProps = {
   /** DESIGN-028: listing-scoped cancellation tier for the card trust chip. */
   cancellationTier?: CancellationTier | string | null;
   onClick?: () => void;
+  /**
+   * MKT-014: when set, the card is rendered as a crawlable anchor (`<a href={href}>`) wrapping
+   * the article. Crawlers and AI answer engines need a real `<a>` to follow the card to its
+   * detail page; the previous shape (an `<article>` with three `<button>` children that all
+   * `navigate()` on click) was JS-empty. The click behavior is identical — clicking anywhere in
+   * the card navigates to the listing detail page. `onClick` may still be passed for places that
+   * need an extra side effect, but the anchor's default follows `href` natively.
+   */
+  href?: string;
 };
 
 // TASK-1687: replaced module-level INR-only formatter with the
@@ -62,6 +74,8 @@ type ListingCardProps = {
 
 const ListingCard: React.FC<ListingCardProps> = ({
   id,
+  hostIdentityVerified,
+  marketplace = false,
   name,
   location,
   neighborhoods = [],
@@ -88,6 +102,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   isGstRegistered = true, // TASK-4312: default to true for backward compat
   cancellationTier = null,
   onClick,
+  href,
 }) => {
   const processingFeePercent = useTenantProcessingFee();
   const cancellationChip = resolveListingCardCancellationChip(cancellationTier);
@@ -187,34 +202,57 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
   return (
     <article
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1 md:"
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick?.();
-        }
-      }}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1"
     >
-      <div className="relative h-56 w-full overflow-hidden">
-        <OptimizedImage
-          src={image?.trim() ? image : getPropertyDesignImage(id)}
-          alt={name}
-          className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
-          wrapperClassName="h-full"
-          sizes="(max-width: 768px) 100vw, 33vw"
-        />
-        <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary">
-          {propertyType}
-        </span>
-      </div>
+      {href ? (
+        // MKT-014: a non-interactive image wrapper when the card is itself a link, so the page
+        // contains a single crawlable `<a href>` per card. The anchor (rendered further down) is
+        // the focusable element; clicks on the image area follow it naturally.
+        <a
+          href={href}
+          aria-label={`View photos and room ${name}`}
+          className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]"
+        >
+          <OptimizedImage
+            src={image?.trim() ? image : getPropertyDesignImage(id)}
+            alt={name}
+            className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
+            wrapperClassName="h-full"
+            sizes="(max-width: 768px) 100vw, 33vw"
+          />
+          <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary">
+            {propertyType}
+          </span>
+        </a>
+      ) : (
+        <button type="button" onClick={onClick} aria-label={`View photos and room ${name}`} className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]">
+          <OptimizedImage
+            src={image?.trim() ? image : getPropertyDesignImage(id)}
+            alt={name}
+            className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
+            wrapperClassName="h-full"
+            sizes="(max-width: 768px) 100vw, 33vw"
+          />
+          <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary">
+            {propertyType}
+          </span>
+        </button>
+      )}
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-semibold text-text-primary">{name}</h3>
+            <h3 className="text-lg font-semibold text-text-primary">
+              {href ? (
+                <a href={href} className="block min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">
+                  {name}
+                </a>
+              ) : (
+                <button type="button" onClick={onClick} className="min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">
+                  {name}
+                </button>
+              )}
+            </h3>
             <p className="text-sm text-text-muted">{location}</p>
             {neighborhoods.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-2">
@@ -238,7 +276,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                 }}
-                className="inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100 transition-colors"
+                className="inline-flex min-h-11 items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100 transition-colors"
                 aria-label="View guest reviews"
               >
                 <span aria-hidden>★</span>
@@ -251,7 +289,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                 onClick={(e) => {
                   e.stopPropagation();
                 }}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-text-primary hover:opacity-80 transition-opacity"
+                className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-text-primary hover:opacity-80 transition-opacity"
                 aria-label="View guest reviews"
               >
                 <span aria-hidden>★</span>
@@ -263,6 +301,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
             )}
           </div>
         </div>
+
+        <HostIdentityLabel marketplace={marketplace} verified={hostIdentityVerified} />
 
         {/* TASK-1360: Last-booked social-proof badge */}
         {lastBookedLabel && (
@@ -338,7 +378,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowTotal(false)}
-                    className="text-xs text-cta-primary hover:underline font-semibold self-start"
+                    className="min-h-11 text-xs text-cta-primary hover:underline font-semibold self-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]"
                   >
                     Hide total
                   </button>
@@ -350,7 +390,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     {processingFeePercent !== null && <button
                       type="button"
                       onClick={() => setShowTotal(true)}
-                      className="text-xs text-cta-primary hover:underline font-semibold self-start"
+                      className="min-h-11 text-xs text-cta-primary hover:underline font-semibold self-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]"
                     >
                       See total ↓
                     </button>}
@@ -413,17 +453,27 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   <OwnerShareBadge nightlyPrice={finalPrice} />
                 </div>
               </div>
-              <button
-                type="button"
-                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-3 text-sm font-semibold text-[color:var(--text-on-cta)] transition duration-150 hover:-translate-y-0.5  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onClick?.();
-                }}
-                aria-label={`View room ${name}`}
-              >
-                View room
-              </button>
+              {href ? (
+                <a
+                  href={href}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-3 text-sm font-semibold text-[color:var(--text-on-cta)] transition duration-150 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
+                  aria-label={`View room ${name}`}
+                >
+                  View room
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-3 text-sm font-semibold text-[color:var(--text-on-cta)] transition duration-150 hover:-translate-y-0.5  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onClick?.();
+                  }}
+                  aria-label={`View room ${name}`}
+                >
+                  View room
+                </button>
+              )}
               <p className="w-full text-xs font-semibold text-text-muted">Total shown before payment; no hidden charges.</p>
             </div>
           </div>

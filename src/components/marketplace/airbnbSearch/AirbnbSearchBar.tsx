@@ -360,9 +360,11 @@ export default function AirbnbSearchBar() {
                 <li className="px-4 py-3 text-sm text-text-muted">No destinations found</li>
               ) : (
                 filteredDestinations.map((item, index) => (
-                  <li key={`${item.kind}-${item.label}`} role="option" aria-selected={highlightedIndex === index}>
+                  <li key={`${item.kind}-${item.label}`} role="none">
                     <button
                       type="button"
+                      role="option"
+                      aria-selected={highlightedIndex === index}
                       className={`flex w-full flex-col px-4 py-3 text-left hover:bg-bg-muted ${
                         highlightedIndex === index ? 'bg-bg-muted' : ''
                       }`}

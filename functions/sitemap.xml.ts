@@ -2,10 +2,19 @@ import { resolveTenantSlugFromDomain } from "./_lib/tenantSlug";
 import { isAtlasDirectBookingHost, isMarketplaceHost } from "./_lib/tenantSiteMeta";
 import { isNoindexHost } from "./_lib/noindexHosts";
 import { textMatchesCityKeywords } from "./_lib/cityKeywordMatch";
+import { buildHomeUnitPath, getPropertySlug } from "../src/utils/navigation";
 import goaCityContent from "../src/content/cities/goa.json";
 import coorgCityContent from "../src/content/cities/coorg.json";
 import hyderabadCityContent from "../src/content/cities/hyderabad.json";
 import manaliCityContent from "../src/content/cities/manali.json";
+// MKT-014: city landing pages for the four cities with live marketplace supply (1 listing per
+// city on 2026-10-02). Keywords are pulled from the same JSON the CityLandingPage component
+// reads, so a sitemap drop and a city-page render can never disagree on which slug a listing
+// matches.
+import bengaluruCityContent from "../src/content/cities/bengaluru.json";
+import gurugramCityContent from "../src/content/cities/gurugram.json";
+import nashikCityContent from "../src/content/cities/nashik.json";
+import guwahatiCityContent from "../src/content/cities/guwahati.json";
 
 interface Env {
   ATLAS_API_BASE_URL?: string;
@@ -14,8 +23,20 @@ interface Env {
   ATLAS_WORKER_PROXY_SECRET?: string;
 }
 
-// TASK-4414: city landing pages for SEO acquisition (Atlas marketplace surfaces only — TASK-7194)
-const CITY_LANDING_SLUGS = ["goa", "coorg", "hyderabad", "manali"] as const;
+// TASK-4414: city landing pages for SEO acquisition (Atlas marketplace surfaces only — TASK-7194).
+// MKT-014: added bengaluru, gurugram, nashik, guwahati — see the matching CityLandingPage.tsx
+// registration in src/App.tsx and the per-city JSON content under src/content/cities/. A
+// sitemap drop and a city-page render both pull from these same JSONs, so they cannot disagree.
+const CITY_LANDING_SLUGS = [
+  "goa",
+  "coorg",
+  "hyderabad",
+  "manali",
+  "bengaluru",
+  "gurugram",
+  "nashik",
+  "guwahati",
+] as const;
 
 /**
  * MKT-006: keyword lists a marketplace listing must match to count as supply for a given city
@@ -32,6 +53,10 @@ const CITY_LANDING_KEYWORDS: Record<(typeof CITY_LANDING_SLUGS)[number], string[
   coorg: coorgCityContent.listingKeywords,
   hyderabad: hyderabadCityContent.listingKeywords,
   manali: manaliCityContent.listingKeywords,
+  bengaluru: bengaluruCityContent.listingKeywords,
+  gurugram: gurugramCityContent.listingKeywords,
+  nashik: nashikCityContent.listingKeywords,
+  guwahati: guwahatiCityContent.listingKeywords,
 };
 
 const ATLAS_CITY_PATHS = CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`);
@@ -90,16 +115,21 @@ export async function fetchAllMarketplaceListings(
  * `MarketplaceHomepage.tsx`'s `marketplaceListingPath` links to and the listing detail page
  * declares as its own canonical (`?tenant=` tells the detail page which tenant's listing to
  * resolve on the shared marketplace host).
+ *
+ * MKT-010: the property slug MUST match the marketplace card's link exactly. The card uses
+ * `getPropertySlug({ property_name: item.title })` and `buildHomeUnitPath(...)` from
+ * `src/utils/navigation.ts`. We import and call the same helpers here rather than re-implement
+ * them — `listingPathSlug` (used by per-tenant sitemaps below) was over-preferring the API's
+ * `slug` field, which `/marketplace/listings` sets to `String(id)` on 28/28 rows today, so
+ * every sitemap `/homes/` URL resolved to a soft-404.
  */
 export function marketplaceListingPath(
   listing: SitemapMarketplaceListingRow,
-  opts: { allowAtlasHomesFallback: boolean },
+  _opts: { allowAtlasHomesFallback: boolean },
 ): string {
-  const propertySlug = listingPathSlug(
-    { id: listing.id, slug: listing.slug, propertyName: listing.title },
-    opts,
-  );
-  return `/homes/${propertySlug}/${listing.id}?tenant=${encodeURIComponent(listing.tenantSlug)}`;
+  const propertySlug = getPropertySlug({ property_name: listing.title });
+  const base = buildHomeUnitPath(propertySlug, listing.id);
+  return `${base}?tenant=${encodeURIComponent(listing.tenantSlug)}`;
 }
 
 const SHARED_CORE_PATHS = [

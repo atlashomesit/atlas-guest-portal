@@ -388,8 +388,8 @@
 
 .rdrDayNumber span.hero-date-text.hero-date-disabled,
 .rdrDay .rdrDayNumber span.hero-date-text.hero-date-disabled {
-  color: #d1d5db !important;
-  opacity: 0.4 !important;
+  color: #64748b !important;
+  opacity: 1 !important;
   cursor: not-allowed;
 }
 
@@ -475,14 +475,14 @@
 }
 
 .rdrDayDisabled .rdrDayNumber span {
-  color: #d1d5db;
+  color: #64748b;
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: 1;
 }
 
 /* Passive dates (other months) - muted, NO backgrounds */
 .rdrDayPassive .rdrDayNumber span {
-  color: #d1d5db;
+  color: #64748b;
   font-weight: 400;
   background: transparent !important;
   box-shadow: none !important;

@@ -187,7 +187,7 @@ function AppWrapper() {
         <main
           id="main-content"
           tabIndex={-1}
-          style={{ paddingTop: shouldHideNavbar ? 0 : 'var(--nav-height)' }}
+          style={{ paddingTop: shouldHideNavbar ? 0 : 'var(--measured-nav-height, var(--nav-height))' }}
         >
         <Suspense fallback={<LazyFallback />} key={`suspense-${location.pathname}`}>
         <Routes key={location.pathname}>

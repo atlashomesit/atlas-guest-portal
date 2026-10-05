@@ -67,8 +67,14 @@ function genericWhiteLabelFaq(businessPhone: string, ownerPhone: string): FaqHig
  * TASK-7194: Atlas demo "penthouse" copy is marketplace/Atlas-only — never on Neutral white-label.
  */
 export function getFaqHighlights(): FaqHighlight[] {
+  // GUEST-008: API tenant FAQ check first, then fallback to tenantOverrides
+  const tenantCtx = getTenantContext();
+  if (tenantCtx?.faq && tenantCtx.faq.length > 0) {
+    return tenantCtx.faq;
+  }
+
   // TASK-1878: tenant override check
-  const slug = getTenantContext()?.slug;
+  const slug = tenantCtx?.slug;
   const overrides = getTenantOverrides(slug);
   if (overrides.faq && overrides.faq.length > 0) {
     return overrides.faq;

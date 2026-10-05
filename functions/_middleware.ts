@@ -1,6 +1,13 @@
-import { isRewriteEligibleHost, buildMetaRewriteValues, type TenantSiteMeta } from "./_lib/tenantSiteMeta";
+import { isRewriteEligibleHost, isMarketplaceHost, buildMetaRewriteValues, type TenantSiteMeta } from "./_lib/tenantSiteMeta";
 import { apexRedirectForHost, buildAtlasHostCanonical, isAtlasSelfCanonicalHost } from "./_lib/atlasHostCanonical";
 import { TtlCache } from "./_lib/ttlCache";
+import {
+  isMarketplaceRewriteRoute,
+  extractListingIdFromPath,
+  buildMarketplaceMetaValues,
+  fetchMarketplaceListingsCached,
+} from "./_lib/marketplaceSiteMeta";
+
 
 /**
  * TASK-4905 / ADR-0018 (2026-07-16 amendment): root-level Cloudflare Pages Function middleware.
@@ -37,9 +44,12 @@ interface Env {
 // `tsconfig.app.json`'s `include` so it is not part of `npm run typecheck` either).
 interface RewriterElement {
   setAttribute(name: string, value: string): void;
-  setInnerContent(content: string): void;
+  setInnerContent(content: string, options?: { html?: boolean }): void;
   remove(): void;
+  append?(content: string, options?: { html?: boolean }): void;
+  after?(content: string, options?: { html?: boolean }): void;
 }
+
 interface RewriterElementHandlers {
   element(el: RewriterElement): void;
 }
@@ -159,7 +169,107 @@ function rewriteAtlasHostCanonical(
   return applyFrameProtection(request, rewriter.transform(framed));
 }
 
+/**
+ * MKT-013: edge <head> rewrite on the marketplace host (atlastays.com) for /, /homestays-in-*,
+ * and /homes/*. Using HTMLRewriter, injects unique title and description, absolute self canonical
+ * and og:url, raster og:image (never relative, never .svg), and LodgingBusiness JSON-LD on /homes/*.
+ * Non-marketplace routes or errors fail open, preserving the original response.
+ */
+async function rewriteMarketplaceHostHead(
+  request: Request,
+  env: Env,
+  framed: Response,
+  url: URL,
+  host: string,
+): Promise<Response> {
+  const pathname = url.pathname;
+  if (!isMarketplaceRewriteRoute(pathname)) {
+    return rewriteAtlasHostCanonical(request, env, framed, url, host, "");
+  }
+
+  const apiBase = (env.ATLAS_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
+  let listing = null;
+  const listingId = extractListingIdFromPath(pathname);
+  if (listingId !== null && apiBase) {
+    const listings = await fetchMarketplaceListingsCached(apiBase);
+    listing = listings.find((l) => l.id === listingId) ?? null;
+  }
+
+  const origin = url.origin;
+  const values = buildMarketplaceMetaValues(pathname, url.search, origin, listing);
+
+  const rewriter = new HTMLRewriter()
+    .on("title", {
+      element(el: RewriterElement) {
+        el.setInnerContent(values.title);
+      },
+    })
+    .on('meta[name="description"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("content", values.description);
+      },
+    })
+    .on('meta[property="og:title"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("content", values.title);
+      },
+    })
+    .on('meta[property="og:description"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("content", values.description);
+      },
+    })
+    .on('meta[property="og:image"]', {
+      element(el: RewriterElement) {
+        if (values.image) el.setAttribute("content", values.image);
+        else el.remove();
+      },
+    })
+    .on('meta[property="og:url"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("content", values.url);
+      },
+    })
+    .on('link[rel="canonical"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("href", values.canonical);
+        if (values.jsonLd && typeof el.after === "function") {
+          el.after(`\n  <script type="application/ld+json">${JSON.stringify(values.jsonLd)}</script>`, { html: true });
+        }
+      },
+    })
+    .on('meta[name="twitter:title"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("content", values.title);
+      },
+    })
+    .on('meta[name="twitter:description"]', {
+      element(el: RewriterElement) {
+        el.setAttribute("content", values.description);
+      },
+    })
+    .on('meta[name="twitter:image"]', {
+      element(el: RewriterElement) {
+        if (values.image) el.setAttribute("content", values.image);
+        else el.remove();
+      },
+    });
+
+  if (values.jsonLd) {
+    rewriter.on("head", {
+      element(el: RewriterElement) {
+        if (typeof el.append === "function") {
+          el.append(`\n  <script type="application/ld+json">${JSON.stringify(values.jsonLd)}</script>\n`, { html: true });
+        }
+      },
+    });
+  }
+
+  return applyFrameProtection(request, rewriter.transform(framed));
+}
+
 export const onRequest = async (context: {
+
   request: Request;
   env: Env;
   next: () => Promise<Response>;
@@ -211,8 +321,12 @@ export const onRequest = async (context: {
     // existing static/runtime OG tags — no API call, no tenant rewrite. The one exception is the
     // canonical/og:url pair on Atlas direct-booking hosts (TASK-101940), which mirrors SEO.tsx.
     if (!isRewriteEligibleHost(host)) {
+      if (isMarketplaceHost(host)) {
+        return await rewriteMarketplaceHostHead(context.request, context.env, framed, url, host);
+      }
       return rewriteAtlasHostCanonical(context.request, context.env, framed, url, host, forwardedHost);
     }
+
 
     const apiBase = (context.env.ATLAS_API_BASE_URL ?? "").trim().replace(/\/+$/, "");
     if (!apiBase) return framed; // misconfigured Pages env — fail open, not a 500

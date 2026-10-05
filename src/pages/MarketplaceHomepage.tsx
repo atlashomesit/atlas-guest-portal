@@ -1,3 +1,4 @@
+import HostIdentityLabel from '@/components/property/HostIdentityLabel';
 import { feePercent } from "../utils/paymentFeeCopy";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -11,7 +12,6 @@ import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
 import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
-import MobileMarketplaceNav from '@/components/marketplace/MobileMarketplaceNav'; // TASK-102165
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
@@ -34,6 +34,7 @@ type MarketplacePropertyApi = {
 };
 
 type MarketplaceItem = {
+  hostIdentityVerified?: unknown;
   id: number;
   tenantSlug: string;
   tenantName: string;
@@ -55,6 +56,9 @@ type MarketplaceItem = {
   // render "verified"); externalReviewCount = imported feedback (Google etc.).
   verifiedStayCount?: number | null;
   externalReviewCount?: number | null;
+  // MKT-012: dominant source name and sourceUrl gate for imported reviews
+  externalReviewSource?: string | null;
+  externalReviewSourceUrl?: string | null;
   // MKT-001: server-derived per-tenant payment routing (TenantsController/IPaymentRoutingService).
   // Missing metadata must remain unknown, without a platform-wide percentage fallback.
   chargesOnlinePaymentFee?: boolean;
@@ -84,9 +88,22 @@ export function formatVerifiedStaysLabel(count?: number | null): string | null {
   return count === 1 ? '1 verified stay' : `${count} verified stays`;
 }
 
-export function formatExternalReviewsLabel(count?: number | null): string | null {
+// MKT-012: external review count labelled by its real dominant source, e.g. "54 reviews on Airbnb".
+// Says "Google" only when the source is Google. When sourceUrl is null or empty, omits the count
+// rather than assert an unverifiable trust claim.
+export function formatExternalReviewsLabel(
+  count?: number | null,
+  source?: string | null,
+  sourceUrl?: string | null,
+): string | null {
   if (count == null || count <= 0) return null;
-  return count === 1 ? '1 Google review' : `${count} Google reviews`;
+  if (sourceUrl === null || sourceUrl === '') return null;
+
+  const normalizedSource = source?.trim() || 'Google';
+  if (normalizedSource.toLowerCase() === 'google') {
+    return count === 1 ? '1 Google review' : `${count} Google reviews`;
+  }
+  return count === 1 ? `1 review on ${normalizedSource}` : `${count} reviews on ${normalizedSource}`;
 }
 
 type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
@@ -493,7 +510,7 @@ export default function MarketplaceHomepage() {
                 <button
                   type="button"
                   aria-label={isFav ? 'Remove from saved' : 'Save listing'}
-                  className="absolute right-2 top-2 z-10 rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
+                  className="absolute right-2 top-2 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
                   onClick={() => {
                     toggleFavorite(item.id);
                     setFavEpoch((e) => e + 1);
@@ -507,6 +524,7 @@ export default function MarketplaceHomepage() {
                 <div className="flex flex-1 flex-col gap-2 p-4">
                   <div className="text-xs uppercase tracking-wide text-text-muted">{item.tenantName}</div>
                   <h2 className="text-base font-semibold text-text-primary leading-snug">{item.title}</h2>
+                  <HostIdentityLabel marketplace verified={item.hostIdentityVerified} />
 
                   {/* TASK-4511: Trust signal badges */}
                   {(item.hasVerifiedPhotos || item.isGstRegistered) && (
@@ -544,12 +562,17 @@ export default function MarketplaceHomepage() {
                     </p>
                   )}
 
-                  {/* TASK-10089: review provenance — verified stays and Google reviews are
+                  {/* TASK-10089 / MKT-012: review provenance — verified stays and external reviews are
                       distinct labels from distinct counts. External-only cards (no
-                      verifiedStayCount) never claim a verified stay. */}
+                      verifiedStayCount) never claim a verified stay. MKT-012 names the dominant
+                      source and omits the count when sourceUrl is null. */}
                   {(() => {
                     const verifiedLabel = formatVerifiedStaysLabel(item.verifiedStayCount);
-                    const externalLabel = formatExternalReviewsLabel(item.externalReviewCount);
+                    const externalLabel = formatExternalReviewsLabel(
+                      item.externalReviewCount,
+                      item.externalReviewSource,
+                      item.externalReviewSourceUrl,
+                    );
                     if (!verifiedLabel && !externalLabel) return null;
                     return (
                       <p className="text-xs text-text-muted" data-testid="marketplace-review-provenance">
@@ -596,7 +619,7 @@ export default function MarketplaceHomepage() {
                   <OwnerShareBadge className="self-start" processingFeePercent={item.chargesOnlinePaymentFee === false ? 0 : feePercent(item.convenienceFeePercent)} />
 
                   <Link
-                    className="mt-auto inline-flex min-h-[40px] items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
+                    className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
                     to={marketplaceListingPath(item, searchSuffix)}
                   >
                     View home
@@ -660,8 +683,6 @@ export default function MarketplaceHomepage() {
         </div>
       )}
     </section>
-    {/* TASK-102165: mobile bottom nav (Explore, Wishlists, Bookings, Support). */}
-    <MobileMarketplaceNav />
     </>
   );
 }

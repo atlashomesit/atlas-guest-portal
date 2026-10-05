@@ -115,6 +115,15 @@ export interface TenantInfo {
   guestCommsBrandingMode?: 'Platform' | 'Neutral';
   /** TASK-1715: Premium search-by-image feature flag from tenant bootstrap API. */
   searchByImageEnabled?: boolean;
+  /** GUEST-008: Custom tenant FAQ entries from API. */
+  faq?: Array<{ id: string; question: string; answer: string }>;
+  /** GUEST-008: Custom cookie consent banner from API. */
+  cookieBanner?: {
+    title?: string;
+    text: string;
+    privacyUrl: string;
+    privacyLinkLabel?: string;
+  };
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -123,6 +132,8 @@ export interface TenantLegalContactPack {
   displayName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  /** GUEST-008: Owner / escalation contact phone. */
+  ownerPhone?: string;
   registeredAddress?: string;
   city?: string;
   state?: string;
@@ -150,6 +161,7 @@ export function parseLegalContactPack(data: Record<string, unknown>): TenantLega
     displayName: typeof pack.displayName === 'string' ? pack.displayName : undefined,
     contactEmail: typeof pack.contactEmail === 'string' ? pack.contactEmail : undefined,
     contactPhone: typeof pack.contactPhone === 'string' ? pack.contactPhone : undefined,
+    ownerPhone: typeof pack.ownerPhone === 'string' ? pack.ownerPhone : undefined,
     registeredAddress: typeof pack.registeredAddress === 'string' ? pack.registeredAddress : undefined,
     city: typeof pack.city === 'string' ? pack.city : undefined,
     state: typeof pack.state === 'string' ? pack.state : undefined,
@@ -333,6 +345,15 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
           ? data.guestCommsBrandingMode
           : undefined,
       searchByImageEnabled: Boolean(data.searchByImageEnabled),
+      faq: Array.isArray(data.faq) ? data.faq : undefined,
+      cookieBanner: data.cookieBanner && typeof data.cookieBanner.text === 'string'
+        ? {
+            title: typeof data.cookieBanner.title === 'string' ? data.cookieBanner.title : undefined,
+            text: data.cookieBanner.text,
+            privacyUrl: typeof data.cookieBanner.privacyUrl === 'string' ? data.cookieBanner.privacyUrl : '/privacy',
+            privacyLinkLabel: typeof data.cookieBanner.privacyLinkLabel === 'string' ? data.cookieBanner.privacyLinkLabel : undefined,
+          }
+        : undefined,
     };
     return tenantInfo;
   } catch (error) {
@@ -413,3 +434,127 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
   };
   return tenantInfo;
 }
+
+type ListingTenantCacheEntry = {
+  value?: TenantInfo | null;
+  promise: Promise<TenantInfo | null>;
+};
+const listingTenantCache = new Map<string, ListingTenantCacheEntry>();
+
+export function getCachedListingTenantContext(slug: string): TenantInfo | null | undefined {
+  const trimmed = slug?.trim().toLowerCase();
+  if (!trimmed) return undefined;
+  return listingTenantCache.get(trimmed)?.value;
+}
+
+/**
+ * MKT-011: Resolves tenant context for a given tenant slug on the marketplace without mutating
+ * the global page tenantInfo. Uses the same /tenants/from-domain endpoint that boot uses,
+ * with fallback to /tenants/{slug}/public.
+ */
+export async function fetchListingTenantContext(slug: string, apiBaseUrl?: string): Promise<TenantInfo | null> {
+  const trimmed = slug?.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  const cached = listingTenantCache.get(trimmed);
+  if (cached) {
+    return cached.promise;
+  }
+
+  const promise = (async () => {
+    try {
+      const domain = `${trimmed}.atlastays.com`;
+      const lookupDomain = normalizeHostForDomainLookup(domain);
+      const base = (apiBaseUrl || (hasRuntimeConfig() ? getRuntimeConfig().apiBaseUrl : '') || '').replace(/\/$/, '');
+      const url =
+        import.meta.env.DEV && typeof window !== 'undefined'
+          ? `/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`
+          : `${base}/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`;
+
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        const brandShort = String(data.brandName ?? '').trim();
+        const brandLong =
+          typeof data.legalContactPack?.legalName === 'string' ? data.legalContactPack.legalName.trim() : '';
+
+        const info: TenantInfo = {
+          name: brandShort || trimmed,
+          brandName: brandShort || undefined,
+          brandNameLong: brandLong || undefined,
+          slug: data.tenantSlug || trimmed,
+          logoUrl: data.logoUrl ?? undefined,
+          primaryColor: data.primaryColor ?? undefined,
+          tagline: data.tagline ?? undefined,
+          faviconUrl: data.faviconUrl ?? undefined,
+          category: data.category ?? undefined,
+          isMarketplaceRoot: Boolean(data.isMarketplaceRoot),
+          brandColor: data.primaryColor ?? undefined,
+          isGstVerified: Boolean(data.isGstVerified),
+          paymentProvider: data.paymentProvider ?? undefined,
+          displayMerchantName: data.displayMerchantName ?? undefined,
+          upiVpa: data.upiVpa ?? undefined,
+          upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
+          upiInstructions: data.upiInstructions ?? undefined,
+          bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP')
+            ? data.bookingMode
+            : undefined,
+          whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
+            ? data.whatsappBookingPhone
+            : undefined,
+          legalContactPack: parseLegalContactPack(data as Record<string, unknown>),
+          isInternal: Boolean(data.isInternal),
+        };
+        const entry = listingTenantCache.get(trimmed);
+        if (entry) entry.value = info;
+        return info;
+      }
+
+      // Fallback: /tenants/${slug}/public
+      const fallbackUrl =
+        import.meta.env.DEV && typeof window !== 'undefined'
+          ? `/tenants/${encodeURIComponent(trimmed)}/public`
+          : `${base}/tenants/${encodeURIComponent(trimmed)}/public`;
+      const fRes = await fetch(fallbackUrl, { headers: { Accept: 'application/json' } });
+      if (fRes.ok) {
+        const fData = await fRes.json();
+        const fName = String(fData.name ?? '').trim();
+        const info: TenantInfo = {
+          name: fName || trimmed,
+          brandName: fName || undefined,
+          slug: trimmed,
+          bookingMode: (fData.bookingMode === 'ONLINE' || fData.bookingMode === 'MANUAL' || fData.bookingMode === 'WHATSAPP')
+            ? fData.bookingMode
+            : undefined,
+          whatsappBookingPhone: typeof fData.whatsappBookingPhone === 'string' && fData.whatsappBookingPhone.length > 0
+            ? fData.whatsappBookingPhone
+            : undefined,
+        };
+        const entry = listingTenantCache.get(trimmed);
+        if (entry) entry.value = info;
+        return info;
+      }
+
+      const entry = listingTenantCache.get(trimmed);
+      if (entry) entry.value = null;
+      return null;
+    } catch {
+      const entry = listingTenantCache.get(trimmed);
+      if (entry) entry.value = null;
+      return null;
+    }
+  })();
+
+  listingTenantCache.set(trimmed, { promise });
+  return promise;
+}
+
+export function _setListingTenantContextForTests(slug: string, info: TenantInfo | null): void {
+  const trimmed = slug.trim().toLowerCase();
+  listingTenantCache.set(trimmed, { value: info, promise: Promise.resolve(info) });
+}
+
+export function _clearListingTenantCacheForTests(): void {
+  listingTenantCache.clear();
+}
+

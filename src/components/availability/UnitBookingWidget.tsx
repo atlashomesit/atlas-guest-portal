@@ -46,6 +46,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
+import type { TenantInfo } from '@/tenant/tenantContext';
 import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
@@ -96,6 +97,8 @@ interface UnitBookingWidgetProps {
    * widget distinguish "resolving" (pending — keep interactive) from "failed" (fail closed).
    */
   lookupFailed?: boolean;
+  /** MKT-011: optional listing tenant context (used on marketplace to match listing host's bookingMode) */
+  tenantContext?: TenantInfo | null;
 }
 
 export type BookingStickySummary = {
@@ -176,6 +179,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   graceHours: graceHoursProp,
   onStickySummaryChange,
   lookupFailed = false,
+  tenantContext,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -1309,7 +1313,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // guest. Delegated to `hasOnlinePaymentRail` so this widget, the property-details trust list and
   // the footer MOR disclosure cannot drift apart again; that helper also treats MANUAL
   // (pay-on-arrival) as no-gateway, which the previous inline predicate missed.
-  const showOnlinePaymentProcessing = hasOnlinePaymentRail();
+  const showOnlinePaymentProcessing = hasOnlinePaymentRail(tenantContext !== undefined ? tenantContext : undefined);
 
   const convenienceFeePercent = !showOnlinePaymentProcessing
     ? 0
@@ -1654,8 +1658,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           // it doesn't compute the fee, which caused the checkout page to show ₹0 processing
           // fee and a total ₹378 lower than the listing widget. Fall back to the client-computed
           // breakdownConvenienceFee so both surfaces agree.
-          convenienceFeeAmount: typeof serverConvFee === 'number' && serverConvFee > 0 ? serverConvFee : breakdownConvenienceFee,
-          finalAmount: typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
+          convenienceFeeAmount: !showOnlinePaymentProcessing
+            ? 0
+            : (typeof serverConvFee === 'number' && serverConvFee > 0 ? serverConvFee : breakdownConvenienceFee),
+          finalAmount: !showOnlinePaymentProcessing
+            ? (finalTotal > 0 ? finalTotal : breakdownPrice)
+            : (typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal)),
           nights: stayNights,
           currency: 'INR',
           touristTaxAmount: resolvedTouristTax,
@@ -2255,7 +2263,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         title={datesUnavailable ? 'These dates aren’t available. Please select different dates.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
-        style={{ marginTop: 20, width: '100%', background: 'var(--gradient-cta, linear-gradient(135deg, #f08c71, #e86a4a))', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'filter .2s, box-shadow .2s', boxShadow: '0 4px 12px rgba(196, 90, 63, 0.25)' }}
+        style={{ marginTop: 20, width: '100%', background: 'var(--cta-primary, #c04528)', color: 'var(--text-on-cta, #fff)', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'filter .2s, box-shadow .2s', boxShadow: '0 4px 12px rgba(196, 90, 63, 0.25)' }}
       >
         {isBookingDisabled || datesUnavailable
           ? 'Unavailable'

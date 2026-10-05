@@ -51,10 +51,15 @@ describe('GUEST-010 saved-home reminder account scope', () => {
     const input = screen.getByRole('textbox', { name: 'Reminder email address' });
     expect(input).toHaveValue('guest@example.test');
     expect(posts()).toHaveLength(0);
+    const region = screen.getByRole('status');
+    screen.getByRole('button', { name: 'Remind me' }).focus();
     fireEvent.submit(input.closest('form')!);
     await settle();
     screen.getByRole('status');
     expect(posts()).toHaveLength(1);
+    expect(screen.getByRole('status')).toBe(region);
+    expect(region).toHaveFocus();
+    expect(region).toHaveAttribute('aria-live', 'polite');
     expect(JSON.parse(posts()[0][1]!.body as string)).toEqual({ guestEmail: 'guest@example.test', listingId: 11 });
     expect(localStorage.getItem('atlas_guest_email')).toBe('previous-account@example.test');
   });
@@ -91,14 +96,14 @@ describe('GUEST-010 saved-home reminder account scope', () => {
     view.rerender(page(signedIn('next@example.test', 92)));
     expect(signal?.aborted).toBe(true);
     await act(async () => { finish({ ok: true } as Response); });
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(screen.getByRole('textbox')).toHaveValue('next@example.test');
     fetchMock.mockResolvedValue({ ok: true } as Response);
     fireEvent.submit(screen.getByRole('textbox').closest('form')!);
     await settle();
     screen.getByRole('status');
     view.rerender(page(signedOut));
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
     expect(screen.getByRole('textbox')).toHaveValue('');
     expect(localStorage.getItem('atlas_guest_email')).toBeNull();
   });
@@ -124,3 +129,4 @@ describe('GUEST-010 saved-home reminder account scope', () => {
     expect(screen.getByRole('status')).toHaveTextContent('7 days');
   });
 });
+

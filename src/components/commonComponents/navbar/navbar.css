@@ -90,15 +90,13 @@
   }
 }
 
-/* Frosted ivory navbar — Gaurav Website chrome */
+/* Opaque navigation keeps scrolling page content from competing with its labels. */
 .navbar-container {
   width: 100%;
   position: fixed;
   top: 0;
   z-index: var(--z-sticky);
-  background-color: color-mix(in srgb, var(--bg-primary, #fefcf9) 90%, transparent);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background-color: var(--bg-primary, #fefcf9);
   border-bottom: 1px solid var(--border-subtle, rgba(59, 31, 30, 0.08));
   transition: box-shadow 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94), background 300ms ease;
   display: flex;
@@ -412,7 +410,7 @@
   padding: 0.55rem 1rem;
   border-radius: 999px;
   border: 1px solid var(--navbar-search-pill-border, rgba(220, 210, 200, 0.55));
-  background: var(--navbar-search-pill-bg, rgba(255, 250, 245, 0.95));
+  background: var(--navbar-search-pill-bg, var(--bg-muted, #fffaf5));
   text-decoration: none;
   color: inherit;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
@@ -633,3 +631,5 @@
     display: flex !important;
   }
 }
+/* The neutral fallback artwork uses dark strokes; keep it visible on dark tenant headers. */
+.navbar-logo[src$="tenant-logo-placeholder.svg"] { background: #fefcf9; border-radius: 8px; padding: 4px; }

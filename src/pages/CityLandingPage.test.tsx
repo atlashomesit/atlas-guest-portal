@@ -121,4 +121,28 @@ describe("CityLandingPage", () => {
       expect(fetchPublicListings).not.toHaveBeenCalled();
     });
   });
+
+  // MKT-014: cards on a city landing page are now real `<a href>` anchors, not nested buttons
+  // calling navigate() — so non-JS crawlers can follow a city page to its homes. The href must
+  // mirror the marketplace card helper's path (MKT-004 cross-tenant `?tenant=` carry).
+  it("MKT-014: city-page cards render as crawlable anchors to /homes/... paths", async () => {
+    vi.mocked(fetchPublicListings).mockResolvedValue([goaListing]);
+
+    render(
+      <MemoryRouter>
+        <CurrencyProvider>
+          <BookingProvider>
+            <CityLandingPage citySlug="goa" />
+          </BookingProvider>
+        </CurrencyProvider>
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const section = screen.getByTestId("city-landing-listings");
+    const anchors = section.querySelectorAll("a[href*='/homes/']");
+    expect(anchors.length, "city-page card container must contain at least one /homes/ anchor").toBeGreaterThan(0);
+    // Same-tenant city page (not marketplace) — no ?tenant= hint needed.
+    expect(anchors[0].getAttribute("href")).toMatch(/\/homes\/atlas-coastal-villa\/501$/);
+  });
 });

@@ -65,8 +65,11 @@ export function getGuestFacingPhone(channel: ContactChannel = "business"): strin
 export function getContactPhone(channel: ContactChannel = "business"): string {
   const overrides = tenantContact();
   if (channel === "owner") {
-    // For white-label tenants, never fall back to the Atlas owner number.
-    return overrides?.ownerPhone ?? (isWhiteLabelTenant() ? "" : DEFAULT_OWNER_PHONE);
+    // GUEST-008: explicit override → API legalContactPack.ownerPhone → (white-label: "" : default)
+    if (overrides?.ownerPhone) return overrides.ownerPhone;
+    const fromApiOwner = toNationalDigits(getTenantContext()?.legalContactPack?.ownerPhone);
+    if (fromApiOwner) return fromApiOwner;
+    return isWhiteLabelTenant() ? "" : DEFAULT_OWNER_PHONE;
   }
   // Precedence: explicit override → the tenant's own number from the API →
   // Atlas default (marketplace only — never on a white-label custom domain).

@@ -29,12 +29,34 @@ interface CheckinDetails {
   houseRulesSignedAt?: string | null;
   guestCount?: number | null;
   guestName?: string | null;
+  /**
+   * TASK-102915: split-stay legs, in date order. The public check-in endpoint
+   * returns every leg with its dates plus the door code for the CURRENT leg
+   * only — a leg the guest has not moved into yet never carries a code, so this
+   * UI cannot leak a future room's code. Absent (null/undefined) for today's
+   * single-room bookings, which render exactly as before.
+   */
+  stays?: StayLeg[] | null;
   // TASK-4510: Digital Guest Guidebook
   guidebookAppliancesText?: string | null;
   guidebookWifiTroubleshootingText?: string | null;
   guidebookTrashParkingText?: string | null;
   guidebookCheckoutChecklistText?: string | null;
   guidebookFoodThingsTodoText?: string | null;
+}
+
+/**
+ * TASK-102915: one leg of a split stay. Dates are display-ready strings from the
+ * API (e.g. "29 Sep"); the portal renders them verbatim and sorts legs by
+ * parsed start date with a stable fallback to response order. `isCurrentLeg`
+ * marks the room the guest sleeps in tonight — the only leg whose door code is
+ * ever returned (as the top-level `doorCode`, not per leg).
+ */
+export interface StayLeg {
+  roomName: string;
+  startDate: string;
+  endDate: string;
+  isCurrentLeg?: boolean;
 }
 
 export interface GuestInfo {
@@ -631,6 +653,44 @@ export default function SelfCheckIn() {
               {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
               {details.emergencyContactPhone && <InfoRow label="Emergency" value={details.emergencyContactPhone} />}
             </div>
+
+            {/* TASK-102915: split-stay legs in date order. Rendered only when the
+                API returns more than one leg; single-room bookings (no `stays`)
+                keep the exact view above. The door code shown is tonight's room
+                only — future legs never carry a code. */}
+            {details.stays && details.stays.length > 1 && (
+              <div className="mb-5 rounded-xl bg-bg-page border border-border-subtle p-4 text-sm">
+                <h2 className="font-semibold text-text-primary mb-1">Your rooms</h2>
+                <p className="text-text-secondary text-xs mb-3">
+                  You move rooms during this stay. The door code above is for tonight&apos;s room only.
+                </p>
+                <ul data-testid="self-checkin-stay-legs" className="space-y-2">
+                  {[...details.stays]
+                    .sort((a, b) => {
+                      const ta = Date.parse(a.startDate);
+                      const tb = Date.parse(b.startDate);
+                      if (Number.isNaN(ta) || Number.isNaN(tb)) return 0;
+                      return ta - tb;
+                    })
+                    .map((leg, i) => (
+                      <li
+                        key={`${leg.roomName}-${leg.startDate}-${i}`}
+                        data-testid="self-checkin-stay-leg"
+                        className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle bg-bg-surface px-3 py-2"
+                      >
+                        <span className="font-medium text-text-primary">
+                          {leg.roomName} · {leg.startDate} → {leg.endDate}
+                        </span>
+                        {leg.isCurrentLeg && (
+                          <span className="shrink-0 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
+                            Tonight
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
 
             {details.checkinInstructions && (
               <div className="mb-5 rounded-xl bg-bg-page border border-border-subtle p-4 text-sm text-text-secondary whitespace-pre-line">

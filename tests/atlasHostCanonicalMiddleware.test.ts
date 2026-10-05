@@ -288,10 +288,12 @@ describe("Atlas direct-booking hosts: canonical + og:url before JS (TASK-101940)
   });
 
   it.each(["https://atlastays.com/", "https://www.atlastays.com/", "https://dev.atlastays.com/"])(
-    "leaves marketplace host %s untouched (not an Atlas direct-booking host)",
+    "rewrites marketplace host %s with marketplace pre-JS meta instead of direct-booking logic (MKT-013)",
     async (url) => {
       const { body } = await serve(url);
-      expect(body).toBe(INDEX_HTML);
+      expect(body).toContain("<title>Atlastays — Book Homestays Directly with Verified Owners</title>");
+      expect(body).toContain(`<link rel="canonical" href="${url}" />`);
+      expect(body).toContain(`<meta property="og:url" content="${url}" />`);
       expect(fetchSpy).not.toHaveBeenCalled();
     },
   );
