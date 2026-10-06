@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { addDays, differenceInCalendarDays, format, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { NETWORK_ERROR_MESSAGE } from './unitBookingPaymentOrderErrors';
+import { NETWORK_ERROR_MESSAGE, isProviderNotConfiguredError } from './unitBookingPaymentOrderErrors';
+import { ReserveWhatsAppHandoff } from './ReserveWhatsAppHandoff';
+import { buildReserveWhatsAppUrl } from './reserveHandoffLink';
 import { Button } from '@/components/ui/Button';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { AtlasBookingCalendar } from './AtlasBookingCalendar';
@@ -45,8 +47,9 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import { track } from '@/lib/events'; // TASK-1480
+import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
-import type { TenantInfo } from '@/tenant/tenantContext';
+import { getTenantContext, type TenantInfo } from '@/tenant/tenantContext';
 import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
   ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
@@ -387,6 +390,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const effectiveMaxGuests = maxGuests;
   /** RA-006: payment provider not configured for this tenant. */
   const [providerBlocked, setProviderBlocked] = useState(false);
+  /**
+   * The Reserve init-hold answered 422 PAYMENT_PROVIDER_NOT_CONFIGURED_*: this tenant cannot take an online
+   * payment (TASK-101182's fail-closed guard), so the guest is handed to the host on WhatsApp instead of
+   * the generic "couldn't start checkout" line. Unlike `providerBlocked` this NEVER replaces the form -
+   * the dates and guest count the guest picked stay on screen. Reset on every new Reserve attempt.
+   */
+  const [providerHandoff, setProviderHandoff] = useState(false);
 
   // TASK-4551: Availability range must cover the full selectable booking range (today + 365 days)
   // to prevent booked dates beyond 60 days from appearing available. Re-fetch when shown month changes.
@@ -1467,6 +1477,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const handleReserve = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    // A new attempt supersedes any hand-off from the previous 422 (the host may have reconnected a provider).
+    setProviderHandoff(false);
     if (isBookingDisabled) {
       setFormError('Service temporarily unavailable. Please try again later.');
       return;
@@ -1701,6 +1713,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       const status = (error as { response?: { status?: number } })?.response?.status;
       if (status === 503 && code === 'PAYMENT_PROVIDER_NOT_CONFIGURED_PLATFORM') {
         setProviderBlocked(true);
+      } else if (isProviderNotConfiguredError(error)) {
+        // 422 PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT / PAYMENT_PROVIDER_NOT_CONFIGURED: no hold was
+        // created (the API checks the provider BEFORE it holds inventory), the tenant cannot take an
+        // online payment. Matched on the API code - never raw server text - and never a dead end.
+        setProviderHandoff(true);
       } else {
         setFormError(getBookingErrorMessage(error, 'order'));
         // AVAILABILITY_CONFLICT (409): the dates were just taken by another in-flight checkout.
@@ -1721,6 +1738,30 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
     resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours,
   ]);
+
+  // Hand-off link for the Reserve 422 above. Derived at render, not captured in handleReserve, so it
+  // always carries the dates and guest count currently on screen. The host number comes ONLY from the
+  // resolved tenant context - the LISTING host's on a marketplace page (the `tenantContext` prop), the
+  // site's own otherwise (same `!== undefined` convention as hasOnlinePaymentRail above) - never a
+  // platform default; with no number the hand-off renders the message and no link.
+  const handoffHref = useMemo(() => {
+    if (!providerHandoff) return '';
+    const handoffTenant = tenantContext !== undefined ? tenantContext : getTenantContext();
+    return buildReserveWhatsAppUrl({
+      phone: handoffTenant?.whatsappBookingPhone,
+      listingName,
+      checkIn: dateRange.startDate,
+      checkOut: dateRange.endDate,
+      guests,
+    });
+  }, [providerHandoff, tenantContext, listingName, dateRange.startDate, dateRange.endDate, guests]);
+
+  const handleHandoffCtaClick = useCallback(() => {
+    trackEvent('whatsapp_cta_click', {
+      surface: 'reserve_handoff',
+      listingId: listingId != null ? Number(listingId) : undefined,
+    });
+  }, [listingId]);
 
   if (providerBlocked) {
     return (
@@ -2205,6 +2246,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {statusMessage && <p className="text-xs text-text-secondary" style={{ marginTop: 4 }}>{statusMessage}</p>}
 
       {/* TASK-2612: Guest form fields moved to GuestDetailsPage */}
+
+      {/* Reserve 422 PAYMENT_PROVIDER_NOT_CONFIGURED_*: this tenant cannot take an online payment - hand the
+          guest to the host on WhatsApp. The form (dates, guests) stays mounted and selected above. */}
+      {providerHandoff && (
+        <ReserveWhatsAppHandoff href={handoffHref} onCtaClick={handleHandoffCtaClick} />
+      )}
 
       {formError && (
         <p className="text-sm text-support-error" role="alert" style={{ marginTop: 4 }}>
