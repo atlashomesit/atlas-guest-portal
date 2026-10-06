@@ -42,7 +42,7 @@
     "@rollup/rollup-linux-x64-gnu": "4.63.1"
   },
   "overrides": {
-    "@jridgewell/sourcemap-codec": "1.5.5",
+    "@jridgewell/sourcemap-codec": "1.6.0",
     "@xmldom/xmldom": "^0.9.12",
     "dom-accessibility-api": "^0.6.3",
     "minimatch": ">=10.2.1",
