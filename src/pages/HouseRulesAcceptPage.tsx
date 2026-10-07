@@ -28,6 +28,7 @@ export default function HouseRulesAcceptPage() {
   const { bookingRef } = useParams<{ bookingRef: string }>();
   const [searchParams] = useSearchParams();
   const lastName = searchParams.get("lastName") ?? "";
+  const token = (searchParams.get("t") ?? searchParams.get("token") ?? "").trim();
 
   const [data, setData] = useState<HouseRulesData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,8 +47,9 @@ export default function HouseRulesAcceptPage() {
     }
     (async () => {
       try {
+        const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
         const url = buildApiUrl(
-          `/api/public/checkin/${encodeURIComponent(bookingRef)}/house-rules?lastName=${encodeURIComponent(lastName)}`,
+          `/api/public/checkin/${encodeURIComponent(bookingRef)}/house-rules?lastName=${encodeURIComponent(lastName)}${tokenQuery}`,
         );
         const res = await fetch(url, { headers: getApiHeaders() });
         if (!res.ok) {
@@ -61,18 +63,19 @@ export default function HouseRulesAcceptPage() {
         setLoading(false);
       }
     })();
-  }, [bookingRef, lastName]);
+  }, [bookingRef, lastName, token]);
 
   const handleAccept = async () => {
     if (!bookingRef) return;
     setAccepting(true);
     setError(null);
     try {
-      const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef)}/accept-house-rules`);
+      const tokenQuery = token ? `?t=${encodeURIComponent(token)}` : "";
+      const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef)}/accept-house-rules${tokenQuery}`);
       const res = await fetch(url, {
         method: "POST",
         headers: { ...getApiHeaders(), "Content-Type": "application/json" },
-        body: JSON.stringify({ lastName }),
+        body: JSON.stringify({ lastName, token: token || undefined }),
       });
       if (res.status === 409) {
         setError("This booking is no longer awaiting host approval, so House Rules cannot be accepted.");

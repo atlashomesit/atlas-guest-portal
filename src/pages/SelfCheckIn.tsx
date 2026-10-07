@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import { getTenantBrandName } from "../tenant/displayBrand";
@@ -82,6 +82,8 @@ type Step = "auth" | "summary" | "id-upload" | "house-rules" | "damage-waiver" |
 export default function SelfCheckIn() {
   const brandName = getTenantBrandName();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
+  const [searchParams] = useSearchParams();
+  const token = (searchParams.get("t") ?? searchParams.get("token") ?? "").trim();
 
   const [bookingRef, setBookingRef] = useState(urlRef ?? "");
   const [lastName, setLastName] = useState("");
@@ -363,8 +365,9 @@ export default function SelfCheckIn() {
     setBusy(true);
     setError("");
     try {
+      const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
       const url = buildApiUrl(
-        `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/damage-waiver?lastName=${encodeURIComponent(lastName.trim())}`
+        `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/damage-waiver?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`
       );
       const res = await fetch(url, { headers: getApiHeaders() });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -400,9 +403,10 @@ export default function SelfCheckIn() {
       if (payload.typedName) form.append("typedName", payload.typedName);
       if (payload.signatureBlob) form.append("signatureBlob", payload.signatureBlob, "signature.png");
 
+      const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
       const res = await fetch(
         buildApiUrl(
-          `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/damage-waiver/sign?lastName=${encodeURIComponent(lastName.trim())}`
+          `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/damage-waiver/sign?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`
         ),
         { method: "POST", headers: getApiHeaders(), body: form }
       );
@@ -428,7 +432,8 @@ export default function SelfCheckIn() {
     setBusy(true);
     setError("");
     try {
-      const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}?lastName=${encodeURIComponent(lastName.trim())}`);
+      const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
+      const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`);
       const res = await fetch(url, { headers: getApiHeaders() });
       if (res.status === 404) {
         setError("Booking not found. Check your reference number and last name.");
@@ -468,13 +473,14 @@ export default function SelfCheckIn() {
     try {
       // TASK-4346: Upload ID document if provided
       let idDocumentUrl: string | null = null;
+      const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
       const primaryFile = guests[0]?.idFile || idFile;
       if (primaryFile) {
         const formData = new FormData();
         formData.append("file", primaryFile);
         const uploadRes = await fetch(
           buildApiUrl(
-            `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/id-document?lastName=${encodeURIComponent(lastName.trim())}`
+            `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/id-document?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`
           ),
           {
             method: "POST",
@@ -501,7 +507,7 @@ export default function SelfCheckIn() {
           formData.append("file", g.idFile);
           const uploadRes = await fetch(
             buildApiUrl(
-              `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/id-document?lastName=${encodeURIComponent(lastName.trim())}`
+              `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/id-document?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`
             ),
             {
               method: "POST",
@@ -525,12 +531,14 @@ export default function SelfCheckIn() {
       }
 
       const primary = guests[0];
-      const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/complete`);
+      const completeTokenQuery = token ? `?t=${encodeURIComponent(token)}` : "";
+      const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/complete${completeTokenQuery}`);
       const res = await fetch(url, {
         method: "POST",
         headers: { ...getApiHeaders(), "Content-Type": "application/json" },
         body: JSON.stringify({
           lastName: lastName.trim(),
+          token: token || null,
           idDocumentUrl,
           houseRulesAccepted: rulesAccepted,
           govtIdType: primary?.govtIdType || govtIdType || null,
