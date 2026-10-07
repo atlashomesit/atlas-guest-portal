@@ -1191,18 +1191,10 @@ export default function BookingConfirmationPage() {
           />
         )}
 
-        {/* TASK-2091: placeholder while invoice is being generated */}
-        {!isCancelled && booking.status === 'Confirmed' && !booking.hasGstInvoice && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
-            <p className="text-sm text-text-secondary">
-              Your GST invoice is being generated — we'll send it to your email within 1 hour.
-            </p>
-            <p className="text-xs text-text-muted">
-              Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
-            </p>
-          </div>
-        )}
+        {/* TASK-103053: the TASK-2091 "being generated — within 1 hour" placeholder was removed.
+            Since TASK-102031 retired auto-generation, no invoice is ever generated or sent, so the
+            promise was a dead end. The Documents card below still shows the invoice when
+            hasGstInvoice is true. */}
 
         {/* Documents: GST invoice + booking voucher + stay receipt + stay guide (TASK-102057) */}
         {!isCancelled && ((booking.hasGstInvoice && pdfUrl) || voucherUrl) && (
