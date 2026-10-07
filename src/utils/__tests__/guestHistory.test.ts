@@ -249,10 +249,10 @@ describe('GUEST-009: recently viewed listings cross-device sync', () => {
       guestId: 1,
     };
 
-    let serverUser1Items = [
+    const serverUser1Items = [
       { listingId: 201, viewedAtUtc: '2026-10-01T10:00:00.000Z', path: '/homes/goa/villa-1' },
     ];
-    let serverUser2Items = [
+    const serverUser2Items = [
       { listingId: 202, viewedAtUtc: '2026-10-01T10:00:00.000Z', path: '/homes/goa/villa-2' },
     ];
 
