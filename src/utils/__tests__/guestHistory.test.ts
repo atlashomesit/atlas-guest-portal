@@ -5,7 +5,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   addRecentlyViewed,
   getRecentlyViewed,
+  removeRecentlyViewed,
+  clearRecentlyViewed,
   loadRecentlyViewedIfAuthenticated,
+  resetRecentlyViewedOnLogout,
   _resetRecentlyViewedSyncedForTesting,
   type GuestListingHistoryItem,
 } from '../guestHistory';
@@ -69,7 +72,7 @@ describe('GUEST-009: recently viewed listings cross-device sync', () => {
               Promise.resolve({
                 items: [
                   { listingId: 10, viewedAtUtc: '2026-10-01T12:00:00.000Z' }, // newer timestamp from other device
-                  { listingId: 20, viewedAtUtc: '2026-10-01T11:00:00.000Z' }, // viewed on another device only
+                  { listingId: 20, viewedAtUtc: '2026-10-01T11:00:00.000Z', propertySlug: 'goa', unitSlug: 'beach-side' }, // viewed on another device only
                 ],
               }),
           });
@@ -102,7 +105,7 @@ describe('GUEST-009: recently viewed listings cross-device sync', () => {
     const item20 = merged.find((x) => x.listingId === 20);
     expect(item20).toBeDefined();
     expect(item20?.viewedAtUtc).toBe('2026-10-01T11:00:00.000Z');
-    expect(item20?.path).toBe('/listings/20');
+    expect(item20?.path).toBe('/homes/goa/beach-side');
 
     // Listing 30 should have been preserved from local
     const item30 = merged.find((x) => x.listingId === 30);
@@ -174,5 +177,119 @@ describe('GUEST-009: recently viewed listings cross-device sync', () => {
         method: 'POST',
       })
     );
+  });
+
+  it('server-only row yields /homes/ path or is omitted when unresolvable', async () => {
+    mockAuthState = {
+      isAuthenticated: true,
+      token: 'jwt-123',
+      email: 'guest@example.com',
+      guestId: 42,
+    };
+
+    const fetchMock = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      if (url.includes('/api/guest/recently-viewed') && (!options || options.method === 'GET' || !options.method)) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              items: [
+                // Server item with full /homes/ path
+                { listingId: 101, viewedAtUtc: '2026-10-01T12:00:00.000Z', path: '/homes/goa/beach-villa' },
+                // Server item with propertySlug and unitSlug
+                { listingId: 102, viewedAtUtc: '2026-10-01T11:00:00.000Z', propertySlug: 'manali', unitSlug: 'mountain-chalet' },
+                // Server item with unresolvable path (no /homes/ path or slugs) -> MUST BE OMITTED (not /listings/103)
+                { listingId: 103, viewedAtUtc: '2026-10-01T10:00:00.000Z' },
+              ],
+            }),
+        });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ items: [] }) });
+    });
+    global.fetch = fetchMock;
+
+    await loadRecentlyViewedIfAuthenticated();
+
+    const items = getRecentlyViewed();
+    expect(items.find((x) => x.listingId === 101)?.path).toBe('/homes/goa/beach-villa');
+    expect(items.find((x) => x.listingId === 102)?.path).toBe('/homes/manali/mountain-chalet');
+    expect(items.find((x) => x.listingId === 103)).toBeUndefined();
+  });
+
+  it('clearRecentlyViewed and removeRecentlyViewed call server delete when authenticated', () => {
+    mockAuthState = {
+      isAuthenticated: true,
+      token: 'jwt-123',
+      email: 'guest@example.com',
+      guestId: 42,
+    };
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    global.fetch = fetchMock;
+
+    removeRecentlyViewed(42);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.test/api/guest/recently-viewed/42',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+
+    clearRecentlyViewed();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.test/api/guest/recently-viewed',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+  });
+
+  it('after logout and second login, first account items are absent', async () => {
+    mockAuthState = {
+      isAuthenticated: true,
+      token: 'jwt-user1',
+      email: 'user1@example.com',
+      guestId: 1,
+    };
+
+    let serverUser1Items = [
+      { listingId: 201, viewedAtUtc: '2026-10-01T10:00:00.000Z', path: '/homes/goa/villa-1' },
+    ];
+    let serverUser2Items = [
+      { listingId: 202, viewedAtUtc: '2026-10-01T10:00:00.000Z', path: '/homes/goa/villa-2' },
+    ];
+
+    const fetchMock = vi.fn().mockImplementation((url: string, options?: RequestInit) => {
+      if (url.includes('/api/guest/recently-viewed')) {
+        if (!options || options.method === 'GET' || !options.method) {
+          const items = mockAuthState?.guestId === 1 ? serverUser1Items : serverUser2Items;
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ items }),
+          });
+        }
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) });
+    });
+    global.fetch = fetchMock;
+
+    // User 1 logs in and loads items
+    await loadRecentlyViewedIfAuthenticated();
+    expect(getRecentlyViewed().map((x) => x.listingId)).toContain(201);
+
+    // User 1 logs out
+    mockAuthState = null;
+    resetRecentlyViewedOnLogout();
+    expect(getRecentlyViewed()).toEqual([]);
+
+    // User 2 logs in
+    mockAuthState = {
+      isAuthenticated: true,
+      token: 'jwt-user2',
+      email: 'user2@example.com',
+      guestId: 2,
+    };
+    await loadRecentlyViewedIfAuthenticated();
+    const user2Viewed = getRecentlyViewed();
+    expect(user2Viewed.map((x) => x.listingId)).toContain(202);
+    expect(user2Viewed.map((x) => x.listingId)).not.toContain(201);
   });
 });
