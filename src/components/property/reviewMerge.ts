@@ -14,6 +14,7 @@ export type ListingReviewRow = {
   hostResponse?: string | null;
   hostResponseAt?: string | null;
   createdAt: string;
+  photoUrls?: string[] | null;
   isVerifiedStay?: boolean;
   ratingCleanliness?: number | null;
   ratingValue?: number | null;
