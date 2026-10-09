@@ -433,44 +433,11 @@ type ListingReviewRow = {
     ratingCommunication?: number | null;
 };
 
-/** TASK-1979: row shape from `GET /api/public/listings/{id}` externalReviews array. */
-type ExternalReviewRow = {
-    guestName?: string;
-    rating?: number | null;
-    body?: string | null;
-    reviewDate?: string;
-    source?: string;
-    sourceUrl?: string | null;
-};
-
-type DisplayReviewRow = ListingReviewRow & {
-    displayKey: string;
-    isGoogle?: boolean;
-    sourceUrl?: string | null;
-};
-
-function mergeListingAndExternalReviews(
-    native: ListingReviewRow[],
-    external: ExternalReviewRow[],
-): DisplayReviewRow[] {
-    const externalRows: DisplayReviewRow[] = external.map((r, idx) => ({
-        id: -(idx + 1),
-        displayKey: `gbp-${idx}-${r.reviewDate ?? ''}`,
-        guestName: r.guestName ?? 'Google user',
-        rating: r.rating ?? 0,
-        body: r.body ?? null,
-        createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
-        isGoogle: true,
-        sourceUrl: r.sourceUrl ?? null,
-    }));
-    const nativeRows: DisplayReviewRow[] = native.map((r) => ({
-        ...r,
-        displayKey: `native-${r.id}`,
-    }));
-    return [...nativeRows, ...externalRows].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-}
+import {
+    mergeListingAndExternalReviews,
+    type ExternalReviewRow,
+    type DisplayReviewRow,
+} from '@/components/property/reviewMerge';
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
@@ -2389,8 +2356,50 @@ useEffect(() => {
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
-                              <article key={r.id} className="pp-v2-review-card">
+                              <article key={r.displayKey ?? r.id} className="pp-v2-review-card">
                                 <span className="pp-v2-review-quote" aria-hidden="true">&ldquo;</span>
+                                {r.isGoogle ? (
+                                  <span
+                                    title="Review from Google"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: '50%',
+                                      background: '#4285F4',
+                                      color: '#fff',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      marginBottom: 8,
+                                    }}
+                                  >
+                                    G
+                                  </span>
+                                ) : r.source ? (
+                                  <span
+                                    title={`Review from ${r.source}`}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      padding: '2px 6px',
+                                      borderRadius: 4,
+                                      background: r.source.toLowerCase().includes('airbnb') ? '#FF5A5F' : r.source.toLowerCase().includes('booking') ? '#003580' : '#475569',
+                                      color: '#fff',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                      marginBottom: 8,
+                                    }}
+                                  >
+                                    {r.source}
+                                  </span>
+                                ) : null}
+                                {r.rating > 0 && (
+                                  <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-primary, #4a3535)' }} aria-label={`${r.rating} out of 5 stars`}>
+                                    {'★'.repeat(Math.min(5, r.rating))}{'☆'.repeat(Math.max(0, 5 - r.rating))}
+                                  </div>
+                                )}
                                 {r.body && <p className="pp-v2-review-body">{r.body}</p>}
                                 {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
                                 {(() => {
