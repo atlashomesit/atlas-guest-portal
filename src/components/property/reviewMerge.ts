@@ -49,9 +49,15 @@ export function normalizeReviewSource(source?: string | null): string | undefine
   if (!source) return undefined;
   const s = source.trim();
   const lower = s.toLowerCase();
-  if (lower === 'atlassyncbookingcom' || lower === 'atlassync') {
+  if (lower === 'atlassyncbookingcom' || lower === 'atlassync' || lower === 'booking_com' || lower === 'booking.com') {
     return 'Booking.com';
   }
+  if (lower === 'airbnb') return 'Airbnb';
+  if (lower === 'google') return 'Google';
+  if (lower === 'makemytrip' || lower === 'mmt') return 'MakeMyTrip';
+  if (lower === 'expedia') return 'Expedia';
+  if (lower === 'agoda') return 'Agoda';
+  if (lower === 'vrbo') return 'Vrbo';
   return s;
 }
 
