@@ -85,4 +85,38 @@ describe('mergeListingAndExternalReviews (TASK-103146)', () => {
 
     expect(result.map((r) => r.guestName)).toEqual(['Native Newer', 'Ext Mid', 'Native Older']);
   });
+
+  it('maps host responses and responded timestamps from external reviews (REV-014)', () => {
+    const external: ExternalReviewRow[] = [
+      {
+        guestName: 'Alice',
+        rating: 5,
+        body: 'Fantastic villa experience!',
+        reviewDate: '2026-10-01',
+        source: 'Airbnb',
+        hostResponse: '  Thank you for being great guests!  ',
+        respondedAt: '2026-10-02T10:00:00.000Z',
+      },
+      {
+        guestName: 'Bob',
+        rating: 4,
+        body: 'Nice stay overall.',
+        reviewDate: '2026-10-02',
+        source: 'Google',
+        hostResponse: null,
+      },
+    ];
+
+    const result = mergeListingAndExternalReviews([], external);
+
+    expect(result).toHaveLength(2);
+    const alice = result.find((r) => r.guestName === 'Alice');
+    const bob = result.find((r) => r.guestName === 'Bob');
+
+    expect(alice?.hostResponse).toBe('Thank you for being great guests!');
+    expect(alice?.hostResponseAt).toBe('2026-10-02T10:00:00.000Z');
+    expect(bob?.hostResponse).toBeNull();
+    expect(bob?.hostResponseAt).toBeNull();
+  });
 });
+
