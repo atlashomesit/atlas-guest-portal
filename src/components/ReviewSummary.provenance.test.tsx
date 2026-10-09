@@ -73,5 +73,18 @@ describe('TASK-10089 ReviewSummary provenance gating', () => {
     await settle();
     expect(screen.getByText(/Mostly positive/)).toBeInTheDocument();
   });
+
+  it('renders the chip for external-only listings where verifiedStayCount is null or 0', async () => {
+    const externalSummary = {
+      ...SUMMARY,
+      verifiedStayCount: 0,
+      externalReviewCount: 5,
+    };
+    stubSummary(externalSummary);
+    render(<ReviewSummary listingId={9} verifiedStayCount={null} />);
+    await settle();
+    expect(screen.getByText(/Mostly positive/)).toBeInTheDocument();
+    expect(screen.getByText(/Guests mention/)).toBeInTheDocument();
+  });
 });
 
