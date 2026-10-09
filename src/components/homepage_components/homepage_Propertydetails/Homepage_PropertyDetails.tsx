@@ -598,6 +598,9 @@ const PropertyDetails = () => {
     // Lightbox state
     const [showLightbox, setShowLightbox] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
+    // REV-017: Review photos lightbox state
+    const [reviewLightboxImages, setReviewLightboxImages] = useState<string[] | null>(null);
+    const [reviewLightboxIndex, setReviewLightboxIndex] = useState(0);
 
     /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
     const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
@@ -1940,6 +1943,14 @@ useEffect(() => {
               />
             )}
 
+            {reviewLightboxImages && reviewLightboxImages.length > 0 && (
+              <Lightbox
+                images={reviewLightboxImages}
+                initialIndex={reviewLightboxIndex}
+                onClose={() => setReviewLightboxImages(null)}
+              />
+            )}
+
             {/* ---- TASK-1359: Virtual tour ---- */}
             {data.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
               <div style={{ marginTop: 24, borderRadius: 18, overflow: 'hidden', aspectRatio: '16/9', width: '100%' }}>
@@ -2452,6 +2463,38 @@ useEffect(() => {
                                 )}
                                 {r.body && <p className="pp-v2-review-body">{r.body}</p>}
                                 {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
+                                {r.photoUrls && r.photoUrls.length > 0 && (
+                                  <div className="pp-review-photos" style={{ display: 'flex', gap: 8, margin: '8px 0', flexWrap: 'wrap' }} data-testid="review-photos">
+                                    {r.photoUrls.map((url, pIdx) => (
+                                      <button
+                                        key={url + pIdx}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setReviewLightboxImages(r.photoUrls ?? []);
+                                          setReviewLightboxIndex(pIdx);
+                                        }}
+                                        style={{
+                                          padding: 0,
+                                          border: '1px solid var(--border-subtle, #e2e8f0)',
+                                          borderRadius: 6,
+                                          overflow: 'hidden',
+                                          cursor: 'pointer',
+                                          background: 'none',
+                                        }}
+                                        aria-label={`View photo ${pIdx + 1} from ${r.guestName ?? 'guest'}`}
+                                        data-testid={`review-photo-thumb-${pIdx}`}
+                                      >
+                                        <img
+                                          src={url}
+                                          alt={`Review photo ${pIdx + 1}`}
+                                          style={{ width: 64, height: 64, objectFit: 'cover', display: 'block' }}
+                                          loading="lazy"
+                                        />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                                 {(() => {
                                   const chips: { label: string; v: number }[] = [];
                                   if (r.ratingCleanliness != null && r.ratingCleanliness >= 1) chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });

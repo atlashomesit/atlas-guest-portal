@@ -76,7 +76,7 @@ export default function ReviewSummary({ listingId, verifiedStayCount }: ReviewSu
     };
   }, [listingId]);
 
-  if (!data || data.topKeywords.length === 0) return null;
+  if (!data || !Array.isArray(data.topKeywords) || data.topKeywords.length === 0) return null;
 
   // TASK-10089: source/count agreement with the hosting card. Gate only when both
   // sides carry the number — an older API without the field must not blank chips.
