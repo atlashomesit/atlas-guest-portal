@@ -370,6 +370,9 @@ interface Property {
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -406,6 +409,9 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         minStay: (item as unknown as { minStay?: number | null }).minStay ?? null,
         latitude: item.latitude,
         longitude: item.longitude,
+        city: item.city ?? ((item as unknown as Record<string, unknown>).City as string | undefined),
+        state: item.state ?? ((item as unknown as Record<string, unknown>).State as string | undefined),
+        country: item.country ?? ((item as unknown as Record<string, unknown>).Country as string | undefined),
     };
 }
 
@@ -1247,6 +1253,18 @@ const PropertyDetails = () => {
                             const n = raw == null || raw === '' ? NaN : Number(raw);
                             return Number.isFinite(n) ? n : null;
                         })(),
+                        city: (() => {
+                            const raw = (apiListing as Record<string, unknown>).city ?? (apiListing as Record<string, unknown>).City;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        state: (() => {
+                            const raw = (apiListing as Record<string, unknown>).state ?? (apiListing as Record<string, unknown>).State;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        country: (() => {
+                            const raw = (apiListing as Record<string, unknown>).country ?? (apiListing as Record<string, unknown>).Country;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
                     };
                     const images = filterGuestImageUrls(
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
@@ -1389,6 +1407,16 @@ useEffect(() => {
             .filter((node) => node.reviewBody.length > 0);
 
         const displayNightly = directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
+        const tenantInfo = isNonAtlasMarketplaceListing ? (listingTenantCtx ?? null) : _getTenantCtx();
+        const resolvedRegion =
+            data.state?.trim() ||
+            (data as any).addressRegion?.trim() ||
+            tenantInfo?.legalContactPack?.state?.trim() ||
+            (tenantInfo?.legalContactPack as any)?.address?.state?.trim() ||
+            (tenantInfo as any)?.address?.state?.trim() ||
+            undefined;
+        const resolvedLocality = data.city?.trim() || (data as any).addressLocality?.trim() || undefined;
+        const resolvedCountry = data.country?.trim() || 'IN';
 
         return [
             {
@@ -1401,8 +1429,9 @@ useEffect(() => {
                 address: {
                     '@type': 'PostalAddress',
                     streetAddress: data.property_location || undefined,
-                    addressRegion: 'Telangana',
-                    addressCountry: 'IN',
+                    ...(resolvedLocality ? { addressLocality: resolvedLocality } : {}),
+                    ...(resolvedRegion ? { addressRegion: resolvedRegion } : {}),
+                    addressCountry: resolvedCountry,
                 },
                 aggregateRating:
                     ratingValue > 0 && reviewCount > 0
@@ -1458,6 +1487,9 @@ useEffect(() => {
         listingReviewsFromApi,
         directBookingNightly,
         nightlyPrice?.finalNightlyPrice,
+        isNonAtlasMarketplaceListing,
+        listingTenantCtx,
+        hostDescription.text,
     ]);
 
     if (!data) {
