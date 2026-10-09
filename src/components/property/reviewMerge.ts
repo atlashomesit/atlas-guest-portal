@@ -28,6 +28,9 @@ export type ExternalReviewRow = {
   reviewDate?: string;
   source?: string;
   sourceUrl?: string | null;
+  hostResponse?: string | null;
+  hostResponseAt?: string | null;
+  respondedAt?: string | null;
 };
 
 export type DisplayReviewRow = ListingReviewRow & {
@@ -59,6 +62,8 @@ export function mergeListingAndExternalReviews(
       isGoogle,
       source: r.source,
       sourceUrl: r.sourceUrl ?? null,
+      hostResponse: r.hostResponse?.trim() ?? null,
+      hostResponseAt: r.hostResponseAt ?? r.respondedAt ?? null,
     };
   });
 
