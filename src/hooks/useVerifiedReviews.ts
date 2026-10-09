@@ -2,12 +2,16 @@ import { useEffect, useState } from "react";
 
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 
+import { normalizeReviewSource } from "@/components/property/reviewMerge";
+
 /**
- * TASK-2872: real verified-stay reviews for the homepage testimonials section.
+ * TASK-2872 / REV-019: real verified reviews for the homepage testimonials section.
  *
- * Aggregates reviews from the tenant's listings via the existing anonymous
- * GET /api/listings/{id}/reviews endpoint (already public on listing pages),
- * keeps only verified-stay reviews (rating >= 4, non-empty text), and returns
+ * Aggregates reviews from the tenant's listings via:
+ * 1. GET /api/listings/{id}/reviews (native verified stays, rating >= 4)
+ * 2. GET /api/public/listings/{id} (imported OTA/Google reviews, rating >= 4)
+ *
+ * Keeps only verified reviews (rating >= 4, non-empty text), and returns
  * the most recent few. Returns an EMPTY array when there are no real reviews —
  * the section then renders nothing. This never fabricates reviewers.
  */
@@ -17,6 +21,7 @@ export type VerifiedReview = {
   rating: number;
   text: string;
   createdAt: string;
+  source?: string;
 };
 
 type ReviewDto = {
@@ -27,6 +32,15 @@ type ReviewDto = {
   body?: string | null;
   createdAt: string;
   isVerifiedStay: boolean;
+};
+
+type ExternalReviewDto = {
+  guestName?: string | null;
+  rating?: number | null;
+  body?: string | null;
+  reviewDate?: string | null;
+  source?: string | null;
+  sourceUrl?: string | null;
 };
 
 /** Privacy: show only the first name (reviews are already public per-listing). */
@@ -63,19 +77,29 @@ export function useVerifiedReviews(
     let active = true;
     setLoading(true);
 
+    const targetIds = ids.slice(0, MAX_LISTINGS_QUERIED);
     Promise.all(
-      ids.slice(0, MAX_LISTINGS_QUERIED).map((id) =>
-        fetch(buildApiUrl(`/api/listings/${id}/reviews`), { headers: getApiHeaders() })
-          .then((res) => (res.ok ? res.json() : null))
-          .catch(() => null),
-      ),
+      targetIds.map(async (id) => {
+        const [nativeRes, publicRes] = await Promise.all([
+          fetch(buildApiUrl(`/api/listings/${id}/reviews`), { headers: getApiHeaders() })
+            .then((res) => (res.ok ? res.json() : null))
+            .catch(() => null),
+          fetch(buildApiUrl(`/api/public/listings/${id}`), { headers: getApiHeaders() })
+            .then((res) => (res.ok ? res.json() : null))
+            .catch(() => null),
+        ]);
+        return {
+          nativeReviews: (nativeRes?.reviews ?? []) as ReviewDto[],
+          externalReviews: (publicRes?.externalReviews ?? []) as ExternalReviewDto[],
+        };
+      }),
     ).then((results) => {
       if (!active) return;
 
       const collected: VerifiedReview[] = [];
       for (const res of results) {
-        const list = (res?.reviews ?? []) as ReviewDto[];
-        for (const r of list) {
+        // Native completed stays
+        for (const r of res.nativeReviews) {
           const text = (r.body ?? r.title ?? "").trim();
           if (r.isVerifiedStay && r.rating >= 4 && text.length > 0) {
             collected.push({
@@ -84,6 +108,22 @@ export function useVerifiedReviews(
               rating: r.rating,
               text,
               createdAt: r.createdAt,
+            });
+          }
+        }
+        // External verified reviews (Airbnb, Booking.com, Google)
+        for (const ext of res.externalReviews) {
+          const rating = Number(ext.rating);
+          const text = (ext.body ?? "").trim();
+          if (!isNaN(rating) && rating >= 4 && text.length > 0) {
+            const cleanSource = normalizeReviewSource(ext.source) ?? (ext.sourceUrl?.includes("google") ? "Google" : undefined);
+            collected.push({
+              id: -(collected.length + 1),
+              firstName: firstNameOnly(ext.guestName),
+              rating,
+              text,
+              createdAt: ext.reviewDate ? `${ext.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
+              source: cleanSource,
             });
           }
         }
