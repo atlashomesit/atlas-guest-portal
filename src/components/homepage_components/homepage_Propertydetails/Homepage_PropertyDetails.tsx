@@ -427,6 +427,7 @@ type ListingReviewRow = {
 
 import {
     mergeListingAndExternalReviews,
+    normalizeReviewSource,
     type ExternalReviewRow,
     type DisplayReviewRow,
 } from '@/components/property/reviewMerge';
@@ -2423,24 +2424,27 @@ useEffect(() => {
                                   >
                                     G
                                   </span>
-                                ) : r.source ? (
-                                  <span
-                                    title={`Review from ${r.source}`}
-                                    style={{
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      padding: '2px 6px',
-                                      borderRadius: 4,
-                                      background: r.source.toLowerCase().includes('airbnb') ? '#FF5A5F' : r.source.toLowerCase().includes('booking') ? '#003580' : '#475569',
-                                      color: '#fff',
-                                      fontSize: 11,
-                                      fontWeight: 600,
-                                      marginBottom: 8,
-                                    }}
-                                  >
-                                    {r.source}
-                                  </span>
-                                ) : null}
+                                ) : r.source ? (() => {
+                                  const cardSource = normalizeReviewSource(r.source) ?? r.source;
+                                  return (
+                                    <span
+                                      title={`Review from ${cardSource}`}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        padding: '2px 6px',
+                                        borderRadius: 4,
+                                        background: cardSource.toLowerCase().includes('airbnb') ? '#FF5A5F' : cardSource.toLowerCase().includes('booking') ? '#003580' : '#475569',
+                                        color: '#fff',
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        marginBottom: 8,
+                                      }}
+                                    >
+                                      {cardSource}
+                                    </span>
+                                  );
+                                })() : null}
                                 {r.rating > 0 && (
                                   <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-primary, #4a3535)' }} aria-label={`${r.rating} out of 5 stars`}>
                                     {'★'.repeat(Math.min(5, r.rating))}{'☆'.repeat(Math.max(0, 5 - r.rating))}

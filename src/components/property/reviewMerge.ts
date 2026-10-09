@@ -40,6 +40,20 @@ export type DisplayReviewRow = ListingReviewRow & {
   sourceUrl?: string | null;
 };
 
+/**
+ * TASK-103154 (REV-011): Normalizes review source string for public display.
+ * Maps legacy/plumbing values like "AtlasSyncBookingCom" or "AtlasSync" to clean brand name "Booking.com".
+ */
+export function normalizeReviewSource(source?: string | null): string | undefined {
+  if (!source) return undefined;
+  const s = source.trim();
+  const lower = s.toLowerCase();
+  if (lower === 'atlassyncbookingcom' || lower === 'atlassync') {
+    return 'Booking.com';
+  }
+  return s;
+}
+
 export function mergeListingAndExternalReviews(
   native: ListingReviewRow[],
   external: ExternalReviewRow[],
@@ -51,16 +65,17 @@ export function mergeListingAndExternalReviews(
   });
 
   const externalRows: DisplayReviewRow[] = validExternal.map((r, idx) => {
-    const isGoogle = (r.source ?? '').toLowerCase() === 'google' || (!r.source && !r.sourceUrl);
+    const cleanSource = normalizeReviewSource(r.source);
+    const isGoogle = (cleanSource ?? '').toLowerCase() === 'google' || (!cleanSource && !r.sourceUrl);
     return {
       id: -(idx + 1),
       displayKey: `ext-${idx}-${r.reviewDate ?? ''}`,
-      guestName: r.guestName ?? (isGoogle ? 'Google user' : r.source ? `${r.source} guest` : 'Guest'),
+      guestName: r.guestName ?? (isGoogle ? 'Google user' : cleanSource ? `${cleanSource} guest` : 'Guest'),
       rating: Number(r.rating) || 5,
       body: r.body?.trim() ?? null,
       createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
       isGoogle,
-      source: r.source,
+      source: cleanSource,
       sourceUrl: r.sourceUrl ?? null,
       hostResponse: r.hostResponse?.trim() ?? null,
       hostResponseAt: r.hostResponseAt ?? r.respondedAt ?? null,
