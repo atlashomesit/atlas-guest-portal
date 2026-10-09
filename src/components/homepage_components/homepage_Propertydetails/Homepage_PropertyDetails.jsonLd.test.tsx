@@ -245,5 +245,79 @@ describe('Homepage_PropertyDetails listing JSON-LD (TASK-102732 item 4)', () => 
     expect(address['addressRegion']).toBe('Kerala');
     expect('addressLocality' in address).toBe(false);
   });
+
+  it('REV-013: includes external reviews and blended rating in aggregateRating and review nodes', async () => {
+    mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/public/listings/101') || url.includes('/public/listings/101')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              externalReviews: [
+                {
+                  guestName: 'Sita',
+                  rating: 5,
+                  body: 'Wonderful vacation at the villa!',
+                  reviewDate: '2026-10-01',
+                  source: 'Airbnb',
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (url.includes('/api/listings/101/reviews') || url.includes('/listings/101/reviews')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              averageRating: 0,
+              totalCount: 0,
+              reviews: [],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      );
+    });
+
+    try {
+      render(
+        <MemoryRouter initialEntries={['/homes/atlas101/101']}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+            </Routes>
+          </Suspense>
+        </MemoryRouter>,
+      );
+
+      await settle();
+      const nodes = readJsonLd();
+      const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness') as Record<string, unknown>;
+      expect(lodging).toBeDefined();
+
+      const aggregateRating = lodging['aggregateRating'] as Record<string, unknown>;
+      expect(aggregateRating).toBeDefined();
+      expect(aggregateRating['@type']).toBe('AggregateRating');
+      expect(aggregateRating['ratingValue']).toBe(5);
+      expect(aggregateRating['reviewCount']).toBe(1);
+
+      const reviews = lodging['review'] as Record<string, unknown>[];
+      expect(reviews).toBeDefined();
+      expect(reviews).toHaveLength(1);
+      expect(reviews[0]['@type']).toBe('Review');
+      expect((reviews[0]['author'] as Record<string, unknown>)['name']).toBe('Sita');
+      expect((reviews[0]['reviewRating'] as Record<string, unknown>)['ratingValue']).toBe(5);
+      expect(reviews[0]['reviewBody']).toBe('Wonderful vacation at the villa!');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
 

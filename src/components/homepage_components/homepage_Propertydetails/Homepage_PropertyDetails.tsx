@@ -1353,17 +1353,33 @@ useEffect(() => {
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
-    /** TASK-1357: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
+    const ppApiReviews = listingReviewsFromApi;
+    const ppMergedReviews = useMemo(() => {
+        return ppApiReviews && !ppApiReviews.loading
+            ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
+            : [];
+    }, [ppApiReviews, externalReviewsFromApi]);
+    const ppCombinedReviewCount = ppMergedReviews.length;
+    const ppCombinedAverageRating = useMemo(() => {
+        return ppCombinedReviewCount > 0
+            ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
+                / ppMergedReviews.filter((r) => r.rating > 0).length
+            : 0;
+    }, [ppMergedReviews, ppCombinedReviewCount]);
+    const ppHasApiReviews = Boolean(
+        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
+    );
+
+    /** TASK-1357 / REV-013: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
     const propertyJsonLd = useMemo(() => {
         if (!data) return undefined;
         const pageUrlForLd = typeof window !== 'undefined' ? window.location.href : '';
         const primaryImageForLd = filterGuestImageUrls(data.property_img ?? [])[0];
-        const apiRev = listingReviewsFromApi;
-        const useApiRatings = Boolean(apiRev && !apiRev.loading && apiRev.totalCount > 0 && apiRev.averageRating > 0);
-        // TASK-2554: only use API-sourced rating; never fall back to static catalog counts for JSON-LD
-        const ratingValue = useApiRatings ? apiRev!.averageRating : 0;
-        const reviewCount = useApiRatings ? apiRev!.totalCount : 0;
-        const reviewNodes = (apiRev?.reviews ?? [])
+        const useApiRatings = Boolean(ppHasApiReviews && ppCombinedReviewCount > 0 && ppCombinedAverageRating > 0);
+        // TASK-2554 / REV-013: only use API-sourced rating; never fall back to static catalog counts for JSON-LD
+        const ratingValue = useApiRatings ? Number(ppCombinedAverageRating.toFixed(1)) : 0;
+        const reviewCount = useApiRatings ? ppCombinedReviewCount : 0;
+        const reviewNodes = ppMergedReviews
             .filter((r) => Number(r.rating) >= 1 && Number(r.rating) <= 5)
             .slice(0, 8)
             .map((r) => ({
@@ -1453,7 +1469,10 @@ useEffect(() => {
         ];
     }, [
         data,
-        listingReviewsFromApi,
+        ppHasApiReviews,
+        ppCombinedReviewCount,
+        ppCombinedAverageRating,
+        ppMergedReviews,
         directBookingNightly,
         nightlyPrice?.finalNightlyPrice,
         isNonAtlasMarketplaceListing,
@@ -1643,18 +1662,6 @@ useEffect(() => {
         ? data.amenityCodes.map((code) => amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code))
         : (data.property_amenities || []).map((a) => a.amenities_icon ? formatAmenityName(a.amenities_icon) : 'Amenity');
 
-    const ppApiReviews = listingReviewsFromApi;
-    const ppMergedReviews = ppApiReviews && !ppApiReviews.loading
-        ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
-        : [];
-    const ppCombinedReviewCount = ppMergedReviews.length;
-    const ppCombinedAverageRating = ppCombinedReviewCount > 0
-        ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
-            / ppMergedReviews.filter((r) => r.rating > 0).length
-        : 0;
-    const ppHasApiReviews = Boolean(
-        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
-    );
     /** TASK-102112: pill counts + the filtered/sorted review set (instant, client-side). */
     const ppReviewFilterCounts = {
         all: ppMergedReviews.length,
