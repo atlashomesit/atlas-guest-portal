@@ -118,5 +118,31 @@ describe('mergeListingAndExternalReviews (TASK-103146)', () => {
     expect(bob?.hostResponse).toBeNull();
     expect(bob?.hostResponseAt).toBeNull();
   });
+
+  it('normalizes legacy AtlasSyncBookingCom and AtlasSync sources to Booking.com (REV-011)', () => {
+    const external: ExternalReviewRow[] = [
+      {
+        guestName: 'Kiran',
+        rating: 5,
+        body: 'Superb hotel apartment experience!',
+        reviewDate: '2026-10-05',
+        source: 'AtlasSyncBookingCom',
+      },
+      {
+        guestName: 'Rohit',
+        rating: 4,
+        body: 'Great location and hospitality',
+        reviewDate: '2026-10-06',
+        source: 'AtlasSync',
+      },
+    ];
+
+    const result = mergeListingAndExternalReviews([], external);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.source)).toEqual(['Booking.com', 'Booking.com']);
+    expect(result.map((r) => r.guestName)).toEqual(['Rohit', 'Kiran']);
+    expect(result.every((r) => !r.isGoogle)).toBe(true);
+  });
 });
 
