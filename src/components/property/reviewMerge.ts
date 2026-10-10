@@ -7,7 +7,7 @@
 
 export type ListingReviewRow = {
   id: number;
-  guestName?: string;
+  guestName?: string | null;
   rating: number;
   title?: string | null;
   body?: string | null;
@@ -23,7 +23,7 @@ export type ListingReviewRow = {
 };
 
 export type ExternalReviewRow = {
-  guestName?: string;
+  guestName?: string | null;
   rating?: number | null;
   body?: string | null;
   reviewDate?: string;
