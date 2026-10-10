@@ -429,7 +429,6 @@ import {
     mergeListingAndExternalReviews,
     normalizeReviewSource,
     type ExternalReviewRow,
-    type DisplayReviewRow,
 } from '@/components/property/reviewMerge';
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
