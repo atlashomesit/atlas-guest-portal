@@ -148,7 +148,7 @@ describe('Heritage PropertyDetails review photos (REV-017)', () => {
 
       await settle();
 
-      const photosContainer = await screen.findByTestId('review-photos');
+      const photosContainer = screen.getByTestId('review-photos');
       expect(photosContainer).toBeInTheDocument();
 
       const thumb0 = screen.getByTestId('review-photo-thumb-0');
