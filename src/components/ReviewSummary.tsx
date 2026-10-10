@@ -7,12 +7,12 @@
  * Returns null when the listing has fewer than 3 reviews (API returns 204).
  * Behind Reviews:UseLlmSummary=false flag on the API for future LLM upgrade.
  *
- * TASK-10089: marketplace provenance gating. The summary is computed from native
- * Atlas reviews only, so when the hosting card passes its own `verifiedStayCount`
- * (from GET /marketplace/listings) the chip renders only if the summary's
- * verified-stay count agrees. A mismatch means the card and the chip describe
- * different review sets — rendering either label would be unverified proof — so
- * the chip hides. Surfaces that pass no expectation keep the historical behaviour.
+ * TASK-10089 / REV-015: marketplace provenance gating. The summary is computed from
+ * visible native reviews (>= 4★) and active external reviews (!IsHidden, Rating >= 4).
+ * When the hosting card passes its own `verifiedStayCount` (from GET /marketplace/listings),
+ * the chip renders only if the summary's verified-stay count agrees. A mismatch means the card
+ * and the chip describe different verified review sets — rendering either label would be
+ * unverified proof — so the chip hides. Surfaces that pass no expectation keep the historical behaviour.
  */
 import { useEffect, useState } from "react";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
@@ -76,7 +76,7 @@ export default function ReviewSummary({ listingId, verifiedStayCount }: ReviewSu
     };
   }, [listingId]);
 
-  if (!data || data.topKeywords.length === 0) return null;
+  if (!data || !Array.isArray(data.topKeywords) || data.topKeywords.length === 0) return null;
 
   // TASK-10089: source/count agreement with the hosting card. Gate only when both
   // sides carry the number — an older API without the field must not blank chips.

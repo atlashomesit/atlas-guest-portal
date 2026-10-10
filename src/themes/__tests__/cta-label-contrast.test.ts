@@ -139,6 +139,34 @@ describe("on-CTA label contrast (WCAG AA, normal text)", () => {
   });
 
   /**
+   * Same surface sweep for the core text roles. Shared chrome paints them on surfaces the
+   * palette prose never listed: `editorial` documented `--text-muted` against `--bg-primary`
+   * only (4.90:1), but the navbar/mobile search pill, the search "Sort:" label and the home
+   * intro copy sit on `--bg-secondary` #f2ece1, where it measured 4.48:1 — an axe
+   * `color-contrast` failure on every booking-funnel page (2026-10-06 UX audit, slot A).
+   */
+  const TEXT_ROLES = ["--text-primary", "--text-secondary", "--text-muted", "--text-body"];
+
+  it.each(layoutThemeIds)("core text roles on every surface: %s", (id) => {
+    const tokens = themeRegistry[id].defaultColorTokens as Record<string, string> | undefined;
+    if (!tokens) return;
+    const failures: string[] = [];
+    for (const token of TEXT_ROLES) {
+      const hex = tokens[token];
+      if (!hex) continue;
+      for (const surface of SURFACES) {
+        const bg = tokens[surface];
+        if (!bg) continue;
+        const ratio = contrastRatio(hex, bg);
+        if (ratio < AA_NORMAL_TEXT) {
+          failures.push(`${token} ${hex} on ${surface} ${bg} = ${ratio.toFixed(2)}:1`);
+        }
+      }
+    }
+    expect(failures, `${id}: text roles below ${AA_NORMAL_TEXT}:1`).toEqual([]);
+  });
+
+  /**
    * `--brand-ink` has exactly one consumer — `navbar.css`'s `.util-bar`, which uses it as a dark
    * BACKGROUND behind hardcoded warm-light text. A palette that reads the name as "light ink"
    * instead renders light-on-light; noir did, at 1.04-1.70:1.

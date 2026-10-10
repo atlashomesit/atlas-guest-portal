@@ -59,13 +59,33 @@ export function removeRecentlyViewed(listingId: number): void {
   } catch {
     /* non-browser */
   }
+  // TASK-103034: delete server-side if guest is authenticated
+  if (getCachedGuestAuthState()?.isAuthenticated) {
+    fetch(buildApiUrl(`/api/guest/recently-viewed/${listingId}`), {
+      method: "DELETE",
+      headers: getApiHeaders(),
+    }).catch(() => { /* non-critical — fire and forget */ });
+  }
 }
 
 export function clearRecentlyViewed(): void {
   try {
     localStorage.removeItem(RECENT_KEY);
+    localStorage.removeItem("atlas_recently_viewed");
   } catch {
     /* ignore quota / private mode */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("atlas-recently-viewed-changed"));
+  } catch {
+    /* non-browser */
+  }
+  // TASK-103034: delete server-side if guest is authenticated
+  if (getCachedGuestAuthState()?.isAuthenticated) {
+    fetch(buildApiUrl("/api/guest/recently-viewed"), {
+      method: "DELETE",
+      headers: getApiHeaders(),
+    }).catch(() => { /* non-critical — fire and forget */ });
   }
 }
 
@@ -212,11 +232,25 @@ export async function loadRecentlyViewedIfAuthenticated(): Promise<void> {
             viewedAtUtc: sTime > lTime ? s.viewedAtUtc : existing.viewedAtUtc,
           });
         } else {
-          mergedMap.set(s.listingId, {
-            listingId: s.listingId,
-            path: `/listings/${s.listingId}`,
-            viewedAtUtc: s.viewedAtUtc,
-          });
+          // TASK-103034: resolve listing's /homes/:propertySlug/:unitSlug path or omit when unresolvable
+          const sObj = s as any;
+          const resolvedPath = typeof sObj.path === "string" && sObj.path.startsWith("/homes/")
+            ? sObj.path
+            : (sObj.propertySlug && sObj.unitSlug)
+              ? `/homes/${sObj.propertySlug}/${sObj.unitSlug}`
+              : null;
+
+          if (resolvedPath) {
+            mergedMap.set(s.listingId, {
+              listingId: s.listingId,
+              path: resolvedPath,
+              name: sObj.name,
+              coverPhotoUrl: sObj.coverPhotoUrl,
+              location: sObj.location,
+              pricePerNight: sObj.pricePerNight,
+              viewedAtUtc: s.viewedAtUtc,
+            });
+          }
         }
       }
 
@@ -243,6 +277,24 @@ export async function loadRecentlyViewedIfAuthenticated(): Promise<void> {
     }
   } catch (err) {
     console.warn("Failed to load server recently viewed:", err);
+  }
+}
+
+/**
+ * TASK-103034: reset local recently-viewed state and sync flag on logout so accounts don't leak history
+ */
+export function resetRecentlyViewedOnLogout(): void {
+  try {
+    localStorage.removeItem(RECENT_KEY);
+    localStorage.removeItem("atlas_recently_viewed");
+  } catch {
+    /* ignore */
+  }
+  recentlyViewedSynced = false;
+  try {
+    window.dispatchEvent(new CustomEvent("atlas-recently-viewed-changed"));
+  } catch {
+    /* non-browser */
   }
 }
 

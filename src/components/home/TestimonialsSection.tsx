@@ -166,7 +166,7 @@ const TestimonialsSection = () => {
 
   const averageRating =
     Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 100) / 100;
-  const ratingLine = `${averageRating} · ${reviews.length} verified ${reviews.length === 1 ? "stay" : "stays"}`;
+  const ratingLine = `${averageRating} · ${reviews.length} verified ${reviews.length === 1 ? "review" : "reviews"}`;
 
   return (
     <section
@@ -198,7 +198,7 @@ const TestimonialsSection = () => {
                   </span>
                   <div>
                     <p className="font-semibold text-text-primary leading-tight">{r.firstName}</p>
-                    <p className="text-xs text-text-muted">Verified stay</p>
+                    <p className="text-xs text-text-muted">{r.source ? `${r.source} review` : "Verified stay"}</p>
                   </div>
                 </div>
               </div>

@@ -37,7 +37,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           >
             <svg
               aria-hidden="true"
-              class="lucide lucide-circle-check w-5 h-5 text-primary mt-1"
+              class="lucide lucide-circle-check lucide-check-circle-2 w-5 h-5 text-primary mt-1"
               fill="none"
               height="24"
               stroke="currentColor"
@@ -66,7 +66,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           >
             <svg
               aria-hidden="true"
-              class="lucide lucide-circle-check w-5 h-5 text-primary mt-1"
+              class="lucide lucide-circle-check lucide-check-circle-2 w-5 h-5 text-primary mt-1"
               fill="none"
               height="24"
               stroke="currentColor"
@@ -95,7 +95,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           >
             <svg
               aria-hidden="true"
-              class="lucide lucide-circle-check w-5 h-5 text-primary mt-1"
+              class="lucide lucide-circle-check lucide-check-circle-2 w-5 h-5 text-primary mt-1"
               fill="none"
               height="24"
               stroke="currentColor"
@@ -150,7 +150,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           >
             <svg
               aria-hidden="true"
-              class="lucide lucide-sparkles w-4 h-4"
+              class="lucide lucide-sparkles lucide-stars w-4 h-4"
               fill="none"
               height="24"
               stroke="currentColor"
@@ -233,7 +233,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             >
               <svg
                 aria-hidden="true"
-                class="lucide lucide-clock4 lucide-clock-4 w-5 h-5"
+                class="lucide lucide-clock-4 w-5 h-5"
                 fill="none"
                 height="24"
                 stroke="currentColor"
@@ -369,7 +369,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             >
               <svg
                 aria-hidden="true"
-                class="lucide lucide-circle-check w-5 h-5"
+                class="lucide lucide-circle-check lucide-check-circle-2 w-5 h-5"
                 fill="none"
                 height="24"
                 stroke="currentColor"
@@ -673,7 +673,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           >
             <svg
               aria-hidden="true"
-              class="lucide lucide-sparkles w-5 h-5"
+              class="lucide lucide-sparkles lucide-stars w-5 h-5"
               fill="none"
               height="24"
               stroke="currentColor"

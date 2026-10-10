@@ -50,6 +50,17 @@ const SearchResultsMap = lazy(() => import("../components/search/SearchResultsMa
 
 const ITEMS_PER_PAGE = 12;
 const MAP_MARKER_CAP = 100;
+const MAX_GUESTS_FILTER = 16;
+
+/**
+ * The marketplace search bar sends adults/children and a derived `guests`; the filter reads
+ * adults+children first. Any edit to the guest count must drop the breakdown too, or the
+ * old total keeps winning and the box, the chip and "Clear filters" silently do nothing.
+ */
+function deleteGuestBreakdown(params: URLSearchParams) {
+  params.delete("adults");
+  params.delete("children");
+}
 
 type NormalizedListing = {
   id: string;
@@ -374,11 +385,11 @@ const SearchPage = () => {
   const checkIn = useMemo(() => parseDate(checkInParam), [checkInParam]);
   const checkOut = useMemo(() => parseDate(checkOutParam), [checkOutParam]);
   const guests = useMemo(() => {
-    if (adultsParam || childrenParam) {
-      const total = (Number(adultsParam) || 0) + (Number(childrenParam) || 0);
-      return total > 0 ? total : null;
-    }
-    return Number(guestsParam) || null;
+    const total = adultsParam || childrenParam
+      ? (Number(adultsParam) || 0) + (Number(childrenParam) || 0)
+      : Number(guestsParam) || 0;
+    // A hand-edited URL (?guests=-2) must not become a nonsense filter.
+    return total > 0 ? Math.min(Math.floor(total), MAX_GUESTS_FILTER) : null;
   }, [adultsParam, childrenParam, guestsParam]);
   const minPrice = useMemo(() => Number(minPriceParam) || null, [minPriceParam]);
   const maxPrice = useMemo(() => Number(maxPriceParam) || null, [maxPriceParam]);
@@ -763,6 +774,7 @@ const SearchPage = () => {
       const next = new URLSearchParams(prev);
       if (value) next.set(key, value);
       else next.delete(key);
+      if (key === "guests") deleteGuestBreakdown(next);
       return next;
     }, { replace: true });
   };
@@ -784,6 +796,7 @@ const SearchPage = () => {
       next.delete("longStay");
       next.delete("availableNow");
       next.delete("guests");
+      deleteGuestBreakdown(next);
       // TASK-1738: clear digital nomad filters
       next.delete("nomadWifi");
       next.delete("nomadWorkspace");
@@ -802,6 +815,7 @@ const SearchPage = () => {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.delete(key);
+        if (key === "guests") deleteGuestBreakdown(next);
         return next;
       }, { replace: true });
     };
@@ -1094,7 +1108,7 @@ const SearchPage = () => {
                 id="filter-guests"
                 type="number"
                 min={1}
-                max={16}
+                max={MAX_GUESTS_FILTER}
                 placeholder="Any"
                 value={guests ?? ""}
                 onChange={(e) => updateParam("guests", e.target.value)}

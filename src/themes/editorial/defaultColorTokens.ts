@@ -31,10 +31,12 @@
  *   --support-danger (#b3261e) / --bg-primary   (#faf6f0)  →  6.07:1
  *   --footer-link/--footer-text (#cbbfae) / --footer-bg (#1f1b16) → 9.60:1
  * All normal-text pairs clear the 4.5:1 AA threshold with wide margin. `--text-muted`
- * (#756a5e, ~4.90:1 on --bg-primary) is intentionally the *lowest*-margin token in this
- * palette; `Home.tsx`/`EditorialPullQuote.tsx` never bind it to anything smaller than this
- * layout's byline/meta copy (still normal body size, and it clears 4.5:1) — no token in this
- * file relies on the large-text 3:1 carve-out. `--border-subtle`/`--border-strong` are
+ * (#6e6357: 5.44:1 on --bg-primary, 4.98:1 on --bg-secondary/--bg-muted #f2ece1) is the
+ * *lowest*-margin token in this palette. It was #756a5e until 2026-10-06: 4.90:1 on
+ * --bg-primary, but shared chrome (navbar/mobile search pill, search "Sort:" label, home intro
+ * copy) paints it on --bg-secondary, where it measured 4.48:1 — an axe `color-contrast`
+ * failure on every booking-funnel page. `cta-label-contrast.test.ts` now checks every text role
+ * on every surface. No token in this file relies on the large-text 3:1 carve-out. `--border-subtle`/`--border-strong` are
  * decorative-only (never bound to text), same convention as every other palette in this
  * registry.
  */
@@ -63,7 +65,7 @@ export const editorialDefaultColorTokens: Readonly<Record<string, string>> = {
 
   "--text-primary": "#1f1b16",
   "--text-secondary": "#4a4038",
-  "--text-muted": "#756a5e",
+  "--text-muted": "#6e6357",
   "--text-body": "#241f1a",
   "--text-on-hero": "#1f1b16",
 

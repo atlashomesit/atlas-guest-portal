@@ -6,7 +6,7 @@ import {
   persistGuestAuthState,
   clearGuestAuthState,
 } from '@/storage/guestAuthStorage';
-import { loadFavoritesIfAuthenticated, loadRecentlyViewedIfAuthenticated } from '@/utils/guestHistory'; // TASK-4515 / GUEST-009: sync favorites & recently viewed on login
+import { loadFavoritesIfAuthenticated, loadRecentlyViewedIfAuthenticated, resetRecentlyViewedOnLogout } from '@/utils/guestHistory'; // TASK-4515 / GUEST-009 / TASK-103034
 
 /**
  * TASK-4017: Guest authentication context
@@ -103,6 +103,7 @@ export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const logout = useCallback(() => {
     setAuth(defaultState);
+    resetRecentlyViewedOnLogout();
     void clearGuestAuthState().catch((error) => {
       console.error('Failed to clear guest auth from storage:', error);
     });

@@ -147,15 +147,18 @@ function buildBookingIcsContent(args: {
 }
 
 /** TASK-2490: guest web self-check-in form — posts arrival time + party size + optional ID link. */
-function SelfCheckInCard() {
+function SelfCheckInCard({ bookingRef, token }: { bookingRef?: string; token?: string | null }) {
   // TASK-4514: Card is now a status + CTA into canonical SelfCheckIn flow
   // The divergent /api/guest/bookings/{bookingId}/check-in endpoint is superseded by the canonical flow
+  const checkinPath = bookingRef
+    ? `/check-in/${encodeURIComponent(bookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ''}`
+    : `/check-in${token ? `?t=${encodeURIComponent(token)}` : ''}`;
   return (
     <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5" data-testid="self-checkin-done">
       <h2 className="text-sm font-semibold text-text-primary mb-1">Complete your check-in</h2>
       <p className="text-sm text-text-secondary mb-3">Share your arrival details and verify your ID through our secure check-in process.</p>
       <a
-        href="/check-in"
+        href={checkinPath}
         className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:bg-brand-primary/90 transition-colors"
       >
         Start check-in →
@@ -1191,18 +1194,10 @@ export default function BookingConfirmationPage() {
           />
         )}
 
-        {/* TASK-2091: placeholder while invoice is being generated */}
-        {!isCancelled && booking.status === 'Confirmed' && !booking.hasGstInvoice && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
-            <p className="text-sm text-text-secondary">
-              Your GST invoice is being generated — we'll send it to your email within 1 hour.
-            </p>
-            <p className="text-xs text-text-muted">
-              Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
-            </p>
-          </div>
-        )}
+        {/* TASK-103053: the TASK-2091 "being generated — within 1 hour" placeholder was removed.
+            Since TASK-102031 retired auto-generation, no invoice is ever generated or sent, so the
+            promise was a dead end. The Documents card below still shows the invoice when
+            hasGstInvoice is true. */}
 
         {/* Documents: GST invoice + booking voucher + stay receipt + stay guide (TASK-102057) */}
         {!isCancelled && ((booking.hasGstInvoice && pdfUrl) || voucherUrl) && (
@@ -1336,7 +1331,7 @@ export default function BookingConfirmationPage() {
 
         {/* TASK-2490: guest web self-check-in */}
         {!isCancelled && bookingId && token && (
-          <SelfCheckInCard />
+          <SelfCheckInCard bookingRef={booking?.bookingRef} token={token} />
         )}
 
         {/* TASK-4333: guest-facing messages thread — read + reply to host */}
@@ -1492,7 +1487,7 @@ export default function BookingConfirmationPage() {
         {!isCancelled && booking.bookingRef &&
           (booking.status === 'Confirmed' || booking.status === 'CheckedIn') && (
           <Link
-            to={`/check-in/${encodeURIComponent(booking.bookingRef)}`}
+            to={`/check-in/${encodeURIComponent(booking.bookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ''}`}
             data-testid="self-checkin-link"
             className="flex items-center justify-between gap-4 rounded-2xl border border-brand-primary/40 bg-brand-primary/5 p-5 hover:bg-brand-primary/10 transition-colors"
           >

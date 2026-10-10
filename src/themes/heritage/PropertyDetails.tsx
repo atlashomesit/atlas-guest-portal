@@ -370,6 +370,9 @@ interface Property {
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -406,6 +409,9 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         minStay: (item as unknown as { minStay?: number | null }).minStay ?? null,
         latitude: item.latitude,
         longitude: item.longitude,
+        city: item.city ?? ((item as unknown as Record<string, unknown>).City as string | undefined),
+        state: item.state ?? ((item as unknown as Record<string, unknown>).State as string | undefined),
+        country: item.country ?? ((item as unknown as Record<string, unknown>).Country as string | undefined),
     };
 }
 
@@ -427,44 +433,11 @@ type ListingReviewRow = {
     ratingCommunication?: number | null;
 };
 
-/** TASK-1979: row shape from `GET /api/public/listings/{id}` externalReviews array. */
-type ExternalReviewRow = {
-    guestName?: string;
-    rating?: number | null;
-    body?: string | null;
-    reviewDate?: string;
-    source?: string;
-    sourceUrl?: string | null;
-};
-
-type DisplayReviewRow = ListingReviewRow & {
-    displayKey: string;
-    isGoogle?: boolean;
-    sourceUrl?: string | null;
-};
-
-function mergeListingAndExternalReviews(
-    native: ListingReviewRow[],
-    external: ExternalReviewRow[],
-): DisplayReviewRow[] {
-    const externalRows: DisplayReviewRow[] = external.map((r, idx) => ({
-        id: -(idx + 1),
-        displayKey: `gbp-${idx}-${r.reviewDate ?? ''}`,
-        guestName: r.guestName ?? 'Google user',
-        rating: r.rating ?? 0,
-        body: r.body ?? null,
-        createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
-        isGoogle: true,
-        sourceUrl: r.sourceUrl ?? null,
-    }));
-    const nativeRows: DisplayReviewRow[] = native.map((r) => ({
-        ...r,
-        displayKey: `native-${r.id}`,
-    }));
-    return [...nativeRows, ...externalRows].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-}
+import {
+    mergeListingAndExternalReviews,
+    normalizeReviewSource,
+    type ExternalReviewRow,
+} from '@/components/property/reviewMerge';
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
@@ -630,6 +603,9 @@ const PropertyDetails = () => {
     // Lightbox state
     const [showLightbox, setShowLightbox] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
+    // REV-017: Review photos lightbox state
+    const [reviewLightboxImages, setReviewLightboxImages] = useState<string[] | null>(null);
+    const [reviewLightboxIndex, setReviewLightboxIndex] = useState(0);
 
     /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
     const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
@@ -1247,6 +1223,18 @@ const PropertyDetails = () => {
                             const n = raw == null || raw === '' ? NaN : Number(raw);
                             return Number.isFinite(n) ? n : null;
                         })(),
+                        city: (() => {
+                            const raw = (apiListing as Record<string, unknown>).city ?? (apiListing as Record<string, unknown>).City;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        state: (() => {
+                            const raw = (apiListing as Record<string, unknown>).state ?? (apiListing as Record<string, unknown>).State;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        country: (() => {
+                            const raw = (apiListing as Record<string, unknown>).country ?? (apiListing as Record<string, unknown>).Country;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
                     };
                     const images = filterGuestImageUrls(
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
@@ -1366,17 +1354,33 @@ useEffect(() => {
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
-    /** TASK-1357: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
+    const ppApiReviews = listingReviewsFromApi;
+    const ppMergedReviews = useMemo(() => {
+        return ppApiReviews && !ppApiReviews.loading
+            ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
+            : [];
+    }, [ppApiReviews, externalReviewsFromApi]);
+    const ppCombinedReviewCount = ppMergedReviews.length;
+    const ppCombinedAverageRating = useMemo(() => {
+        return ppCombinedReviewCount > 0
+            ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
+                / ppMergedReviews.filter((r) => r.rating > 0).length
+            : 0;
+    }, [ppMergedReviews, ppCombinedReviewCount]);
+    const ppHasApiReviews = Boolean(
+        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
+    );
+
+    /** TASK-1357 / REV-013: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
     const propertyJsonLd = useMemo(() => {
         if (!data) return undefined;
         const pageUrlForLd = typeof window !== 'undefined' ? window.location.href : '';
         const primaryImageForLd = filterGuestImageUrls(data.property_img ?? [])[0];
-        const apiRev = listingReviewsFromApi;
-        const useApiRatings = Boolean(apiRev && !apiRev.loading && apiRev.totalCount > 0 && apiRev.averageRating > 0);
-        // TASK-2554: only use API-sourced rating; never fall back to static catalog counts for JSON-LD
-        const ratingValue = useApiRatings ? apiRev!.averageRating : 0;
-        const reviewCount = useApiRatings ? apiRev!.totalCount : 0;
-        const reviewNodes = (apiRev?.reviews ?? [])
+        const useApiRatings = Boolean(ppHasApiReviews && ppCombinedReviewCount > 0 && ppCombinedAverageRating > 0);
+        // TASK-2554 / REV-013: only use API-sourced rating; never fall back to static catalog counts for JSON-LD
+        const ratingValue = useApiRatings ? Number(ppCombinedAverageRating.toFixed(1)) : 0;
+        const reviewCount = useApiRatings ? ppCombinedReviewCount : 0;
+        const reviewNodes = ppMergedReviews
             .filter((r) => Number(r.rating) >= 1 && Number(r.rating) <= 5)
             .slice(0, 8)
             .map((r) => ({
@@ -1389,6 +1393,16 @@ useEffect(() => {
             .filter((node) => node.reviewBody.length > 0);
 
         const displayNightly = directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
+        const tenantInfo = isNonAtlasMarketplaceListing ? (listingTenantCtx ?? null) : _getTenantCtx();
+        const resolvedRegion =
+            data.state?.trim() ||
+            (data as any).addressRegion?.trim() ||
+            tenantInfo?.legalContactPack?.state?.trim() ||
+            (tenantInfo?.legalContactPack as any)?.address?.state?.trim() ||
+            (tenantInfo as any)?.address?.state?.trim() ||
+            undefined;
+        const resolvedLocality = data.city?.trim() || (data as any).addressLocality?.trim() || undefined;
+        const resolvedCountry = data.country?.trim() || 'IN';
 
         return [
             {
@@ -1401,8 +1415,9 @@ useEffect(() => {
                 address: {
                     '@type': 'PostalAddress',
                     streetAddress: data.property_location || undefined,
-                    addressRegion: 'Telangana',
-                    addressCountry: 'IN',
+                    ...(resolvedLocality ? { addressLocality: resolvedLocality } : {}),
+                    ...(resolvedRegion ? { addressRegion: resolvedRegion } : {}),
+                    addressCountry: resolvedCountry,
                 },
                 aggregateRating:
                     ratingValue > 0 && reviewCount > 0
@@ -1455,9 +1470,15 @@ useEffect(() => {
         ];
     }, [
         data,
-        listingReviewsFromApi,
+        ppHasApiReviews,
+        ppCombinedReviewCount,
+        ppCombinedAverageRating,
+        ppMergedReviews,
         directBookingNightly,
         nightlyPrice?.finalNightlyPrice,
+        isNonAtlasMarketplaceListing,
+        listingTenantCtx,
+        hostDescription.text,
     ]);
 
     if (!data) {
@@ -1624,18 +1645,6 @@ useEffect(() => {
         ? data.amenityCodes.map((code) => amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code))
         : (data.property_amenities || []).map((a) => a.amenities_icon ? formatAmenityName(a.amenities_icon) : 'Amenity');
 
-    const ppApiReviews = listingReviewsFromApi;
-    const ppMergedReviews = ppApiReviews && !ppApiReviews.loading
-        ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
-        : [];
-    const ppCombinedReviewCount = ppMergedReviews.length;
-    const ppCombinedAverageRating = ppCombinedReviewCount > 0
-        ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
-            / ppMergedReviews.filter((r) => r.rating > 0).length
-        : 0;
-    const ppHasApiReviews = Boolean(
-        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
-    );
     /** TASK-102112: pill counts + the filtered/sorted review set (instant, client-side). */
     const ppReviewFilterCounts = {
         all: ppMergedReviews.length,
@@ -1894,6 +1903,14 @@ useEffect(() => {
                 images={galleryUrls}
                 initialIndex={lightboxIndex}
                 onClose={() => setShowLightbox(false)}
+              />
+            )}
+
+            {reviewLightboxImages && reviewLightboxImages.length > 0 && (
+              <Lightbox
+                images={reviewLightboxImages}
+                initialIndex={reviewLightboxIndex}
+                onClose={() => setReviewLightboxImages(null)}
               />
             )}
 
@@ -2357,10 +2374,87 @@ useEffect(() => {
                           {/* v2: 3-col card layout with quote marks */}
                           <div className="pp-v2-review-grid" data-testid="reviews-grid">
                             {ppDisplayedReviews.map((r, idx) => (
-                              <article key={r.id} className="pp-v2-review-card">
+                              <article key={r.displayKey ?? r.id} className="pp-v2-review-card">
                                 <span className="pp-v2-review-quote" aria-hidden="true">&ldquo;</span>
+                                {r.isGoogle ? (
+                                  <span
+                                    title="Review from Google"
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 20,
+                                      height: 20,
+                                      borderRadius: '50%',
+                                      background: '#4285F4',
+                                      color: '#fff',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      marginBottom: 8,
+                                    }}
+                                  >
+                                    G
+                                  </span>
+                                ) : r.source ? (() => {
+                                  const cardSource = normalizeReviewSource(r.source) ?? r.source;
+                                  return (
+                                    <span
+                                      title={`Review from ${cardSource}`}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        padding: '2px 6px',
+                                        borderRadius: 4,
+                                        background: cardSource.toLowerCase().includes('airbnb') ? '#FF5A5F' : cardSource.toLowerCase().includes('booking') ? '#003580' : '#475569',
+                                        color: '#fff',
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        marginBottom: 8,
+                                      }}
+                                    >
+                                      {cardSource}
+                                    </span>
+                                  );
+                                })() : null}
+                                {r.rating > 0 && (
+                                  <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-primary, #4a3535)' }} aria-label={`${r.rating} out of 5 stars`}>
+                                    {'★'.repeat(Math.min(5, r.rating))}{'☆'.repeat(Math.max(0, 5 - r.rating))}
+                                  </div>
+                                )}
                                 {r.body && <p className="pp-v2-review-body">{r.body}</p>}
                                 {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
+                                {r.photoUrls && r.photoUrls.length > 0 && (
+                                  <div className="pp-review-photos" style={{ display: 'flex', gap: 8, margin: '8px 0', flexWrap: 'wrap' }} data-testid="review-photos">
+                                    {r.photoUrls.map((url, pIdx) => (
+                                      <button
+                                        key={url + pIdx}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setReviewLightboxImages(r.photoUrls ?? []);
+                                          setReviewLightboxIndex(pIdx);
+                                        }}
+                                        style={{
+                                          padding: 0,
+                                          border: '1px solid var(--border-subtle, #e2e8f0)',
+                                          borderRadius: 6,
+                                          overflow: 'hidden',
+                                          cursor: 'pointer',
+                                          background: 'none',
+                                        }}
+                                        aria-label={`View photo ${pIdx + 1} from ${r.guestName ?? 'guest'}`}
+                                        data-testid={`review-photo-thumb-${pIdx}`}
+                                      >
+                                        <img
+                                          src={url}
+                                          alt={`Review photo ${pIdx + 1}`}
+                                          style={{ width: 64, height: 64, objectFit: 'cover', display: 'block' }}
+                                          loading="lazy"
+                                        />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                                 {(() => {
                                   const chips: { label: string; v: number }[] = [];
                                   if (r.ratingCleanliness != null && r.ratingCleanliness >= 1) chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });

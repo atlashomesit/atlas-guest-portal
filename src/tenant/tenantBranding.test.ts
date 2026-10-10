@@ -6,6 +6,8 @@
  * tenant (incl. the atlastays.com marketplace apex) keeps API values or the
  * brand-neutral defaults.
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { applyTenantBranding } from './tenantBranding';
 import type { TenantInfo } from './tenantContext';
@@ -150,3 +152,36 @@ describe('applyTenantBranding — TASK-4899 no-brand-configured fallback', () =>
     expect(document.title).toBe('Atlastays');
   });
 });
+
+// ---------------------------------------------------------------------------
+// TASK-103033: dynamic tenant PWA manifest (applyTenantWebManifest) generates
+// a blob: URL. The CSP in public/_headers must allow blob: in manifest-src
+// for both /embed/* and /* so tenant portals don't block the manifest.
+// ---------------------------------------------------------------------------
+describe('public/_headers CSP manifest-src for PWA dynamic manifest (TASK-103033)', () => {
+  const headersPath = resolve(__dirname, '../../public/_headers');
+  const headersFile = readFileSync(headersPath, 'utf-8');
+
+  function cspForRule(rule: string): string {
+    const lines = headersFile.split(/\r?\n/);
+    const idx = lines.findIndex((l) => l.trim() === rule);
+    if (idx < 0) throw new Error(`missing ${rule} rule in _headers`);
+    for (let i = idx + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^[^\s/]/.test(line) && !line.startsWith(' ')) break;
+      if (line.includes('Content-Security-Policy')) return line;
+    }
+    throw new Error(`no CSP under ${rule} in _headers`);
+  }
+
+  it("contains manifest-src 'self' blob: in /embed/* CSP directive", () => {
+    const csp = cspForRule('/embed/*');
+    expect(csp).toContain("manifest-src 'self' blob:;");
+  });
+
+  it("contains manifest-src 'self' blob: in /* CSP directive", () => {
+    const csp = cspForRule('/*');
+    expect(csp).toContain("manifest-src 'self' blob:;");
+  });
+});
+

@@ -40,7 +40,8 @@ export const heritageDefaultColorTokens: Readonly<Record<string, string>> = {
   "--cta-secondary-rgb": "107 114 128",
 
   "--text-primary": "#1a1a2e",
-  "--text-secondary": "#64748b",
+  // Was #64748b (verbatim recovery): 4.36:1 on --bg-secondary/--bg-muted #fff3e8. #5b6a80 = 5.04:1.
+  "--text-secondary": "#5b6a80",
   "--text-muted": "#475569",
   "--text-body": "#1a1a2e",
   "--text-on-hero": "#ffffff",
