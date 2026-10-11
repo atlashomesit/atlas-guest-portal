@@ -309,3 +309,36 @@
   .search-filters__summary-hint { display: block; margin: .15rem 0 0 1rem; }
   .search-filters__field input { padding-inline: .4rem; }
 }
+
+/* Approved 12 October: useful results width with local, static secondary filters. */
+.search-page__shell { width: min(2240px, calc(100% - 3rem)); gap: 12px; padding-block: 16px 48px; }
+.search-page__shell > header h1 { font-size: 30px; line-height: 1.15; }
+.search-page__shell > header > p:last-child { font-size: 14px; line-height: 1.45; max-width: 90ch; }
+.search-filter-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.search-filter-summary > * { margin: 0; }
+.search-filters { padding: 12px 16px; gap: 8px; }
+.search-browse { display: grid; gap: 16px; min-width: 0; align-items: start; }
+.search-results-workspace { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.search-secondary-region { padding: 10px 14px; border: 1px solid var(--border-subtle); border-radius: var(--search-radius); background: var(--bg-surface); min-width: 0; }
+.search-secondary-region .search-filters__row--toggles { grid-template-columns: 1fr; }
+.search-secondary-region .search-filters__toggle { white-space: normal; }
+.search-secondary-region .search-filters__chip-label { flex-basis: 100%; }
+@media (min-width: 1024px) {
+  .search-browse { grid-template-columns: 240px minmax(0, 1fr); }
+  .search-filters { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 20px; }
+  .search-filters__row--meta { display: flex; gap: 12px; border: 0; min-height: 44px; }
+  .search-card__media { height: 160px; }
+  .search-filters__summary-hint { display: block; margin-left: 0; }
+}
+@media (min-width: 1600px) { .search-results-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } .search-card__media { height: 200px; } }
+@media (min-width: 2200px) { .search-results-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1024px) and (max-width: 1599px) {
+  .search-page__shell > header > p:last-child { max-width: none; }
+  .search-card { display: grid; grid-template-columns: 34% minmax(0, 1fr); }
+  .search-card__media { height: 100%; min-height: 200px; }
+  .search-card__body { padding: 12px; gap: 6px; }
+  .search-card__foot { gap: 8px; padding-top: 6px; }
+  .search-card__price-amt { font-size: 20px; }
+  .search-card__cta { padding-inline: 12px; }
+}
+@media (max-width: 600px) { .search-page__shell { width: calc(100% - 2rem); } .search-page__shell > header h1 { font-size: 26px; } }

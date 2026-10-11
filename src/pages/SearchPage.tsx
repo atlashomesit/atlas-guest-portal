@@ -1005,6 +1005,7 @@ const SearchPage = () => {
 
         <RecentlyViewedStrip />
 
+        <div className="search-filter-summary">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-text-primary">Filters</span>
           {searchByImageEnabled && !isMarketplaceSearch ? (
@@ -1049,6 +1050,7 @@ const SearchPage = () => {
           </ul>
         ) : null}
 
+        </div>
         {/* Approved r2: dates and guests remain directly editable; all secondary controls stay available. */}
         {/* NOT sticky. `sticky top-16 z-10` came from TASK-2075, when this was a single-row
             ~90px filter bar; d1ab2590's redesign grew it to five rows (~344px at 1280px wide)
@@ -1094,7 +1096,32 @@ const SearchPage = () => {
             </div>
           </div>
 
-          <details className="search-filters__secondary" data-testid="search-secondary-filters">
+
+          <div className="search-filters__row search-filters__row--meta">
+            <span className="text-sm text-text-muted">
+              {!isLoading && listings.length > 0
+                ? filteredUnits.length === 0 && hasActiveFilters
+                  ? "No properties match your filters"
+                  : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`
+                : "\u00a0"}
+            </span>
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="min-h-10 rounded-lg border border-border-subtle px-4 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+              >
+                Clear filters
+              </button>
+            ) : (
+              <span />
+            )}
+          </div>
+
+        </div>
+
+        <div className="search-browse">
+          <aside className="search-secondary-region" aria-label="Refine your results">          <details className="search-filters__secondary" data-testid="search-secondary-filters">
             <summary>More filters <span className="search-filters__summary-hint">Price, amenities &amp; accessibility</span></summary>
             <div className="search-filters__secondary-content">
               <div className="search-filters__row search-filters__row--prices">
@@ -1247,30 +1274,8 @@ const SearchPage = () => {
             ))}
           </div>
             </div>
-          </details>
-          <div className="search-filters__row search-filters__row--meta">
-            <span className="text-sm text-text-muted">
-              {!isLoading && listings.length > 0
-                ? filteredUnits.length === 0 && hasActiveFilters
-                  ? "No properties match your filters"
-                  : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`
-                : "\u00a0"}
-            </span>
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="min-h-10 rounded-lg border border-border-subtle px-4 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
-              >
-                Clear filters
-              </button>
-            ) : (
-              <span />
-            )}
-          </div>
-
-        </div>
-
+          </details></aside>
+          <div className="search-results-workspace">
         {/* TASK-1457: list/map toggle · TASK-1714: sort */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div
@@ -1773,7 +1778,7 @@ const SearchPage = () => {
                       ))}
                     </ul>
                   ) : (
-                    <div className="min-h-[2.25rem]" aria-hidden />
+                    null
                   )}
 
                   <div className="search-card__foot">
@@ -1819,6 +1824,8 @@ const SearchPage = () => {
             )}
           </section>
         )}
+          </div>
+        </div>
       </div>
       <SearchByImageModal
         isOpen={imageSearchOpen}
