@@ -1049,7 +1049,7 @@ const SearchPage = () => {
           </ul>
         ) : null}
 
-        {/* Designer filter panel — one surface, three aligned rows + chips */}
+        {/* Approved r2: dates and guests remain directly editable; all secondary controls stay available. */}
         {/* NOT sticky. `sticky top-16 z-10` came from TASK-2075, when this was a single-row
             ~90px filter bar; d1ab2590's redesign grew it to five rows (~344px at 1280px wide)
             and carried the pin over unexamined. A 344px panel pinned at top:64px occupies
@@ -1059,7 +1059,7 @@ const SearchPage = () => {
             top 52px sat behind the position:fixed 116px navbar (--nav-height), hiding the
             price inputs. Capping max-height cannot fix this — see search-page.css. */}
         <div className="search-filters">
-          <div className="search-filters__row search-filters__row--fields">
+          <div className="search-filters__row search-filters__row--scope">
             <div className="search-filters__field">
               <label htmlFor="filter-checkin">Check-in</label>
               <input
@@ -1080,6 +1080,24 @@ const SearchPage = () => {
                 onChange={(e) => updateParam("checkOut", e.target.value)}
               />
             </div>
+            <div className="search-filters__field">
+              <label htmlFor="filter-guests">Guests</label>
+              <input
+                id="filter-guests"
+                type="number"
+                min={1}
+                max={MAX_GUESTS_FILTER}
+                placeholder="Any"
+                value={guests ?? ""}
+                onChange={(e) => updateParam("guests", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <details className="search-filters__secondary" data-testid="search-secondary-filters">
+            <summary>More filters <span className="search-filters__summary-hint">Price, amenities &amp; accessibility</span></summary>
+            <div className="search-filters__secondary-content">
+              <div className="search-filters__row search-filters__row--prices">
             <div className="search-filters__field">
               <label htmlFor="filter-min-price">Min price / night</label>
               <input
@@ -1102,20 +1120,7 @@ const SearchPage = () => {
                 onChange={(e) => updateParam("maxPrice", e.target.value)}
               />
             </div>
-            <div className="search-filters__field">
-              <label htmlFor="filter-guests">Guests</label>
-              <input
-                id="filter-guests"
-                type="number"
-                min={1}
-                max={MAX_GUESTS_FILTER}
-                placeholder="Any"
-                value={guests ?? ""}
-                onChange={(e) => updateParam("guests", e.target.value)}
-              />
-            </div>
-          </div>
-
+              </div>
           <div className="search-filters__row search-filters__row--toggles">
             <label className="search-filters__toggle">
               <input
@@ -1156,27 +1161,6 @@ const SearchPage = () => {
               />
               <span>Available tonight</span>
             </label>
-          </div>
-
-          <div className="search-filters__row search-filters__row--meta">
-            <span className="text-sm text-text-muted">
-              {!isLoading && listings.length > 0
-                ? filteredUnits.length === 0 && hasActiveFilters
-                  ? "No properties match your filters"
-                  : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`
-                : "\u00a0"}
-            </span>
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="min-h-10 rounded-lg border border-border-subtle px-4 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
-              >
-                Clear filters
-              </button>
-            ) : (
-              <span />
-            )}
           </div>
 
           <div className="search-filters__chips">
@@ -1262,6 +1246,29 @@ const SearchPage = () => {
               </button>
             ))}
           </div>
+            </div>
+          </details>
+          <div className="search-filters__row search-filters__row--meta">
+            <span className="text-sm text-text-muted">
+              {!isLoading && listings.length > 0
+                ? filteredUnits.length === 0 && hasActiveFilters
+                  ? "No properties match your filters"
+                  : `${filteredUnits.length} ${filteredUnits.length === 1 ? "property" : "properties"} found`
+                : "\u00a0"}
+            </span>
+            {hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="min-h-10 rounded-lg border border-border-subtle px-4 text-sm font-medium text-text-muted hover:bg-bg-muted focus:outline-none"
+              >
+                Clear filters
+              </button>
+            ) : (
+              <span />
+            )}
+          </div>
+
         </div>
 
         {/* TASK-1457: list/map toggle · TASK-1714: sort */}
