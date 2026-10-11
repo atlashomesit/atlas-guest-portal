@@ -15,6 +15,7 @@ interface DateRangePickerPopoverProps {
   onClose: () => void;
   open: boolean;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   popoverClassName?: string;
   activeField?: 'checkin' | 'checkout' | null;
 }
@@ -50,6 +51,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
   onClose,
   open,
   children,
+  footer,
   popoverClassName,
   activeField,
 }) => {
@@ -132,6 +134,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
               {loadingLabel}
             </p>
           </div>
+          {footer}
         </div>
       </>,
       portalTarget,
@@ -171,6 +174,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
             ?
           </span>
         </div>
+        <button type="button" onClick={onClose} aria-label="Close date picker" className="adr-close">×</button>
         {showInstruction && instructionText ? (
           <p className="ml-3 text-xs text-[var(--text-muted)]" aria-live="polite">
             {instructionText}
@@ -184,6 +188,7 @@ export const DateRangePickerPopover: React.FC<DateRangePickerPopoverProps> = ({
           {loadingLabel}
         </p>
       </div>
+      {footer}
     </div>
   );
 };

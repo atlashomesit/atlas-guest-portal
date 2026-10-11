@@ -382,7 +382,7 @@
 }
 
 /* On narrow viewports collapse to 1 month and anchor as bottom sheet */
-@media (max-width: 620px) {
+@media (max-width: 760px) {
   .bc-months {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -615,3 +615,74 @@
   border-top: 1px solid var(--border-subtle, #f0ddd0);
   margin-top: 4px;
 }
+
+/* Booking-date refinement: readable month grids and explicit range/close controls.
+   Scoped selectors also protect raw calendar buttons from generic app button styles. */
+.bc-popover {
+  --bc-accent: var(--brand-primary, #b8472f);
+  --bc-border: var(--border-subtle, #f0ddd0);
+  box-sizing: border-box;
+  width: 704px;
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  min-width: 0;
+  max-width: calc(100vw - 32px);
+  padding: 20px 24px 0;
+  border-radius: 16px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.bc-popover .bc-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.bc-popover .bc-heading h2 { font-family: var(--font-sans, inherit); font-weight: 700; font-size: 20px; line-height: 1.3; margin: 0 0 4px; color: var(--text-primary, #1b2a47); }
+.bc-popover .bc-heading p { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-muted, #64748b); }
+.bc-popover .bc-close, .bc-popover .bc-nav-btn { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--bc-border); background: var(--bg-surface, #fff); color: var(--text-primary, #1b2a47); border-radius: 50%; box-shadow: none; }
+.bc-popover .bc-close:hover, .bc-popover .bc-nav-btn:hover:not(:disabled) { background: var(--bg-muted, #f4f6fa); color: var(--text-primary, #1b2a47); border-color: var(--bc-border); box-shadow: none; }
+.bc-popover .bc-selection { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--bc-border); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+.bc-popover .bc-selection > div { min-width: 0; padding: 10px 14px; background: var(--bg-surface, #fff); }
+.bc-popover .bc-selection > div + div { border-left: 1px solid var(--bc-border); }
+.bc-popover .bc-selection > div[data-active="true"] { box-shadow: inset 0 -3px var(--bc-accent); }
+.bc-popover .bc-selection span { display: block; color: var(--text-muted, #64748b); font-size: 11px; font-weight: 600; line-height: 1.5; text-transform: uppercase; letter-spacing: .04em; }
+.bc-popover .bc-selection strong { display: block; font-size: 14px; line-height: 1.6; font-weight: 600; color: var(--text-primary, #1b2a47); }
+.bc-popover .bc-presets { gap: 8px; flex-wrap: nowrap; overflow-x: auto; padding: 0 0 6px; margin-bottom: 12px; scrollbar-width: thin; }
+.bc-popover .bc-chip { flex-shrink: 0; min-height: 36px; height: auto; padding: 7px 12px; font-size: 12px; line-height: 1.4; border-radius: 8px; border: 1px solid var(--bc-border); background: var(--bg-surface, #fff); color: var(--text-primary, #1b2a47); box-shadow: none; }
+.bc-popover .bc-chip:hover, .bc-popover .bc-chip-active { border-color: var(--bc-accent); background: var(--bg-muted, #f4f6fa); color: var(--bc-accent); box-shadow: none; }
+.bc-popover .bc-months { column-gap: 24px; }
+.bc-popover .bc-month-title { min-height: 44px; padding: 12px 44px 10px; font-size: 15px; line-height: 1.3; font-weight: 700; }
+.bc-popover .bc-dow-row { margin: 8px 0 6px; }
+.bc-popover .bc-dow { font-size: 11px; line-height: 1.5; font-weight: 500; padding: 0; }
+.bc-popover .bc-cell-wrap { height: 50px; }
+.bc-popover .bc-cell { padding: 0; box-shadow: none; }
+.bc-popover .bc-num { font-size: 15px; line-height: 1.2; }
+.bc-popover .bc-price { font-size: 10px; line-height: 1.2; }
+.bc-popover .bc-legend { gap: 8px 14px; padding: 12px 0; margin-top: 12px; font-size: 11px; line-height: 1.4; }
+.bc-popover .bc-footer { position: sticky; bottom: 0; z-index: 4; background: var(--bg-surface, #fff); display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid var(--bc-border); }
+.bc-popover .bc-clear, .bc-popover .bc-apply { min-height: 44px; padding: 10px 18px; font-family: inherit; font-weight: 600; font-size: 14px; line-height: 1.4; border: 1px solid transparent; border-radius: 8px; box-shadow: none; }
+.bc-popover .bc-clear { padding-inline: 4px; color: var(--text-primary, #1b2a47); background: transparent; text-decoration: underline; text-underline-offset: 3px; }
+.bc-popover .bc-clear:hover { color: var(--bc-accent); background: transparent; border-color: transparent; box-shadow: none; }
+.bc-popover .bc-apply { min-width: 120px; color: #fff; background: var(--bc-accent); }
+.bc-popover .bc-apply:hover:not(:disabled) { background: var(--bc-accent); filter: brightness(.95); box-shadow: none; }
+.bc-popover .bc-apply:disabled, .bc-popover .bc-clear:disabled { opacity: .45; cursor: not-allowed; }
+.bc-popover button:focus-visible { outline: 2px solid var(--bc-accent); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .bc-popover { width: 100vw; max-width: 100vw; padding: 16px 16px 0; max-height: 92vh; max-height: 92dvh; border-radius: 20px 20px 0 0; }
+  .bc-popover .bc-months { grid-template-columns: minmax(0, 1fr); }
+  .bc-popover .bc-months .bc-month:nth-child(2) { display: none; }
+  .bc-popover .bc-heading { margin-bottom: 12px; }
+  .bc-popover .bc-selection { margin-bottom: 12px; }
+  .bc-popover .bc-chip { min-height: 44px; }
+  .bc-popover .bc-cell-wrap { height: 48px; }
+  .bc-popover .bc-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+}
+@media (pointer: coarse) { .bc-popover .bc-chip { min-height: 44px; } }
+
+/* Fit the full grid and legend above the booking form's next action on desktop. */
+@media (min-width: 761px) {
+  .bc-popover .bc-heading { margin-bottom: 10px; }
+  .bc-popover .bc-selection { margin-bottom: 10px; }
+  .bc-popover .bc-presets { padding-bottom: 2px; margin-bottom: 6px; }
+  .bc-popover .bc-cell-wrap { height: 46px; }
+  .bc-popover .bc-legend { margin-top: 8px; padding-block: 8px; }
+  .bc-popover .bc-footer { padding-block: 10px; }
+}
+.bc-popover { scroll-padding-bottom: 80px; }
+.bc-popover .bc-cell:focus-visible { outline-offset: -2px; }
