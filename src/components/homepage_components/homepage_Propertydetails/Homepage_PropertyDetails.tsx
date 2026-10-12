@@ -1718,7 +1718,7 @@ useEffect(() => {
             HI-FI PROPERTY PAGE — pp-* design system
             All logic preserved; only layout/styling changed.
            ===================================================================== */}
-        <div className="pp-root">
+        <div className={`pp-root${galleryUrls.length === 1 ? " pp-single-photo" : ""}`}>
           <div className="pp-shell">
 
             {/* ---- Breadcrumbs ---- */}
@@ -1881,7 +1881,7 @@ useEffect(() => {
                       fetchPriority="high"
                       decoding="async"
                       className="pp-gallery-img"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      style={{ width: '100%', height: '100%', objectFit: galleryUrls.length === 1 ? 'contain' : 'cover', display: 'block' }}
                     />
                   </button>
                 ) : (
