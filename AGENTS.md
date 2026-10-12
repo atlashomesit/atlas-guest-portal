@@ -1,5 +1,11 @@
 # Agent instructions (atlas-guest-portal)
 
+## Release Train Cut Bar Invariant
+- **Steps 1 to 8**: Zero tolerance (100% green). Never run Step 9 or cut QA if Steps 1–8 fail.
+- **Local Step 9 Cut Bar**: 0 `@ari` failures and fewer than 10 non-ARI failures (< 10 non-ARI).
+- **Founder Ruling (2026-10-12 — Rerun Failure Fixes Invariant)**: Whenever a rerun or repair attempt is undertaken to fix failures, agents must NOT deliberately aim merely to squeak under the `< 10 non-ARI` bar. The deliberate attempt must always be to **fix all failures (100% green)**. The `< 10 non-ARI` bar exists to speed up QA cut on runs where only a few stragglers occur, but whenever the bar itself is not met, the rerun must aggressively target and fix ALL failures.
+- Cut to QA immediately once the local bar is met. Never cut QA without passing local gate first.
+
 ## HARD RULE — GitHub Actions workflows (Sreekar-approved 2026-05-12)
 
 **NEVER create, modify, or delete any file under `.github/workflows/`.**
