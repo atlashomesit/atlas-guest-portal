@@ -228,6 +228,34 @@ describe('AtlasBookingCalendar — Month Visibility & Layout', () => {
       expect(popover.style.clipPath).toBe('');
     });
 
+    it('uses the viewport when keeping Reserve exposed would hide half the month', () => {
+      setViewportHeight(720);
+      addFixedNavbar(136);
+      const reserve = document.createElement('button');
+      reserve.dataset.testid = 'guest-booking-submit';
+      reserve.getBoundingClientRect = () => ({ top: 400 } as DOMRect);
+      document.body.appendChild(reserve);
+      extraNodes.push(reserve);
+      render(<AtlasBookingCalendar {...defaultProps} anchorRef={anchorWithBottom(300)} />);
+      const popover = document.querySelector('.bc-popover') as HTMLElement;
+      expect(popover.style.top).toBe('308px');
+      expect(popover.style.maxHeight).toBe('');
+    });
+
+    it('keeps the final week visible when a tablet navbar consumes the available height', () => {
+      setViewportHeight(720);
+      addFixedNavbar(160);
+      for (const prop of heightProps) Object.defineProperty(HTMLElement.prototype, prop, {
+        configurable: true,
+        get() { return (this as HTMLElement).classList.contains('bc-popover') ? 620 : 0; },
+      });
+      render(<AtlasBookingCalendar {...defaultProps} anchorRef={anchorWithBottom(300)} />);
+      const popover = document.querySelector('.bc-popover') as HTMLElement;
+      expect(popover.style.top).toBe('92px');
+      expect(popover.style.maxHeight).toBe('');
+      expect(popover.style.clipPath).toBe('');
+    });
+
     it('slides under the fixed navbar while scrolling instead of painting over it', () => {
       setViewportHeight(720);
       addFixedNavbar(136);
@@ -243,7 +271,7 @@ describe('AtlasBookingCalendar — Month Visibility & Layout', () => {
       setViewportHeight(727);
       addFixedNavbar(81);
       window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-        matches: query === '(max-width: 620px)',
+        matches: query === '(max-width: 760px)',
         media: query,
         onchange: null,
         addListener: vi.fn(),
@@ -258,6 +286,32 @@ describe('AtlasBookingCalendar — Month Visibility & Layout', () => {
       expect(popover.style.clipPath).toBe('');
       expect(Number(popover.style.zIndex)).toBeGreaterThan(50);
     });
+  });
+
+  it('shows the selected stay and applies it without changing dates', () => {
+    render(<AtlasBookingCalendar {...defaultProps} />);
+    expect(screen.getByTestId('booking-calendar-selection').textContent).toContain('16 Sep 2026');
+    expect(screen.getByTestId('booking-calendar-selection').textContent).toContain('17 Sep 2026');
+    fireEvent.click(screen.getByRole('button', { name: 'Use dates' }));
+    expect(mockOnClose).toHaveBeenCalledOnce();
+    expect(mockOnChange).not.toHaveBeenCalled();
+  });
+
+  it('clears both dates and cannot apply an incomplete stay', () => {
+    const { rerender } = render(<AtlasBookingCalendar {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear dates' }));
+    expect(mockOnChange).toHaveBeenCalledWith({ startDate: null, endDate: null });
+    expect(mockOnClose).not.toHaveBeenCalled();
+    rerender(<AtlasBookingCalendar {...defaultProps} value={{ startDate: new Date(2026, 8, 16), endDate: null }} />);
+    expect((screen.getByRole('button', { name: 'Use dates' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Now choose your check-out date')).toBeDefined();
+  });
+
+  it('closes explicitly without clearing the chosen stay', () => {
+    render(<AtlasBookingCalendar {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Close date picker' }));
+    expect(mockOnClose).toHaveBeenCalledOnce();
+    expect(mockOnChange).not.toHaveBeenCalled();
   });
 });
 

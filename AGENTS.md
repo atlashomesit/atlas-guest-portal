@@ -1,5 +1,11 @@
 # Agent instructions (atlas-guest-portal)
 
+## Release Train Cut Bar Invariant
+- **Steps 1 to 8**: Zero tolerance (100% green). Never run Step 9 or cut QA if Steps 1–8 fail.
+- **Local Step 9 Cut Bar**: 0 `@ari` failures and fewer than 10 non-ARI failures (< 10 non-ARI).
+- **Founder Ruling (2026-10-12 — Rerun Failure Fixes Invariant)**: Whenever a rerun or repair attempt is undertaken to fix failures, agents must NOT deliberately aim merely to squeak under the `< 10 non-ARI` bar. The deliberate attempt must always be to **fix all failures (100% green)**. The `< 10 non-ARI` bar exists to speed up QA cut on runs where only a few stragglers occur, but whenever the bar itself is not met, the rerun must aggressively target and fix ALL failures.
+- Cut to QA immediately once the local bar is met. Never cut QA without passing local gate first.
+
 ## HARD RULE — GitHub Actions workflows (Sreekar-approved 2026-05-12)
 
 **NEVER create, modify, or delete any file under `.github/workflows/`.**
@@ -57,3 +63,7 @@ For AI assistants (Cursor, Codex, etc.) working in this repo:
 - `ffa61c9a` + `b8e7cf16` — onboarding flow now stores `propertyId` from start response to avoid plan-limit dead end.
 - `b52b5965` + `329d4691` — Razorpay CSP allowlist tightened/updated in Cloudflare headers.
 - `7dd1d77b` + `cc496a0f` — CookieConsentBanner/DPDP privacy flow established as the active consent pattern.
+
+## UI design contract
+
+Read [design.md](design.md) before changing this portal's UI. Daily five-screen review work requires a separate UI/UX reviewer and Sreekar's final approval of the exact review revision and PR HEADs before merging, even where older instructions say merge immediately. Preserve existing colours and useful features.

@@ -1,5 +1,6 @@
+import './AtlasDateRangePicker.css';
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { addDays, differenceInCalendarDays } from 'date-fns';
+import { addDays, differenceInCalendarDays, format } from 'date-fns';
 import { DateRange } from 'react-date-range';
 import 'react-date-range/dist/styles.css';
 import 'react-date-range/dist/theme/default.css';
@@ -486,9 +487,25 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
       loadingLabel={loadingLabel}
       onClose={onClose}
       open={open}
-      popoverClassName={popoverClassName}
+      popoverClassName={['atlas-date-range-picker', popoverClassName].filter(Boolean).join(' ')}
       activeField={activeField}
+      footer={(
+        <div className="adr-footer">
+          <button type="button" className="adr-clear" disabled={!value.startDate && !value.endDate} onClick={() => {
+            autoAdvancedEndRef.current = null;
+            setSelectionState('IDLE');
+            setValidationError(null);
+            onChange({ startDate: null, endDate: null });
+            onActiveFieldChange?.('checkin');
+          }}>Clear dates</button>
+          <button type="button" className="adr-apply" disabled={selectionState !== 'RANGE_SELECTED' || !!validationError} onClick={onClose}>Use dates</button>
+        </div>
+      )}
     >
+      <div className="adr-selection" data-testid="search-calendar-selection">
+        <div><span>Check-in</span><strong>{value.startDate ? format(value.startDate, 'd MMM yyyy') : 'Add date'}</strong></div>
+        <div><span>Check-out</span><strong>{value.endDate ? format(value.endDate, 'd MMM yyyy') : 'Add date'}</strong></div>
+      </div>
       <div className={`mx-3 mt-2 mb-1.5 rounded-md px-3 py-1.5 text-xs font-semibold ${statusConfig.bg} ${statusConfig.color}`} aria-live="polite">
         <span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${statusConfig.dot}`} aria-hidden />
         {statusConfig.label}
