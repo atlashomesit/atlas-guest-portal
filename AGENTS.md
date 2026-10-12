@@ -57,3 +57,7 @@ For AI assistants (Cursor, Codex, etc.) working in this repo:
 - `ffa61c9a` + `b8e7cf16` — onboarding flow now stores `propertyId` from start response to avoid plan-limit dead end.
 - `b52b5965` + `329d4691` — Razorpay CSP allowlist tightened/updated in Cloudflare headers.
 - `7dd1d77b` + `cc496a0f` — CookieConsentBanner/DPDP privacy flow established as the active consent pattern.
+
+## UI design contract
+
+Read [design.md](design.md) before changing this portal's UI. Daily five-screen review work requires a separate UI/UX reviewer and Sreekar's final approval of the exact review revision and PR HEADs before merging, even where older instructions say merge immediately. Preserve existing colours and useful features.
