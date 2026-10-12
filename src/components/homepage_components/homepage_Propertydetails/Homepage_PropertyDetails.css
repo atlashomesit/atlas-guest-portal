@@ -1115,7 +1115,7 @@
   .pp-single-photo .pp-shell { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px 28px; align-items: start; }
   .pp-single-photo .pp-shell > * { grid-column: 1 / -1; }
   .pp-single-photo .pp-gallery { grid-column: 1; grid-row: 3; }
-  .pp-single-photo .pp-main { display: contents; }
+  .pp-single-photo .pp-main { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1; }
   .pp-single-photo .pp-main > div { grid-column: 1; }
   .pp-single-photo .pp-booking-col { grid-column: 2; grid-row: 3 / span 4; margin-top: 0; }
   .pp-single-photo .pp-v2-location { grid-column: 1; margin-top: 0; }
