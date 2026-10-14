@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
@@ -89,6 +89,11 @@ export default function SelfCheckIn() {
   const [lastName, setLastName] = useState("");
   const [details, setDetails] = useState<CheckinDetails | null>(null);
   const [step, setStep] = useState<Step>(urlRef ? "auth" : "auth");
+  // The 500 ms hop to house rules below is cleared on unmount, so a page that goes away first never sets state late.
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [govtIdType, setGovtIdType] = useState("");
@@ -219,7 +224,8 @@ export default function SelfCheckIn() {
       (g) => g.isVerified || g.idFile || idCollectedElsewhere
     );
     if (allGuestsReady) {
-      setTimeout(() => {
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = setTimeout(() => {
         setStep("house-rules");
       }, 500);
     }
@@ -255,7 +261,8 @@ export default function SelfCheckIn() {
       (g) => g.isVerified || g.idFile || idCollectedElsewhere
     );
     if (allGuestsReady) {
-      setTimeout(() => {
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = setTimeout(() => {
         setStep("house-rules");
       }, 500);
     }
