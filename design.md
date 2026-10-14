@@ -43,3 +43,11 @@ Approved evidence: private atlas-ux-evidence/docs/ux/daily-five/2026-10-11/r2/in
 ## Approved wide-screen correction — 12 October 2026
 
 Immutable approval: private atlas-ux-evidence/docs/ux/wide-screen-review-2026-10-11/index.html at HEAD 78031d5993aa6b938b0de591127c2148ecefc6e5. Actual evidence: implemented-r1/ under that directory. This supersedes the prior universal vertical-card placement only for Search: compact horizontal cards at 1024–1599px expose a useful price/action before the 720px fold; larger desktops use three/four vertical result columns with locally bounded secondary filters. Phone disclosure, chips, date feedback, fees, source semantics and controls remain available. One-photo Property galleries use the full gallery with contained imagery and bring the booking panel beside it; zero/multiple-photo variants and booking eligibility remain intact. These changes retain the established tenant palette. Final review and exact-head approval remain required; pending setup #601 stays separately held.
+
+## Daily five — 14 October 2026 implementation approval
+
+Sreekar approved the immutable [2026-10-14/r1 proposal](https://github.com/atlashomesit/atlas-ux-evidence/blob/cc48056c8bdbbb3467ccfcc51f7753ec2ae6f9fa/docs/ux/daily-five/2026-10-14/r1/index.html): “I approve all 5 designs. Implement them keeping existing colors and useful features intact, then show me actual before and after for final approval before merging to dev.” Proposal source SHA256: 540623979b182a9aefb300f64442926a2cd3005f604120b2d9f3d4064842d68e.
+
+FAQ UXD-2026-10-14-02-A/B/C: compact the route header/search hierarchy, use a phone topic disclosure with focus at the chosen answer, and filter preserved highlights together with category answers. A highlight-only search must not show a false no-result; no-topic content spans the content area. Preserve Terms precedence, all answers, legal links, tenant theme, native modified-link behavior and default navigation/layout on other legal routes. This supersedes only the FAQ spacing and phone topic placement.
+
+Actual three-column comparisons and independent per-ID review live in private atlas-ux-evidence/docs/ux/daily-five/2026-10-14/implemented-r1. Implementation approval does not authorize merge. Hold the draft PR until Sreekar approves the actual result and exact final head; auto-merge remains off.
