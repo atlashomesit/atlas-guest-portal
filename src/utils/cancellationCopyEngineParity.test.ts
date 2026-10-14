@@ -125,3 +125,62 @@ describe('TASK-8020 — FAQ refund copy agrees with the refund engine', () => {
   // live FAQ page renders faqHighlights.ts / content/legal/faqs.ts instead) -- dead-code
   // cleanup, import-graph sweep 2026-09-28.
 });
+
+describe('TASK-1039743 — listing refund steps and booking confirmation cancellation copy parity', () => {
+  it('refundPolicyTimelines constants describe a reviewed cancellation request and opt-in WhatsApp', async () => {
+    const timelines = await import('../config/refundPolicyTimelines');
+    expect(timelines.REFUND_REQUEST_STEP_DESC).toMatch(/request cancellation/i);
+    expect(timelines.REFUND_REQUEST_STEP_DESC).toMatch(/review/i);
+    expect(timelines.REFUND_CANCELLATION_REQUEST_DISCLOSURE).toMatch(/review/i);
+    expect(timelines.REFUND_CONFIRMATION_STEP_DESC).toMatch(/email/i);
+    expect(timelines.REFUND_CONFIRMATION_STEP_DESC).toMatch(/WhatsApp if you opted in/i);
+
+    for (const val of Object.values(timelines)) {
+      if (typeof val === 'string') {
+        expect(val).not.toMatch(/one tap/i);
+        expect(val).not.toMatch(/no reason needed/i);
+        expect(val).not.toMatch(/SMS and WhatsApp/i);
+      }
+    }
+  });
+
+  it('both property-detail themes and BookingConfirmationPage source refund copy from refundPolicyTimelines', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const { dirname, join } = await import('node:path');
+    const here = dirname(fileURLToPath(import.meta.url));
+
+    const classicSrc = readFileSync(
+      join(here, '../components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx'),
+      'utf8',
+    );
+    const heritageSrc = readFileSync(
+      join(here, '../themes/heritage/PropertyDetails.tsx'),
+      'utf8',
+    );
+    const confirmationSrc = readFileSync(
+      join(here, '../pages/BookingConfirmationPage.tsx'),
+      'utf8',
+    );
+
+    for (const [name, src] of [
+      ['Homepage_PropertyDetails.tsx', classicSrc],
+      ['themes/heritage/PropertyDetails.tsx', heritageSrc],
+    ] as const) {
+      expect(src, `${name} must import REFUND_REQUEST_STEP_DESC`).toContain('REFUND_REQUEST_STEP_DESC');
+      expect(src, `${name} must import REFUND_INITIATED_STEP_DESC`).toContain('REFUND_INITIATED_STEP_DESC');
+      expect(src, `${name} must import REFUND_SETTLEMENT_STEP_DESC`).toContain('REFUND_SETTLEMENT_STEP_DESC');
+      expect(src, `${name} must import REFUND_CONFIRMATION_STEP_DESC`).toContain('REFUND_CONFIRMATION_STEP_DESC');
+      // Used in both online and host-arranged step lists (1 import + 2 uses = 3 occurrences).
+      expect(src.match(/REFUND_REQUEST_STEP_DESC/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+      expect(src).not.toMatch(/one tap/i);
+      expect(src).not.toMatch(/no reason needed/i);
+      expect(src).not.toMatch(/SMS and WhatsApp/i);
+    }
+
+    expect(confirmationSrc).toContain('REFUND_CANCELLATION_REQUEST_DISCLOSURE');
+    expect(confirmationSrc).toContain('REFUND_CANCELLATION_RECEIVED_MESSAGE');
+    expect(confirmationSrc).not.toMatch(/one tap/i);
+    expect(confirmationSrc).not.toMatch(/no reason needed/i);
+  });
+});

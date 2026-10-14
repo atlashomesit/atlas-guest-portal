@@ -5,6 +5,10 @@
 export const REFUND_APPROVAL_WINDOW = "within 24 hours";
 export const REFUND_SETTLEMENT_DAYS = "7–10 business days";
 
+/** Property-page refund journey step 1 (TASK-1039743) */
+export const REFUND_REQUEST_STEP_DESC =
+  "Request cancellation from your booking confirmation; our team reviews it.";
+
 /** Property-page refund journey step 2 */
 export const REFUND_INITIATED_STEP_DESC =
   `Atlas approves and initiates your refund ${REFUND_APPROVAL_WINDOW}. Reference number sent to you.`;
@@ -12,6 +16,10 @@ export const REFUND_INITIATED_STEP_DESC =
 /** Property-page refund journey step 3 */
 export const REFUND_SETTLEMENT_STEP_DESC =
   `Funds reach your account in ${REFUND_SETTLEMENT_DAYS}. Timing depends on your bank.`;
+
+/** Property-page refund journey step 4 (TASK-1039743) */
+export const REFUND_CONFIRMATION_STEP_DESC =
+  "By email, plus WhatsApp if you opted in.";
 
 /** /policies and /faq canonical timeline sentence */
 export const REFUND_POLICY_TIMELINE_SENTENCE =

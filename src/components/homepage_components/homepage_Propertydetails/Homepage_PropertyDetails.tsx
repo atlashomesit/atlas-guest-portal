@@ -18,7 +18,12 @@ import { getTenantListingAddress, getTenantOverrides, shouldHideAtlasBranding } 
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { getGuestFacingPhone } from '@/config/contact';
-import { REFUND_INITIATED_STEP_DESC, REFUND_SETTLEMENT_STEP_DESC } from '@/config/refundPolicyTimelines';
+import {
+  REFUND_CONFIRMATION_STEP_DESC,
+  REFUND_INITIATED_STEP_DESC,
+  REFUND_REQUEST_STEP_DESC,
+  REFUND_SETTLEMENT_STEP_DESC,
+} from '@/config/refundPolicyTimelines';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv, FaDumbbell } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
@@ -174,10 +179,10 @@ function PpGridIcon({ size = 14 }: { size?: number }) {
 // ---- Cancellation helpers (pp-* design system) ------------------------------
 
 const PP_REFUND_STEPS = [
-  { title: 'Cancel from your booking', desc: 'One tap from your booking confirmation. No reason needed.' },
+  { title: 'Cancel from your booking', desc: REFUND_REQUEST_STEP_DESC },
   { title: 'Refund initiated', desc: REFUND_INITIATED_STEP_DESC },
   { title: 'Money in your account', desc: REFUND_SETTLEMENT_STEP_DESC },
-  { title: 'Confirmation', desc: 'SMS and WhatsApp when the refund clears. Both.' },
+  { title: 'Confirmation', desc: REFUND_CONFIRMATION_STEP_DESC },
 ];
 
 interface PpCancellationInfo {
@@ -189,7 +194,7 @@ interface PpCancellationInfo {
 function getPpRefundSteps(hasOnlinePayment: boolean): Array<{ title: string; desc: string }> {
   if (!hasOnlinePayment) {
     return [
-      { title: 'Cancel from your booking', desc: 'One tap from your booking confirmation. No reason needed.' },
+      { title: 'Cancel from your booking', desc: REFUND_REQUEST_STEP_DESC },
       { title: 'Refund with your host', desc: 'Your host confirms the refund amount and timing directly with you.' },
       { title: 'Money returned', desc: 'UPI or bank transfer as arranged with the host — timing varies.' },
       { title: 'Confirmation', desc: 'Your host or our team confirms when the refund is complete.' },
