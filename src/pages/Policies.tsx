@@ -9,6 +9,8 @@ import { CONTACT } from "../config/contact";
 import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import { getTenantBrandName, MARKETPLACE_BRAND_BASELINE } from "../tenant/displayBrand";
 
+import "./Policies.css";
+
 const Policies = () => {
   const brandName = getTenantBrandName();
   const localizedPolicies = useMemo(
@@ -55,6 +57,7 @@ const Policies = () => {
 
   return (
     <LegalLayout
+      className="policies-page"
       current="policies"
       title="Guest Policies"
       description="Practical rules for bookings, arrivals, conduct, and how we keep stays predictable."
@@ -66,11 +69,11 @@ const Policies = () => {
         url="/policies"
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-        <SectionNav sections={sectionNav} />
+      <div className={`policies-grid grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 ${sectionNav.length ? "" : "policies-grid--empty"}`}>
+        <SectionNav key={sectionNav.length ? "topics" : "empty"} sections={sectionNav} collapsibleOnMobile toggleLabel="Jump to a policy" />
 
-        <div className="space-y-6">
-          <div className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-4">
+        <div className="policies-body space-y-6">
+          <div className="policies-search bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <LegalSearch value={search} onChange={setSearch} placeholder="Search policies" />
               <div className="bg-[color:color-mix(in_srgb,var(--accent-soft)_65%,var(--bg-surface))] text-text-primary border border-border-subtle rounded-xl p-4 text-sm">

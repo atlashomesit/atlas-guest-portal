@@ -15,6 +15,8 @@ import { messageFromApiResponse } from "../../utils/serverErrorFromResponse";
 import { getTenantBrandName } from "../../tenant/displayBrand";
 import { useTenantListings } from "../../hooks/useTenantListings";
 
+import "./ContactUs.css";
+
 type StatusMessage = {
     type: "info" | "success" | "error";
     text: string;
@@ -113,22 +115,17 @@ const ContactUs = () => {
     };
 
     return (
-        <section>
-            {/* Banner */}
-            <CommonBanner image="" PageName={'Contact Us'} />
-
-            {/* Contact Info Section */}
-            <div className="bg-bg-muted border-b border-border-subtle">
-                <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6 lg:gap-8">
-                        {/* Left Section - Main Message */}
-                        <div className="flex flex-col justify-between space-y-8">
+        <section className="contact-page">
+            <div className="contact-title"><CommonBanner image="" PageName="Contact Us" /></div>
+            <div className="contact-grid">
+<div className="contact-intro flex flex-col justify-between space-y-8">
                             <div className="space-y-4">
                                 <Typography variant="h2">We are ready to help</Typography>
                                 <Typography variant="subtitle">
                                     Questions about reservations, special requests, or the best unit for your stay? Our guest team will respond quickly on our primary contact lines.
                                 </Typography>
                             </div>
+<a className="contact-note-jump" href="#name" onClick={(event) => { if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); const input = document.getElementById("name"); input?.focus({ preventScroll: true }); input?.scrollIntoView({ block: "center" }); window.history.replaceState(null, "", "#name"); }}>Send us a note ↓</a>
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <a
                                     href={getWhatsAppLink()}
@@ -161,42 +158,7 @@ const ContactUs = () => {
                                 </a>
                             </Typography>
                         </div>
-
-                        {/* Right Section - Contact Details Card */}
-                        <Card className="flex flex-col space-y-8 h-fit">
-                            <div className="space-y-3">
-                                <Typography variant="muted" className="tracking-wider uppercase text-xs font-semibold">Direct lines</Typography>
-                                <Typography variant="h3">Business desk</Typography>
-                            </div>
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <Typography variant="muted" className="text-xs font-semibold uppercase">Call</Typography>
-                                    <a className="font-semibold text-lg text-cta-primary hover:text-cta-primary/80 transition" href={getTelLink()}>{formatDisplayNumber()}</a>
-                                </div>
-                                <div className="space-y-2">
-                                    <Typography variant="muted" className="text-xs font-semibold uppercase">WhatsApp</Typography>
-                                    <a className="font-semibold text-lg text-cta-primary hover:text-cta-primary/80 transition" href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer">{formatDisplayNumber()}</a>
-                                </div>
-                                <div className="space-y-2">
-                                    <Typography variant="muted" className="text-xs font-semibold uppercase">Email</Typography>
-                                    <a className="font-semibold text-lg text-cta-primary hover:text-cta-primary/80 transition break-all" href={`mailto:${contactEmail}`}>
-                                        {contactEmail}
-                                    </a>
-                                </div>
-                            </div>
-                            <div className="pt-4 border-t border-border-subtle">
-                                <Typography variant="muted" className="text-sm">Owner contact is reserved for escalations; reach out on the business line first for the fastest help.</Typography>
-                            </div>
-                        </Card>
-                    </div>
-                </div>
-            </div>
-
-            {/* Contact Form Section */}
-            <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-                <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6 lg:gap-8">
-                    {/* Form Card */}
-                    <Card className="space-y-6">
+<Card className="contact-form space-y-6">
                         <div className="space-y-3 text-center">
                             <Typography variant="h2">Send us a note</Typography>
                             <Typography variant="subtitle">Share your trip details and we will reply with tailored options.</Typography>
@@ -288,9 +250,32 @@ const ContactUs = () => {
                             </Button>
                         </form>
                     </Card>
-
-                    {/* Sidebar - Quick Links */}
-                    <Card className="space-y-8 h-fit">
+<Card className="contact-direct flex flex-col space-y-8 h-fit">
+                            <div className="space-y-3">
+                                <Typography variant="muted" className="tracking-wider uppercase text-xs font-semibold">Direct lines</Typography>
+                                <Typography variant="h3">Business desk</Typography>
+                            </div>
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <Typography variant="muted" className="text-xs font-semibold uppercase">Call</Typography>
+                                    <a className="font-semibold text-lg text-cta-primary hover:text-cta-primary/80 transition" href={getTelLink()}>{formatDisplayNumber()}</a>
+                                </div>
+                                <div className="space-y-2">
+                                    <Typography variant="muted" className="text-xs font-semibold uppercase">WhatsApp</Typography>
+                                    <a className="font-semibold text-lg text-cta-primary hover:text-cta-primary/80 transition" href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer">{formatDisplayNumber()}</a>
+                                </div>
+                                <div className="space-y-2">
+                                    <Typography variant="muted" className="text-xs font-semibold uppercase">Email</Typography>
+                                    <a className="font-semibold text-lg text-cta-primary hover:text-cta-primary/80 transition break-all" href={`mailto:${contactEmail}`}>
+                                        {contactEmail}
+                                    </a>
+                                </div>
+                            </div>
+                            <div className="pt-4 border-t border-border-subtle">
+                                <Typography variant="muted" className="text-sm">Owner contact is reserved for escalations; reach out on the business line first for the fastest help.</Typography>
+                            </div>
+                        </Card>
+<Card className="contact-quick space-y-8 h-fit">
                         <div className="space-y-3">
                             <Typography variant="muted" className="tracking-wider uppercase text-xs font-semibold">Quick links</Typography>
                             <Typography variant="h3">Find answers faster</Typography>
@@ -307,7 +292,6 @@ const ContactUs = () => {
                             <p>WhatsApp us on {formatDisplayNumber()} for booking confirmations.</p>
                         </div>
                     </Card>
-                </div>
             </div>
         </section>
     );

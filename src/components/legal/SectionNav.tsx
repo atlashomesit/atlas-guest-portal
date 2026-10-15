@@ -3,9 +3,10 @@ import { useId, useState, type MouseEvent } from "react";
 interface SectionNavProps {
   sections: { id: string; label: string }[];
   collapsibleOnMobile?: boolean;
+  toggleLabel?: string;
 }
 
-const SectionNav = ({ sections, collapsibleOnMobile = false }: SectionNavProps) => {
+const SectionNav = ({ sections, collapsibleOnMobile = false, toggleLabel = "Jump to a topic" }: SectionNavProps) => {
   const [expanded, setExpanded] = useState(false);
   const listId = useId();
   const goToTopic = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
@@ -28,8 +29,8 @@ const SectionNav = ({ sections, collapsibleOnMobile = false }: SectionNavProps) 
       aria-label="Section navigation"
       className={`sticky top-24 bg-bg-surface border border-border-subtle rounded-xl p-4 shadow-sm h-fit z-[var(--z-sticky)] ${collapsibleOnMobile ? "section-nav--collapsible" : ""} ${expanded ? "section-nav--expanded" : ""}`}
     >
-      <p className="section-nav-label text-sm font-semibold text-text-primary mb-3">{collapsibleOnMobile ? "Jump to a topic" : "Jump to section"}</p>
-      {collapsibleOnMobile && <button type="button" className="section-nav-toggle" aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(value => !value)}>Jump to a topic</button>}
+      <p className="section-nav-label text-sm font-semibold text-text-primary mb-3">{collapsibleOnMobile ? toggleLabel : "Jump to section"}</p>
+      {collapsibleOnMobile && <button type="button" className="section-nav-toggle" aria-expanded={expanded} aria-controls={listId} onClick={() => setExpanded(value => !value)}>{toggleLabel}</button>}
       <ul id={listId} className="space-y-2 text-sm">
         {sections.map((section) => (
           <li key={section.id}>
