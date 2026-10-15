@@ -1,0 +1,35 @@
+.faq-page { padding-top: 28px; padding-bottom: 48px; }
+.faq-page .legal-layout-content > * + * { margin-top: 24px; }
+.faq-page .legal-layout-header { padding: 20px; }
+.faq-page .legal-layout-header h1 { font-size: 30px; line-height: 1.16; }
+.faq-page .legal-layout-header p { font-size: 16px; }
+.faq-page .faq-grid { margin-top: 20px; }
+.faq-page .faq-grid--no-topics { grid-template-columns: minmax(0, 1fr); }
+.faq-search { padding: 16px; }
+.faq-search > div { gap: 12px; }
+.faq-search > div > div:last-child { padding: 10px; }
+.faq-highlights--compact .faq-highlights-title { text-align: left; margin-bottom: 16px; }
+.faq-highlights--compact .faq-highlights-title h2 { font-size: 22px; }
+.section-nav-toggle { display: none; font: inherit; font-size: 14px; font-weight: 600; min-height: 44px; background: none; border: 0; color: inherit; padding: 0; cursor: pointer; }
+.section-nav-toggle:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+.faq-page .section-nav--collapsible a { min-height: 32px; display: flex; align-items: center; }
+.faq-page section[id] { scroll-margin-top: 100px; }
+@media (max-width: 1023px) {
+  .faq-page .section-nav--collapsible { position: static; padding: 8px 16px; }
+  .faq-page .section-nav-label { display: none; }
+  .faq-page .section-nav-toggle { display: block; }
+  .faq-page .section-nav--collapsible ul { display: none; }
+  .faq-page .section-nav--expanded ul { display: block; }
+  .faq-page .section-nav--collapsible a { min-height: 44px; }
+  .faq-page .legal-layout-header { padding: 18px; }
+  .faq-page .legal-layout-header h1 { font-size: 26px; }
+  .faq-page .legal-layout-header p { font-size: 14px; }
+  .faq-page .legal-layout-content > * + * { margin-top: 16px; }
+  .faq-page .legal-layout-header nav a { padding-left: 12px; padding-right: 12px; }
+  .faq-page .faq-grid { margin-top: 16px; gap: 12px; }
+  .faq-answers { min-width: 0; }
+  .faq-page .faq-answers > * + * { margin-top: 16px; }
+  .faq-search { padding: 12px; }
+  .faq-search > div { gap: 8px; }
+  .faq-search input { width: 100%; }
+}
