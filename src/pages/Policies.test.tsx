@@ -31,11 +31,27 @@ describe('Policies page', () => {
     });
   });
 
-  it('provides anchors for each section target', () => {
-    const { container } = renderPage();
-    const firstLink = screen.getByRole('link', { name: policySections[0].title });
-    fireEvent.click(firstLink);
-    expect(container.querySelector(`#${policySections[0].id}`)).not.toBeNull();
+  it('provides anchors for each section target', async () => {
+    // SectionNav moves focus and scrolls from a requestAnimationFrame callback after the click. Fake
+    // timers let the test own that frame: it runs inside this test, not after it has ended.
+    vi.useFakeTimers();
+    try {
+      const { container } = renderPage();
+      const target = container.querySelector<HTMLElement>(`#${policySections[0].id}`);
+      expect(target).not.toBeNull();
+      // jsdom does not implement scrollIntoView. Without this stub the frame callback throws and
+      // vitest fails the whole run on an unhandled error (exit 1) although every test passed.
+      const scrollIntoView = vi.fn();
+      target!.scrollIntoView = scrollIntoView;
+
+      fireEvent.click(screen.getByRole('link', { name: policySections[0].title }));
+      await vi.advanceTimersByTimeAsync(16);
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+      expect(target).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('renders a stable anchor list snapshot', () => {
