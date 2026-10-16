@@ -1,13 +1,23 @@
-import { useId, useState, type MouseEvent } from "react";
+import { useEffect, useId, useState, type MouseEvent } from "react";
 
 interface SectionNavProps {
   sections: { id: string; label: string }[];
   collapsibleOnMobile?: boolean;
   toggleLabel?: string;
+  nativeDisclosure?: boolean;
 }
 
-const SectionNav = ({ sections, collapsibleOnMobile = false, toggleLabel = "Jump to a topic" }: SectionNavProps) => {
+const SectionNav = ({ sections, collapsibleOnMobile = false, toggleLabel = "Jump to a topic", nativeDisclosure = false }: SectionNavProps) => {
   const [expanded, setExpanded] = useState(false);
+  const [desktop, setDesktop] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
+  useEffect(() => {
+    if (!nativeDisclosure) return;
+    const media = window.matchMedia("(min-width: 1024px)");
+    const update = () => { setDesktop(media.matches); setExpanded(false); };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [nativeDisclosure]);
   const listId = useId();
   const goToTopic = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
     if (!collapsibleOnMobile || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
@@ -23,6 +33,17 @@ const SectionNav = ({ sections, collapsibleOnMobile = false, toggleLabel = "Jump
     });
   };
   if (!sections.length) return null;
+
+  if (nativeDisclosure) return (
+    <nav aria-label="Section navigation" className="privacy-topics sticky top-24 bg-bg-surface border border-border-subtle rounded-xl shadow-sm h-fit z-[var(--z-sticky)]">
+      <details open={desktop || expanded} onToggle={event => { if (!desktop) setExpanded(event.currentTarget.open); }}>
+        <summary>{toggleLabel}</summary>
+        <ul className="space-y-2 text-sm">
+          {sections.map(section => <li key={section.id}><a href={`#${section.id}`} onClick={event => goToTopic(event, section.id)} className="text-text-muted hover:text-[var(--accent-text)] font-medium">{section.label}</a></li>)}
+        </ul>
+      </details>
+    </nav>
+  );
 
   return (
     <nav

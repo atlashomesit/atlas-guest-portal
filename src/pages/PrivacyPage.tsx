@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
+import "./PrivacyPage.css";
 import LegalLayout from "../components/legal/LegalLayout";
 import LegalSearch from "../components/legal/LegalSearch";
 import SectionNav from "../components/legal/SectionNav";
@@ -126,10 +127,20 @@ const PrivacyPage = () => {
   };
 
   const sectionNav = filteredSections.map((section) => ({ id: section.id, label: section.title }));
+  const jumpToSection = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    const target = document.getElementById(id);
+    if (!target) return;
+    event.preventDefault();
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "start" });
+    history.replaceState(null, "", `#${id}`);
+  };
 
   return (
     <LegalLayout
       current="privacy"
+      className="privacy-page"
       title={tenantTitle}
       description="How we collect, use, store, and share your personal data — and the rights you have under India's Digital Personal Data Protection Act, 2023."
       lastUpdated={privacyMetadata.effectiveDate}
@@ -140,8 +151,13 @@ const PrivacyPage = () => {
         url="/privacy"
       />
 
+      <nav className="privacy-actions" aria-label="Privacy actions">
+        <a href="#dpdp-rights" onClick={event => jumpToSection(event, "dpdp-rights")}>Your rights</a>
+        <a href="#cookie-consent-revocation" onClick={event => jumpToSection(event, "cookie-consent-revocation")}>Cookie choices</a>
+        <a href="#privacy-request" onClick={event => jumpToSection(event, "privacy-request")}>Send a privacy request</a>
+      </nav>
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-        <SectionNav sections={sectionNav} />
+        <SectionNav sections={sectionNav} collapsibleOnMobile nativeDisclosure toggleLabel="Browse privacy topics" />
 
         <div className="space-y-6">
           <div className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-4">
@@ -200,7 +216,7 @@ const PrivacyPage = () => {
               </p>
             </div>
 
-            <div id="dpdp-rights" className="space-y-2">
+            <div id="dpdp-rights" tabIndex={-1} className="space-y-2">
               <h3 className="text-lg font-semibold text-text-primary">
                 Your rights — access, correction, erasure, and withdrawal of consent
               </h3>
@@ -238,6 +254,7 @@ const PrivacyPage = () => {
 
           <section
             id="cookie-consent-revocation"
+            tabIndex={-1}
             className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-3"
           >
             <h2 className="text-xl font-bold text-text-primary">Cookie &amp; consent settings</h2>
@@ -306,7 +323,7 @@ const PrivacyPage = () => {
           </div>
 
           <div className="bg-gradient-to-r from-primary/90 to-primary text-[var(--text-contrast)] rounded-2xl p-6 shadow-level2">
-            <div className="flex flex-col gap-6">
+            <div id="privacy-request" tabIndex={-1} className="flex flex-col gap-6">
               <div>
                 <h3 className="text-xl font-bold">File a data protection grievance</h3>
                 <p className="text-[color-mix(in_srgb,var(--text-contrast)_90%,transparent)] mt-1">
