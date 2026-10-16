@@ -1,0 +1,36 @@
+.policies-page { padding-top: 24px; padding-bottom: 48px; }
+.policies-page .legal-layout-content { display: flex; flex-direction: column; gap: 20px; }
+.policies-page .legal-layout-content > * { margin-block: 0; }
+.policies-page .legal-layout-header { padding: 20px; }
+.policies-page .legal-layout-header h1 { font-size: 30px; }
+.policies-page .legal-layout-header p { font-size: 16px; }
+.policies-page .policies-grid--empty { grid-template-columns: minmax(0, 1fr); }
+.policies-page .policies-body { min-width: 0; }
+.policies-page .policies-search { padding: 16px; }
+.policies-page .policies-search > div { gap: 16px; }
+.policies-page article { scroll-margin-top: 110px; }
+.policies-page article > header { gap: 16px; }
+.policies-page article > header > div:first-child { max-width: 65ch; }
+.policies-page article > header > div:last-child { max-width: 350px; flex-shrink: 0; }
+.policies-page .section-nav-toggle { display: none; font: inherit; font-weight: 600; color: inherit; background: none; border: 0; min-height: 44px; cursor: pointer; padding: 0; }
+.policies-page .section-nav-toggle:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+.policies-page .section-nav--collapsible a { display: flex; align-items: center; min-height: 36px; }
+@media (max-width: 1023px) {
+  .policies-page .legal-layout-content { gap: 14px; }
+  .policies-page .legal-layout-header { padding: 18px; }
+  .policies-page .legal-layout-header h1 { font-size: 26px; }
+  .policies-page .legal-layout-header p { font-size: 14px; }
+  .policies-page .section-nav--collapsible { position: static; z-index: auto; padding: 8px 16px; }
+  .policies-page .section-nav-label { display: none; }
+  .policies-page .section-nav-toggle { display: block; }
+  .policies-page .section-nav--collapsible ul { display: none; }
+  .policies-page .section-nav--expanded ul { display: block; }
+  .policies-page .section-nav--collapsible a { min-height: 44px; }
+  .policies-page .policies-grid { gap: 12px; }
+  .policies-page .policies-search { padding: 12px; }
+  .policies-page .policies-search > div { gap: 8px; }
+  .policies-page .policies-search input { width: 100%; }
+  .policies-page .policies-body { display: flex; flex-direction: column; gap: 14px; }
+  .policies-page .policies-body > * { margin-block: 0; }
+  .policies-page article > header > div:last-child { max-width: none; }
+}

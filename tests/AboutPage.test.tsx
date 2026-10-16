@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import AboutPage from "@/pages/AboutPage";
 import { MARKETPLACE_BRAND_BASELINE } from "@/tenant/displayBrand";
+import { lucideOwnedMarkup, withStableIcons } from "@/test/stableIconMarkup";
 
 describe("AboutPage", () => {
   it("renders mission, team, standards, and trust content", () => {
@@ -28,6 +29,12 @@ describe("AboutPage", () => {
 
   it("matches the snapshot", () => {
     const { container } = render(<AboutPage />);
-    expect(container.firstChild).toMatchSnapshot();
+    // TASK-103194: this snapshot flipped ten times in five weeks (2026-09-04 to 2026-10-10) on lucide-react's own markup:
+    // glyph paths and alias class names that differ between lucide versions and between stale and fresh installs, never
+    // on our code. It stores each icon as the stable marker from src/test/stableIconMarkup.ts, and asserts nothing
+    // lucide owns is left in it.
+    const stable = withStableIcons(container.firstChild as Element);
+    expect(lucideOwnedMarkup(stable.outerHTML)).toEqual([]);
+    expect(stable).toMatchSnapshot();
   });
 });

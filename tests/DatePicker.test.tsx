@@ -2,6 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { lucideOwnedMarkup, withStableIcons } from "@/test/stableIconMarkup";
 
 const mockTrackEvent = vi.fn();
 
@@ -135,7 +136,9 @@ describe("Hero date picker", () => {
     // `"_" + identifierPrefix + "r_" + treeId.toString(32) + "_"`). Match both so a future
     // React version bump doesn't silently let raw, unstable ids leak back into the snapshot.
     const idMap = new Map<string, string>();
-    const stableHtml = document.body.innerHTML
+    // TASK-103194: icons go through the shared stable-icon marker (src/test/stableIconMarkup.ts), which drops lucide's
+    // glyph geometry AND its class names; the regex this replaced kept the class names, which flip between lucide versions.
+    const stableHtml = withStableIcons(document.body).innerHTML
       .replace(/:r[0-9a-z]+:|_r_[0-9a-z]+_/gi, (id) => {
         const existing = idMap.get(id);
         if (existing) return existing;
@@ -155,10 +158,10 @@ describe("Hero date picker", () => {
       // Scope note: that prohibition is about ENVIRONMENT-dependent drift (the jsdom artifact
       // above, and useId churn). lucide-react minor bumps rewrite calendar-range path `d`
       // and rect y (0.544→0.545, 0.561→0.562) identically everywhere — still not a product
-      // change. Strip lucide inner markup so a pin bump cannot fail the unit bar; the
-      // snapshot is the popover structure, not icon glyphs.
-      .replace(/\s*\*\s*,\s*\*\s*/g, ", ")
-      .replace(/<svg([^>]*\blucide[\w-]*\b[^>]*)>[\s\S]*?<\/svg>/g, "<svg$1></svg>");
+      // change; withStableIcons above removes them, so the snapshot is the popover structure,
+      // not icon glyphs or lucide's class names.
+      .replace(/\s*\*\s*,\s*\*\s*/g, ", ");
+    expect(lucideOwnedMarkup(stableHtml)).toEqual([]);
     expect(stableHtml).toMatchSnapshot("date-picker-mobile");
 
     view.unmount();
