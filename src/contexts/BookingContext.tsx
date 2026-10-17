@@ -59,6 +59,9 @@ type BookingState = {
   holdCancellationTier: CancellationTier | null;
   holdCancellationWindowHours: number | null;
   holdGraceHours: number | null;
+  /** MRP-002: Selected rate plan ID and display name forwarded from UnitBookingWidget (session-only). */
+  listingRatePlanId?: number | null;
+  ratePlanName?: string | null;
 };
 
 type BookingContextValue = {
@@ -95,6 +98,8 @@ const defaultState: BookingState = {
   holdCancellationTier: null,
   holdCancellationWindowHours: null,
   holdGraceHours: null,
+  listingRatePlanId: null,
+  ratePlanName: null,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
@@ -134,6 +139,8 @@ const loadState = (): BookingState => {
       holdCancellationTier: null,
       holdCancellationWindowHours: null,
       holdGraceHours: null,
+      listingRatePlanId: null,
+      ratePlanName: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);
