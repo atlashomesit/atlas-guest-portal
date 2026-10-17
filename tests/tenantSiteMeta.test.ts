@@ -72,20 +72,20 @@ describe("buildMetaRewriteValues (TASK-4905 / ADR-0018 amendment)", () => {
     expect(values.url).toBe("https://gauravsguesthouse.com/homes/1");
   });
 
-  it("falls back to a generated description when description is missing", () => {
+  // GUEST-012: neutral fallback description without unverified/zero-fee claims.
+  it("falls back to a neutral generated description when description is missing (GUEST-012)", () => {
     const values = buildMetaRewriteValues(
       { ...fullMeta, description: null },
       "https://gauravsguesthouse.com/",
     );
 
-    expect(values.description).toBe(
-      "Book Gaurav's Lake View Villa directly. Verified property, zero booking fees, instant confirmation.",
-    );
+    expect(values.description).toBe("Book directly with Gaurav's Lake View Villa.");
+    expect(values.description).not.toMatch(/verified property|zero booking fees|instant confirmation/i);
   });
 
   it("falls back to a generated description when description is whitespace-only (malformed)", () => {
     const values = buildMetaRewriteValues({ ...fullMeta, description: "   " }, "https://x.com/");
-    expect(values.description).toContain("Gaurav's Lake View Villa");
+    expect(values.description).toBe("Book directly with Gaurav's Lake View Villa.");
   });
 
   // TASK-7468 #5: rewrite path is tenant/white-label only — never Atlas /og-image.svg.
