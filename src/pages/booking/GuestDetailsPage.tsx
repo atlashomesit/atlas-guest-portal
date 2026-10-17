@@ -183,6 +183,8 @@ type CheckoutHoldCache = {
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
+  listingRatePlanId?: number | null;
+  ratePlanName?: string | null;
 };
 
 function loadCheckoutHold(): CheckoutHoldCache | null {
@@ -321,6 +323,8 @@ const GuestDetailsPage: React.FC = () => {
           checkIn: cached.checkIn ?? null,
           checkOut: cached.checkOut ?? null,
           guests: cached.guests ?? booking.guests,
+          listingRatePlanId: cached.listingRatePlanId ?? null,
+          ratePlanName: cached.ratePlanName ?? null,
         });
       }
     }
@@ -482,6 +486,8 @@ const GuestDetailsPage: React.FC = () => {
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
+      listingRatePlanId: booking.listingRatePlanId ?? null,
+      ratePlanName: booking.ratePlanName ?? null,
     };
     try {
       window.sessionStorage.setItem(CHECKOUT_HOLD_KEY, JSON.stringify(payload));
@@ -490,7 +496,7 @@ const GuestDetailsPage: React.FC = () => {
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
     booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
-    booking.holdGraceHours, propertySlug, unitSlug, effectiveTenantSlug,
+    booking.holdGraceHours, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
@@ -882,6 +888,7 @@ const GuestDetailsPage: React.FC = () => {
           notes: formData.notes.trim().slice(0, 500) || undefined,
           guestNationality: formData.nationality || 'India',
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
+          ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
         },
       };
 

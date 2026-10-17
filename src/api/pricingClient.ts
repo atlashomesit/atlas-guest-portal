@@ -143,19 +143,95 @@ export function netChargeableRoomFare(b: GuestPriceBreakdown): number {
 }
 
 /**
+ * MRP-002: Public rate plan DTO returned by GET /api/listings/{listingId}/rate-plans/public.
+ */
+export type PublicListingRatePlanDto = {
+  id: number;
+  listingId: number;
+  name: string;
+  isDefault: boolean;
+  sortOrder: number;
+  baseNightlyRate: number;
+  effectiveNightlyRate: number;
+  totalStayAmount: number | null;
+  guests: number;
+  cancellationPolicy: string | null;
+  cancellationSummary: string | null;
+  mealPlanCode: string | null;
+  mealPlanLabel: string | null;
+  isDerived: boolean;
+};
+
+/**
+ * MRP-002: Fetch active public rate plans for a listing (and optional date range + guest count).
+ */
+export async function fetchPublicListingRatePlans(
+  listingId: string | number,
+  checkIn?: string | null,
+  checkOut?: string | null,
+  guests?: number | null,
+  signal?: AbortSignal,
+): Promise<PublicListingRatePlanDto[]> {
+  const url = new URL(buildApiUrl(`/api/listings/${Number(listingId)}/rate-plans/public`));
+  if (checkIn) url.searchParams.set('checkIn', checkIn);
+  if (checkOut) url.searchParams.set('checkOut', checkOut);
+  if (guests != null && guests > 0) url.searchParams.set('guests', String(guests));
+
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  if (!response.ok) {
+    throw new Error(await messageFromApiResponse(response));
+  }
+
+  const raw = (await response.json()) as Array<Record<string, unknown>>;
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((r) => {
+    const totalStayRaw = r.totalStayRate ?? r.TotalStayRate ?? r.totalStayAmount ?? r.TotalStayAmount;
+    const cancelPolicyRaw = r.cancellationPolicy ?? r.CancellationPolicy;
+    const cancelSummaryRaw = r.cancellationSummary ?? r.CancellationSummary;
+    const mealCodeRaw = r.mealPlanCode ?? r.MealPlanCode;
+    const mealLabelRaw = r.mealPlanLabel ?? r.MealPlanLabel;
+    return {
+      id: Number(r.id ?? r.Id ?? 0),
+      listingId: Number(r.listingId ?? r.ListingId ?? listingId),
+      name: String(r.name ?? r.Name ?? 'Standard Rate'),
+      isDefault: Boolean(r.isDefault ?? r.IsDefault),
+      sortOrder: Number(r.sortOrder ?? r.SortOrder ?? 0),
+      baseNightlyRate: Number(r.baseNightlyRate ?? r.BaseNightlyRate ?? 0),
+      effectiveNightlyRate: Number(r.effectiveNightlyRate ?? r.EffectiveNightlyRate ?? 0),
+      totalStayAmount:
+        totalStayRaw !== undefined && totalStayRaw !== null ? Number(totalStayRaw) : null,
+      guests: Number(r.guests ?? r.Guests ?? 2),
+      cancellationPolicy:
+        typeof cancelPolicyRaw === 'string' && cancelPolicyRaw.trim() ? cancelPolicyRaw : null,
+      cancellationSummary:
+        typeof cancelSummaryRaw === 'string' && cancelSummaryRaw.trim() ? cancelSummaryRaw : null,
+      mealPlanCode: typeof mealCodeRaw === 'string' && mealCodeRaw.trim() ? mealCodeRaw : null,
+      mealPlanLabel: typeof mealLabelRaw === 'string' && mealLabelRaw.trim() ? mealLabelRaw : null,
+      isDerived: Boolean(r.isDerived ?? r.IsDerived),
+    };
+  });
+}
+
+/**
  * GET /pricing/guest-breakdown?listingId=&checkIn=&checkOut= — authoritative pre-checkout quote.
  * TASK-7016: widget totals must derive from this, not from GET /pricing/breakdown calendar rows.
+ * MRP-002: optional `listingRatePlanId` selects a specific rate plan's pricing.
  */
 export async function fetchGuestPriceBreakdown(
   listingId: string | number,
   checkIn: string,
   checkOut: string,
   signal?: AbortSignal,
+  listingRatePlanId?: number | null,
 ): Promise<GuestPriceBreakdown> {
   const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(listingId));
   url.searchParams.set('checkIn', checkIn);
   url.searchParams.set('checkOut', checkOut);
+  if (listingRatePlanId != null && Number.isFinite(listingRatePlanId) && listingRatePlanId > 0) {
+    url.searchParams.set('listingRatePlanId', String(listingRatePlanId));
+  }
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
   if (!response.ok) {
@@ -198,8 +274,9 @@ export async function fetchGuestGstBreakdown(
   checkIn: string,
   checkOut: string,
   signal?: AbortSignal,
+  listingRatePlanId?: number | null,
 ): Promise<GuestGstBreakdown> {
-  const b = await fetchGuestPriceBreakdown(listingId, checkIn, checkOut, signal);
+  const b = await fetchGuestPriceBreakdown(listingId, checkIn, checkOut, signal, listingRatePlanId);
   return {
     gstPercent: b.gstPercent,
     gstAmount: b.gstAmount,

@@ -38,8 +38,10 @@ import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import {
   fetchCalendarPricing,
   fetchGuestPriceBreakdown,
+  fetchPublicListingRatePlans,
   netChargeableRoomFare,
   type GuestPriceBreakdown,
+  type PublicListingRatePlanDto,
 } from '@/api/pricingClient';
 import { fetchAvailabilityRatesForMonths } from '@/api/availabilityRatesClient';
 import { fetchPublicListings } from '@/api/listingClient';
@@ -239,6 +241,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [selectedRangePricingFailed, setSelectedRangePricingFailed] = useState(false);
   // TASK-4331 / TASK-7016: authoritative server quote (charge engine, not calendar display engine).
   const [serverPriceBreakdown, setServerPriceBreakdown] = useState<GuestPriceBreakdown | null>(null);
+  // MRP-002: Public rate plans for this listing & selected rate plan ID.
+  const [publicRatePlans, setPublicRatePlans] = useState<PublicListingRatePlanDto[]>([]);
+  const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
@@ -975,6 +980,34 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Near the ₹7,500 boundary the two bases can pick different slabs, so we fetch the
   // server's real value here and prefer it; the client-derived slab below remains only as
   // a fallback while this request is in flight or if it fails.
+  // MRP-002: Fetch active public rate plans for this listing & date range.
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') {
+      setPublicRatePlans([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetchPublicListingRatePlans(
+      listingId,
+      gstRangeStartIso,
+      gstRangeEndIso,
+      guests,
+      controller.signal,
+    )
+      .then((plans) => {
+        setPublicRatePlans(plans);
+        setSelectedRatePlanId((prev) => {
+          if (prev != null && plans.some((p) => p.id === prev)) return prev;
+          const def = plans.find((p) => p.isDefault) ?? plans[0];
+          return def ? def.id : null;
+        });
+      })
+      .catch(() => {
+        // Best-effort — keep existing plans or fall back to single-rate flow
+      });
+    return () => controller.abort();
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, guests]);
+
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') {
       setServerPriceBreakdown(null);
@@ -985,7 +1018,13 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       return;
     }
     const controller = new AbortController();
-    fetchGuestPriceBreakdown(listingId, gstRangeStartIso, gstRangeEndIso, controller.signal)
+    fetchGuestPriceBreakdown(
+      listingId,
+      gstRangeStartIso,
+      gstRangeEndIso,
+      controller.signal,
+      selectedRatePlanId,
+    )
       .then((b) => {
         setServerPriceBreakdown(b);
       })
@@ -993,7 +1032,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setServerPriceBreakdown(null);
       });
     return () => controller.abort();
-  }, [listingId, gstRangeStartIso, gstRangeEndIso]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId]);
 
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
@@ -1212,34 +1251,60 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO) || dateBookabilityMap.get(checkinISO) === false;
   }, [dateRange.startDate, dateStatusMap, blockedSet, dateBookabilityMap]);
 
+  const selectedRatePlan = useMemo(
+    () => publicRatePlans.find((p) => p.id === selectedRatePlanId) ?? publicRatePlans[0] ?? null,
+    [publicRatePlans, selectedRatePlanId],
+  );
+
+  const effectiveRatePlanCancellationTier = useMemo((): 'Flexible' | 'Moderate' | 'Strict' => {
+    const policy = selectedRatePlan?.cancellationPolicy;
+    if (policy === 'Flexible') return 'Flexible';
+    if (policy === 'Moderate') return 'Moderate';
+    if (policy === 'Firm' || policy === 'Strict') return 'Strict';
+    return resolvedCancellationTier;
+  }, [selectedRatePlan?.cancellationPolicy, resolvedCancellationTier]);
+
+  const isSelectedRatePlanNonRefundable = selectedRatePlan?.cancellationPolicy === 'NonRefundable';
+
   // TASK-4334/TASK-4405: recompute the free-cancellation deadline whenever the guest's selected
   // check-in date, the listing's resolved cancellation tier, or the resolved grace hours changes.
   // Uses "now" as the booking-time estimate (the actual booking doesn't exist yet at this stage) —
   // same estimate posture the tier-only deadline already used pre-booking.
   const freeCancellationCopy = useMemo(() => {
+    if (isSelectedRatePlanNonRefundable) return null;
     if (!dateRange.startDate) return null;
     return resolveFreeCancellationTrustCopy({
       checkInDate: dateRange.startDate,
-      tier: resolvedCancellationTier,
-      windowHoursOverride: resolvedCancellationWindowHours,
+      tier: effectiveRatePlanCancellationTier,
+      windowHoursOverride: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
       bookingCreatedAt: new Date(),
       graceHours: resolvedGraceHours,
     });
-  }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours]);
+  }, [
+    isSelectedRatePlanNonRefundable,
+    dateRange.startDate,
+    effectiveRatePlanCancellationTier,
+    selectedRatePlan?.cancellationPolicy,
+    resolvedCancellationWindowHours,
+    resolvedGraceHours,
+  ]);
 
   // TASK-7012: trust-strip sentence, or null when there is nothing truthful to say (a still-active
   // grace window with a lapsed tier deadline — the grace strip below carries that claim instead).
-  const cancellationTrustText =
-    freeCancellationCopy?.trustMessage
-    ?? (!dateRange.startDate ? 'Select check-in dates to see your free cancellation deadline' : null);
+  const cancellationTrustText = isSelectedRatePlanNonRefundable
+    ? 'Non-refundable rate — lowest price'
+    : freeCancellationCopy?.trustMessage
+      ?? (!dateRange.startDate ? 'Select check-in dates to see your free cancellation deadline' : null);
 
   // TASK-7012: grace hours we may DISCLOSE. Once a check-in date is picked we know whether the server
   // would void the grace window for these dates, so gate on the resolved value — `resolvedGraceHours`
   // only says the feature is on for this listing, not that this guest's dates qualify. Before a date
   // is picked there is nothing to void against, so the listing-level value carries generic copy.
-  const disclosableGraceHours = dateRange.startDate
-    ? freeCancellationCopy?.applicableGraceHours ?? null
-    : resolvedGraceHours;
+  const disclosableGraceHours = isSelectedRatePlanNonRefundable
+    ? null
+    : dateRange.startDate
+      ? freeCancellationCopy?.applicableGraceHours ?? null
+      : resolvedGraceHours;
 
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary(listingId);
   const dailyPricing = useMemo(
@@ -1470,7 +1535,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // old hold. Mirrors the cart-change key clear in GuestDetailsPage.tsx (TASK-4536/4607).
   useEffect(() => {
     reserveIdempotencyKeyRef.current = null;
-  }, [listingId, dateRange.startDate, dateRange.endDate, guests]);
+  }, [listingId, dateRange.startDate, dateRange.endDate, guests, selectedRatePlanId]);
 
   // TASK-2612: handleReserve replaces the old handleSubmit.
   // Calls init-hold mode (GuestInfo absent), stores holdId+holdExpiresAt in context, navigates to details page.
@@ -1596,6 +1661,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           checkinDate: toCalendarISO(checkinIst),
           checkoutDate: toCalendarISO(checkoutIst),
           guests,
+          ...(selectedRatePlanId != null ? { listingRatePlanId: selectedRatePlanId } : {}),
         },
         currency: 'INR',
         // GuestInfo absent — init-hold mode
@@ -1680,9 +1746,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           currency: 'INR',
           touristTaxAmount: resolvedTouristTax,
         },
-        holdCancellationTier: resolvedCancellationTier,
-        holdCancellationWindowHours: resolvedCancellationWindowHours,
-        holdGraceHours: resolvedGraceHours,
+        holdCancellationTier: effectiveRatePlanCancellationTier,
+        holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
+        holdGraceHours: isSelectedRatePlanNonRefundable ? null : resolvedGraceHours,
         // Forward dates/guests into context for the details page. BookingContext's wire format
         // is an ISO instant, and the hydration effect above reads it back as an IST civil date —
         // so emit the IST-midnight instant (unchanged format, correct day) rather than
@@ -1690,6 +1756,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         checkIn: istInstantFromCalendarDate(checkinIst).toISOString(),
         checkOut: istInstantFromCalendarDate(checkoutIst).toISOString(),
         guests,
+        listingRatePlanId: selectedRatePlanId,
+        ratePlanName: selectedRatePlan?.name ?? null,
       });
 
       // TASK-8218: the hold succeeded and its ownership token is now in BookingContext — clear
@@ -1736,7 +1804,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     dateBookabilityMap, today,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate,
-    resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours,
+    resolvedCancellationWindowHours, resolvedGraceHours,
+    selectedRatePlanId, selectedRatePlan, effectiveRatePlanCancellationTier, isSelectedRatePlanNonRefundable,
   ]);
 
   // Hand-off link for the Reserve 422 above. Derived at render, not captured in handleReserve, so it
@@ -2026,6 +2095,74 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
+        {publicRatePlans.length > 1 && (
+          <div
+            className="bw-rate-plan-selector"
+            data-testid="bw-rate-plan-selector"
+            role="radiogroup"
+            aria-label="Rate plan options"
+            style={{
+              marginTop: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary, #475569)' }}>
+              Choose your rate option
+            </div>
+            {publicRatePlans.map((plan) => {
+              const isSelected = (selectedRatePlan?.id ?? publicRatePlans[0]?.id) === plan.id;
+              return (
+                <button
+                  key={plan.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  data-testid={`bw-rate-plan-option-${plan.id}`}
+                  onClick={() => setSelectedRatePlanId(plan.id)}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    border: isSelected
+                      ? '2px solid var(--accent-primary, #0f172a)'
+                      : '1px solid var(--border-subtle, #e2e8f0)',
+                    background: isSelected ? 'var(--bg-subtle, #f8fafc)' : '#ffffff',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
+                      {plan.name}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
+                      <span>{plan.mealPlanLabel}</span>
+                      <span>·</span>
+                      <span>{plan.cancellationSummary}</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
+                      {displayPrice(
+                        plan.totalStayAmount != null && plan.totalStayAmount > 0
+                          ? plan.totalStayAmount
+                          : plan.effectiveNightlyRate,
+                      )}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-secondary, #64748b)' }}>
+                      {plan.totalStayAmount != null && plan.totalStayAmount > 0 ? 'total base' : '/ night'}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
         {/* The hint and legend sit BELOW the joined dates + guests card: the guests cell has no
             top border, so anything rendered between the two halves splits the card. */}
         {/* Incomplete date hint */}
