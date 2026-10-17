@@ -534,7 +534,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
         // Optionally scroll to the date picker to make it visible
         if (calendarButtonRef.current) {
-          calendarButtonRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          calendarButtonRef.current.scrollIntoView({ block: 'nearest' });
         }
       } catch {
         // Silently handle parse errors
