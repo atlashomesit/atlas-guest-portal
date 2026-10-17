@@ -1256,7 +1256,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     [publicRatePlans, selectedRatePlanId],
   );
 
-  const effectiveRatePlanCancellationTier = useMemo((): 'Flexible' | 'Moderate' | 'Strict' => {
+  const effectiveRatePlanCancellationTier = useMemo((): CancellationTier | null => {
     const policy = selectedRatePlan?.cancellationPolicy;
     if (policy === 'Flexible') return 'Flexible';
     if (policy === 'Moderate') return 'Moderate';
