@@ -20,6 +20,8 @@ export type ListingReviewRow = {
   ratingValue?: number | null;
   ratingCheckin?: number | null;
   ratingCommunication?: number | null;
+  ratingAccuracy?: number | null;
+  ratingLocation?: number | null;
 };
 
 export type ExternalReviewRow = {

@@ -175,11 +175,20 @@ export default function MarketplaceHomepage() {
     }
     return p.toString();
   }, [searchParams]);
-  // TASK-4413: price-range control — client-side filter over the fetched grid, mirroring
-  // SearchPage.tsx's minPrice/maxPrice pattern. Local state (not URL) — the marketplace
-  // grid fetch already covers date/guest/category/city; price narrows the same result set.
+  // TASK-4413 / MKT-016: price-range control — forwarded as minPrice/maxPrice query params to
+  // GET /marketplace/listings so server-side filtering and pagination work across all pages,
+  // while keeping the client-side filter as a safety net.
   const [minPriceInput, setMinPriceInput] = useState('');
   const [maxPriceInput, setMaxPriceInput] = useState('');
+
+  const minPrice = useMemo(() => {
+    const n = Number(minPriceInput);
+    return minPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
+  }, [minPriceInput]);
+  const maxPrice = useMemo(() => {
+    const n = Number(maxPriceInput);
+    return maxPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
+  }, [maxPriceInput]);
 
   // TASK-101491: the FILTER half of the query only - deliberately excludes page/pageSize so that
   // changing a filter produces a new key (resetting paging) while paging does not re-trigger the
@@ -197,8 +206,10 @@ export default function MarketplaceHomepage() {
     if (checkOut) p.set('checkOut', checkOut);
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
+    if (minPrice != null) p.set('minPrice', String(minPrice));
+    if (maxPrice != null) p.set('maxPrice', String(maxPrice));
     return p.toString();
-  }, [category, query, searchParams]);
+  }, [category, query, searchParams, minPrice, maxPrice]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -288,18 +299,6 @@ export default function MarketplaceHomepage() {
       })
       .finally(() => setLoadingMore(false));
   }, [buildPagePath, filterQuery, hasMore, items, loadingMore, page]);
-
-  // TASK-4413: client-side price filter over the fetched grid, mirroring SearchPage.tsx's
-  // minPrice/maxPrice behavior. Applying a price filter does not touch `category` state, so
-  // the active category tab selection is preserved.
-  const minPrice = useMemo(() => {
-    const n = Number(minPriceInput);
-    return minPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
-  }, [minPriceInput]);
-  const maxPrice = useMemo(() => {
-    const n = Number(maxPriceInput);
-    return maxPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
-  }, [maxPriceInput]);
 
   const visibleItems = useMemo(() => {
     if (minPrice == null && maxPrice == null) return items;

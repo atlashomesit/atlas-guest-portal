@@ -436,6 +436,8 @@ type ListingReviewRow = {
     ratingValue?: number | null;
     ratingCheckin?: number | null;
     ratingCommunication?: number | null;
+    ratingAccuracy?: number | null;
+    ratingLocation?: number | null;
 };
 
 import {
@@ -1756,10 +1758,15 @@ useEffect(() => {
                 <div className="pp-submeta">
                   {ppHasApiReviews && ppCombinedReviewCount > 0 && (
                     <>
-                      <span className="pp-rating" data-testid="property-header-rating">
+                      <a
+                        href="#reviews"
+                        className="pp-rating"
+                        data-testid="property-header-rating"
+                        style={{ textDecoration: 'none', color: 'inherit' }}
+                      >
                         ★ {ppCombinedAverageRating.toFixed(1)}{' '}
                         <em>({ppCombinedReviewCount} {ppCombinedReviewCount === 1 ? 'review' : 'reviews'})</em>
-                      </span>
+                      </a>
                       <span className="pp-submeta-sep" aria-hidden="true">·</span>
                     </>
                   )}
@@ -2360,7 +2367,7 @@ useEffect(() => {
                         </div>
                       </div>
 
-                      {api.reviews.length > 0 ? (
+                      {ppMergedReviews.length > 0 ? (
                         <>
                           {/* TASK-4404: review summary (sentiment + top keywords) — same id source as the reviews fetch */}
                           <Suspense fallback={null}>
@@ -2463,6 +2470,10 @@ useEffect(() => {
                                 {(() => {
                                   const chips: { label: string; v: number }[] = [];
                                   if (r.ratingCleanliness != null && r.ratingCleanliness >= 1) chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
+                                  if (r.ratingAccuracy != null && r.ratingAccuracy >= 1) chips.push({ label: 'Accuracy', v: r.ratingAccuracy });
+                                  if (r.ratingCheckin != null && r.ratingCheckin >= 1) chips.push({ label: 'Check-in', v: r.ratingCheckin });
+                                  if (r.ratingCommunication != null && r.ratingCommunication >= 1) chips.push({ label: 'Communication', v: r.ratingCommunication });
+                                  if (r.ratingLocation != null && r.ratingLocation >= 1) chips.push({ label: 'Location', v: r.ratingLocation });
                                   if (r.ratingValue != null && r.ratingValue >= 1) chips.push({ label: 'Value', v: r.ratingValue });
                                   if (chips.length === 0) return null;
                                   return (
@@ -2496,7 +2507,12 @@ useEffect(() => {
                                 </div>
                                 {r.hostResponse && (
                                   <div className="pp-review-host-resp" style={{ marginTop: 10 }}>
-                                    <div className="pp-review-host-resp-label">Host response</div>
+                                    <div className="pp-review-host-resp-label" data-testid="review-host-response-label">
+                                      Host response
+                                      {r.hostResponseAt && !Number.isNaN(new Date(r.hostResponseAt).getTime())
+                                        ? ` · ${new Date(r.hostResponseAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`
+                                        : ''}
+                                    </div>
                                     <p>{r.hostResponse}</p>
                                   </div>
                                 )}

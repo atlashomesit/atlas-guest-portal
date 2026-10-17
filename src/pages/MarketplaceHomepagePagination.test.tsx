@@ -225,4 +225,18 @@ describe('TASK-101875 stale Show-more response is discarded on filter change', (
     expect(screen.queryByText('Listing 1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('marketplace-load-more')).not.toBeInTheDocument();
   });
+
+  it('MKT-016: forwards minPrice and maxPrice to GET /marketplace/listings and resets paging to page 1', async () => {
+    renderPage();
+    await settle();
+
+    fireEvent.change(screen.getByPlaceholderText('Min'), { target: { value: '2500' } });
+    fireEvent.change(screen.getByPlaceholderText('Max'), { target: { value: '6000' } });
+    await settle();
+
+    const lastUrl = new URL(listingRequests[listingRequests.length - 1]);
+    expect(lastUrl.searchParams.get('minPrice')).toBe('2500');
+    expect(lastUrl.searchParams.get('maxPrice')).toBe('6000');
+    expect(lastUrl.searchParams.get('page')).toBe('1');
+  });
 });

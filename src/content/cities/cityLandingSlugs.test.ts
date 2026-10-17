@@ -11,12 +11,13 @@ import {
   type CityLandingSlug,
 } from "./cityLandingSlugs";
 
-describe("MKT-014: city landing slug registry", () => {
-  it("includes the four new cities added by MKT-014 (bengaluru, gurugram, nashik, guwahati)", () => {
+describe("MKT-014 / MKT-017: city landing slug registry", () => {
+  it("includes the new cities added by MKT-014 and MKT-017 (bengaluru, gurugram, nashik, guwahati, jalandhar)", () => {
     expect(CITY_LANDING_SLUGS).toContain("bengaluru");
     expect(CITY_LANDING_SLUGS).toContain("gurugram");
     expect(CITY_LANDING_SLUGS).toContain("nashik");
     expect(CITY_LANDING_SLUGS).toContain("guwahati");
+    expect(CITY_LANDING_SLUGS).toContain("jalandhar");
   });
 
   it("still includes the original four cities", () => {

@@ -1336,7 +1336,7 @@ export default function BookingConfirmationPage() {
 
         {/* TASK-4333: guest-facing messages thread — read + reply to host */}
         {bookingId && token && (
-          <GuestMessageThread bookingId={Number(bookingId)} token={token} issueCategory={searchParams.get('issue')} issueRequestKey={location.key} />
+          <GuestMessageThread bookingId={Number(bookingId)} token={token} issueCategory={searchParams.get('issue')} issueRequestKey={location.key} hostPhone={hostPhone} />
         )}
 
         {/* TASK-4415: guest self-serve FAQ — same as listing detail page */}

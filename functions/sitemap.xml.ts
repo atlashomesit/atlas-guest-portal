@@ -15,6 +15,7 @@ import bengaluruCityContent from "../src/content/cities/bengaluru.json";
 import gurugramCityContent from "../src/content/cities/gurugram.json";
 import nashikCityContent from "../src/content/cities/nashik.json";
 import guwahatiCityContent from "../src/content/cities/guwahati.json";
+import jalandharCityContent from "../src/content/cities/jalandhar.json";
 
 interface Env {
   ATLAS_API_BASE_URL?: string;
@@ -24,9 +25,10 @@ interface Env {
 }
 
 // TASK-4414: city landing pages for SEO acquisition (Atlas marketplace surfaces only — TASK-7194).
-// MKT-014: added bengaluru, gurugram, nashik, guwahati — see the matching CityLandingPage.tsx
-// registration in src/App.tsx and the per-city JSON content under src/content/cities/. A
-// sitemap drop and a city-page render both pull from these same JSONs, so they cannot disagree.
+// MKT-014 / MKT-017: added bengaluru, gurugram, nashik, guwahati, jalandhar — see the matching
+// CityLandingPage.tsx registration in src/App.tsx and the per-city JSON content under
+// src/content/cities/. A sitemap drop and a city-page render both pull from these same JSONs, so
+// they cannot disagree.
 const CITY_LANDING_SLUGS = [
   "goa",
   "coorg",
@@ -36,6 +38,7 @@ const CITY_LANDING_SLUGS = [
   "gurugram",
   "nashik",
   "guwahati",
+  "jalandhar",
 ] as const;
 
 /**
@@ -57,6 +60,7 @@ const CITY_LANDING_KEYWORDS: Record<(typeof CITY_LANDING_SLUGS)[number], string[
   gurugram: gurugramCityContent.listingKeywords,
   nashik: nashikCityContent.listingKeywords,
   guwahati: guwahatiCityContent.listingKeywords,
+  jalandhar: jalandharCityContent.listingKeywords,
 };
 
 const ATLAS_CITY_PATHS = CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`);
