@@ -1,0 +1,12 @@
+.about-page { max-width: 1600px; margin-inline: auto; padding-top: 32px; }
+.about-intro p { max-width: 65ch; }
+.about-page > section[id] { scroll-margin-top: 110px; }
+.about-topic-links { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }
+.about-topic-links a { display: inline-flex; align-items: center; min-height: 44px; padding: 6px 12px; border: 1px solid currentColor; border-radius: 22px; font-size: 14px; text-decoration: none; }
+.about-topic-links a:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+@media (max-width: 640px) {
+  .about-page { padding-top: 24px; }
+  .about-intro { padding: 24px; gap: 24px; }
+  .about-intro p { font-size: 16px; line-height: 1.6; }
+  .about-intro h1 { font-size: 30px; line-height: 1.2; }
+}

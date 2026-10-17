@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import "./Terms.css";
 import LegalLayout from "../components/legal/LegalLayout";
 import SectionNav from "../components/legal/SectionNav";
 import SEO from "../components/SEO";
@@ -22,6 +23,14 @@ const Terms = () => {
   );
 
   const [open, setOpen] = useState<Set<string>>(new Set(termsSections.map((section) => section.id)));
+  const [desktopTopics, setDesktopTopics] = useState(() => window.matchMedia("(min-width:1024px)").matches);
+  const [topicsOpen, setTopicsOpen] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width:1024px)");
+    const update = () => { setDesktopTopics(media.matches); setTopicsOpen(false); };
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   const sectionNav = useMemo(
     () => localizedSections.map((section) => ({ id: section.id, label: section.title })),
@@ -47,6 +56,7 @@ const Terms = () => {
   return (
     <LegalLayout
       current="terms"
+      className="terms-page"
       title="Terms of Service"
       description="The definitive legal contract governing bookings, payments, conduct, and liabilities."
       lastUpdated={termsMetadata.lastUpdated}
@@ -58,7 +68,19 @@ const Terms = () => {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-        <SectionNav sections={sectionNav} />
+        <details className="terms-topics" open={desktopTopics || topicsOpen}
+          onToggle={(event) => { if (!desktopTopics) setTopicsOpen(event.currentTarget.open); }}
+          onClick={(event) => {
+            if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+            const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#"]');
+            const target = anchor && document.getElementById(anchor.hash.slice(1));
+            if (!target) return;
+            if (!desktopTopics) setTopicsOpen(false);
+            requestAnimationFrame(() => { target.focus({ preventScroll: true }); target.scrollIntoView({ block: "start" }); });
+          }}>
+          <summary hidden={desktopTopics}>Terms topics ({sectionNav.length})</summary>
+          <SectionNav sections={sectionNav} />
+        </details>
 
         <div className="space-y-6">
           <div className="flex flex-wrap gap-3 items-center">
@@ -90,6 +112,7 @@ const Terms = () => {
               <article
                 key={section.id}
                 id={section.id}
+                tabIndex={-1}
                 className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1"
               >
                 <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
