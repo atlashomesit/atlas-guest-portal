@@ -88,11 +88,83 @@ function receiptClassName(state: ReceiptState): string {
  * TASK-10088: polite live-region announcement for a newly polled host reply; never auto-focus
  * and never pull a composing / manually-scrolled guest to the bottom.
  */
+const MAX_ATTACHED_PHOTOS = 3;
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(new Error("Failed to read image file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function compressPhotoForMessage(file: File): Promise<string> {
+  const rawDataUrl = await readFileAsDataUrl(file);
+  if (
+    !rawDataUrl ||
+    typeof document === "undefined" ||
+    typeof Image === "undefined" ||
+    (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent))
+  ) {
+    return rawDataUrl;
+  }
+  return new Promise<string>((resolve) => {
+    const timeout = window.setTimeout(() => resolve(rawDataUrl), 300);
+    try {
+      const img = new Image();
+      img.onload = () => {
+        window.clearTimeout(timeout);
+        try {
+          const maxDim = 1024;
+          let { width, height } = img;
+          if (!width || !height) {
+            resolve(rawDataUrl);
+            return;
+          }
+          if (width > maxDim || height > maxDim) {
+            if (width >= height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(rawDataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          const webp = canvas.toDataURL("image/webp", 0.78);
+          resolve(webp && webp.startsWith("data:image/") ? webp : rawDataUrl);
+        } catch {
+          resolve(rawDataUrl);
+        }
+      };
+      img.onerror = () => {
+        window.clearTimeout(timeout);
+        resolve(rawDataUrl);
+      };
+      img.src = rawDataUrl;
+    } catch {
+      window.clearTimeout(timeout);
+      resolve(rawDataUrl);
+    }
+  });
+}
+
 interface GuestMessageThreadProps {
   bookingId: number;
   token: string;
   issueCategory?: string | null;
   issueRequestKey?: string;
+  /** GUEST-017: optional host phone number for urgent call fallback. */
+  hostPhone?: string | null;
 }
 
 export default function GuestMessageThread(props: GuestMessageThreadProps) {
@@ -101,12 +173,14 @@ export default function GuestMessageThread(props: GuestMessageThreadProps) {
   return <BookingMessageThread key={`${props.bookingId}:${props.token}`} {...props} />;
 }
 
-function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey }: GuestMessageThreadProps) {
+function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey, hostPhone }: GuestMessageThreadProps) {
   const [messages, setMessages] = useState<GuestConversationMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [category, setCategory] = useState(() => parseStayIssueCategory(issueCategory));
+  const [pendingPhotos, setPendingPhotos] = useState<string[]>([]);
+  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
@@ -119,6 +193,7 @@ function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey
   const threadEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const initialLoadCompleteRef = useRef(false);
   const seenHostMessageIdsRef = useRef<Set<number>>(new Set());
   const isComposingRef = useRef(false);
@@ -128,6 +203,7 @@ function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey
   const selectedIssue = parseStayIssueCategory(issueCategory);
   const prefix = stayIssuePrefix(category);
   const messageTooLong = prefix.length + draft.trim().length > MAX_MESSAGE_LENGTH;
+  const hostPhoneDigits = (hostPhone ?? "").replace(/[^\d+]/g, "");
 
   useEffect(() => {
     if (!selectedIssue || loading) return;
@@ -251,19 +327,58 @@ function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey
     void sendGuestTypingHeartbeat(bookingId, token).catch(() => {});
   };
 
+  const handlePhotoSelect = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setSendError(null);
+    const remainingSlots = MAX_ATTACHED_PHOTOS - pendingPhotos.length;
+    if (remainingSlots <= 0) {
+      setSendError(`You can attach up to ${MAX_ATTACHED_PHOTOS} photos per message.`);
+      return;
+    }
+    const selected = Array.from(files)
+      .filter((f) => f.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic)$/i.test(f.name))
+      .slice(0, remainingSlots);
+    if (selected.length === 0) {
+      setSendError("Please choose an image file (JPG, PNG, or WebP).");
+      return;
+    }
+    try {
+      const encoded = await Promise.all(selected.map((f) => compressPhotoForMessage(f)));
+      const valid = encoded.filter((u) => u.length > 0);
+      setPendingPhotos((prev) => [...prev, ...valid].slice(0, MAX_ATTACHED_PHOTOS));
+    } catch {
+      setSendError("Couldn't attach photo. Please try another image.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemovePendingPhoto = (idx: number) => {
+    setPendingPhotos((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   const handleSend = async () => {
     const trimmed = draft.trim();
-    if (!trimmed || sendingRef.current || prefix.length + trimmed.length > MAX_MESSAGE_LENGTH) return;
+    const hasPhotos = pendingPhotos.length > 0;
+    if ((!trimmed && !hasPhotos) || sendingRef.current || prefix.length + trimmed.length > MAX_MESSAGE_LENGTH) return;
     sendingRef.current = true;
     setSending(true);
     setSendError(null);
     try {
-      const sent = await sendGuestMessage(bookingId, token, `${prefix}${trimmed}`);
+      const bodyToSend = trimmed ? `${prefix}${trimmed}` : `${prefix}📷 Photo attachment`;
+      const sent = hasPhotos
+        ? await sendGuestMessage(bookingId, token, bodyToSend, pendingPhotos)
+        : await sendGuestMessage(bookingId, token, bodyToSend);
+      const sentWithPhotos: GuestConversationMessage =
+        hasPhotos && (!sent.photos || sent.photos.length === 0)
+          ? { ...sent, photos: pendingPhotos }
+          : sent;
       pendingGuestSendRef.current = true;
       stickToBottomRef.current = true;
-      setMessages((prev) => [...prev, sent]);
+      setMessages((prev) => [...prev, sentWithPhotos]);
       setDraft("");
       setCategory('');
+      setPendingPhotos([]);
     } catch (err) {
       console.error("Failed to send guest message:", err);
       setSendError("Couldn't send your message. Please try again.");
@@ -285,31 +400,47 @@ function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey
       >
         {liveAnnouncement}
       </div>
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold text-text-primary">Messages</h2>
-        {hasUnreadMessages && (
-          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full" data-testid="messages-unread-badge">
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-            New reply
-          </span>
-        )}
-        {hostTyping && (
-          <span
-            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 text-text-secondary"
-            data-testid="host-typing-indicator"
-            role="status"
-            aria-label="Host is typing"
-          >
-            <span className="flex gap-0.5" aria-hidden="true">
-              <span className="w-1 h-1 bg-current rounded-full animate-bounce" />
-              <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-text-primary">Messages</h2>
+          {hasUnreadMessages && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full" data-testid="messages-unread-badge">
+              <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+              New reply
             </span>
-            Host typing…
-          </span>
+          )}
+          {hostTyping && (
+            <span
+              className="inline-flex items-center gap-1 text-xs px-2 py-0.5 text-text-secondary"
+              data-testid="host-typing-indicator"
+              role="status"
+              aria-label="Host is typing"
+            >
+              <span className="flex gap-0.5" aria-hidden="true">
+                <span className="w-1 h-1 bg-current rounded-full animate-bounce" />
+                <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </span>
+              Host typing…
+            </span>
+          )}
+        </div>
+        {hostPhoneDigits && (
+          <a
+            href={`tel:${hostPhoneDigits}`}
+            className="inline-flex items-center gap-1 text-xs font-medium text-brand-primary hover:underline"
+            data-testid="guest-message-urgent-call"
+          >
+            📞 Urgent? Call host
+          </a>
         )}
       </div>
-      <p className="text-sm text-text-secondary">Ask your host a question or read past replies.</p>
+      <div className="space-y-0.5">
+        <p className="text-sm text-text-secondary">Ask your host a question or read past replies.</p>
+        <p className="text-xs text-text-muted" data-testid="guest-message-reply-guidance">
+          Typical host reply time: under 1 hour during daytime
+        </p>
+      </div>
 
       {loading ? (
         <p className="text-sm text-text-secondary" data-testid="guest-messages-loading">Loading messages…</p>
@@ -342,6 +473,26 @@ function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                  {m.photos && m.photos.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5" data-testid="guest-message-photos">
+                      {m.photos.map((photoUrl, pIdx) => (
+                        <button
+                          key={`${m.id}-photo-${pIdx}`}
+                          type="button"
+                          onClick={() => setLightboxPhoto(photoUrl)}
+                          className="overflow-hidden rounded-lg border border-white/25 focus:outline-none focus:ring-2 focus:ring-white"
+                          aria-label={`View attached photo ${pIdx + 1}`}
+                          data-testid="guest-message-photo-thumb"
+                        >
+                          <img
+                            src={photoUrl}
+                            alt={`Attached photo ${pIdx + 1}`}
+                            className="h-16 w-16 object-cover block"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <p className={`mt-1 text-[11px] ${isGuest ? "text-white/75" : "text-text-secondary"}`}>
                     {isGuest ? "You" : "Host"} · {formatTime(m.sentAtUtc)}
                     {isGuest && (
@@ -381,6 +532,30 @@ function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey
         </select>
         {category && <p className="text-xs text-text-secondary">Your message will start with {prefix.trim()}. It is sent when you choose Send.</p>}
       </div>
+
+      {pendingPhotos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" data-testid="guest-message-photo-preview">
+          {pendingPhotos.map((photoUrl, idx) => (
+            <div key={`pending-photo-${idx}`} className="relative inline-block">
+              <img
+                src={photoUrl}
+                alt={`Selected photo ${idx + 1}`}
+                className="h-14 w-14 rounded-lg object-cover border border-border-subtle"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemovePendingPhoto(idx)}
+                aria-label={`Remove photo ${idx + 1}`}
+                data-testid={`guest-message-photo-remove-${idx}`}
+                className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-white text-xs leading-none"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row gap-2">
         <textarea
           ref={textareaRef}
@@ -407,20 +582,71 @@ function BookingMessageThread({ bookingId, token, issueCategory, issueRequestKey
           className="min-w-0 flex-1 rounded-lg border border-border-subtle px-3 py-2 text-sm resize-none"
           data-testid="guest-message-input"
         />
-        <button
-          type="button"
-          disabled={sending || !draft.trim() || messageTooLong}
-          onClick={() => void handleSend()}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2 hover:bg-brand-primary/90 transition-colors disabled:opacity-50 sm:self-end"
-          data-testid="guest-message-send"
-        >
-          {sending ? "Sending…" : "Send"}
-        </button>
+        <div className="flex items-center gap-2 sm:self-end">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            disabled={sending || pendingPhotos.length >= MAX_ATTACHED_PHOTOS}
+            onChange={(e) => void handlePhotoSelect(e.target.files)}
+            data-testid="guest-message-photo-input"
+          />
+          <button
+            type="button"
+            disabled={sending || pendingPhotos.length >= MAX_ATTACHED_PHOTOS}
+            onClick={() => fileInputRef.current?.click()}
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border-subtle bg-bg-surface text-text-primary text-sm font-medium px-3 py-2 hover:bg-bg-muted transition-colors disabled:opacity-50"
+            aria-label="Attach photo"
+            title={`Attach photo (up to ${MAX_ATTACHED_PHOTOS})`}
+            data-testid="guest-message-attach-photo"
+          >
+            📷 Photo{pendingPhotos.length > 0 ? ` (${pendingPhotos.length}/${MAX_ATTACHED_PHOTOS})` : ""}
+          </button>
+          <button
+            type="button"
+            disabled={sending || (!draft.trim() && pendingPhotos.length === 0) || messageTooLong}
+            onClick={() => void handleSend()}
+            className="inline-flex min-h-11 flex-1 sm:flex-initial items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-2 hover:bg-brand-primary/90 transition-colors disabled:opacity-50"
+            data-testid="guest-message-send"
+          >
+            {sending ? "Sending…" : "Send"}
+          </button>
+        </div>
       </div>
       <p id="guest-message-length" className={`text-xs ${messageTooLong ? 'text-red-600' : 'text-text-muted'}`} role={messageTooLong ? 'alert' : undefined}>
         {messageTooLong ? 'Shorten your message to send. ' : ''}{prefix.length + draft.length}/{MAX_MESSAGE_LENGTH} characters including category. Shift+Enter adds a new line.
       </p>
       </div>
+
+      {lightboxPhoto && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Attached photo preview"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxPhoto(null)}
+          data-testid="guest-message-photo-lightbox"
+        >
+          <div className="relative max-h-[90vh] max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightboxPhoto}
+              alt="Full size attachment"
+              className="max-h-[85vh] max-w-[90vw] rounded-xl object-contain"
+            />
+            <button
+              type="button"
+              onClick={() => setLightboxPhoto(null)}
+              aria-label="Close photo preview"
+              data-testid="guest-message-photo-lightbox-close"
+              className="absolute -top-3 -right-3 flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-900 font-bold shadow"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

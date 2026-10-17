@@ -428,6 +428,8 @@ type ListingReviewRow = {
     ratingValue?: number | null;
     ratingCheckin?: number | null;
     ratingCommunication?: number | null;
+    ratingAccuracy?: number | null;
+    ratingLocation?: number | null;
 };
 
 import {
@@ -2502,6 +2504,10 @@ useEffect(() => {
                                 {(() => {
                                   const chips: { label: string; v: number }[] = [];
                                   if (r.ratingCleanliness != null && r.ratingCleanliness >= 1) chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
+                                  if (r.ratingAccuracy != null && r.ratingAccuracy >= 1) chips.push({ label: 'Accuracy', v: r.ratingAccuracy });
+                                  if (r.ratingCheckin != null && r.ratingCheckin >= 1) chips.push({ label: 'Check-in', v: r.ratingCheckin });
+                                  if (r.ratingCommunication != null && r.ratingCommunication >= 1) chips.push({ label: 'Communication', v: r.ratingCommunication });
+                                  if (r.ratingLocation != null && r.ratingLocation >= 1) chips.push({ label: 'Location', v: r.ratingLocation });
                                   if (r.ratingValue != null && r.ratingValue >= 1) chips.push({ label: 'Value', v: r.ratingValue });
                                   if (chips.length === 0) return null;
                                   return (
@@ -2535,7 +2541,12 @@ useEffect(() => {
                                 </div>
                                 {r.hostResponse && (
                                   <div className="pp-review-host-resp" style={{ marginTop: 10 }}>
-                                    <div className="pp-review-host-resp-label">Host response</div>
+                                    <div className="pp-review-host-resp-label" data-testid="review-host-response-label">
+                                      Host response
+                                      {r.hostResponseAt && !Number.isNaN(new Date(r.hostResponseAt).getTime())
+                                        ? ` · ${new Date(r.hostResponseAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`
+                                        : ''}
+                                    </div>
                                     <p>{r.hostResponse}</p>
                                   </div>
                                 )}
@@ -2761,8 +2772,8 @@ useEffect(() => {
                         // resolving) so that with listingId undefined it fail-closes with the
                         // availability error + retry UI instead of an all-available calendar.
                         lookupFailed={!resolvedListingId && !isListingLookupPending && listingLookupError != null}
-                        reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
-                        reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
+                        reviewRating={ppHasApiReviews && ppCombinedReviewCount > 0 ? ppCombinedAverageRating : undefined}
+                        reviewCount={ppHasApiReviews && ppCombinedReviewCount > 0 ? ppCombinedReviewCount : undefined}
                         minStayNights={
                           data.minStay != null && Number.isFinite(data.minStay) && data.minStay > 0
                             ? data.minStay

@@ -2140,8 +2140,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
                       {plan.name}
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
-                      <span>{plan.mealPlanLabel}</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
+                      <span data-testid={`rate-plan-meal-badge-${plan.id}`}>
+                        {plan.mealPlanCode && ['BB', 'CP'].includes(plan.mealPlanCode.toUpperCase())
+                          ? `☕ ${plan.mealPlanLabel}`
+                          : plan.mealPlanCode && ['MAP', 'HB', 'AP', 'FB', 'AI'].includes(plan.mealPlanCode.toUpperCase())
+                            ? `🍽️ ${plan.mealPlanLabel}`
+                            : plan.mealPlanLabel}
+                      </span>
                       <span>·</span>
                       <span>{plan.cancellationSummary}</span>
                     </div>

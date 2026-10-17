@@ -21,6 +21,7 @@ import bengaluruContent from "@/content/cities/bengaluru.json";
 import gurugramContent from "@/content/cities/gurugram.json";
 import nashikContent from "@/content/cities/nashik.json";
 import guwahatiContent from "@/content/cities/guwahati.json";
+import jalandharContent from "@/content/cities/jalandhar.json";
 import { type CityLandingSlug } from "@/content/cities/cityLandingSlugs";
 
 export type CityLandingPageProps = {
@@ -49,12 +50,13 @@ const CITY_CONTENT: Record<CityLandingSlug, CityLandingJson> = {
   coorg: coorgContent as CityLandingJson,
   hyderabad: hyderabadContent as CityLandingJson,
   manali: manaliContent as CityLandingJson,
-  // MKT-014: city guides for live marketplace supply. Content follows the existing shape and
+  // MKT-014 / MKT-017: city guides for live marketplace supply. Content follows the existing shape and
   // keywords match the stored city values — see each JSON file's `listingKeywords`.
   bengaluru: bengaluruContent as CityLandingJson,
   gurugram: gurugramContent as CityLandingJson,
   nashik: nashikContent as CityLandingJson,
   guwahati: guwahatiContent as CityLandingJson,
+  jalandhar: jalandharContent as CityLandingJson,
 };
 
 function toListingCardModel(listing: PublicListing) {

@@ -14,6 +14,7 @@ export const CITY_LANDING_SLUGS = [
   "gurugram",
   "nashik",
   "guwahati",
+  "jalandhar",
 ] as const;
 
 export type CityLandingSlug = (typeof CITY_LANDING_SLUGS)[number];
