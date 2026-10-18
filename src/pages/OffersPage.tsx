@@ -250,16 +250,19 @@ export default function OffersPage() {
         {/* Promo code checker */}
         <div className="rounded-2xl bg-bg-surface border border-border-subtle shadow-level1 p-6 space-y-4">
           <h2 className="font-bold text-text-primary text-xl">Have a Promo Code?</h2>
-          <p className="text-text-muted text-sm">Enter your code below to check its validity before booking.</p>
+          <p id="promo-code-help" className="text-text-muted text-sm">Enter your code below to check its validity before booking.</p>
+          <label htmlFor="guest-promo-code" className="block text-sm font-semibold" style={{ marginBottom: 8 }}>Promo code</label>
           <form onSubmit={handleValidate} className="flex gap-2">
             <input
               ref={inputRef}
+              id="guest-promo-code"
               type="text"
               value={promoCode}
               onChange={(e) => setPromoCode(normalizePromoCodeInput(e.target.value))}
               placeholder="e.g. SUMMER25"
               className="flex-1 rounded-xl border border-border-subtle bg-white px-4 py-2.5 text-sm font-mono uppercase tracking-widest text-text-primary placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-brand-primary"
               aria-label="Promo code"
+              aria-describedby="promo-code-help"
               maxLength={32}
             />
             <button

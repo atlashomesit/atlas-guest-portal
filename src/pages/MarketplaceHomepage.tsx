@@ -88,18 +88,33 @@ export function formatVerifiedStaysLabel(count?: number | null): string | null {
   return count === 1 ? '1 verified stay' : `${count} verified stays`;
 }
 
-// MKT-012: external review count labelled by its real dominant source, e.g. "54 reviews on Airbnb".
-// Says "Google" only when the source is Google. When sourceUrl is null or empty, omits the count
-// rather than assert an unverifiable trust claim.
+// MKT-012 / MKT-015: external review count labelled by its real dominant source, e.g. "54 reviews on Airbnb".
+// Says "Google" only when the source is Google. Normalizes raw sync source codes (e.g. "AtlasSyncBookingCom" -> "Booking.com")
+// and still renders the provenance label as plain text when sourceUrl is null/empty.
+export function normalizeExternalReviewSourceName(source?: string | null): string {
+  const raw = source?.trim() || 'Google';
+  const lower = raw.toLowerCase();
+  if (
+    lower === 'atlassyncbookingcom' ||
+    lower === 'booking_com' ||
+    lower === 'booking.com' ||
+    lower === 'bookingcom'
+  ) {
+    return 'Booking.com';
+  }
+  if (lower === 'airbnb') return 'Airbnb';
+  if (lower === 'google') return 'Google';
+  return raw;
+}
+
 export function formatExternalReviewsLabel(
   count?: number | null,
   source?: string | null,
-  sourceUrl?: string | null,
+  _sourceUrl?: string | null,
 ): string | null {
   if (count == null || count <= 0) return null;
-  if (sourceUrl === null || sourceUrl === '') return null;
 
-  const normalizedSource = source?.trim() || 'Google';
+  const normalizedSource = normalizeExternalReviewSourceName(source);
   if (normalizedSource.toLowerCase() === 'google') {
     return count === 1 ? '1 Google review' : `${count} Google reviews`;
   }
@@ -160,11 +175,20 @@ export default function MarketplaceHomepage() {
     }
     return p.toString();
   }, [searchParams]);
-  // TASK-4413: price-range control — client-side filter over the fetched grid, mirroring
-  // SearchPage.tsx's minPrice/maxPrice pattern. Local state (not URL) — the marketplace
-  // grid fetch already covers date/guest/category/city; price narrows the same result set.
+  // TASK-4413 / MKT-016: price-range control — forwarded as minPrice/maxPrice query params to
+  // GET /marketplace/listings so server-side filtering and pagination work across all pages,
+  // while keeping the client-side filter as a safety net.
   const [minPriceInput, setMinPriceInput] = useState('');
   const [maxPriceInput, setMaxPriceInput] = useState('');
+
+  const minPrice = useMemo(() => {
+    const n = Number(minPriceInput);
+    return minPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
+  }, [minPriceInput]);
+  const maxPrice = useMemo(() => {
+    const n = Number(maxPriceInput);
+    return maxPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
+  }, [maxPriceInput]);
 
   // TASK-101491: the FILTER half of the query only - deliberately excludes page/pageSize so that
   // changing a filter produces a new key (resetting paging) while paging does not re-trigger the
@@ -182,8 +206,10 @@ export default function MarketplaceHomepage() {
     if (checkOut) p.set('checkOut', checkOut);
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
+    if (minPrice != null) p.set('minPrice', String(minPrice));
+    if (maxPrice != null) p.set('maxPrice', String(maxPrice));
     return p.toString();
-  }, [category, query, searchParams]);
+  }, [category, query, searchParams, minPrice, maxPrice]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -273,18 +299,6 @@ export default function MarketplaceHomepage() {
       })
       .finally(() => setLoadingMore(false));
   }, [buildPagePath, filterQuery, hasMore, items, loadingMore, page]);
-
-  // TASK-4413: client-side price filter over the fetched grid, mirroring SearchPage.tsx's
-  // minPrice/maxPrice behavior. Applying a price filter does not touch `category` state, so
-  // the active category tab selection is preserved.
-  const minPrice = useMemo(() => {
-    const n = Number(minPriceInput);
-    return minPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
-  }, [minPriceInput]);
-  const maxPrice = useMemo(() => {
-    const n = Number(maxPriceInput);
-    return maxPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
-  }, [maxPriceInput]);
 
   const visibleItems = useMemo(() => {
     if (minPrice == null && maxPrice == null) return items;
@@ -562,10 +576,10 @@ export default function MarketplaceHomepage() {
                     </p>
                   )}
 
-                  {/* TASK-10089 / MKT-012: review provenance — verified stays and external reviews are
+                  {/* TASK-10089 / MKT-012 / MKT-015: review provenance — verified stays and external reviews are
                       distinct labels from distinct counts. External-only cards (no
-                      verifiedStayCount) never claim a verified stay. MKT-012 names the dominant
-                      source and omits the count when sourceUrl is null. */}
+                      verifiedStayCount) never claim a verified stay. Renders as an outbound link
+                      when externalReviewSourceUrl is present, and as plain text when null/empty. */}
                   {(() => {
                     const verifiedLabel = formatVerifiedStaysLabel(item.verifiedStayCount);
                     const externalLabel = formatExternalReviewsLabel(
@@ -574,6 +588,8 @@ export default function MarketplaceHomepage() {
                       item.externalReviewSourceUrl,
                     );
                     if (!verifiedLabel && !externalLabel) return null;
+                    const trimmedSourceUrl = item.externalReviewSourceUrl?.trim() ?? '';
+                    const hasValidExternalUrl = /^https?:\/\//i.test(trimmedSourceUrl);
                     return (
                       <p className="text-xs text-text-muted" data-testid="marketplace-review-provenance">
                         {verifiedLabel && (
@@ -581,7 +597,20 @@ export default function MarketplaceHomepage() {
                         )}
                         {verifiedLabel && externalLabel && <span aria-hidden> · </span>}
                         {externalLabel && (
-                          <span data-testid="marketplace-external-reviews">{externalLabel}</span>
+                          hasValidExternalUrl ? (
+                            <a
+                              href={trimmedSourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="underline hover:text-text-primary"
+                              data-testid="marketplace-external-reviews"
+                            >
+                              {externalLabel}
+                            </a>
+                          ) : (
+                            <span data-testid="marketplace-external-reviews">{externalLabel}</span>
+                          )
                         )}
                       </p>
                     );

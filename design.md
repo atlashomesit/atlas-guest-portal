@@ -1,5 +1,13 @@
 # Guest portal design contract
 
+## Daily ten — 17 October 2026 implementation approval
+
+Sreekar said **“i approve”** while viewing the immutable [2026-10-17/r1 gallery](https://github.com/atlashomesit/atlas-ux-evidence/blob/df538417675db34dc2fb69bcecd6a1a95b2b1c74/docs/ux/daily-five/2026-10-17/r1/index.html). Binding approval: private evidence 2026-10-17/implemented-r1/APPROVAL.json. Prototype SHA256: e89d22a9a08658a0b94e4d6a8b4f832459cd5b2ee1659388259ae0e6695f7c97.
+
+UXD-2026-10-17-04-A/B, 08-A/B and 10-A: compact Terms introduction with responsive native topic disclosure/focus; About section shortcuts and bounded reading layout; persistent Offers promo label and help association.
+
+This supersedes only those disclosed presentation decisions. Existing colors, imagery, useful actions, permissions, financial/availability meanings and service handlers remain authoritative. Actual rendered fidelity, four viewport sizes and real 200% zoom require independent verification. Keep the PR DRAFT with hold-for-review and auto-merge off. Source/build checks do not authorize merge; Sreekar's separate final approval must identify actual evidence and exact heads.
+
 Established 2026-10-11 from the founder's guest date-selection review and existing theme contracts.
 
 ## Purpose and identity

@@ -5,10 +5,10 @@ exports[`AboutPage > matches the snapshot 1`] = `
   class="bg-bg-muted text-text-primary min-h-screen"
 >
   <div
-    class="px-4 md:px-10 lg:px-20 py-20 space-y-16"
+    class="about-page px-4 md:px-10 lg:px-20 py-20 space-y-16"
   >
     <section
-      class="bg-bg-surface border border-border-subtle shadow-level2 rounded-3xl p-8 md:p-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center"
+      class="about-intro bg-bg-surface border border-border-subtle shadow-level2 rounded-3xl p-8 md:p-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center"
       data-testid="mission-section"
     >
       <div
@@ -24,6 +24,26 @@ exports[`AboutPage > matches the snapshot 1`] = `
         >
           Where dependable stays meet human hospitality
         </h1>
+        <nav
+          aria-label="About page topics"
+          class="about-topic-links"
+        >
+          <a
+            href="#about-standards"
+          >
+            Standards
+          </a>
+          <a
+            href="#about-host"
+          >
+            Your host
+          </a>
+          <a
+            href="#about-promises"
+          >
+            Booking promises
+          </a>
+        </nav>
         <p
           class="text-lg text-text-muted max-w-2xl"
         >
@@ -110,6 +130,8 @@ exports[`AboutPage > matches the snapshot 1`] = `
     <section
       class="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] items-center"
       data-testid="hospitality-section"
+      id="about-standards"
+      tabindex="-1"
     >
       <div
         class="space-y-4"
@@ -261,6 +283,8 @@ exports[`AboutPage > matches the snapshot 1`] = `
     <section
       class="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1"
       data-testid="team-section"
+      id="about-host"
+      tabindex="-1"
     >
       <div
         class="flex items-start justify-between gap-4 flex-wrap"
@@ -299,6 +323,8 @@ exports[`AboutPage > matches the snapshot 1`] = `
     <section
       class="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1"
       data-testid="trust-section"
+      id="about-promises"
+      tabindex="-1"
     >
       <div
         class="flex items-start justify-between gap-4 flex-wrap"

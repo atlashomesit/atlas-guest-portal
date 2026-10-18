@@ -389,6 +389,16 @@ export const onRequest = async (context: {
           if (values.image) el.setAttribute("content", values.image);
           else el.remove();
         },
+      })
+      .on('meta[property="og:site_name"]', {
+        element(el: RewriterElement) {
+          el.setAttribute("content", values.title);
+        },
+      })
+      .on('meta[name="apple-mobile-web-app-title"]', {
+        element(el: RewriterElement) {
+          el.setAttribute("content", values.title);
+        },
       });
 
     return applyFrameProtection(context.request, rewriter.transform(framed));
