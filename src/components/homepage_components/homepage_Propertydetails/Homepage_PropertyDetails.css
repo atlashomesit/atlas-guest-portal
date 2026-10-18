@@ -1122,3 +1122,9 @@
   .pp-single-photo .pp-title-row { margin-bottom: 0; }
 }
 @media (max-width: 640px) { .pp-single-photo .pp-gallery { height: 240px; } }
+
+/* UXV-2026-10-18-04: focus the existing form below the phone header. */
+@media (max-width: 767px) {
+  .pp-root .lv-booking[tabindex="-1"] { scroll-margin-top: 96px; }
+  .pp-root .lv-booking[tabindex="-1"]:focus { outline: 2px solid var(--cta-primary, #c04528); outline-offset: 3px; }
+}
