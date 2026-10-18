@@ -1736,7 +1736,7 @@ const SearchPage = () => {
                   <div className="search-card__title-row">
                     <div className="min-w-0">
                       <h2 className="search-card__title">{unit.title}</h2>
-                      {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating > 0 && (
+                      {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating >= 4 && (
                         <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2 py-0.5 text-xs font-semibold text-yellow-800">
                           <span aria-hidden>★</span>
                           <span>{unit.rating.toFixed(1)}</span>
