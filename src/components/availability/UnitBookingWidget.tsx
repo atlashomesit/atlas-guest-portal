@@ -256,6 +256,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
+  // TASK-1039690: per-date minStayArrival overrides from GET /api/public/listings/{id}/availability-calendar
+  // when GapNightDirectMinStay is enabled for the tenant.
+  const [perDateMinStayMap, setPerDateMinStayMap] = useState<Map<string, number>>(new Map());
   // TASK-7491 (Rate Sync Authority opt-out): per-date `bookable` flag from GET
   // /api/pricing/availability-rates. `false` = fail-closed — no usable inbound rate for that
   // date (beyond the carry-forward cap, or none at all) — never render a price or allow
@@ -399,6 +402,20 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   ]);
 
   const minStayNights = resolvedMinStay;
+  const getEffectiveMinStayForDate = useCallback(
+    (checkInDate?: Date | null): number => {
+      if (checkInDate && !Number.isNaN(checkInDate.getTime())) {
+        const iso = toCalendarISO(startOfCalendarDay(checkInDate));
+        const override = perDateMinStayMap.get(iso);
+        if (override != null && Number.isFinite(override) && override >= 1) {
+          return override;
+        }
+      }
+      return minStayNights;
+    },
+    [perDateMinStayMap, minStayNights],
+  );
+  const effectiveMinStayNights = getEffectiveMinStayForDate(dateRange.startDate);
   const effectiveMaxGuests = maxGuests;
   /** RA-006: payment provider not configured for this tenant. */
   const [providerBlocked, setProviderBlocked] = useState(false);
@@ -582,11 +599,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       hydratedRangeRef.current = { start, end };
       return;
     }
-    // TASK-4556: enforce min-stay on URL-hydrated dates
+    // TASK-4556 / TASK-1039690: enforce min-stay (including per-date minStayArrival) on URL-hydrated dates
     const nights = calculateNights(start, end);
-    if (minStayNights > 1 && nights < minStayNights) {
+    const effectiveHydratedMinStay = getEffectiveMinStayForDate(start);
+    if (effectiveHydratedMinStay > 1 && nights < effectiveHydratedMinStay) {
       setDateRange({ startDate: start, endDate: end });
-      setDateError(`Minimum stay is ${minStayNights} nights.`);
+      setDateError(`Minimum stay is ${effectiveHydratedMinStay} nights.`);
       hasHydratedFromContextRef.current = true;
       hydratedRangeRef.current = { start, end };
       return;
@@ -605,7 +623,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
     hydratedRangeRef.current = { start, end };
-  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights]);
+  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights, getEffectiveMinStayForDate]);
 
   // TASK-4726 fix: re-validate a URL-hydrated range against interior-night overlaps once the
   // availability-calendar fetch (blockedSet/dateStatusMap) has actually loaded. The hydration
@@ -627,8 +645,17 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
     if (checkInteriorNightOverlap(hydrated.start, hydrated.end)) {
       setDateConflictError('These dates overlap an existing booking or hold.');
+      return;
     }
-  }, [blockedSet, dateStatusMap, dateRange.startDate, dateRange.endDate]);
+    // TASK-1039690: re-evaluate per-date minStayArrival once availability-calendar settles
+    const nights = calculateNights(hydrated.start, hydrated.end);
+    const effectiveHydratedMinStay = getEffectiveMinStayForDate(hydrated.start);
+    if (effectiveHydratedMinStay > 1 && nights < effectiveHydratedMinStay) {
+      setDateError(`Minimum stay is ${effectiveHydratedMinStay} nights.`);
+    } else if (dateError?.startsWith('Minimum stay is ')) {
+      setDateError(null);
+    }
+  }, [blockedSet, dateStatusMap, perDateMinStayMap, dateRange.startDate, dateRange.endDate, getEffectiveMinStayForDate, dateError, setDateError, setDateConflictError]);
 
   useEffect(() => {
     const g = booking.guests;
@@ -677,13 +704,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json() as unknown;
-        const entries = Array.isArray(data) ? (data as Array<{ date?: string; status?: string }>) : [];
+        const entries = Array.isArray(data)
+          ? (data as Array<{ date?: string; status?: string; minStayArrival?: number | null }>)
+          : [];
         
         if (!isActive) return;
         
         // Filter out past dates and process availability with status
         const newBlockedDates = new Set<string>();
         const newDateStatusMap = new Map<string, ListingCalendarDayStatus>();
+        const newPerDateMinStayMap = new Map<string, number>();
         
         entries.forEach((item) => {
           const dateStr = item?.date;
@@ -713,6 +743,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           // Store status for rendering
           newDateStatusMap.set(itemISO, status);
 
+          if (
+            typeof item?.minStayArrival === 'number' &&
+            Number.isFinite(item.minStayArrival) &&
+            item.minStayArrival >= 1
+          ) {
+            newPerDateMinStayMap.set(itemISO, Math.max(1, Math.floor(item.minStayArrival)));
+          }
+
           // Update blockedSet for backward compatibility with existing logic
           // Booked, Blocked and Hold dates should be in blockedSet (all are non-selectable). Turnover is bookable.
           const isBlocked =
@@ -726,6 +764,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         
         setBlockedSet(newBlockedDates);
         setDateStatusMap(newDateStatusMap);
+        setPerDateMinStayMap(newPerDateMinStayMap);
         // TASK-4830: a successful load means the maps are authoritative again — clear any
         // prior failure so Reserve is re-enabled (or correctly gated by real blocked dates).
         setAvailabilityFailed(false);
@@ -1173,8 +1212,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // differenceInCalendarDays, not an epoch-millis divide: on the calendar basis a guest whose
   // local zone crosses a DST boundary mid-stay has days that are 23h or 25h long.
   const selectedNights = differenceInCalendarDays(endCal, startCal);
-  if (minStayNights > 1 && selectedNights < minStayNights) {
-    setDateError(`Minimum stay is ${minStayNights} nights.`);
+  const effectiveRangeMinStay = getEffectiveMinStayForDate(startCal);
+  if (effectiveRangeMinStay > 1 && selectedNights < effectiveRangeMinStay) {
+    setDateError(`Minimum stay is ${effectiveRangeMinStay} nights.`);
     return;
   }
 
@@ -1638,9 +1678,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setDateError('Check-out must be after check-in.');
       return;
     }
-    // TASK-4556: enforce min-stay on handleReserve (like handleRangeChange does)
-    if (minStayNights > 1 && stayNights < minStayNights) {
-      setDateError(`Minimum stay is ${minStayNights} nights.`);
+    // TASK-4556 / TASK-1039690: enforce min-stay (including per-date minStayArrival) on handleReserve
+    const effectiveReserveMinStay = getEffectiveMinStayForDate(checkinIst);
+    if (effectiveReserveMinStay > 1 && stayNights < effectiveReserveMinStay) {
+      setDateError(`Minimum stay is ${effectiveReserveMinStay} nights.`);
       return;
     }
 
@@ -1989,13 +2030,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (2) + (3): Date range card + Guests card */}
       <div className="lv-booking-form">
-        {minStayNights > 1 && (
+        {effectiveMinStayNights > 1 && (
           <p
             className="inline-flex items-center rounded-full bg-[#ffe4d6] px-3 py-1.5 text-sm font-medium text-[#4a3535] border border-[#e5cfc0]"
             style={{ marginBottom: 8 }}
             data-testid="min-stay-badge"
           >
-            Minimum {minStayNights} night{minStayNights !== 1 ? 's' : ''}
+            Minimum {effectiveMinStayNights} night{effectiveMinStayNights !== 1 ? 's' : ''}
           </p>
         )}
         {/* v2 date card */}

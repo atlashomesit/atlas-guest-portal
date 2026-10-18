@@ -34,7 +34,13 @@ import {
   toRazorpayContactDigits,
 } from '@/utils/guestPhoneDial';
 import { getTenantContext } from '@/tenant/tenantContext';
-import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
+import {
+  hasOnlinePaymentRail,
+  isTenantNotTakingBookings,
+  isTenantTrialPayAtPropertyOnly,
+  NOT_TAKING_BOOKINGS_COPY,
+  TRIAL_PAY_AT_PROPERTY_COPY,
+} from '@/tenant/paymentRail';
 import { getGuestDataProcessingEntityName, getTenantBrandName } from '@/tenant/displayBrand';
 import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
@@ -908,6 +914,10 @@ const GuestDetailsPage: React.FC = () => {
     async (e: React.FormEvent) => {
       e.preventDefault();
       if (isSubmitting || holdExpired) return;
+      if (isTenantNotTakingBookings(getTenantContext())) {
+        setOrderError(NOT_TAKING_BOOKINGS_COPY);
+        return;
+      }
       if (!validateForm()) return;
       // TASK-8048: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
       if (!hasOnlinePaymentRail(getTenantContext())) {
@@ -1597,6 +1607,8 @@ const GuestDetailsPage: React.FC = () => {
   // TASK-8048: single choke-point — do not offer a Razorpay pay rail when no online provider is configured.
   // hasOnlinePaymentRail() mirrors GET /tenants/from-domain's bookingMode derivation (TENANT vs WHATSAPP).
   const hasOnlineRail = hasOnlinePaymentRail(tenantCtx);
+  const notTakingBookings = isTenantNotTakingBookings(tenantCtx);
+  const trialPayAtProperty = isTenantTrialPayAtPropertyOnly(tenantCtx);
   const whatsappHandoffUrl = (() => {
     const digits = (whatsappNumber || '').replace(/\D/g, '');
     const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
@@ -1610,7 +1622,7 @@ const GuestDetailsPage: React.FC = () => {
   const paymentFailureEmail = getContactEmail();
   const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment failed — need help')}`;
 
-  const payDisabled = isSubmitting || holdExpired || !consentAccepted;
+  const payDisabled = isSubmitting || holdExpired || !consentAccepted || notTakingBookings;
 
   return (
     <div className="gd-page">
@@ -2443,6 +2455,24 @@ const GuestDetailsPage: React.FC = () => {
                   TASK-8048 WhatsApp-handoff branch where there is no gateway to claim. */}
               <SecurityBadges />
             </>
+          ) : notTakingBookings ? (
+            <>
+              <div className="gd-banner" role="status" data-testid="guest-not-taking-bookings-notice">
+                <IconAlert size={16}/>
+                <div>
+                  <b>{NOT_TAKING_BOOKINGS_COPY}</b><br/>
+                  <span>Checkout is currently disabled for this property.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="gd-pay"
+                disabled
+                data-testid="guest-booking-disabled-cta"
+              >
+                Not taking bookings right now
+              </button>
+            </>
           ) : (
             <>
               <div className="gd-banner" role="status" data-testid="guest-booking-offline-notice">
@@ -2450,6 +2480,11 @@ const GuestDetailsPage: React.FC = () => {
                 <div>
                   <b>Online payment is not available for this property.</b><br/>
                   <span>Contact the host on WhatsApp to confirm your dates — your hold is reserved for {countdown}.</span>
+                  {trialPayAtProperty && (
+                    <div data-testid="guest-trial-pay-at-property-notice" style={{ marginTop: 4 }}>
+                      {TRIAL_PAY_AT_PROPERTY_COPY}
+                    </div>
+                  )}
                 </div>
               </div>
               <a
@@ -2497,6 +2532,15 @@ const GuestDetailsPage: React.FC = () => {
                 ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
                 : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
             }
+          </button>
+        ) : notTakingBookings ? (
+          <button
+            type="button"
+            className="gd-mobile-bar-cta"
+            disabled
+            data-testid="guest-booking-disabled-cta-mobile"
+          >
+            Not taking bookings right now
           </button>
         ) : (
           <a
