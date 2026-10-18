@@ -555,7 +555,7 @@ const PropertyDetails = () => {
     const { setProperty, updateBooking } = useBooking();
     const [searchParams] = useSearchParams();
     const tenantSlugFromUrl = searchParams.get('tenant')?.trim() || null;
-    const isMarketplaceHost = Boolean(_getTenantCtx()?.isMarketplaceRoot) || isMarketplaceMode() || isMarketplaceHostname();
+    const isMarketplaceHost = Boolean(_getTenantCtx()?.isMarketplaceRoot) || isMarketplaceMode() || isMarketplaceHostname() || Boolean(tenantSlugFromUrl);
     const isNonAtlasMarketplaceListing = Boolean(isMarketplaceHost && tenantSlugFromUrl && tenantSlugFromUrl.toLowerCase() !== 'atlas');
 
     const [listingTenantCtx, setListingTenantCtx] = useState<TenantInfo | null>(() => {
@@ -740,7 +740,7 @@ const PropertyDetails = () => {
 
         const loadListing = async () => {
             try {
-                const listing = await resolveListing(String(lookupId), controller.signal);
+                const listing = await resolveListing(String(lookupId), controller.signal, tenantSlugFromUrl);
                 if (!listing) {
                     setListingLookupError('Property not available.');
                     return;
@@ -1093,7 +1093,7 @@ const PropertyDetails = () => {
             }
             const controller = new AbortController();
             let cancelled = false;
-            resolveListing(String(listingIdParam), controller.signal)
+            resolveListing(String(listingIdParam), controller.signal, tenantSlugFromUrl)
                 .then(async (apiListing: ListingDetail | null) => {
                     if (cancelled || !apiListing) {
                         if (import.meta.env.DEV && !cancelled) {
