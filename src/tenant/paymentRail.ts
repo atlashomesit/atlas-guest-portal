@@ -28,6 +28,37 @@ import { paymentFeeCopy } from '@/utils/paymentFeeCopy';
 /** Providers that never produce an online gateway charge for the guest. */
 const OFFLINE_PROVIDERS = new Set(['MANUAL']);
 
+/** TASK-10298791: Canonical guest-facing message when a tenant is in the Blocked lifecycle stage. */
+export const NOT_TAKING_BOOKINGS_COPY = 'This property is not taking bookings right now.';
+
+/** TASK-10298790: Canonical guest-facing copy when a tenant is on Trial (pay at property only). */
+export const TRIAL_PAY_AT_PROPERTY_COPY =
+  'Pay at property only — online guest payments are disabled while this property is on a free trial.';
+
+/**
+ * TASK-10298790: True when the tenant is in the 7-day Trial stage (or onlinePaymentsEnabled === false),
+ * where online guest payments are hidden and bookings are pay-at-property only.
+ */
+export function isTenantTrialPayAtPropertyOnly(ctx: TenantInfo | null = getTenantContext()): boolean {
+  if (!ctx) return false;
+  if (ctx.onlinePaymentsEnabled === false) return true;
+  const stage = (ctx.lifecycleStage ?? '').trim();
+  return stage === 'Trial' || stage === 'TrialEndedNudge';
+}
+
+/**
+ * TASK-10298791: True when the tenant is in the Blocked lifecycle stage (day 15+ after trial or renewal lapse)
+ * and the public website must show "not taking bookings right now" with checkout disabled.
+ */
+export function isTenantNotTakingBookings(ctx: TenantInfo | null = getTenantContext()): boolean {
+  if (!ctx) return false;
+  if (ctx.notTakingBookings === true) return true;
+  if ((ctx.websiteStatus ?? '').trim().toLowerCase() === 'not_taking_bookings') return true;
+  if ((ctx.lifecycleStage ?? '').trim() === 'Blocked') return true;
+  if (ctx.bookingMode === 'BLOCKED_LIFECYCLE') return true;
+  return false;
+}
+
 /**
  * True when an online payment gateway will actually charge this guest — i.e. when it is honest to
  * quote a payment-processing fee, render the Razorpay pay rail, or credit Razorpay as the
@@ -36,6 +67,8 @@ const OFFLINE_PROVIDERS = new Set(['MANUAL']);
  */
 export function hasOnlinePaymentRail(ctx: TenantInfo | null = getTenantContext()): boolean {
   if (!ctx) return false;
+  // TASK-10298790 & TASK-10298791: Never offer online payment on Trial or when Blocked ("not taking bookings right now").
+  if (isTenantNotTakingBookings(ctx) || isTenantTrialPayAtPropertyOnly(ctx)) return false;
   // Authoritative when present — mirrors the server's own payment-routing resolution.
   if (ctx.bookingMode) return ctx.bookingMode === 'ONLINE';
   const provider = (ctx.paymentProvider ?? '').trim().toUpperCase();

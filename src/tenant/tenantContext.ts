@@ -53,9 +53,18 @@ export interface TenantInfo {
    *  - "ONLINE"   — Razorpay / UPI inline checkout
    *  - "MANUAL"   — pay-on-arrival; capture booking, skip payment
    *  - "WHATSAPP" — no provider configured; hand off to host's WhatsApp with prefilled booking details
+   *  - "BLOCKED_LIFECYCLE" — tenant is in Blocked lifecycle stage ("not taking bookings right now")
    *  - undefined  — no path to book (no provider, no phone) — show "Bookings opening soon"
    */
-  bookingMode?: 'ONLINE' | 'MANUAL' | 'WHATSAPP';
+  bookingMode?: 'ONLINE' | 'MANUAL' | 'WHATSAPP' | 'BLOCKED_LIFECYCLE';
+  /** TASK-10298790 & TASK-10298791: Canonical subscriber lifecycle stage (Trial, TrialEndedNudge, ActivePaid, Blocked, etc.). */
+  lifecycleStage?: string;
+  /** TASK-10298791: Public website status ("active" | "not_taking_bookings"). */
+  websiteStatus?: string;
+  /** TASK-10298790: False during 7-day Trial (pay at property only; online guest payments hidden). */
+  onlinePaymentsEnabled?: boolean;
+  /** TASK-10298791: True when the tenant is Blocked (day 15+) and the public website shows "not taking bookings right now". */
+  notTakingBookings?: boolean;
   /** Digits-only WhatsApp number for direct-booking handoff. Always populated when host has a phone. */
   whatsappBookingPhone?: string;
   /** TL-API: Map pin coordinates for the location page, set by the host via the admin portal picker.
@@ -302,9 +311,23 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
       upiVpa: data.upiVpa ?? undefined,
       upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
       upiInstructions: data.upiInstructions ?? undefined,
-      bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP')
+      bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP' || data.bookingMode === 'BLOCKED_LIFECYCLE')
         ? data.bookingMode
         : undefined,
+      lifecycleStage: typeof data.lifecycleStage === 'string' ? data.lifecycleStage : (typeof data.stage === 'string' ? data.stage : undefined),
+      websiteStatus: typeof data.websiteStatus === 'string' ? data.websiteStatus : undefined,
+      onlinePaymentsEnabled: typeof data.onlinePaymentsEnabled === 'boolean'
+        ? data.onlinePaymentsEnabled
+        : (data.lifecycleStage === 'Trial' || data.lifecycleStage === 'TrialEndedNudge' || data.stage === 'Trial')
+          ? false
+          : undefined,
+      notTakingBookings: Boolean(
+        data.notTakingBookings === true ||
+        data.websiteStatus === 'not_taking_bookings' ||
+        data.lifecycleStage === 'Blocked' ||
+        data.stage === 'Blocked' ||
+        data.bookingMode === 'BLOCKED_LIFECYCLE'
+      ),
       whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
         ? data.whatsappBookingPhone
         : undefined,
