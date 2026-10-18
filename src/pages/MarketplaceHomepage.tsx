@@ -316,11 +316,29 @@ export default function MarketplaceHomepage() {
     [items],
   );
 
-  // TL-PROP: separately fetch the canonical marketplace properties endpoint for map pins.
-  // Independent of the card grid — different endpoint shape, different fields.
+  // TL-PROP / MKT-020: fetch the canonical marketplace properties endpoint for map pins,
+  // forwarding active city/location, checkIn, checkOut, and guests query parameters.
+  const propertiesQuery = useMemo(() => {
+    const p = new URLSearchParams();
+    p.set('pageSize', '200');
+    const activeCity =
+      query.trim() ||
+      searchParams.get('city')?.trim() ||
+      searchParams.get('destination')?.trim() ||
+      '';
+    if (activeCity) p.set('location', activeCity);
+    const checkIn = searchParams.get('checkIn');
+    if (checkIn) p.set('checkIn', checkIn);
+    const checkOut = searchParams.get('checkOut');
+    if (checkOut) p.set('checkOut', checkOut);
+    const guests = searchParams.get('guests');
+    if (guests) p.set('guests', guests);
+    return p.toString();
+  }, [query, searchParams]);
+
   useEffect(() => {
     let cancelled = false;
-    fetch(buildApiUrl('/marketplace/properties?pageSize=200'))
+    fetch(buildApiUrl(`/marketplace/properties?${propertiesQuery}`))
       .then(async (r) => (r.ok ? ((await r.json()) as MarketplacePropertyApi[]) : []))
       .then((rows) => {
         if (cancelled) return;
@@ -332,15 +350,42 @@ export default function MarketplaceHomepage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [propertiesQuery]);
 
-  // TASK-102058: pin hrefs carry the active search criteria (recomputed from rows so a
-  // search submit never refetches the properties endpoint just to rewrite links).
+  // TASK-102058 / MKT-020: pin hrefs carry the active search criteria, and mapPins
+  // intersects with active city, price, and category filters so Map (N) matches active filters.
   const mapPins = useMemo(() => {
+    const activeCityFilter = (
+      query.trim() ||
+      searchParams.get('city')?.trim() ||
+      searchParams.get('destination')?.trim() ||
+      ''
+    ).toLowerCase();
+    const hasPriceOrCategoryFilter =
+      minPrice != null || maxPrice != null || category !== 'all';
+    const visibleListingIds = new Set(visibleItems.map((item) => item.id));
+    const allLoadedListingIds = new Set(items.map((item) => item.id));
+
     const seen = new Map<number, MapPin>();
     for (const row of marketplaceProperties) {
       if (row.latitude == null || row.longitude == null) continue;
       if (seen.has(row.propertyId)) continue;
+
+      if (activeCityFilter) {
+        const rowText = `${row.propertyName ?? ''} ${row.propertyAddress ?? ''} ${row.listingName ?? ''}`.toLowerCase();
+        const matchesCityText = rowText.includes(activeCityFilter);
+        const matchesVisibleListing = visibleListingIds.has(row.listingId);
+        if (allLoadedListingIds.has(row.listingId)) {
+          if (!matchesVisibleListing && !matchesCityText) continue;
+        } else if (!matchesCityText && !matchesVisibleListing) {
+          continue;
+        }
+      }
+
+      if (hasPriceOrCategoryFilter && !loading) {
+        if (!visibleListingIds.has(row.listingId)) continue;
+      }
+
       seen.set(row.propertyId, {
         id: `mp-${row.propertyId}`,
         lat: Number(row.latitude),
@@ -360,7 +405,18 @@ export default function MarketplaceHomepage() {
       });
     }
     return Array.from(seen.values());
-  }, [marketplaceProperties, searchSuffix]);
+  }, [
+    category,
+    items,
+    loading,
+    marketplaceProperties,
+    maxPrice,
+    minPrice,
+    query,
+    searchParams,
+    searchSuffix,
+    visibleItems,
+  ]);
 
   return (
     <>
@@ -565,8 +621,8 @@ export default function MarketplaceHomepage() {
 
                   <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
 
-                  {/* TASK-1873: rating row */}
-                  {item.rating != null && item.rating > 0 && (
+                  {/* TASK-1873 / TASK-10298776: rating row — enforce >= 4★ suppression guard */}
+                  {item.rating != null && item.rating >= 4 && (item.reviewCount == null || item.reviewCount > 0) && (
                     <p className="text-sm font-medium text-[var(--accent-text)]">
                       {'★'.repeat(Math.round(item.rating))}
                       <span className="ml-1 text-text-muted">{item.rating.toFixed(1)}</span>

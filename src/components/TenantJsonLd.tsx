@@ -147,7 +147,7 @@ export const TenantJsonLd: React.FC = () => {
         name: `Is there a booking fee at ${brandName}?`,
         acceptedAnswer: {
           '@type': 'Answer',
-          text: `Direct booking — no OTA commission. You pay the nightly rate and applicable GST shown at checkout.`,
+          text: `Direct booking — no OTA commission. You pay the tariff shown at checkout with no extra GST added on top.`,
         },
       });
     }
@@ -156,7 +156,7 @@ export const TenantJsonLd: React.FC = () => {
       name: `Does ${brandName} provide GST invoices?`,
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Yes. GST-compliant invoices are automatically generated after checkout for all bookings. SAC 9963 with CGST/SGST breakdown for intra-state guests.',
+        text: 'GST invoices are available from the host upon request when applicable.',
       },
     });
 

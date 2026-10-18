@@ -25,7 +25,7 @@ import LongStayCalculator from "../components/LongStayCalculator"; // TASK-1739
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
-import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "../tenant/tenantResolver";
+import { isMarketplaceMode } from "../tenant/tenantResolver";
 import AirbnbSearchBar from "../components/marketplace/airbnbSearch/AirbnbSearchBar";
 import { enrichMarketplaceCoverItems } from "../utils/marketplaceListingCover";
 import {
@@ -276,7 +276,8 @@ const SearchPage = () => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const processingFeePercent = useTenantProcessingFee();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isMarketplaceSearch = isMarketplaceMode() && isAtlastaysMarketplaceSurface();
+  const isMarketplaceSearch =
+    isMarketplaceMode() || searchParams.get("brand")?.trim().toLowerCase() === "atlastays";
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(true);
   const [apiListings, setApiListings] = useState<NormalizedListing[] | null>(null);
@@ -1735,7 +1736,7 @@ const SearchPage = () => {
                   <div className="search-card__title-row">
                     <div className="min-w-0">
                       <h2 className="search-card__title">{unit.title}</h2>
-                      {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating > 0 && (
+                      {(unit.reviewCount ?? 0) > 0 && unit.rating != null && unit.rating >= 4 && (
                         <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2 py-0.5 text-xs font-semibold text-yellow-800">
                           <span aria-hidden>★</span>
                           <span>{unit.rating.toFixed(1)}</span>

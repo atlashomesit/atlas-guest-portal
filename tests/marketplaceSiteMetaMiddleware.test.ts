@@ -85,7 +85,8 @@ describe("marketplaceSiteMetaMiddleware (MKT-013)", () => {
       innerContents: Record<string, string>;
     };
 
-    expect(body.innerContents["title"]).toBe("Atlastays — Book Homestays Directly with Verified Owners");
+    expect(body.innerContents["title"]).toBe("Atlastays — Book Homestays Directly with Hosts");
+    expect(body.innerContents["title"]).not.toMatch(/verified/i);
     expect(body.appliedAttrs['link[rel="canonical"]::href']).toBe("https://atlastays.com/");
     expect(body.appliedAttrs['meta[property="og:url"]::content']).toBe("https://atlastays.com/");
     expect(body.appliedAttrs['meta[property="og:image"]::content']).toBe("https://atlastays.com/icons/logo512.png");

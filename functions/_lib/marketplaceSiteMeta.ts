@@ -20,6 +20,7 @@ export interface MarketplaceListingMetaRow {
   city?: string | null;
   state?: string | null;
   description?: string | null;
+  coverImageUrl?: string | null;
   coverPhotoUrl?: string | null;
   photos?: string[];
   tenantSlug: string;
@@ -94,9 +95,9 @@ export function buildMarketplaceMetaValues(
       const title = `${listing.title}${cityPart} — Atlastays`;
       const description =
         (listing.description ?? "").trim() ||
-        `Book ${listing.title}${cityPart} directly with the owner on Atlastays. Verified vacation home, instant confirmation, zero platform fees.`;
+        `Book ${listing.title}${cityPart} directly with the host on Atlastays. Vacation home with zero platform booking fees.`;
       const image = toAbsoluteRasterImage(
-        listing.coverPhotoUrl || listing.photos?.[0],
+        listing.coverImageUrl || listing.coverPhotoUrl || listing.photos?.[0],
         origin,
       );
 
@@ -144,8 +145,8 @@ export function buildMarketplaceMetaValues(
   if (cityMatch) {
     const citySlug = cityMatch[1].toLowerCase();
     const cityName = formatCityNameFromSlug(citySlug);
-    const title = `Homestays in ${cityName} — Book Direct with Owners | Atlastays`;
-    const description = `Discover verified homestays, holiday homes, and villas in ${cityName}. Book directly with local owners with zero booking fees on Atlastays.`;
+    const title = `Homestays in ${cityName} — Book Direct with Hosts | Atlastays`;
+    const description = `Discover homestays, holiday homes, and villas in ${cityName}. Book directly with local hosts with zero booking fees on Atlastays.`;
     const image = `${origin}/icons/logo512.png`;
     const canonical = `${origin}/homestays-in-${citySlug}`;
 
@@ -161,9 +162,9 @@ export function buildMarketplaceMetaValues(
 
   // 3. Homepage /
   return {
-    title: "Atlastays — Book Homestays Directly with Verified Owners",
+    title: "Atlastays — Book Homestays Directly with Hosts",
     description:
-      "Browse and book verified vacation homes and homestays across India directly from local owners. Zero platform booking fees on Atlastays.",
+      "Browse and book vacation homes and homestays across India directly from local hosts. Zero platform booking fees on Atlastays.",
     image: `${origin}/icons/logo512.png`,
     url: `${origin}/`,
     canonical: `${origin}/`,

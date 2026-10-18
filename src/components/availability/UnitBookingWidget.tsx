@@ -115,6 +115,11 @@ export type BookingStickySummary = {
   datesUnavailable?: boolean;
   /** Navigation readiness from the same state that enables the existing Reserve action. */
   canReviewBooking?: boolean;
+  /** GUEST-022: selected rate plan name and meal badge for mobile sticky bar visibility. */
+  ratePlanLabel?: string | null;
+  mealPlanCode?: string | null;
+  mealPlanLabel?: string | null;
+  hasMultipleRatePlans?: boolean;
 };
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
@@ -1026,6 +1031,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       gstRangeEndIso,
       controller.signal,
       selectedRatePlanId,
+      guests,
     )
       .then((b) => {
         setServerPriceBreakdown(b);
@@ -1034,7 +1040,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setServerPriceBreakdown(null);
       });
     return () => controller.abort();
-  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests]);
 
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
@@ -1517,6 +1523,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? null
         : freeCancellationCopy?.deadlineFormatted ?? null,
       datesUnavailable,
+      ratePlanLabel: publicRatePlans.length > 0 ? (selectedRatePlan?.name ?? null) : null,
+      mealPlanCode: publicRatePlans.length > 0 ? (selectedRatePlan?.mealPlanCode ?? null) : null,
+      mealPlanLabel: publicRatePlans.length > 0 ? (selectedRatePlan?.mealPlanLabel ?? null) : null,
+      hasMultipleRatePlans: publicRatePlans.length > 1,
     });
   }, [
     onStickySummaryChange,
@@ -1527,6 +1537,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     rangePricingPending,
     calendarOpenPricingPending,
     freeCancellationCopy?.deadlineFormatted,
+    publicRatePlans.length,
+    selectedRatePlan?.name,
+    selectedRatePlan?.mealPlanCode,
+    selectedRatePlan?.mealPlanLabel,
   ]);
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
@@ -1870,7 +1884,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   return (
     // TASK-2612: fragment wrapper intentional — avoids extra DOM nesting
     <>
-      <form id="booking-form" tabIndex={-1} data-can-review-booking={canReviewBooking ? "true" : "false"} onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
+      <form id="booking-form" tabIndex={-1} data-booking-widget="true" data-can-review-booking={canReviewBooking ? "true" : "false"} onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">

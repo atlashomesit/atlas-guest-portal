@@ -52,8 +52,10 @@ describe("marketplaceSiteMeta pure logic (MKT-013)", () => {
 
     it("produces unique title, description, self canonical and raster image for homepage /", () => {
       const meta = buildMarketplaceMetaValues("/", "", origin, null);
-      expect(meta.title).toBe("Atlastays — Book Homestays Directly with Verified Owners");
-      expect(meta.description).toContain("verified vacation homes");
+      expect(meta.title).toBe("Atlastays — Book Homestays Directly with Hosts");
+      expect(meta.description).toContain("vacation homes");
+      expect(meta.title).not.toMatch(/verified/i);
+      expect(meta.description).not.toMatch(/verified/i);
       expect(meta.canonical).toBe("https://atlastays.com/");
       expect(meta.url).toBe("https://atlastays.com/");
       expect(meta.image).toBe("https://atlastays.com/icons/logo512.png");
@@ -63,8 +65,10 @@ describe("marketplaceSiteMeta pure logic (MKT-013)", () => {
 
     it("produces city-specific title, description, self canonical and raster image for /homestays-in-*", () => {
       const meta = buildMarketplaceMetaValues("/homestays-in-hyderabad", "", origin, null);
-      expect(meta.title).toBe("Homestays in Hyderabad — Book Direct with Owners | Atlastays");
+      expect(meta.title).toBe("Homestays in Hyderabad — Book Direct with Hosts | Atlastays");
       expect(meta.description).toContain("Hyderabad");
+      expect(meta.title).not.toMatch(/verified/i);
+      expect(meta.description).not.toMatch(/verified/i);
       expect(meta.canonical).toBe("https://atlastays.com/homestays-in-hyderabad");
       expect(meta.url).toBe("https://atlastays.com/homestays-in-hyderabad");
       expect(meta.image).toBe("https://atlastays.com/icons/logo512.png");
@@ -95,6 +99,8 @@ describe("marketplaceSiteMeta pure logic (MKT-013)", () => {
 
       expect(meta.title).toBe("The Estate by Grove & Co. in Hyderabad — Atlastays");
       expect(meta.description).toContain("Luxury 4-BHK villa");
+      expect(meta.title).not.toMatch(/verified/i);
+      expect(meta.description).not.toMatch(/verified/i);
       expect(meta.canonical).toBe("https://atlastays.com/homes/the-estate-by-grove-co/676?tenant=grove-and-co");
       expect(meta.image).toBe("https://imagedelivery.net/abc/hero.jpg");
       expect(meta.image.endsWith(".svg")).toBe(false);
@@ -113,6 +119,21 @@ describe("marketplaceSiteMeta pure logic (MKT-013)", () => {
         },
         priceRange: "₹12000",
       });
+    });
+
+    it("populates meta.image from coverImageUrl returned by /api/marketplace/listings", () => {
+      const sampleListing: MarketplaceListingMetaRow = {
+        id: 777,
+        title: "Coorg Mist Villa",
+        city: "Coorg",
+        coverImageUrl: "https://imagedelivery.net/abc/coorg-cover.jpg",
+        tenantSlug: "coorg-stays",
+      };
+
+      const meta = buildMarketplaceMetaValues("/homes/coorg-mist-villa/777", "", origin, sampleListing);
+      expect(meta.image).toBe("https://imagedelivery.net/abc/coorg-cover.jpg");
+      expect(meta.title).not.toMatch(/verified/i);
+      expect(meta.description).not.toMatch(/verified/i);
     });
 
     it("falls back to raster logo when listing photo is svg or missing", () => {

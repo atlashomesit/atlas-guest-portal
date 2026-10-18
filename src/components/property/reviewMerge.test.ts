@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   mergeListingAndExternalReviews,
+  stripReviewScraperBoilerplate,
   type ExternalReviewRow,
   type ListingReviewRow,
 } from './reviewMerge';
@@ -143,6 +144,35 @@ describe('mergeListingAndExternalReviews (TASK-103146)', () => {
     expect(result.map((r) => r.source)).toEqual(['Booking.com', 'Booking.com']);
     expect(result.map((r) => r.guestName)).toEqual(['Rohit', 'Kiran']);
     expect(result.every((r) => !r.isGoogle)).toBe(true);
+  });
+
+  it('strips OTA scraper boilerplate prefixes and filters boilerplate-only bodies (TASK-10298750)', () => {
+    expect(
+      stripReviewScraperBoilerplate('Headline: Amazing stay\nPublic review: Super clean rooms and warm host!\nPositive: Location'),
+    ).toBe('Amazing stay\nSuper clean rooms and warm host!\nLocation');
+    expect(stripReviewScraperBoilerplate('Public review:\nHeadline:\nPositive:')).toBe('');
+
+    const external: ExternalReviewRow[] = [
+      {
+        guestName: 'Meera',
+        rating: 5,
+        body: 'Public review: Loved the balcony and coffee!',
+        reviewDate: '2026-10-07',
+        source: 'Airbnb',
+      },
+      {
+        guestName: 'Boilerplate Only',
+        rating: 5,
+        body: 'Public review: \nHeadline: ',
+        reviewDate: '2026-10-08',
+        source: 'Booking.com',
+      },
+    ];
+
+    const result = mergeListingAndExternalReviews([], external);
+    expect(result).toHaveLength(1);
+    expect(result[0].guestName).toBe('Meera');
+    expect(result[0].body).toBe('Loved the balcony and coffee!');
   });
 });
 

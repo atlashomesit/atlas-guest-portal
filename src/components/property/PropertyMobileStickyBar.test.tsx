@@ -81,7 +81,7 @@ describe("PropertyMobileStickyBar", () => {
     expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 
-  it("keeps + taxes & fees on per-night fallback when dates are incomplete", () => {
+  it("shows all fees included on per-night fallback when dates are incomplete (GUEST-020)", () => {
     render(
       <PropertyMobileStickyBar
         bookable
@@ -94,8 +94,8 @@ describe("PropertyMobileStickyBar", () => {
 
     expect(screen.queryByTestId("mobile-sticky-total")).not.toBeInTheDocument();
     expect(screen.getByText(/\/ night/i)).toBeInTheDocument();
-    expect(screen.getByText(/\+ taxes & fees/i)).toBeInTheDocument();
-    expect(screen.queryByText(/all fees included/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/all fees included/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 
   it("stays hidden near the top, appears after scrolling past the hero, hides again on top (TASK-102075)", () => {
@@ -184,15 +184,13 @@ describe("PropertyMobileStickyBar", () => {
   });
 });
 
-describe("approved booking review shortcut", () => {
-  it("focuses the existing ready form without submitting, then returns to dates as readiness changes", () => {
-    const scroll = vi.fn();
-    const oldScroll = HTMLElement.prototype.scrollIntoView;
-    HTMLElement.prototype.scrollIntoView = scroll;
+describe("approved booking review shortcut (GUEST-022)", () => {
+  it("triggers the ready booking form submit directly on one tap, then returns to dates as readiness changes", () => {
     const trigger = document.createElement("button"); trigger.id = "unit-booking-dates";
     const openDates = vi.fn(); trigger.addEventListener("click", openDates);
     const form = document.createElement("form"); form.dataset.testid = "guest-booking-form"; form.tabIndex = -1; form.dataset.canReviewBooking = "true";
     const reserve = document.createElement("button"); reserve.dataset.testid = "guest-booking-submit"; reserve.type = "submit"; form.append(reserve);
+    const reserveClick = vi.fn(); reserve.addEventListener("click", reserveClick);
     const submit = vi.fn((event: Event) => event.preventDefault()); form.addEventListener("submit", submit);
     document.body.append(trigger, form);
     const ready = { hasCompleteDates: true, totalAmount: 10605, pricingPending: false, freeCancelUntil: null, canReviewBooking: true };
@@ -200,8 +198,8 @@ describe("approved booking review shortcut", () => {
     const view = render(<PropertyMobileStickyBar {...props} summary={ready} />);
     fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
     expect(screen.getByTestId("mobile-sticky-book-now")).toHaveTextContent("Review booking");
-    expect(form).toHaveFocus(); expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
-    expect(submit).not.toHaveBeenCalled(); expect(openDates).not.toHaveBeenCalled();
+    expect(reserveClick).toHaveBeenCalledTimes(1);
+    expect(openDates).not.toHaveBeenCalled();
     // A child render can invalidate readiness before the summary effect reaches the bar.
     form.dataset.canReviewBooking = "false";
     fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
@@ -216,7 +214,51 @@ describe("approved booking review shortcut", () => {
       expect(screen.getByTestId("mobile-sticky-book-now")).not.toHaveTextContent("Review booking");
       fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
     }
-    expect(openDates).toHaveBeenCalledTimes(5); expect(submit).not.toHaveBeenCalled();
-    view.unmount(); form.remove(); trigger.remove(); HTMLElement.prototype.scrollIntoView = oldScroll;
+    expect(openDates).toHaveBeenCalledTimes(5);
+    expect(reserveClick).toHaveBeenCalledTimes(1);
+    view.unmount(); form.remove(); trigger.remove();
+  });
+
+  it("renders selected rate plan & meal badge and scrolls to widget on 'Change plan / details' when multiple rate plans exist (GUEST-022)", () => {
+    const scroll = vi.fn();
+    const oldScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const form = document.createElement("form");
+    form.dataset.testid = "guest-booking-form";
+    form.dataset.bookingWidget = "true";
+    form.tabIndex = -1;
+    document.body.append(form);
+
+    render(
+      <PropertyMobileStickyBar
+        bookable
+        nightlyFallback={4500}
+        nightlyIsSynthetic={false}
+        summary={{
+          hasCompleteDates: true,
+          totalAmount: 11200,
+          pricingPending: false,
+          freeCancelUntil: "10 Nov",
+          canReviewBooking: true,
+          ratePlanLabel: "Breakfast Flexible",
+          mealPlanCode: "CP",
+          mealPlanLabel: "Breakfast included",
+          hasMultipleRatePlans: true,
+        }}
+        onReserveClick={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId("mobile-sticky-rate-plan")).toHaveTextContent(
+      "Breakfast Flexible · Breakfast included",
+    );
+    const changePlanBtn = screen.getByTestId("mobile-sticky-change-plan");
+    expect(changePlanBtn).toHaveTextContent("Change plan / details");
+    fireEvent.click(changePlanBtn);
+    expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(form).toHaveFocus();
+
+    form.remove();
+    HTMLElement.prototype.scrollIntoView = oldScroll;
   });
 });

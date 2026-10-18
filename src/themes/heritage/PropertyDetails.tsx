@@ -583,11 +583,17 @@ const PropertyDetails = () => {
     }, [isNonAtlasMarketplaceListing, tenantSlugFromUrl]);
     // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
     const backToResultsHref = useMemo(() => {
-        const searchKeys = ["checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
+        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
         const hasSearchParams = searchKeys.some((k) => searchParams.has(k));
         if (!hasSearchParams) return null;
+        if (isMarketplaceHost) {
+          const cleanParams = new URLSearchParams(searchParams);
+          cleanParams.delete("tenant");
+          const qs = cleanParams.toString();
+          return qs ? `/?${qs}` : "/";
+        }
         return `/search?${searchParams.toString()}`;
-    }, [searchParams]);
+    }, [searchParams, isMarketplaceHost]);
     // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
     // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
     // never render, silently masking the degraded-state UI for a failed listing lookup (the
@@ -1719,7 +1725,7 @@ useEffect(() => {
                 <>
                   <Link to="/">Home</Link>
                   <span className="pp-sep" aria-hidden="true">›</span>
-                  <Link to="/#our-homes">Stays</Link>
+                  <Link to={isMarketplaceHost ? "/" : "/#our-homes"}>{isMarketplaceHost ? "All Homes" : "Stays"}</Link>
                   <span className="pp-sep" aria-hidden="true">›</span>
                 </>
               )}
@@ -2286,11 +2292,22 @@ useEffect(() => {
                       <div style={{ height: 120, borderRadius: 16, background: '#f0e6dc' }} />
                     </section>
                   );
-                  if (!api || (!api.loading && api.totalCount <= 0 && externalReviewsFromApi.length <= 0)) return null;
+                  if (!api || (!api.loading && ppMergedReviews.length <= 0)) return null;
                   const rating = ppCombinedAverageRating;
                   const count = ppCombinedReviewCount;
                   // TASK-8019 (mirrored from the default theme): "verified stay(s) / through this platform" only for native Atlas reviews.
                   const nativeVerifiedCount = api.totalCount;
+                  const externalSources = Array.from(
+                    new Set(
+                      ppMergedReviews
+                        .map((r) => r.source?.trim())
+                        .filter((s): s is string => Boolean(s) && s!.toLowerCase() !== 'atlas'),
+                    ),
+                  );
+                  const externalSourcePhrase =
+                    externalSources.length > 0
+                      ? `from ${externalSources.join(', ')}`
+                      : 'from external platforms';
                   return (
                     <section className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
@@ -2342,7 +2359,7 @@ useEffect(() => {
                                 <p style={{ margin: 0 }}>
                                   {nativeVerifiedCount > 0
                                     ? `${nativeVerifiedCount} verified ${nativeVerifiedCount === 1 ? 'review' : 'reviews'} · all through this platform.`
-                                    : `${count} ${count === 1 ? 'review' : 'reviews'} including guest feedback from Google.`}
+                                    : `${count} ${count === 1 ? 'review' : 'reviews'} including guest feedback ${externalSourcePhrase}.`}
                                 </p>
                               </div>
                             );
@@ -2652,7 +2669,10 @@ useEffect(() => {
                           );
                           const img = rawImg ? toTransformedGuestImageUrl(rawImg, 480) : undefined;
                           const imgSrcSet = rawImg ? buildGuestImageSrcSet(rawImg, GUEST_IMAGE_SRCSET_WIDTHS) : undefined;
-                          const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
+                          const basePath = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
+                          const path = tenantSlugFromUrl
+                            ? `${basePath}?tenant=${encodeURIComponent(tenantSlugFromUrl)}`
+                            : basePath;
                           return (
                             <Link
                               key={String(it.id)}

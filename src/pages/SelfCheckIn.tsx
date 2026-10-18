@@ -119,6 +119,17 @@ export default function SelfCheckIn() {
   // host-set foreign nationality on complete (API also preserves host-set when nationality omitted).
   const [nationality, setNationality] = useState("");
   const [passportNumber, setPassportNumber] = useState("");
+  // TASK-10298730: Form III (Form C) mandatory fields for foreign nationals
+  const [passportExpiryDate, setPassportExpiryDate] = useState("");
+  const [ociCardNumber, setOciCardNumber] = useState("");
+  const [visaNumber, setVisaNumber] = useState("");
+  const [visaType, setVisaType] = useState("");
+  const [visaExpiryDate, setVisaExpiryDate] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const isForeignGuest =
+    nationality.trim() !== "" &&
+    nationality.trim().toLowerCase() !== "india" &&
+    nationality.trim().toLowerCase() !== "in";
   // TASK-5131: Aadhaar VC preferred; photo upload is explicit fallback only
   const [aadhaarVcVerified, setAadhaarVcVerified] = useState(false);
   // TASK-102530: setAadhaarMasked is still called live from updateGuest() and
@@ -555,10 +566,32 @@ export default function SelfCheckIn() {
           guestCount: guestCount ? Number(guestCount) : null,
           nationality: nationality.trim() || null,
           passportNumber:
-            nationality.trim() &&
-            nationality.trim().toLowerCase() !== "india" &&
-            passportNumber.trim()
+            isForeignGuest && passportNumber.trim()
               ? passportNumber.trim()
+              : null,
+          passportExpiryDate:
+            isForeignGuest && passportExpiryDate.trim()
+              ? passportExpiryDate.trim()
+              : null,
+          ociCardNumber:
+            isForeignGuest && ociCardNumber.trim()
+              ? ociCardNumber.trim()
+              : null,
+          visaNumber:
+            isForeignGuest && visaNumber.trim()
+              ? visaNumber.trim()
+              : null,
+          visaType:
+            isForeignGuest && visaType.trim()
+              ? visaType.trim()
+              : null,
+          visaExpiryDate:
+            isForeignGuest && visaExpiryDate.trim()
+              ? visaExpiryDate.trim()
+              : null,
+          dateOfBirth:
+            isForeignGuest && dateOfBirth.trim()
+              ? dateOfBirth.trim()
               : null,
           idCollectedElsewhere,
           isVerified: primary ? primary.isVerified : aadhaarVcVerified,
@@ -798,20 +831,137 @@ export default function SelfCheckIn() {
               <option value="Other">Other</option>
             </select>
 
-            {nationality !== "" && nationality !== "India" && (
-              <>
+            {isForeignGuest && (
+              <div className="mb-5 rounded-xl border border-border-subtle bg-bg-page p-4" data-testid="checkin-foreign-guest-fields">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <p className="text-sm font-semibold text-text-primary">
+                    FRRO Form C Details (Foreign Nationals)
+                  </p>
+                  {passportNumber.trim() &&
+                  visaNumber.trim() &&
+                  visaType.trim() &&
+                  visaExpiryDate.trim() &&
+                  dateOfBirth.trim() ? (
+                    <span
+                      data-testid="checkin-form-c-badge"
+                      className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800"
+                    >
+                      ✓ Form C ready
+                    </span>
+                  ) : (
+                    <span
+                      data-testid="checkin-form-c-badge"
+                      className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800"
+                    >
+                      Form C details required
+                    </span>
+                  )}
+                </div>
+
                 <label htmlFor="checkin-passport" className="block text-sm font-medium text-text-primary mb-1">
                   Passport number
                 </label>
                 <input
                   id="checkin-passport"
                   type="text"
-                  className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+                  className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
                   placeholder="Enter passport number"
                   value={passportNumber}
                   onChange={(e) => setPassportNumber(e.target.value)}
                 />
-              </>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label htmlFor="checkin-passport-expiry" className="block text-sm font-medium text-text-primary mb-1">
+                      Passport expiry date
+                    </label>
+                    <input
+                      id="checkin-passport-expiry"
+                      type="date"
+                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      value={passportExpiryDate}
+                      onChange={(e) => setPassportExpiryDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="checkin-dob" className="block text-sm font-medium text-text-primary mb-1">
+                      Date of birth
+                    </label>
+                    <input
+                      id="checkin-dob"
+                      type="date"
+                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      value={dateOfBirth}
+                      onChange={(e) => setDateOfBirth(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label htmlFor="checkin-visa-number" className="block text-sm font-medium text-text-primary mb-1">
+                      Visa number
+                    </label>
+                    <input
+                      id="checkin-visa-number"
+                      type="text"
+                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      placeholder="Enter visa number"
+                      value={visaNumber}
+                      onChange={(e) => setVisaNumber(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="checkin-visa-type" className="block text-sm font-medium text-text-primary mb-1">
+                      Visa type
+                    </label>
+                    <select
+                      id="checkin-visa-type"
+                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      value={visaType}
+                      onChange={(e) => setVisaType(e.target.value)}
+                    >
+                      <option value="">Select visa type</option>
+                      <option value="Tourist">Tourist</option>
+                      <option value="e-Visa">e-Visa</option>
+                      <option value="Business">Business</option>
+                      <option value="Employment">Employment</option>
+                      <option value="Student">Student</option>
+                      <option value="Medical">Medical</option>
+                      <option value="OCI">OCI</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="checkin-visa-expiry" className="block text-sm font-medium text-text-primary mb-1">
+                      Visa expiry date
+                    </label>
+                    <input
+                      id="checkin-visa-expiry"
+                      type="date"
+                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      value={visaExpiryDate}
+                      onChange={(e) => setVisaExpiryDate(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="checkin-oci-number" className="block text-sm font-medium text-text-primary mb-1">
+                      OCI card number (optional)
+                    </label>
+                    <input
+                      id="checkin-oci-number"
+                      type="text"
+                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      placeholder="If applicable"
+                      value={ociCardNumber}
+                      onChange={(e) => setOciCardNumber(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Guest ID Cards */}
@@ -1330,6 +1480,15 @@ export default function SelfCheckIn() {
             <p className="text-text-secondary text-sm mb-6">
               Enjoy your stay at <strong>{details.listingName}</strong>.
             </p>
+
+            {isForeignGuest && (
+              <div
+                data-testid="checkin-form-c-status"
+                className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800"
+              >
+                <span>✓ Form C details submitted for FRRO reporting</span>
+              </div>
+            )}
 
             <div className="rounded-xl bg-bg-page border border-border-subtle p-4 text-left text-sm mb-6">
               {details.wifiName && <InfoRow label="WiFi" value={details.wifiName} />}
