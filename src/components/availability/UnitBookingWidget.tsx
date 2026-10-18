@@ -113,6 +113,8 @@ export type BookingStickySummary = {
   freeCancelUntil: string | null;
   /** DESIGN-030: selected range cannot be booked — sticky must not show a bookable total. */
   datesUnavailable?: boolean;
+  /** Navigation readiness from the same state that enables the existing Reserve action. */
+  canReviewBooking?: boolean;
 };
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
@@ -1484,9 +1486,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? lastSettledHeadlineRef.current
       : finalTotal;
 
+  // Keep the navigation shortcut tied to the authoritative form eligibility.
+  const reserveDisabled =
+    isSubmitting ||
+    isBookingDisabled ||
+    (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
+    // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
+    datesUnavailable ||
+    // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
+    // reserving now would seed holdPriceBreakdown's client fallback with the provisional
+    // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
+    // stay clickable (TASK-4277): rangePricingPending is false without both dates.
+    // Do NOT gate on availability-fetch loading — that violated TASK-4277 on F1 (2026-07-12).
+    rangePricingPending ||
+    // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
+    (hasSelectedRange && calendarPricingFailed) ||
+    // TASK-4729: guard against NaN pricing (non-numeric server response)
+    (hasSelectedRange && !rangePricingPending && isNaN(finalTotal));
+  const canReviewBooking = hasSelectedRange && !reserveDisabled && !calendarOpenPricingPending && displayFinalTotal > 0;
+
   useEffect(() => {
     onStickySummaryChange?.({
       hasCompleteDates: hasSelectedRange,
+      canReviewBooking,
       // DESIGN-030: never feed the sticky a bookable total for unavailable dates.
       totalAmount:
         hasSelectedRange && !datesUnavailable && displayFinalTotal > 0 ? displayFinalTotal : null,
@@ -1498,6 +1520,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     });
   }, [
     onStickySummaryChange,
+    canReviewBooking,
     hasSelectedRange,
     datesUnavailable,
     displayFinalTotal,
@@ -1847,7 +1870,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   return (
     // TASK-2612: fragment wrapper intentional — avoids extra DOM nesting
     <>
-      <form id="booking-form" onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
+      <form id="booking-form" tabIndex={-1} data-can-review-booking={canReviewBooking ? "true" : "false"} onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">
@@ -2433,23 +2456,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         // handleReserve can surface the inline "Add a check-in/check-out date to continue."
         // validation (and focus the missing field) instead of the button silently swallowing
         // the click. Genuine blockers (service down, invalid range) still disable it.
-        disabled={
-          isSubmitting ||
-          isBookingDisabled ||
-          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
-          // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
-          datesUnavailable ||
-          // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
-          // reserving now would seed holdPriceBreakdown's client fallback with the provisional
-          // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
-          // stay clickable (TASK-4277): rangePricingPending is false without both dates.
-          // Do NOT gate on availability-fetch loading — that violated TASK-4277 on F1 (2026-07-12).
-          rangePricingPending ||
-          // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
-          (hasSelectedRange && calendarPricingFailed) ||
-          // TASK-4729: guard against NaN pricing (non-numeric server response)
-          (hasSelectedRange && !rangePricingPending && isNaN(finalTotal))
-        }
+        disabled={reserveDisabled}
         title={datesUnavailable ? 'These dates aren’t available. Please select different dates.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"

@@ -1002,3 +1002,9 @@
   .pp-v2-review-grid { grid-template-columns: 1fr; }
   .pp-v2-location { margin: 16px 0 0; }
 }
+
+/* UXV-2026-10-18-04: focus the existing form below the phone header. */
+@media (max-width: 767px) {
+  .pp-root .lv-booking[tabindex="-1"] { scroll-margin-top: 96px; }
+  .pp-root .lv-booking[tabindex="-1"]:focus { outline: 2px solid var(--cta-primary, #c04528); outline-offset: 3px; }
+}

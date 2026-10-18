@@ -183,3 +183,40 @@ describe("PropertyMobileStickyBar", () => {
     expect(onReserveClick).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("approved booking review shortcut", () => {
+  it("focuses the existing ready form without submitting, then returns to dates as readiness changes", () => {
+    const scroll = vi.fn();
+    const oldScroll = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = scroll;
+    const trigger = document.createElement("button"); trigger.id = "unit-booking-dates";
+    const openDates = vi.fn(); trigger.addEventListener("click", openDates);
+    const form = document.createElement("form"); form.dataset.testid = "guest-booking-form"; form.tabIndex = -1; form.dataset.canReviewBooking = "true";
+    const reserve = document.createElement("button"); reserve.dataset.testid = "guest-booking-submit"; reserve.type = "submit"; form.append(reserve);
+    const submit = vi.fn((event: Event) => event.preventDefault()); form.addEventListener("submit", submit);
+    document.body.append(trigger, form);
+    const ready = { hasCompleteDates: true, totalAmount: 10605, pricingPending: false, freeCancelUntil: null, canReviewBooking: true };
+    const props = { bookable: true, nightlyFallback: 3500, nightlyIsSynthetic: false, onReserveClick: vi.fn() };
+    const view = render(<PropertyMobileStickyBar {...props} summary={ready} />);
+    fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
+    expect(screen.getByTestId("mobile-sticky-book-now")).toHaveTextContent("Review booking");
+    expect(form).toHaveFocus(); expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(submit).not.toHaveBeenCalled(); expect(openDates).not.toHaveBeenCalled();
+    // A child render can invalidate readiness before the summary effect reaches the bar.
+    form.dataset.canReviewBooking = "false";
+    fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
+    expect(openDates).toHaveBeenCalledTimes(1);
+    for (const summary of [
+      { ...ready, hasCompleteDates: false, canReviewBooking: false, totalAmount: null },
+      { ...ready, datesUnavailable: true, canReviewBooking: false },
+      { ...ready, pricingPending: true, canReviewBooking: false },
+      { ...ready, canReviewBooking: false },
+    ]) {
+      view.rerender(<PropertyMobileStickyBar {...props} summary={summary} />);
+      expect(screen.getByTestId("mobile-sticky-book-now")).not.toHaveTextContent("Review booking");
+      fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
+    }
+    expect(openDates).toHaveBeenCalledTimes(5); expect(submit).not.toHaveBeenCalled();
+    view.unmount(); form.remove(); trigger.remove(); HTMLElement.prototype.scrollIntoView = oldScroll;
+  });
+});

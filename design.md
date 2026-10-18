@@ -73,3 +73,11 @@ Sreekar approved UXD-2026-10-16-03-A/B for implementation, with final approval o
 Privacy uses a compact intro, a native phone topic disclosure containing all eleven topics and open desktop navigation. Search recovery, remounting and resize must retain usable navigation. Rights, Cookie choices and Send a privacy request links move focus to the existing sections. All legal text, dates, consent semantics, form fields, validation, submit behavior, contact actions and tenant colors remain unchanged. Other legal routes retain their existing navigation behavior.
 
 Actual three-column comparisons and independent intent/preservation and wide-workflow verdicts live in [implemented-r1](https://github.com/atlashomesit/atlas-ux-evidence/blob/main/docs/ux/daily-five/2026-10-16/implemented-r1/index.html). Keep the draft PR held with auto-merge off until Sreekar approves the actual result and exact final head.
+
+## Approved value review — 18 October 2026
+
+Sreekar said “i approve” while viewing the immutable [five-proposal r2](https://github.com/atlashomesit/atlas-ux-evidence/blob/1c8f07b9349c7de0a1c4b490fdede94c7c6f6ca8/docs/ux/daily-five/2026-10-17-next-ten/r2/index.html), manifest SHA256 695ee50f25cb96d795c82454c14ca7d7d3144a47fd1157cb4693f8dd8c9c2960.
+
+UXV-2026-10-18-04 changes the phone sticky shortcut to Review booking only when the existing booking form is enabled and its selected-date price is ready. Real React summary state shares the authoritative Reserve disabled expression and calendar-pricing state. It focuses the same dates/price/Reserve form below the header; it never submits, creates a hold or starts payment. Missing/unavailable/pending/error states retain the date-picker path, while desktop, imagery, tenant colors, fees, cancellation and validation stay unchanged.
+
+This supersedes only the identified placement/presentation/navigation decisions. The rejected r1 remains rejected. Actual current baseline / approved proposal / implementation comparisons and independent per-ID verdicts belong in private 2026-10-17-next-ten/implemented-r1. Hold draft PRs with auto-merge off until Sreekar gives separate final approval of actual results and exact PR heads.

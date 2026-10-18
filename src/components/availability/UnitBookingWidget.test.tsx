@@ -542,7 +542,9 @@ describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pr
       content.indexOf('data-testid="guest-booking-submit"') - 1400,
       content.indexOf('data-testid="guest-booking-submit"'),
     );
-    expect(buttonSection).toContain('rangePricingPending');
+    expect(buttonSection).toContain('disabled={reserveDisabled}');
+    const disabledExpression = content.slice(content.indexOf('  const reserveDisabled ='), content.indexOf('  const canReviewBooking ='));
+    expect(disabledExpression).toContain('rangePricingPending ||');
   });
 });
 

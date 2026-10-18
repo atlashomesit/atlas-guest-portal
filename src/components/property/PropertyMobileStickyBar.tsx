@@ -97,13 +97,24 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
   onReserveClick,
 }) => {
   const pastHero = useStickyBarVisibility();
+  const canReviewBooking = Boolean(summary?.canReviewBooking && summary.hasCompleteDates && !summary.datesUnavailable && !summary.pricingPending && summary.totalAmount != null && summary.totalAmount > 0);
 
   const handleReserve = React.useCallback(() => {
+    if (canReviewBooking) {
+      const form = document.querySelector<HTMLElement>(STICKY_BAR_BOOKING_FORM_SELECTOR);
+      const submit = form?.querySelector<HTMLButtonElement>('[data-testid="guest-booking-submit"]');
+      // The form reflects the current widget render even before its summary effect propagates.
+      if (form?.dataset.canReviewBooking === "true" && submit && !submit.disabled) {
+        form.scrollIntoView({ behavior: "smooth", block: "start" });
+        form.focus({ preventScroll: true });
+        return;
+      }
+    }
     // Primary: open the existing date-picker bottom sheet directly. It renders
     // fixed on mobile, so no scroll is needed. Fallback: scroll to the form.
     if (tryOpenPropertyDateSheet()) return;
     onReserveClick();
-  }, [onReserveClick]);
+  }, [canReviewBooking, onReserveClick]);
 
   if (!bookable) {
     return (
@@ -183,9 +194,9 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
         data-testid="mobile-sticky-book-now"
         onClick={handleReserve}
         tabIndex={pastHero ? 0 : -1}
-        aria-label={datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
+        aria-label={canReviewBooking ? "Review selected dates and price" : datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
       >
-        {datesUnavailable ? "Change dates" : "Reserve"}
+        {canReviewBooking ? "Review booking" : datesUnavailable ? "Change dates" : "Reserve"}
       </button>
     </div>
   );
