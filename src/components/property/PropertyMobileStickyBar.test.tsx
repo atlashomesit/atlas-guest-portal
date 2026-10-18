@@ -81,7 +81,7 @@ describe("PropertyMobileStickyBar", () => {
     expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 
-  it("keeps + taxes & fees on per-night fallback when dates are incomplete", () => {
+  it("shows all fees included on per-night fallback when dates are incomplete (GUEST-020)", () => {
     render(
       <PropertyMobileStickyBar
         bookable
@@ -94,8 +94,8 @@ describe("PropertyMobileStickyBar", () => {
 
     expect(screen.queryByTestId("mobile-sticky-total")).not.toBeInTheDocument();
     expect(screen.getByText(/\/ night/i)).toBeInTheDocument();
-    expect(screen.getByText(/\+ taxes & fees/i)).toBeInTheDocument();
-    expect(screen.queryByText(/all fees included/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/all fees included/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 
   it("stays hidden near the top, appears after scrolling past the hero, hides again on top (TASK-102075)", () => {

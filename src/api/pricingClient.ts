@@ -224,6 +224,7 @@ export async function fetchGuestPriceBreakdown(
   checkOut: string,
   signal?: AbortSignal,
   listingRatePlanId?: number | null,
+  guests?: number | null,
 ): Promise<GuestPriceBreakdown> {
   const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(listingId));
@@ -231,6 +232,9 @@ export async function fetchGuestPriceBreakdown(
   url.searchParams.set('checkOut', checkOut);
   if (listingRatePlanId != null && Number.isFinite(listingRatePlanId) && listingRatePlanId > 0) {
     url.searchParams.set('listingRatePlanId', String(listingRatePlanId));
+  }
+  if (guests != null && Number.isFinite(guests) && guests > 0) {
+    url.searchParams.set('guests', String(Math.floor(guests)));
   }
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });

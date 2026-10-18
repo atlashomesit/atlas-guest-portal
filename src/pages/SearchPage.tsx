@@ -25,7 +25,7 @@ import LongStayCalculator from "../components/LongStayCalculator"; // TASK-1739
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../utils/atlasHomesBuildingOrder";
 import { buildApiUrl, getApiHeaders } from "../api/client";
-import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "../tenant/tenantResolver";
+import { isMarketplaceMode } from "../tenant/tenantResolver";
 import AirbnbSearchBar from "../components/marketplace/airbnbSearch/AirbnbSearchBar";
 import { enrichMarketplaceCoverItems } from "../utils/marketplaceListingCover";
 import {
@@ -276,7 +276,8 @@ const SearchPage = () => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const processingFeePercent = useTenantProcessingFee();
   const [searchParams, setSearchParams] = useSearchParams();
-  const isMarketplaceSearch = isMarketplaceMode() && isAtlastaysMarketplaceSurface();
+  const isMarketplaceSearch =
+    isMarketplaceMode() || searchParams.get("brand")?.trim().toLowerCase() === "atlastays";
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
   const [isLoading, setIsLoading] = useState(true);
   const [apiListings, setApiListings] = useState<NormalizedListing[] | null>(null);

@@ -373,18 +373,20 @@ const GuestDetailsPage: React.FC = () => {
   // TASK-8219: mirror the current hold identity into a ref so the pagehide/unmount abandon
   // guard (registered once, empty deps) always reads the latest holdId/holdToken without
   // needing to re-subscribe its event listeners on every hold change.
-  const latestHoldRef = useRef<{ holdId: number | null; holdToken: string | null; holdTenantSlug: string | null }>({
+  const latestHoldRef = useRef<{ holdId: number | null; holdToken: string | null; holdTenantSlug: string | null; holdExpiresAt: string | null }>({
     holdId: null,
     holdToken: null,
     holdTenantSlug: null,
+    holdExpiresAt: null,
   });
   useEffect(() => {
     latestHoldRef.current = {
       holdId: holdId ? Number(holdId) : null,
       holdToken: holdToken ?? null,
       holdTenantSlug: effectiveTenantSlug ?? null,
+      holdExpiresAt: holdExpiresAt ?? null,
     };
-  }, [holdId, holdToken, effectiveTenantSlug]);
+  }, [holdId, holdToken, effectiveTenantSlug, holdExpiresAt]);
 
   // No hold state (direct navigation or hard reload): instead of a silent redirect,
   // we render a "pick your dates again" card (see early return in Render) and keep the
@@ -398,6 +400,10 @@ const GuestDetailsPage: React.FC = () => {
     holdExpiresAt ? remainingPct(holdExpiresAt) : 0,
   );
   const [holdExpired, setHoldExpired] = useState(false);
+  const holdExpiredRef = useRef(false);
+  useEffect(() => {
+    holdExpiredRef.current = holdExpired;
+  }, [holdExpired]);
 
   // TASK-4439: focus management for the blocking hold dialogs (WCAG 2.4.3 / 2.1.2)
   const noHoldDialogRef = useFocusTrap<HTMLDivElement>(
@@ -423,24 +429,87 @@ const GuestDetailsPage: React.FC = () => {
     return () => clearInterval(id);
   }, [holdExpiresAt]);
 
-  // ── Form state ────────────────────────────────────────────────────────────
-  const [phoneDialCode, setPhoneDialCode] = useState(() => {
+  // ── Form state (GUEST-021: pre-fill from sessionStorage draft or saved localStorage/auth profile) ──
+  const initialGuestProfile = useMemo(() => {
     const draft = loadCheckoutDraft();
-    return typeof draft.phoneDialCode === 'string'
+    let savedName = '';
+    let savedEmail = '';
+    let savedPhoneRaw = '';
+    try {
+      savedName = window.localStorage.getItem('atlas_guest_name')?.trim() ?? '';
+      savedEmail = window.localStorage.getItem('atlas_guest_email')?.trim() ?? '';
+      savedPhoneRaw = window.localStorage.getItem('atlas_guest_phone')?.trim() ?? '';
+      if (!savedEmail) {
+        const rawAuth = window.localStorage.getItem('atlas_guest_auth');
+        if (rawAuth) {
+          const parsedAuth = JSON.parse(rawAuth) as { email?: string | null };
+          if (parsedAuth?.email) savedEmail = parsedAuth.email.trim();
+        }
+      }
+    } catch { /* ignore */ }
+
+    let dialCode = typeof draft.phoneDialCode === 'string'
       && GUEST_DIAL_OPTIONS.some((o) => o.code === draft.phoneDialCode)
       ? draft.phoneDialCode
       : GUEST_DIAL_OPTIONS[0].code;
-  });
-  const [formData, setFormData] = useState(() => {
-    const draft = loadCheckoutDraft();
+
+    let phoneDigits = typeof draft.phone === 'string' ? draft.phone : '';
+    let usedSavedPhone = false;
+    if (!phoneDigits && savedPhoneRaw) {
+      usedSavedPhone = true;
+      if (savedPhoneRaw.startsWith('+')) {
+        const sortedOptions = [...GUEST_DIAL_OPTIONS].sort((a, b) => b.code.length - a.code.length);
+        const matched = sortedOptions.find((o) => savedPhoneRaw.startsWith(o.code));
+        if (matched) {
+          dialCode = matched.code;
+          phoneDigits = clampNationalDigits(savedPhoneRaw.slice(matched.code.length), matched.maxDigits);
+        } else {
+          phoneDigits = clampNationalDigits(savedPhoneRaw, GUEST_DIAL_OPTIONS[0].maxDigits);
+        }
+      } else {
+        phoneDigits = clampNationalDigits(savedPhoneRaw, getGuestDialOption(dialCode).maxDigits);
+      }
+    }
+
+    const draftName = typeof draft.name === 'string' ? draft.name : '';
+    const draftEmail = typeof draft.email === 'string' ? draft.email : '';
+    const usedSavedName = !draftName && Boolean(savedName);
+    const usedSavedEmail = !draftEmail && Boolean(savedEmail);
+
     return {
-      name: typeof draft.name === 'string' ? draft.name : '',
-      email: typeof draft.email === 'string' ? draft.email : '',
-      phone: typeof draft.phone === 'string' ? draft.phone : '',
+      phoneDialCode: dialCode,
+      name: draftName || savedName,
+      email: draftEmail || savedEmail,
+      phone: phoneDigits,
       nationality: typeof draft.nationality === 'string' && draft.nationality ? draft.nationality : 'India',
       notes: typeof draft.notes === 'string' ? draft.notes : '',
+      prefilledFromSaved: usedSavedName || usedSavedEmail || usedSavedPhone,
     };
-  });
+  }, []);
+
+  const [phoneDialCode, setPhoneDialCode] = useState(() => initialGuestProfile.phoneDialCode);
+  const [formData, setFormData] = useState(() => ({
+    name: initialGuestProfile.name,
+    email: initialGuestProfile.email,
+    phone: initialGuestProfile.phone,
+    nationality: initialGuestProfile.nationality,
+    notes: initialGuestProfile.notes,
+  }));
+  const [isPrefilledFromSaved, setIsPrefilledFromSaved] = useState(
+    () => initialGuestProfile.prefilledFromSaved,
+  );
+
+  const handleClearPrefilledGuestDetails = useCallback(() => {
+    setFormData((p) => ({ ...p, name: '', email: '', phone: '' }));
+    setFormErrors({ name: '', email: '', phone: '' });
+    setIsPrefilledFromSaved(false);
+    try {
+      window.localStorage.removeItem('atlas_guest_name');
+      window.localStorage.removeItem('atlas_guest_email');
+      window.localStorage.removeItem('atlas_guest_phone');
+      window.sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+    } catch { /* ignore */ }
+  }, []);
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
@@ -1045,12 +1114,16 @@ const GuestDetailsPage: React.FC = () => {
               const handleClose = () => {
                 if (paymentCompleted) return;
                 paymentCompleted = true;
-                // TASK-5183: release inventory when the guest dismisses Razorpay without paying.
-                // TASK-8219: mark the checkout settled so a pagehide/unmount that follows this
-                // explicit dismiss doesn't fire a second abandon-checkout call for the same hold.
-                checkoutSettledRef.current = true;
-                abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
-                // TASK-10087: terminal outcome — anonymous session/listing identifiers only, no PII.
+                // GUEST-019: keep active hold on modal dismiss for retry; only abandon if expired.
+                const holdStillActive =
+                  !holdExpiredRef.current &&
+                  (!latestHoldRef.current.holdExpiresAt ||
+                    new Date(latestHoldRef.current.holdExpiresAt).getTime() > Date.now());
+                if (!holdStillActive) {
+                  checkoutSettledRef.current = true;
+                  abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
+                }
+                currentAttemptIdempotencyKeyRef.current = null;
                 track(TerminalCheckoutOutcomeEvents.PaymentModalDismissed, holdListingId ? Number(holdListingId) : 0);
                 setIsSubmitting(false);
                 setPaymentCancelled(true);
@@ -1457,6 +1530,15 @@ const GuestDetailsPage: React.FC = () => {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
+        // GUEST-019: Do not abandon an active hold when the browser tab is backgrounded
+        // (e.g., mobile guest switching to UPI app or SMS/bank OTP for 15-60s).
+        // Real tab closes and navigations away are handled by pagehide and unmount;
+        // if the guest never returns, the server-side hold TTL releases the slot automatically.
+        const holdStillActive =
+          !holdExpiredRef.current &&
+          (!latestHoldRef.current.holdExpiresAt ||
+            new Date(latestHoldRef.current.holdExpiresAt).getTime() > Date.now());
+        if (holdStillActive) return;
         if (hiddenTimer) clearTimeout(hiddenTimer);
         hiddenTimer = setTimeout(fireAbandonOnce, HIDDEN_ABANDON_DELAY_MS);
       } else if (hiddenTimer) {
@@ -1634,9 +1716,22 @@ const GuestDetailsPage: React.FC = () => {
           <form onSubmit={handleSubmit} noValidate id="gd-details-form">
             {/* Who's coming */}
             <div className="gd-fset" style={{ marginTop: 0 }}>
-              <div className="gd-fset-head">
-                <h3>Who's coming</h3>
-                <small>Needed for booking &amp; police records</small>
+              <div className="gd-fset-head" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <h3>Who's coming</h3>
+                  <small>Needed for booking &amp; police records</small>
+                </div>
+                {isPrefilledFromSaved && (
+                  <button
+                    type="button"
+                    onClick={handleClearPrefilledGuestDetails}
+                    data-testid="clear-prefilled-guest-details"
+                    className="gd-pill"
+                    style={{ cursor: 'pointer', border: '1px solid var(--gd-border, #e5d5c5)', background: 'transparent', fontSize: 12, padding: '2px 8px' }}
+                  >
+                    Saved details pre-filled · Clear
+                  </button>
+                )}
               </div>
 
               <div className="gd-field">
@@ -1841,7 +1936,7 @@ const GuestDetailsPage: React.FC = () => {
                       </div>
                     )}
                     {!promoValidating && !promoMessage && promoCode && (
-                      <div className="gd-input-help">Codes are case-insensitive. Tax recalculates after apply.</div>
+                      <div className="gd-input-help">Codes are case-insensitive. Total updates after apply.</div>
                     )}
                   </div>
                 </div>

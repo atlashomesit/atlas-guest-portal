@@ -340,11 +340,38 @@ export default function BookingConfirmationPage() {
   const [paymentFailureReason, setPaymentFailureReason] = useState<string | null>(null);
   const [paymentFailedAt, setPaymentFailedAt] = useState<string | null>(null);
   const [paymentRetryUrl, setPaymentRetryUrl] = useState<string | null>(null);
+  const [holdExpiresAtUtc, setHoldExpiresAtUtc] = useState<string | null>(null);
+  const [holdCountdown, setHoldCountdown] = useState<string | null>(null);
   const [paymentCheckManual, setPaymentCheckManual] = useState(false);
   const [paymentPollAttempt, setPaymentPollAttempt] = useState(0);
   const [paymentPollExhausted, setPaymentPollExhausted] = useState(false);
   const [lastPaymentCheckAt, setLastPaymentCheckAt] = useState<Date | null>(null);
   const [relativeNowMs, setRelativeNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!holdExpiresAtUtc || paymentStatus === "success") {
+      setHoldCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const remainingMs = new Date(holdExpiresAtUtc).getTime() - Date.now();
+      if (Number.isNaN(remainingMs)) {
+        setHoldCountdown(null);
+        return;
+      }
+      if (remainingMs <= 0) {
+        setHoldCountdown("0:00");
+        return;
+      }
+      const totalSec = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      setHoldCountdown(`${mins}:${String(secs).padStart(2, "0")}`);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [holdExpiresAtUtc, paymentStatus]);
   const [pwaInstallDismissed, setPwaInstallDismissed] = useState(() => {
     try { return localStorage.getItem("atlas_guest_pwa_install_dismissed_v1") === "1"; } catch { return false; }
   });
@@ -468,7 +495,11 @@ export default function BookingConfirmationPage() {
         setPaymentFailureReason(null);
         setPaymentFailedAt(null);
         setPaymentRetryUrl(null);
+        setHoldExpiresAtUtc(null);
         return "success" as const;
+      }
+      if (body.holdExpiresAtUtc !== undefined) {
+        setHoldExpiresAtUtc(body.holdExpiresAtUtc ?? null);
       }
       if (normalized === "failed") {
         setPaymentStatus("failed");
@@ -992,6 +1023,13 @@ export default function BookingConfirmationPage() {
             data-poll-attempt={paymentPollAttempt}
           >
             <p className="text-sm text-amber-800 font-medium">Confirming your payment…</p>
+            {holdCountdown && (
+              <p className="text-xs text-amber-800/90" data-testid="booking-hold-countdown">
+                {holdCountdown === "0:00"
+                  ? "Reservation hold has expired and dates are released automatically if payment was not completed."
+                  : `Dates held for ${holdCountdown} — unpaid holds release automatically when the timer expires.`}
+              </p>
+            )}
             {paymentPollExhausted && (
               <>
                 <p className="text-sm text-amber-800">
@@ -1015,6 +1053,13 @@ export default function BookingConfirmationPage() {
             <p className="text-sm text-red-700">
               Payment failed: {paymentFailureReason ?? "Your payment could not be completed."}
             </p>
+            {holdCountdown && (
+              <p className="text-xs text-red-800/90" data-testid="booking-hold-countdown">
+                {holdCountdown === "0:00"
+                  ? "Your reservation hold has expired and the dates have been released automatically."
+                  : `Your dates remain held for ${holdCountdown} so you can retry payment. Unpaid holds release automatically when the timer expires.`}
+              </p>
+            )}
             {paymentFailedAt && (
               <p className="text-sm text-red-700/80">
                 Failed at: {new Date(paymentFailedAt).toLocaleString("en-IN", {

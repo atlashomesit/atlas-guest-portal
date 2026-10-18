@@ -352,9 +352,19 @@ export async function fetchListingContact(
   return (await response.json()) as ListingContact;
 }
 
-let cachedListings: PublicListing[] | null = null;
-let cachedListingsAt = 0;
-let cachePromise: Promise<PublicListing[]> | null = null;
+interface TenantListingsCacheEntry {
+  listings: PublicListing[] | null;
+  cachedAt: number;
+  promise: Promise<PublicListing[]> | null;
+}
+
+const listingsCacheByTenant = new Map<string, TenantListingsCacheEntry>();
+
+function getListingsCacheKey(): string {
+  const headers = getApiHeaders() as Record<string, string | undefined>;
+  const slug = headers['X-Tenant-Slug'] ?? headers['x-tenant-slug'] ?? '__default__';
+  return slug.trim().toLowerCase() || '__default__';
+}
 
 /**
  * Public listings change rarely, so we cache them for the page session — but bound the
@@ -365,9 +375,7 @@ export const PUBLIC_LISTINGS_TTL_MS = 60_000;
 
 /** Drop the cached public listings so the next fetch hits the network. */
 export function invalidatePublicListingsCache(): void {
-  cachedListings = null;
-  cachedListingsAt = 0;
-  cachePromise = null;
+  listingsCacheByTenant.clear();
 }
 
 /**
@@ -386,18 +394,20 @@ export const fetchPublicListings = async (
   options?: { locale?: string; bypassCache?: boolean },
 ): Promise<PublicListing[]> => {
   const bypassCache = options?.bypassCache === true;
+  const cacheKey = getListingsCacheKey();
+  const entry = listingsCacheByTenant.get(cacheKey);
   // Return cached result if still within the freshness window (unless bypass requested)
-  if (!bypassCache && cachedListings != null && Date.now() - cachedListingsAt < PUBLIC_LISTINGS_TTL_MS) {
-    return cachedListings;
+  if (!bypassCache && entry?.listings != null && Date.now() - entry.cachedAt < PUBLIC_LISTINGS_TTL_MS) {
+    return entry.listings;
   }
 
   // Return existing promise if already fetching (but bypass must start its own fetch)
-  if (!bypassCache && cachePromise != null) {
-    return cachePromise;
+  if (!bypassCache && entry?.promise != null) {
+    return entry.promise;
   }
 
   // Create new fetch promise
-  cachePromise = (async () => {
+  const promise = (async () => {
     try {
       const params = new URLSearchParams();
       if (options?.locale) {
@@ -420,15 +430,27 @@ export const fetchPublicListings = async (
         .map((item) => normalizePublicListing(item))
         .filter((row): row is PublicListing => row !== null && row.id > 0);
 
-      cachedListings = result;
-      cachedListingsAt = Date.now();
+      listingsCacheByTenant.set(cacheKey, {
+        listings: result,
+        cachedAt: Date.now(),
+        promise: null,
+      });
       return result;
     } finally {
-      cachePromise = null;
+      const current = listingsCacheByTenant.get(cacheKey);
+      if (current) {
+        current.promise = null;
+      }
     }
   })();
 
-  return cachePromise;
+  listingsCacheByTenant.set(cacheKey, {
+    listings: entry?.listings ?? null,
+    cachedAt: entry?.cachedAt ?? 0,
+    promise,
+  });
+
+  return promise;
 };
 
 /** Normalize JSON from GET /listings/{propertyId}/photos into ordered URL strings. */

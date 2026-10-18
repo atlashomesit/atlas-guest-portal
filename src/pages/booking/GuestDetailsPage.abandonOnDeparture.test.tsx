@@ -144,7 +144,7 @@ describe('GuestDetailsPage TASK-8219 abandon-on-departure', () => {
     expect(abandonCalls().length).toBe(0);
   });
 
-  it('abandons the hold once the page stays hidden past the debounce window', async () => {
+  it('preserves the active hold when visibilitychange stays hidden past 3s during mobile UPI/OTP app switch (GUEST-019)', async () => {
     await renderPage();
     // Fake timers only after render/hydration settles under real timers (see note above).
     vi.useFakeTimers();
@@ -154,6 +154,6 @@ describe('GuestDetailsPage TASK-8219 abandon-on-departure', () => {
       vi.advanceTimersByTime(3100);
     });
 
-    expect(abandonCalls().length).toBe(1);
+    expect(abandonCalls().length).toBe(0);
   });
 });

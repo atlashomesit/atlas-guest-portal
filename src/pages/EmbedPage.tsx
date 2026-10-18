@@ -443,9 +443,33 @@ function GuestDetailsForm({
   onBack: () => void;
   brand: string;
 }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const savedInitial = useMemo(() => {
+    try {
+      const savedName = localStorage.getItem('atlas_guest_name')?.trim() ?? '';
+      let savedEmail = localStorage.getItem('atlas_guest_email')?.trim() ?? '';
+      const savedPhone = localStorage.getItem('atlas_guest_phone')?.trim() ?? '';
+      if (!savedEmail) {
+        const rawAuth = localStorage.getItem('atlas_guest_auth');
+        if (rawAuth) {
+          const parsed = JSON.parse(rawAuth) as { email?: string | null };
+          if (parsed?.email) savedEmail = parsed.email.trim();
+        }
+      }
+      return {
+        name: savedName,
+        email: savedEmail,
+        phone: savedPhone,
+        hasSaved: Boolean(savedName || savedEmail || savedPhone),
+      };
+    } catch {
+      return { name: '', email: '', phone: '', hasSaved: false };
+    }
+  }, []);
+
+  const [name, setName] = useState(savedInitial.name);
+  const [email, setEmail] = useState(savedInitial.email);
+  const [phone, setPhone] = useState(savedInitial.phone);
+  const [isPrefilledFromSaved, setIsPrefilledFromSaved] = useState(savedInitial.hasSaved);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [depositAccepted, setDepositAccepted] = useState(false);
   const [pricing, setPricing] = useState<GuestPriceBreakdown | null>(null);
@@ -457,6 +481,40 @@ function GuestDetailsForm({
   // Mirrors GuestDetailsPage's persisted holdId/holdToken/holdExpiresAt pattern, but here the
   // hold is created inside this component (not in BookingContext), so we keep it in local state.
   const [heldHold, setHeldHold] = useState<{ holdId: number; holdToken: string; holdExpiresAt: string } | null>(null);
+  const [holdCountdown, setHoldCountdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!heldHold?.holdExpiresAt) {
+      setHoldCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const remainingMs = new Date(heldHold.holdExpiresAt).getTime() - Date.now();
+      if (remainingMs <= 0) {
+        setHoldCountdown('0:00');
+        return;
+      }
+      const totalSec = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      setHoldCountdown(`${mins}:${String(secs).padStart(2, '0')}`);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [heldHold?.holdExpiresAt]);
+
+  const handleClearPrefilled = () => {
+    setName('');
+    setEmail('');
+    setPhone('');
+    setIsPrefilledFromSaved(false);
+    try {
+      localStorage.removeItem('atlas_guest_name');
+      localStorage.removeItem('atlas_guest_email');
+      localStorage.removeItem('atlas_guest_phone');
+    } catch { /* ignore */ }
+  };
 
   const depositRequired = (listing.securityDepositAmount ?? 0) > 0;
 
@@ -467,12 +525,12 @@ function GuestDetailsForm({
   useEffect(() => {
     let cancelled = false;
     setLoadingPricing(true);
-    fetchGuestPriceBreakdown(listing.id, checkInStr, checkOutStr)
+    fetchGuestPriceBreakdown(listing.id, checkInStr, checkOutStr, undefined, undefined, guests)
       .then((p) => { if (!cancelled) setPricing(p); })
       .catch(() => { if (!cancelled) setError('Could not load pricing. Please try again.'); })
       .finally(() => { if (!cancelled) setLoadingPricing(false); });
     return () => { cancelled = true; };
-  }, [listing.id, checkInStr, checkOutStr]);
+  }, [listing.id, checkInStr, checkOutStr, guests]);
 
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !phone.trim()) {
@@ -574,6 +632,11 @@ function GuestDetailsForm({
               }),
             });
             if (!verifyRes.ok) throw new Error('Payment verification failed');
+            try {
+              localStorage.setItem('atlas_guest_name', name.trim());
+              localStorage.setItem('atlas_guest_email', email.trim());
+              localStorage.setItem('atlas_guest_phone', phone.trim());
+            } catch { /* ignore */ }
             onBook({ bookingId: order.bookingId, bookingToken: order.bookingToken });
           } catch {
             setError('Payment succeeded but confirmation failed. Please contact support.');
@@ -606,6 +669,17 @@ function GuestDetailsForm({
         {listing.name} &middot; {format(checkIn, 'MMM d')} &ndash; {format(checkOut, 'MMM d')} &middot; {formatNightCount(nights)}
       </div>
 
+      {holdCountdown && (
+        <div
+          className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          data-testid="embed-hold-countdown"
+        >
+          {holdCountdown === '0:00'
+            ? 'Reservation hold expired — unpaid holds release automatically. Tap Pay to start a fresh hold.'
+            : `Dates held for ${holdCountdown} — unpaid holds release automatically when the timer expires.`}
+        </div>
+      )}
+
       {loadingPricing ? (
         <div className="py-4 text-center text-sm text-text-muted">Loading pricing...</div>
       ) : pricing && pricing.finalAmount != null ? (
@@ -621,12 +695,6 @@ function GuestDetailsForm({
               <span>{formatCurrency(pricing.convenienceFeeAmount)}</span>
             </div>
           )}
-          {pricing.gstAmount != null && pricing.gstAmount > 0 && (
-            <div className="flex justify-between text-text-secondary">
-              <span>GST ({pricing.gstPercent}%)</span>
-              <span>{formatCurrency(pricing.gstAmount)}</span>
-            </div>
-          )}
           {pricing.touristTaxAmount > 0 && (
             <div className="flex justify-between text-text-secondary">
               <span>Tourist tax</span>
@@ -634,13 +702,26 @@ function GuestDetailsForm({
             </div>
           )}
           <div className="mt-1 flex justify-between border-t border-border-subtle pt-1 font-semibold">
-            <span>Total</span>
+            <span>Total <span className="text-xs font-normal text-text-muted">(all fees included)</span></span>
             <span>{formatCurrency(pricing.finalAmount!)}</span>
           </div>
         </div>
       ) : null}
 
       <div className="mb-3 grid gap-2">
+        {isPrefilledFromSaved && (
+          <div className="flex items-center justify-between rounded-md bg-bg-muted px-2.5 py-1.5 text-xs text-text-secondary">
+            <span>Saved details pre-filled</span>
+            <button
+              type="button"
+              onClick={handleClearPrefilled}
+              data-testid="clear-prefilled-guest-details"
+              className="font-medium text-text-primary underline hover:no-underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
         <label htmlFor="embed-guest-name" className="text-xs font-medium text-text-secondary">Full name</label>
         <input
           id="embed-guest-name"

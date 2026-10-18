@@ -184,7 +184,7 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
           <>
             <b>{nightlyIsSynthetic ? "from " : ""}{formatCurrency(nightlyFallback, { maximumFractionDigits: 0 })}</b>
             <span>/ night</span>
-            <span className="pp-m-sticky-taxes">+ taxes &amp; fees</span>
+            <span className="pp-m-sticky-taxes">all fees included</span>
           </>
         )}
       </div>

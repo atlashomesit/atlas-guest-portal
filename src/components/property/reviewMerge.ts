@@ -63,6 +63,26 @@ export function normalizeReviewSource(source?: string | null): string | undefine
   return s;
 }
 
+/**
+ * TASK-10298750: Strips raw OTA scraper prefixes ("Public review:", "Headline:", "Positive:", "Negative:")
+ * so scraped boilerplate never renders on guest storefronts.
+ */
+export function stripReviewScraperBoilerplate(raw?: string | null): string {
+  if (!raw) return '';
+  return raw
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^\s*(?:public\s+review|headline)\s*:\s*/i, '')
+        .replace(/^\s*(?:positive|negative)\s*:\s*/i, '')
+        .trim(),
+    )
+    .filter((line) => line.length > 0)
+    .join('\n')
+    .trim();
+}
+
 export function mergeListingAndExternalReviews(
   native: ListingReviewRow[],
   external: ExternalReviewRow[],
@@ -70,18 +90,19 @@ export function mergeListingAndExternalReviews(
   const validExternal = (external || []).filter((r) => {
     const rating = Number(r.rating);
     if (isNaN(rating) || rating < 4) return false;
-    return Boolean(r.body && r.body.trim().length > 0);
+    return stripReviewScraperBoilerplate(r.body).length > 0;
   });
 
   const externalRows: DisplayReviewRow[] = validExternal.map((r, idx) => {
     const cleanSource = normalizeReviewSource(r.source);
     const isGoogle = (cleanSource ?? '').toLowerCase() === 'google' || (!cleanSource && !r.sourceUrl);
+    const cleanedBody = stripReviewScraperBoilerplate(r.body);
     return {
       id: -(idx + 1),
       displayKey: `ext-${idx}-${r.reviewDate ?? ''}`,
       guestName: r.guestName ?? (isGoogle ? 'Google user' : cleanSource ? `${cleanSource} guest` : 'Guest'),
       rating: Number(r.rating) || 5,
-      body: r.body?.trim() ?? null,
+      body: cleanedBody || null,
       createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
       isGoogle,
       source: cleanSource,

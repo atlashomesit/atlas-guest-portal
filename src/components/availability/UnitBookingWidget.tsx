@@ -1026,6 +1026,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       gstRangeEndIso,
       controller.signal,
       selectedRatePlanId,
+      guests,
     )
       .then((b) => {
         setServerPriceBreakdown(b);
@@ -1034,7 +1035,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setServerPriceBreakdown(null);
       });
     return () => controller.abort();
-  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests]);
 
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
