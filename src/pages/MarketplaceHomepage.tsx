@@ -155,7 +155,9 @@ export default function MarketplaceHomepage() {
   const [showMap, setShowMap] = useState(false);
   const [marketplaceProperties, setMarketplaceProperties] = useState<MarketplacePropertyApi[]>([]);
   // TASK-4413: read dates and guest count from URL params (from AirbnbSearchBar)
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // MKT-023: Quick amenity filter selection
+  const [selectedAmenity, setSelectedAmenity] = useState<string | null>(null);
   // TASK-102058: the criteria the grid was filtered by, forwarded into every property
   // link (cards + map pins) so details hydrates and Back-navigation restores the bar.
   const searchSuffix = useMemo(() => {
@@ -302,13 +304,27 @@ export default function MarketplaceHomepage() {
   }, [buildPagePath, filterQuery, hasMore, items, loadingMore, page]);
 
   const visibleItems = useMemo(() => {
-    if (minPrice == null && maxPrice == null) return items;
-    return items.filter((item) => {
-      if (minPrice != null && item.pricePerNight < minPrice) return false;
-      if (maxPrice != null && item.pricePerNight > maxPrice) return false;
-      return true;
-    });
-  }, [items, minPrice, maxPrice]);
+    let result = items;
+    if (minPrice != null || maxPrice != null) {
+      result = result.filter((item) => {
+        if (minPrice != null && item.pricePerNight < minPrice) return false;
+        if (maxPrice != null && item.pricePerNight > maxPrice) return false;
+        return true;
+      });
+    }
+    if (selectedAmenity) {
+      const term = selectedAmenity.toLowerCase();
+      result = result.filter((item) => {
+        const text = `${item.title} ${item.slug} ${item.city ?? ''}`.toLowerCase();
+        if (term === 'pool') return text.includes('pool') || text.includes('swimming');
+        if (term === 'pet friendly') return text.includes('pet') || text.includes('dog');
+        if (term === 'beachfront') return text.includes('beach') || text.includes('sea') || text.includes('ocean');
+        if (term === 'mountain view') return text.includes('mountain') || text.includes('hill') || text.includes('valley');
+        return text.includes(term);
+      });
+    }
+    return result;
+  }, [items, minPrice, maxPrice, selectedAmenity]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -501,6 +517,44 @@ export default function MarketplaceHomepage() {
             aria-pressed={showMap}
           >
             {showMap ? 'Hide map' : `Map (${mapPins.length})`}
+          </button>
+        )}
+      </div>
+
+      {/* MKT-023: Top amenities quick filter pills */}
+      <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="marketplace-amenities-pills">
+        <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">Amenities:</span>
+        {[
+          { label: 'Pool', icon: '🏊' },
+          { label: 'Pet Friendly', icon: '🐾' },
+          { label: 'Beachfront', icon: '🏖️' },
+          { label: 'Mountain View', icon: '🏔️' },
+        ].map(({ label, icon }) => {
+          const isSelected = selectedAmenity === label;
+          return (
+            <button
+              key={label}
+              type="button"
+              data-testid={`marketplace-amenity-${label.toLowerCase().replace(/\s+/g, '-')}`}
+              className={`min-h-[38px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+                isSelected
+                  ? 'bg-black text-white border-black'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+              }`}
+              onClick={() => setSelectedAmenity((prev) => (prev === label ? null : label))}
+            >
+              <span aria-hidden="true">{icon}</span>
+              <span>{label}</span>
+            </button>
+          );
+        })}
+        {selectedAmenity && (
+          <button
+            type="button"
+            className="text-xs text-text-muted hover:text-black underline ml-1"
+            onClick={() => setSelectedAmenity(null)}
+          >
+            Clear
           </button>
         )}
       </div>
@@ -784,6 +838,21 @@ export default function MarketplaceHomepage() {
           <p className="mt-1 text-sm text-text-muted">
             Try the “All” tab or a different city to see available homes and rooms.
           </p>
+          <button
+            type="button"
+            data-testid="marketplace-empty-clear-filters"
+            onClick={() => {
+              setQuery('');
+              setCategory('all');
+              setMinPriceInput('');
+              setMaxPriceInput('');
+              setSelectedAmenity(null);
+              setSearchParams({});
+            }}
+            className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-black px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-gray-800 transition-colors"
+          >
+            Clear all filters
+          </button>
         </div>
       )}
     </section>
