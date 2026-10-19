@@ -9,6 +9,7 @@ import { getIstCalendarDate, toCalendarISO } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { formatCurrency } from '@/utils/formatting';
 import { razorpayOrderAmountInrToPaise } from '@/utils/razorpayOrderAmount';
+import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,8 @@ type EmbedListingSummary = {
   checkOutTime: string | null;
   timezoneId: string | null;
   securityDepositAmount: number | null;
+  cancellationTier?: string | null;
+  cancellationWindowHours?: number | null;
 };
 
 type EmbedConfig = {
@@ -177,6 +180,10 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
       timezoneId: (r.timezoneId ?? r.TimezoneId) as string | null,
       securityDepositAmount: r.securityDepositAmount != null || r.SecurityDepositAmount != null
         ? Number(r.securityDepositAmount ?? r.SecurityDepositAmount)
+        : null,
+      cancellationTier: (r.cancellationTier ?? r.CancellationTier) as string | null,
+      cancellationWindowHours: r.cancellationWindowHours != null || r.CancellationWindowHours != null
+        ? Number(r.cancellationWindowHours ?? r.CancellationWindowHours)
         : null,
     })),
   };
@@ -707,6 +714,14 @@ function GuestDetailsForm({
           </div>
         </div>
       ) : null}
+
+      {/* GUEST-024: Visual cancellation policy milestone timeline */}
+      <CancellationMilestoneTimeline
+        checkInDate={checkIn}
+        cancellationTier={listing.cancellationTier}
+        windowHoursOverride={listing.cancellationWindowHours}
+        className="mb-3"
+      />
 
       <div className="mb-3 grid gap-2">
         {isPrefilledFromSaved && (

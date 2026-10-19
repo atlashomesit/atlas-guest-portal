@@ -623,6 +623,8 @@ const PropertyDetails = () => {
     }>(null);
     /** TASK-1979: GBP-imported reviews from `GET /api/public/listings/{id}`. */
     const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
+    /** REV-030: blended star counts from `GET /api/public/listings/{id}`. */
+    const [publicRatingStarCounts, setPublicRatingStarCounts] = useState<number[] | null>(null);
 
     // AMN-001: Fetch amenity master list once on mount
     useEffect(() => {
@@ -887,11 +889,13 @@ const PropertyDetails = () => {
         if (!Number.isFinite(num) || num <= 0) {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
+            setPublicRatingStarCounts(null);
             return;
         }
         const ac = new AbortController();
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
         setExternalReviewsFromApi([]);
+        setPublicRatingStarCounts(null);
         void (async () => {
             try {
                 const [nativeRes, publicRes] = await Promise.all([
@@ -922,14 +926,25 @@ const PropertyDetails = () => {
                 }
 
                 if (publicRes.ok) {
-                    const publicPayload = (await publicRes.json()) as { externalReviews?: ExternalReviewRow[] };
+                    const publicPayload = (await publicRes.json()) as {
+                        externalReviews?: ExternalReviewRow[];
+                        ratingStarCounts?: number[] | null;
+                        RatingStarCounts?: number[] | null;
+                    };
                     if (!ac.signal.aborted) {
                         setExternalReviewsFromApi(
                             Array.isArray(publicPayload.externalReviews) ? publicPayload.externalReviews : [],
                         );
+                        const starCounts = Array.isArray(publicPayload.ratingStarCounts)
+                            ? publicPayload.ratingStarCounts
+                            : Array.isArray(publicPayload.RatingStarCounts)
+                                ? publicPayload.RatingStarCounts
+                                : null;
+                        setPublicRatingStarCounts(starCounts);
                     }
                 } else if (!ac.signal.aborted) {
                     setExternalReviewsFromApi([]);
+                    setPublicRatingStarCounts(null);
                 }
 
                 if (nativePayload && !ac.signal.aborted) {
@@ -944,6 +959,7 @@ const PropertyDetails = () => {
                 if (!ac.signal.aborted) {
                     setListingReviewsFromApi(null);
                     setExternalReviewsFromApi([]);
+                    setPublicRatingStarCounts(null);
                 }
             }
         })();
@@ -2365,8 +2381,13 @@ useEffect(() => {
                           </div>
                         </div>
                         <div className="pp-v2-reviews-detail">
-                        {/* TASK-101380: per-star distribution from this site's complete review list. */}
-                        <RatingDistribution ratings={api.reviews.map((r) => Number(r.rating))} totalCount={api.totalCount} otherSourcesCount={externalReviewsFromApi.length} />
+                        {/* TASK-101380 / REV-030: per-star distribution from blended ratingStarCounts if available. */}
+                        <RatingDistribution
+                          ratings={api.reviews.map((r) => Number(r.rating))}
+                          totalCount={api.totalCount}
+                          starCounts={publicRatingStarCounts}
+                          otherSourcesCount={publicRatingStarCounts ? 0 : externalReviewsFromApi.length}
+                        />
                         {/* Sub-rating bars derived from API reviews if available */}
                         {api.reviews.length > 0 && (() => {
                           const rs = api.reviews.filter((r) => r.rating > 0);
@@ -2386,7 +2407,7 @@ useEffect(() => {
                           ].filter(b => b.v != null);
                           if (bars.length === 0) {
                             // The distribution already states the count and source; do not repeat it.
-                            if (starDistribution(api.reviews.map((r) => Number(r.rating)), api.totalCount)) return null;
+                            if (publicRatingStarCounts || starDistribution(api.reviews.map((r) => Number(r.rating)), api.totalCount)) return null;
                             return (
                               <div style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', lineHeight: 1.6 }}>
                                 <p style={{ margin: '0 0 4px', fontWeight: 600, color: 'var(--text-primary, #4a3535)' }}>Overall rating</p>

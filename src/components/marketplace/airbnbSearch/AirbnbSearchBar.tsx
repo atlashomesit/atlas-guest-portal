@@ -44,8 +44,8 @@ function formatGuestSummary(counts: GuestCounts): string {
 function buildSearchParams(values: AirbnbSearchValues): URLSearchParams {
   const p = new URLSearchParams();
   p.set('destination', values.destination.trim());
-  p.set('checkIn', values.checkIn);
-  p.set('checkOut', values.checkOut);
+  if (values.checkIn) p.set('checkIn', values.checkIn);
+  if (values.checkOut) p.set('checkOut', values.checkOut);
   p.set('adults', String(values.guests.adults));
   p.set('children', String(values.guests.children));
   p.set('infants', String(values.guests.infants));
@@ -229,9 +229,12 @@ export default function AirbnbSearchBar() {
       setDestinationError('Please select a destination.');
       ok = false;
     }
-    if (!dateRange.startDate || !dateRange.endDate || dateRange.endDate <= dateRange.startDate) {
-      setDateError('Please select valid travel dates.');
-      ok = false;
+    const hasAnyDate = Boolean(dateRange.startDate || dateRange.endDate);
+    if (hasAnyDate) {
+      if (!dateRange.startDate || !dateRange.endDate || dateRange.endDate <= dateRange.startDate) {
+        setDateError('Please select valid travel dates.');
+        ok = false;
+      }
     }
     if (guestCounts.adults < 1) {
       ok = false;
@@ -240,8 +243,8 @@ export default function AirbnbSearchBar() {
 
     return {
       destination: destination.trim(),
-      checkIn: toCalendarISO(dateRange.startDate!),
-      checkOut: toCalendarISO(dateRange.endDate!),
+      checkIn: dateRange.startDate ? toCalendarISO(dateRange.startDate) : undefined,
+      checkOut: dateRange.endDate ? toCalendarISO(dateRange.endDate) : undefined,
       guests: guestCounts,
     };
   };
@@ -253,12 +256,13 @@ export default function AirbnbSearchBar() {
     if (!values) return;
     persistRecentSearch(values);
     setRecentEpoch((n) => n + 1);
-    // TASK-4413: On marketplace homepage, filter grid in-place; otherwise redirect to /search
-    if (location.pathname === '/') {
+    // TASK-4413 / MKT-022: On marketplace homepage with dates, filter grid in-place; otherwise redirect to /search
+    const hasDates = Boolean(values.checkIn && values.checkOut);
+    if (location.pathname === '/' && hasDates) {
       const p = new URLSearchParams();
       p.set('city', values.destination.trim());
-      p.set('checkIn', values.checkIn);
-      p.set('checkOut', values.checkOut);
+      p.set('checkIn', values.checkIn!);
+      p.set('checkOut', values.checkOut!);
       const guestTotal = values.guests.adults + values.guests.children;
       if (guestTotal > 0) p.set('guests', String(guestTotal));
       navigate({ pathname: '/', search: p.toString() });

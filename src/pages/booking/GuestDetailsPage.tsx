@@ -62,6 +62,8 @@ import {
 } from '@/utils/cancellationPolicy';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
+import BookDirectPerks from '@/components/trust/BookDirectPerks';
+import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
 function abandonPaymentPendingCheckout(
@@ -1724,6 +1726,9 @@ const GuestDetailsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* GUEST-023: Branded Book Direct Perks */}
+          <BookDirectPerks className="my-4" />
+
           {/* Guest form */}
           <form onSubmit={handleSubmit} noValidate id="gd-details-form">
             {/* Who's coming */}
@@ -2119,6 +2124,16 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* GUEST-024: Visual cancellation policy milestone timeline */}
+            <div className="mb-6">
+              <CancellationMilestoneTimeline
+                checkInDate={booking.checkIn}
+                cancellationTier={booking.holdCancellationTier}
+                windowHoursOverride={booking.holdCancellationWindowHours}
+                graceHours={booking.holdGraceHours}
+              />
+            </div>
+
             {/* Native consent controls keep one focus stop per choice and independent policy links. */}
             <div className="gd-consent">
               <div ref={consentRowRef} className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`} data-testid="guest-booking-consent-row">
@@ -2500,6 +2515,15 @@ const GuestDetailsPage: React.FC = () => {
               <div className="gd-pay-microcopy">You'll be connected directly to the host — no payment taken on this site.</div>
             </>
           )}
+
+          {/* GUEST-024: Cancellation policy milestone timeline in checkout summary */}
+          <CancellationMilestoneTimeline
+            checkInDate={booking.checkIn}
+            cancellationTier={booking.holdCancellationTier}
+            windowHoursOverride={booking.holdCancellationWindowHours}
+            graceHours={booking.holdGraceHours}
+            className="mb-4"
+          />
 
           {/* Trust band (desktop) */}
           <TrustBand

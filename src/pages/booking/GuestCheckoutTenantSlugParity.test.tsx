@@ -380,6 +380,7 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
                   tenantContext={{ slug: tenantSlug, name: 'Grand Villa Host' }}
                 />
               }
+            />
             <Route
               path="/book/:propertySlug/:unitSlug/details"
               element={<div data-testid="guest-details-stub">Details</div>}
