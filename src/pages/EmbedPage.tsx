@@ -11,6 +11,8 @@ import { formatCurrency } from '@/utils/formatting';
 import { razorpayOrderAmountInrToPaise } from '@/utils/razorpayOrderAmount';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import { failureDetailsFromRazorpayEvent, reportPaymentFailure } from '@/api/paymentFailureClient';
+import { createRazorpayWindowWatch, isRazorpayContainerVisible } from '@/utils/razorpayWindowWatch';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
@@ -651,6 +653,8 @@ function GuestDetailsForm({
       const loaded = await loadRazorpayScript();
       if (!loaded) throw new Error('Payment script failed to load. Please try again.');
 
+      // Set by whichever Razorpay event ends this attempt; the "window never opened" watchdog below stops once it is set.
+      let windowSettled = false;
       const rzp = new window.Razorpay({
         key: order.keyId,
         amount: amountPaise,
@@ -659,6 +663,7 @@ function GuestDetailsForm({
         description: `${listing.name} — ${formatNightCount(calculateNights(checkIn, checkOut))}`,
         order_id: order.orderId,
         handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+          windowSettled = true;
           try {
             const verifyRes = await fetch(buildApiUrl('/api/Razorpay/verify'), {
               method: 'POST',
@@ -684,19 +689,41 @@ function GuestDetailsForm({
           }
         },
         modal: {
-          ondismiss: () => { setSubmitting(false); },
+          ondismiss: () => { windowSettled = true; setSubmitting(false); },
         },
         prefill: { name, email, contact: phone },
         theme: { color: brand },
       });
       rzp.on('payment.failed', (resp) => {
+        windowSettled = true;
         const r = resp as { error?: { code?: string; description?: string } };
+        // GUEST-028: keep what Razorpay said (and which website this ran on), so a refusal that blocks every guest is seen.
+        reportPaymentFailure(order.bookingId, order.bookingToken, null, { ...failureDetailsFromRazorpayEvent(resp), orderId: order.orderId });
         // FOUNDER RULED 2026-10-19: "Payment didn't go through" with [Try again] and [Message the host on WhatsApp].
         setError(null);
         setPaymentFailure({ reasonText: mapRazorpayFailureCode(r.error?.code, r.error?.description) });
         setSubmitting(false);
       });
       rzp.open();
+
+      // Razorpay's window can die without telling the page (an in-app browser that blocks it, an order the gateway rejects): without this the
+      // Pay button would stay on "Securing..." for the rest of the hold. Same way out as a failed payment.
+      const windowWatch = createRazorpayWindowWatch(Date.now());
+      const openWatchdog = window.setInterval(() => {
+        // The widget being gone (the guest left) also ends the watch: a departed guest gets no late failure report.
+        if (windowSettled || !document.querySelector('[data-testid="embed-guest-details"]')) { window.clearInterval(openWatchdog); return; }
+        if (!windowWatch.tick(isRazorpayContainerVisible(), Date.now())) return;
+        window.clearInterval(openWatchdog);
+        windowSettled = true;
+        reportPaymentFailure(order.bookingId, order.bookingToken, null, {
+          code: 'CHECKOUT_DID_NOT_OPEN',
+          description: 'The Razorpay payment window did not open or closed without telling the page',
+          orderId: order.orderId,
+        });
+        setError(null);
+        setPaymentFailure({ reasonText: 'The payment window did not open in this browser. Try again, or open this page in Chrome or Safari.' });
+        setSubmitting(false);
+      }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
       setSubmitting(false);

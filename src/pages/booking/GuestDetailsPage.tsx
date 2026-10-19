@@ -50,6 +50,8 @@ import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
 import { TerminalCheckoutOutcomeEvents, track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import { failureDetailsFromRazorpayEvent, reportPaymentFailure } from '@/api/paymentFailureClient';
+import { createRazorpayWindowWatch, isRazorpayContainerVisible } from '@/utils/razorpayWindowWatch';
 import {
   isServerTotalConfirmRequired,
   razorpayOrderAmountInrToPaise,
@@ -781,6 +783,8 @@ const GuestDetailsPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderErrorIs409, setOrderErrorIs409] = useState(false);
+  /** Heading for the "pick different dates" banner. Null = the default "just booked" race wording; set for the host's own stay rules. */
+  const [orderErrorHeading, setOrderErrorHeading] = useState<string | null>(null);
   const [paymentCancelled, setPaymentCancelled] = useState(false);
   /** FOUNDER RULED 2026-10-19: set by the first `payment.failed`; drives the "Payment didn't go through" panel. */
   const [paymentFailure, setPaymentFailure] = useState<{ reasonText: string; code: string; at: number } | null>(null);
@@ -1061,6 +1065,7 @@ const GuestDetailsPage: React.FC = () => {
       setIsSubmitting(true);
       setOrderError(null);
       setOrderErrorIs409(false);
+      setOrderErrorHeading(null);
       setPaymentCancelled(false);
       setPaymentFailure(null);
       // Funnel: the guest got through name / phone / email / consents / house rules and tapped Pay.
@@ -1501,6 +1506,11 @@ const GuestDetailsPage: React.FC = () => {
                 // or back-to-property. TTL worker remains the backstop if they leave mid-failure.
                 // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
                 track(TerminalCheckoutOutcomeEvents.PaymentFailed, holdListingId ? Number(holdListingId) : 0);
+                // GUEST-028: keep what Razorpay said (and which website this ran on), so a refusal that blocks every guest is seen.
+                reportPaymentFailure(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug, {
+                  ...failureDetailsFromRazorpayEvent(failRes),
+                  orderId: orderId,
+                });
                 // FOUNDER RULED 2026-10-19: after the FIRST failed payment show "Payment didn't go through" with
                 // [Try again] and [Message the host on WhatsApp]. The dates stay held until the 10-minute mark.
                 setOrderError(null);
@@ -1518,6 +1528,35 @@ const GuestDetailsPage: React.FC = () => {
 
               track('payment_init', holdListingId ? Number(holdListingId) : 0);
               rzp.open();
+
+              // Razorpay's window can die without telling us (an in-app browser that blocks it, an order the gateway rejects): it alerts,
+              // hides itself, and fires neither `close` nor `payment.failed`, which would leave Pay on "Securing your booking..." for the
+              // rest of the hold. Give the guest the same way out as a failed payment: Try again, or the host on WhatsApp.
+              const windowWatch = createRazorpayWindowWatch(Date.now());
+              const openWatchdog = window.setInterval(() => {
+                // `checkoutSettledRef` also flips when the guest leaves the page, so a departed guest never gets a late failure report.
+                if (paymentCompleted || checkoutSettledRef.current) { window.clearInterval(openWatchdog); return; }
+                if (!windowWatch.tick(isRazorpayContainerVisible(), Date.now())) return;
+                window.clearInterval(openWatchdog);
+                clearInterval(expireCheckInterval);
+                paymentCompleted = true;
+                track(TerminalCheckoutOutcomeEvents.PaymentFailed, holdListingId ? Number(holdListingId) : 0);
+                reportPaymentFailure(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug, {
+                  code: 'CHECKOUT_DID_NOT_OPEN',
+                  description: 'The Razorpay payment window did not open or closed without telling the page',
+                  orderId,
+                });
+                setOrderError(null);
+                setPaymentFailure({
+                  reasonText: 'The payment window did not open in this browser. Try again, or open this page in Chrome or Safari.',
+                  code: 'CHECKOUT_DID_NOT_OPEN',
+                  at: Date.now(),
+                });
+                // The order Razorpay's window refused is not reused: "Try again" starts a fresh order on the SAME hold.
+                setRazorpayOrderId(null);
+                setPaymentCancelled(false);
+                setIsSubmitting(false);
+              }, 1000);
             } catch (err) {
               console.error('[GuestDetailsPage] Razorpay init error:', err);
               setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
@@ -1558,6 +1597,13 @@ const GuestDetailsPage: React.FC = () => {
         } else if (status === 422 && apiCode === 'HOUSE_RULES_NOT_ACCEPTED') {
           setHouseRulesError('Please accept the house rules to continue.');
           setOrderError('Please accept the house rules to continue. No payment was taken.');
+        } else if (status === 409 && apiCode === 'STAY_RULE_REFUSED') {
+          // The host's own stay rule (minimum stay, closed to arrival, stop-sell, ...): the API's sentence is accurate and readable, and
+          // nobody "got there first", so never say that. Nothing was held and no money moved.
+          const ruleSentence = (serverMessage || 'These dates cannot be booked as chosen').trim().replace(/[.!?]+$/, '');
+          setOrderError(`${ruleSentence}. Pick different dates to continue. No payment was taken.`);
+          setOrderErrorHeading("These dates can't be booked as chosen.");
+          setOrderErrorIs409(true);
         } else if (status === 409) {
           // TASK-4537: Distinguish the guest's OWN confirmed booking from an availability race.
           // If the message mentions "confirmed booking" or "already exists", this is likely
@@ -1856,7 +1902,7 @@ const GuestDetailsPage: React.FC = () => {
               <span>
                 Your dates are reserved for the next{' '}
                 <b className="gd-strip-timer">{countdown}</b>.
-                {'  '}Finish payment to confirm — we won't release them while you're here.
+                {'  '}Finish payment to confirm — if the time runs out the dates are released.
               </span>
             ) : (
               <span data-testid="hold-strip-no-clock">
@@ -2517,7 +2563,7 @@ const GuestDetailsPage: React.FC = () => {
               <div className="gd-banner" role="alert">
                 <IconAlert size={16}/>
                 <div>
-                  <b>Sorry, these dates were just booked.</b><br/>
+                  <b>{orderErrorHeading || 'Sorry, these dates were just booked.'}</b><br/>
                   <span>{orderError}</span>
                   <div style={{ marginTop: 10 }}>
                     <button type="button" className="gd-modal-cta" style={{ marginTop: 0 }} onClick={handleBackToProperty}>

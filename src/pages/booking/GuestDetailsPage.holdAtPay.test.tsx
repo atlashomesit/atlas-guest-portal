@@ -213,6 +213,33 @@ describe('GuestDetailsPage - the hold starts at Pay (2026-10-19)', () => {
     expect(rzp.opened).toBe(0);
   });
 
+  it('a host\'s own stay rule (minimum stay) is told in the API\'s own words - NEVER "someone else got there first" - and no money moves', async () => {
+    const post = vi.spyOn(axios, 'post').mockRejectedValue(
+      new AxiosError('conflict', 'ERR_BAD_REQUEST', undefined, undefined, {
+        status: 409,
+        statusText: 'Conflict',
+        data: { code: 'STAY_RULE_REFUSED', message: 'Minimum stay is 2 night(s) for these dates.' },
+        headers: {},
+        config: {} as never,
+      }),
+    );
+    await renderPage();
+    fillDetails();
+    fireEvent.click(screen.getByTestId('guest-booking-consent'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('guest-booking-submit'));
+    });
+    await settle();
+
+    expect(screen.getAllByText(/These dates can't be booked as chosen\./).length).toBeGreaterThan(0);
+    expect(document.body.textContent).toContain('Minimum stay is 2 night(s) for these dates.');
+    expect(document.body.textContent).toContain('No payment was taken');
+    expect(document.body.textContent).not.toMatch(/just booked|someone else got there first/i);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(rzp.opened).toBe(0);
+  });
+
   it('shows the host\'s house rules with a REQUIRED tick: Pay stays disabled until it is ticked, and the final-charge carries it', async () => {
     ctx.info = baseInfo({
       hasHouseRules: true,
