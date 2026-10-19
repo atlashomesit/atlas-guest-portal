@@ -48,6 +48,7 @@ import { fetchPublicListings } from '@/api/listingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
+import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import { track } from '@/lib/events'; // TASK-1480
 import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
@@ -2581,6 +2582,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </span>
         </div>
       ) : null}
+
+      {/* GUEST-023: Branded Book Direct Perks */}
+      <BookDirectPerks className="mt-3.5" />
 
       {/* TASK-7428: Razorpay pay rail only when an online payment provider is configured */}
       {showOnlinePaymentProcessing && (

@@ -76,4 +76,23 @@ describe('TASK-102058 AirbnbSearchBar URL sync', () => {
     expect(screen.getByTestId('airbnb-search-destination')).toHaveValue('Goa');
     expect(screen.getByText('2 guests')).toBeInTheDocument();
   });
+
+  it('MKT-022 allows destination-only search without travel dates and navigates to /search', async () => {
+    renderBarAt('/');
+
+    await settle();
+    fireEvent.change(screen.getByTestId('airbnb-search-destination'), { target: { value: 'Manali' } });
+    await settle();
+
+    fireEvent.submit(screen.getByTestId('airbnb-search-bar'));
+    await settle();
+
+    const probe = screen.getByTestId('location-probe').textContent ?? '';
+    expect(probe).toContain('/search?');
+    const params = new URLSearchParams(probe.split('?')[1] ?? '');
+    expect(params.get('destination')).toBe('Manali');
+    expect(params.get('checkIn')).toBeNull();
+    expect(params.get('checkOut')).toBeNull();
+  });
 });
+

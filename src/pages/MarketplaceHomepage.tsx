@@ -1,7 +1,7 @@
 import HostIdentityLabel from '@/components/property/HostIdentityLabel';
 import { feePercent } from "../utils/paymentFeeCopy";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
 import { formatCurrency } from '@/utils/formatting'; // TASK-1872
@@ -130,6 +130,7 @@ type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; page
 const PAGE_SIZE = 20;
 
 export default function MarketplaceHomepage() {
+  const navigate = useNavigate();
   const [category, setCategory] = useState<'all' | 'homes' | 'rooms'>('all');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
@@ -197,8 +198,8 @@ export default function MarketplaceHomepage() {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
     if (query.trim()) p.set('city', query.trim());
-    // TASK-4413: pass date/guest filters to API if present
-    const city = searchParams.get('city');
+    // TASK-4413 / MKT-022: pass date/guest/destination filters to API if present
+    const city = searchParams.get('city') || searchParams.get('destination');
     if (city?.trim()) p.set('city', city.trim());
     const checkIn = searchParams.get('checkIn');
     if (checkIn) p.set('checkIn', checkIn);
@@ -558,12 +559,20 @@ export default function MarketplaceHomepage() {
         {!loading &&
           visibleItems.map((item) => {
             const isFav = favIds.has(item.id);
+            const canonicalUrl = marketplaceListingPath(item, searchSuffix);
 
             return (
               <article
                 key={item.id}
-                className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-sm transition-colors hover:border-border-subtle"
+                className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-sm transition-all hover:border-border-subtle hover:shadow-md cursor-pointer"
                 data-testid="marketplace-card"
+                onClick={() => navigate(canonicalUrl)}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    navigate(canonicalUrl);
+                  }
+                }}
               >
                 {/* TASK-1874: OptimizedImage replaces raw <img> */}
                 <div className="h-40 w-full bg-bg-muted">
@@ -581,9 +590,10 @@ export default function MarketplaceHomepage() {
                   type="button"
                   aria-label={isFav ? 'Remove from saved' : 'Save listing'}
                   className="absolute right-2 top-2 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     toggleFavorite(item.id);
-                    setFavEpoch((e) => e + 1);
+                    setFavEpoch((prev) => prev + 1);
                   }}
                 >
                   {isFav
@@ -593,7 +603,15 @@ export default function MarketplaceHomepage() {
 
                 <div className="flex flex-1 flex-col gap-2 p-4">
                   <div className="text-xs uppercase tracking-wide text-text-muted">{item.tenantName}</div>
-                  <h2 className="text-base font-semibold text-text-primary leading-snug">{item.title}</h2>
+                  <h2 className="text-base font-semibold text-text-primary leading-snug">
+                    <Link
+                      to={canonicalUrl}
+                      onClick={(e) => e.stopPropagation()}
+                      className="hover:underline focus:outline-none"
+                    >
+                      {item.title}
+                    </Link>
+                  </h2>
                   <HostIdentityLabel marketplace verified={item.hostIdentityVerified} />
 
                   {/* TASK-4511: Trust signal badges */}
@@ -705,7 +723,8 @@ export default function MarketplaceHomepage() {
 
                   <Link
                     className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
-                    to={marketplaceListingPath(item, searchSuffix)}
+                    to={canonicalUrl}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     View home
                   </Link>
