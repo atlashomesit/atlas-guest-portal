@@ -1,4 +1,3 @@
-import React from 'react';
 import { ShieldCheck, MessageSquareCheck, Percent } from 'lucide-react';
 
 interface BookDirectPerksProps {
