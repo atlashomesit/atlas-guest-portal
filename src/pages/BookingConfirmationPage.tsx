@@ -736,6 +736,11 @@ export default function BookingConfirmationPage() {
   const confirmationNotifyPhone = "";
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
   const whatsappUrl = hasWhatsAppContact ? `https://wa.me/${whatsappDigits}?text=${whatsappText}` : "";
+  // GUEST-026: Direct pre-filled WhatsApp link with booking reference and guest name
+  const messageHostWhatsappText = encodeURIComponent(
+    `Hi, I have a confirmed booking (#${booking.bookingId})${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Looking forward to my stay!`
+  );
+  const messageHostWhatsappUrl = hasWhatsAppContact ? `https://wa.me/${whatsappDigits}?text=${messageHostWhatsappText}` : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
   const hasPendingModRequest = modRequests.some((r) => r.status === "Pending");
@@ -1730,6 +1735,41 @@ export default function BookingConfirmationPage() {
                 {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
               </a>
             )}
+          </div>
+        )}
+
+        {/* GUEST-026: Trip Preparation card */}
+        {!isCancelled && (
+          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-4" data-testid="trip-preparation-card">
+            <div>
+              <h2 className="text-sm font-semibold text-text-primary">Trip Preparation</h2>
+              <p className="text-sm text-text-secondary mt-0.5">
+                Save your stay to your calendar and message your host directly to coordinate check-in and directions.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                type="button"
+                onClick={downloadCalendar}
+                data-testid="trip-prep-add-calendar"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-90 transition-opacity"
+                aria-label="Add to Calendar (.ics)"
+              >
+                📅 Add to Calendar (.ics)
+              </button>
+              {hasWhatsAppContact && (
+                <a
+                  href={messageHostWhatsappUrl || whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="trip-prep-message-host-whatsapp"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-50 text-emerald-800 text-sm font-medium px-4 py-3 hover:bg-emerald-100 transition-colors"
+                  aria-label="Message Host on WhatsApp"
+                >
+                  💬 Message Host on WhatsApp
+                </a>
+              )}
+            </div>
           </div>
         )}
 

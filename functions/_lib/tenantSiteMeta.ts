@@ -27,6 +27,7 @@ const MARKETPLACE_HOSTS = new Set<string>([
   "atlastays.com",
   "www.atlastays.com",
   "dev.atlastays.com",
+  "qa.atlastays.com",
 ]);
 
 /* eslint-disable atlas-brand/no-atlas-string-leak -- canonical first-party Atlas host allowlist for OG rewrite short-circuit; never rendered to guests */

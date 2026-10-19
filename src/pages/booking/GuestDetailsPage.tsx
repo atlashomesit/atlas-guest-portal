@@ -2370,6 +2370,34 @@ const GuestDetailsPage: React.FC = () => {
               />
             </div>
 
+            {/* GUEST-025: Clear security deposit terms breakdown */}
+            <div
+              className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3 mb-6 shadow-xs"
+              data-testid="security-deposit-terms"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />
+                <h3 className="text-sm font-semibold text-text-primary">Security Deposit Policy &amp; Terms</h3>
+              </div>
+              <p className="text-xs text-text-secondary">
+                To protect against accidental damage and preserve property care, homestays may collect a standard security deposit.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-border-subtle text-xs">
+                <div className="bg-bg-muted p-3 rounded-xl border border-border-subtle">
+                  <span className="font-semibold text-text-primary block mb-0.5">100% Refundable</span>
+                  <span className="text-text-secondary">Fully refunded if no damages, excess cleaning, or policy violations occur during your stay.</span>
+                </div>
+                <div className="bg-bg-muted p-3 rounded-xl border border-border-subtle">
+                  <span className="font-semibold text-text-primary block mb-0.5">Payment Method</span>
+                  <span className="text-text-secondary">Collected securely via UPI, card link, or at check-in per host instructions (not charged on this hold).</span>
+                </div>
+                <div className="bg-bg-muted p-3 rounded-xl border border-border-subtle">
+                  <span className="font-semibold text-text-primary block mb-0.5">Return Timeframe</span>
+                  <span className="text-text-secondary">Inspected and credited back to your original payment method within 24–48 hours of checkout.</span>
+                </div>
+              </div>
+            </div>
+
             {/* FOUNDER RULED 2026-10-19: the host's own house rules, with a REQUIRED "I accept" tick before Pay.
                 Renders nothing when the host wrote no rules (a listing with no rules never blocks a booking). */}
             <div ref={houseRulesRowRef}>
