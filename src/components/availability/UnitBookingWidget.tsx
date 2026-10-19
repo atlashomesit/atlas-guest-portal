@@ -230,6 +230,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     endDate: null,
   });
   const [openCalendar, setOpenCalendar] = useState(false);
+  // TASK-10298823: Listing owner tenant slug for marketplace mode / cross-tenant calls
+  const verifiedTenantSlug = useMemo(() => {
+    return (
+      tenantContext?.slug?.trim() ||
+      (typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('tenant')?.trim()
+        : null) ||
+      null
+    );
+  }, [tenantContext?.slug]);
   const [shownDate, setShownDate] = useState<Date>(today);
   const shownMonthIso = useMemo(() => toCalendarISO(startOfMonth(shownDate)), [shownDate]);
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
@@ -699,7 +709,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // and across React StrictMode double-mount. Single attempt (no apiFetch
         // retries on 5xx/network — retries against a cold dev API push the count
         // above MAX_GETS=4).
-        const response = await dedupedAvailabilityCalendarFetch(availabilityKey, { headers: getApiHeaders() });
+        const response = await dedupedAvailabilityCalendarFetch(availabilityKey, { headers: getApiHeaders(verifiedTenantSlug) });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -844,7 +854,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
     setShownMonthPricingFailed(false);
-    fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
+    fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal, verifiedTenantSlug)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
@@ -864,7 +874,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         if (trackOpen) endCalendarOpenPricingFetch(gen);
       });
     return () => controller.abort();
-  }, [listingId, shownMonthIso]);
+  }, [listingId, shownMonthIso, verifiedTenantSlug]);
 
   // TASK-4327: when a range is selected, ensure ITS months are (re-)fetched on calendar
   // open — not just the 3 months from `shownMonthIso` (which resets to today's month on
@@ -881,7 +891,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const controller = new AbortController();
     const gen = calendarOpenFetchGenRef.current;
     beginCalendarOpenPricingFetch(gen);
-    fetchCalendarPricing(listingId, selectedMonthIso, 3, controller.signal)
+    fetchCalendarPricing(listingId, selectedMonthIso, 3, controller.signal, verifiedTenantSlug)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
@@ -896,7 +906,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => {
       controller.abort();
     };
-  }, [openCalendar, listingId, dateRange.startDate, dateRange.endDate, shownMonthIso]);
+  }, [openCalendar, listingId, dateRange.startDate, dateRange.endDate, shownMonthIso, verifiedTenantSlug]);
 
   // TASK-4303: does every night of the selected range have a REAL per-date price from the
   // pricing API? Until then, any total the widget could compute rides on the base-rate
@@ -930,7 +940,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
     setSelectedRangePricingFailed(false);
-    fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal)
+    fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal, verifiedTenantSlug)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
@@ -940,7 +950,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         if ((error as Error)?.name !== 'AbortError') setSelectedRangePricingFailed(true);
       });
     return () => controller.abort();
-  }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso]);
+  }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso, verifiedTenantSlug]);
 
   // TASK-7491: fetch per-day `bookable` (rate-sync-authority opt-out) so the calendar can fail
   // closed on a date with no usable inbound rate — never a guessed price. Three effects mirror
@@ -1039,6 +1049,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       gstRangeEndIso,
       guests,
       controller.signal,
+      verifiedTenantSlug,
     )
       .then((plans) => {
         setPublicRatePlans(plans);
@@ -1052,7 +1063,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // Best-effort — keep existing plans or fall back to single-rate flow
       });
     return () => controller.abort();
-  }, [listingId, gstRangeStartIso, gstRangeEndIso, guests]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, guests, verifiedTenantSlug]);
 
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') {
@@ -1071,6 +1082,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       controller.signal,
       selectedRatePlanId,
       guests,
+      verifiedTenantSlug,
     )
       .then((b) => {
         setServerPriceBreakdown(b);
@@ -1079,7 +1091,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setServerPriceBreakdown(null);
       });
     return () => controller.abort();
-  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests, verifiedTenantSlug]);
 
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
@@ -1756,7 +1768,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         idempotencyKey = crypto.randomUUID();
         reserveIdempotencyKeyRef.current = idempotencyKey;
       }
-      const initialHoldHeaders = getOrderRequestHeaders(idempotencyKey);
+      // TASK-10298823: Pass the listing's verified tenant slug in request headers (tenantContext?.slug or ?tenant=),
+      // ensuring the API context receives the listing owner tenant rather than the marketplace platform tenant.
+      const initialHoldHeaders = getOrderRequestHeaders(idempotencyKey, verifiedTenantSlug);
       const response = await axios.post(orderUrl, orderPayload, {
         headers: initialHoldHeaders,
         timeout: 15000,
@@ -1786,13 +1800,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? serverTouristTaxPascal
             : 0;
 
-      // TASK-102017: derive the tenant slug owning this hold so the details route and final-charge
+      // TASK-102017 / TASK-10298823: derive the tenant slug owning this hold so the details route and final-charge
       // calls send the identical X-Tenant-Slug header instead of 422ing against the apex tenant.
       const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
       const tenantFromUrl = typeof window !== 'undefined'
         ? new URLSearchParams(currentSearch).get('tenant')
         : null;
-      const holdTenantSlug = tenantFromUrl || initialHoldHeaders['X-Tenant-Slug'] || null;
+      const holdTenantSlug = verifiedTenantSlug || tenantFromUrl || initialHoldHeaders['X-Tenant-Slug'] || null;
 
       // Store hold state in context and navigate to details page
       updateBooking({

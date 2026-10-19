@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearRuntimeConfig, setRuntimeConfig } from '@/runtime-config';
 import {
+  fetchGuestPriceBreakdown,
   fetchGuestGstBreakdown,
   fetchPricingBreakdown,
   netChargeableRoomFare,
@@ -130,6 +131,35 @@ describe('fetchGuestGstBreakdown — TASK-4331 server-sourced GST slab', () => {
     expect(result.gstPercent).toBeNull();
     expect(result.gstAmount).toBeNull();
     expect(result.finalAmount).toBeNull();
+  });
+
+  // TASK-10298823: verified tenant slug passed in request headers
+  it('sends X-Tenant-Slug header when explicit tenantSlug is provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ gstPercent: 5, gstAmount: 250, finalAmount: 5250 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchGuestGstBreakdown(42, '2026-08-01', '2026-08-08', undefined, null, null, 'host-tenant-slug');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers['X-Tenant-Slug']).toBe('host-tenant-slug');
+  });
+
+  it('fetchGuestPriceBreakdown sends X-Tenant-Slug header when explicit tenantSlug is provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ baseAmount: 5000, finalAmount: 5000 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchGuestPriceBreakdown(42, '2026-08-01', '2026-08-08', undefined, null, 2, 'host-tenant-slug');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers['X-Tenant-Slug']).toBe('host-tenant-slug');
   });
 });
 
