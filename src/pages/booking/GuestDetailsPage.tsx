@@ -2,8 +2,12 @@ import { feeAmount, paymentFeeCopy } from "../../utils/paymentFeeCopy";
 /**
  * TASK-2612: GuestDetailsPage — step 2 of the two-step booking flow.
  *
- * Receives holdId + holdExpiresAt from BookingContext (set by UnitBookingWidget Reserve).
- * Collects guest PII, submits final-charge POST /api/Razorpay/order, opens Razorpay modal.
+ * FOUNDER RULED 2026-10-19: the 10-minute hold (which also closes the night on every OTA) starts when the guest
+ * taps PAY, not at Reserve. UnitBookingWidget Reserve now only hands over the stay (listing, dates, guests, quote)
+ * through BookingContext — no hold, no clock. This page collects the details and the required house-rules tick; at
+ * Pay it re-checks the nights and starts the hold (POST /api/Razorpay/order, init-hold), then submits the
+ * final-charge POST /api/Razorpay/order and opens the Razorpay modal. If the nights are gone it says so BEFORE any
+ * money moves. "Try again" inside the window keeps the same hold; the countdown shows only while a hold is live.
  *
  * Visual: matches Claude Design bundle (post-reserve-checkout) exactly.
  * CSS: .gd-* tokens verbatim from styles.css in bundle.
@@ -64,6 +68,13 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
+import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
+import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
+import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
+import { getIstCalendarDate, toCalendarISO } from '@/utils/date';
+import { isMarketplaceMode } from '@/tenant/tenantResolver';
+import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
 function abandonPaymentPendingCheckout(
@@ -169,16 +180,23 @@ const IconNote = ({ size = 14 }: { size?: number }) => (
 
 const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
-/** TASK-2882: survive hard reload on GuestDetailsPage with a still-valid server hold. */
+/** TASK-2882: survive hard reload on GuestDetailsPage with a still-valid server hold. Since the 2026-10-19 founder
+ *  ruling the cache holds the stay DRAFT (listing, dates, quote) from Reserve onward; the hold fields join it only
+ *  once the guest has tapped Pay. */
 const CHECKOUT_HOLD_KEY = 'atlas_guest_checkout_hold';
+/** A stay draft untouched for this long is ignored on reload (the quote and the nights may have changed). */
+const CHECKOUT_DRAFT_STALE_MS = 2 * 60 * 60 * 1000;
 /** TASK-4296, TASK-4432, TASK-10298713: must match the API's CheckoutHoldConstants.HoldMinutes (10). Drives both the
  *  countdown progress baseline and the hold-expiry copy so they agree on the real duration. */
 const CHECKOUT_HOLD_MINUTES = 10;
 
 type CheckoutHoldCache = {
-  holdId: number;
-  holdExpiresAt: string;
+  /** Present only after the guest tapped Pay (the hold starts at Pay). */
+  holdId?: number | null;
+  holdExpiresAt?: string | null;
   holdToken?: string | null;
+  /** ms since epoch of the last write; drives CHECKOUT_DRAFT_STALE_MS. */
+  savedAt?: number;
   holdListingId?: number | null;
   holdPropertySlug?: string | null;
   holdUnitSlug?: string | null;
@@ -200,10 +218,16 @@ function loadCheckoutHold(): CheckoutHoldCache | null {
     const raw = window.sessionStorage.getItem(CHECKOUT_HOLD_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CheckoutHoldCache;
-    if (!parsed?.holdId || !parsed?.holdExpiresAt) return null;
-    if (new Date(parsed.holdExpiresAt).getTime() <= Date.now()) {
+    // Not a usable stay draft (older cache shape, or cleared): ignore it.
+    if (!(parsed?.holdListingId || parsed?.holdId) || !parsed?.checkIn || !parsed?.checkOut) return null;
+    if (typeof parsed.savedAt === 'number' && Date.now() - parsed.savedAt > CHECKOUT_DRAFT_STALE_MS) {
       window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
       return null;
+    }
+    // A lapsed hold is dropped but the draft stays: the guest taps Pay again, which re-checks the nights and
+    // starts a fresh 10-minute hold.
+    if (parsed.holdId && parsed.holdExpiresAt && new Date(parsed.holdExpiresAt).getTime() <= Date.now()) {
+      return { ...parsed, holdId: null, holdExpiresAt: null, holdToken: null };
     }
     return parsed;
   } catch {
@@ -310,14 +334,15 @@ const GuestDetailsPage: React.FC = () => {
   const { currency, formatINR } = useCurrency();
   const [holdHydrationDone, setHoldHydrationDone] = useState(false);
 
-  // TASK-2882: rehydrate hold from sessionStorage after hard reload before showing "pick dates" modal.
+  // TASK-2882: rehydrate the stay draft (and a still-live hold, if the guest already tapped Pay) from sessionStorage
+  // after a hard reload before showing the "pick dates" modal.
   useEffect(() => {
-    if (!booking.holdId || !booking.holdExpiresAt) {
+    if (!(booking.holdListingId || booking.holdId) || !booking.checkIn || !booking.checkOut) {
       const cached = loadCheckoutHold();
       if (cached) {
         updateBooking({
-          holdId: cached.holdId,
-          holdExpiresAt: cached.holdExpiresAt,
+          holdId: cached.holdId ?? null,
+          holdExpiresAt: cached.holdExpiresAt ?? null,
           holdToken: cached.holdToken ?? null,
           holdListingId: cached.holdListingId ?? null,
           holdPropertySlug: cached.holdPropertySlug ?? null,
@@ -396,11 +421,14 @@ const GuestDetailsPage: React.FC = () => {
     };
   }, [holdId, holdToken, effectiveTenantSlug, holdExpiresAt]);
 
-  // No hold state (direct navigation or hard reload): instead of a silent redirect,
+  // No stay draft (direct navigation, hard reload after a long break): instead of a silent redirect,
   // we render a "pick your dates again" card (see early return in Render) and keep the
   // guest's typed details, which are persisted to sessionStorage below.
+  // FOUNDER RULED 2026-10-19: there is NO hold on arrival — the draft is the listing, dates and quote handed over by
+  // Reserve. The hold (and its clock) exists only after the guest taps Pay.
+  const hasDraft = Boolean((holdListingId || holdId) && booking.checkIn && booking.checkOut);
 
-  // ── Hold countdown ───────────────────────────────────────────────────────
+  // ── Hold countdown (shown ONLY while a hold is live, i.e. during payment) ──────────────────────
   const [countdown, setCountdown] = useState(() =>
     holdExpiresAt ? formatCountdown(holdExpiresAt) : '0:00',
   );
@@ -412,15 +440,25 @@ const GuestDetailsPage: React.FC = () => {
   useEffect(() => {
     holdExpiredRef.current = holdExpired;
   }, [holdExpired]);
+  /** True while a 10-minute hold started at Pay is running. Drives every countdown / "dates held" element. */
+  const holdLive = Boolean(holdId && holdExpiresAt) && !holdExpired;
 
   // TASK-4439: focus management for the blocking hold dialogs (WCAG 2.4.3 / 2.1.2)
   const noHoldDialogRef = useFocusTrap<HTMLDivElement>(
-    holdHydrationDone && (!holdId || !holdExpiresAt),
+    holdHydrationDone && !hasDraft,
   );
   const expiredDialogRef = useFocusTrap<HTMLDivElement>(holdExpired);
 
   useEffect(() => {
-    if (!holdExpiresAt) return;
+    if (!holdExpiresAt) {
+      // No live hold (before Pay, or just cleared): nothing counts down and nothing is "expired".
+      setHoldExpired(false);
+      setCountdown('0:00');
+      setHoldPct(0);
+      return;
+    }
+    // A fresh hold (new expiry) clears a previous lapse; tick() sets it again at once if already past.
+    setHoldExpired(false);
     const tick = () => {
       const remaining = new Date(holdExpiresAt).getTime() - Date.now();
       if (remaining <= 0) {
@@ -523,6 +561,25 @@ const GuestDetailsPage: React.FC = () => {
   const [consentError, setConsentError] = useState('');
   const [consentFlash, setConsentFlash] = useState(false);
   const consentRowRef = useRef<HTMLDivElement>(null);
+
+  // FOUNDER RULED 2026-10-19: the house rules the guest must accept, and the host's OWN WhatsApp / phone for the
+  // failed-payment fallback, both come from the LISTING OWNER (checkout-info) — never from the site's tenant, which on
+  // the atlastays.com marketplace is the platform, and never Atlas's own number.
+  const [checkoutInfo, setCheckoutInfo] = useState<ListingCheckoutInfo | null>(null);
+  const [houseRulesAccepted, setHouseRulesAccepted] = useState(false);
+  const [houseRulesError, setHouseRulesError] = useState('');
+  const houseRulesRowRef = useRef<HTMLDivElement>(null);
+  /** A listing with no host-written rules shows no tick and never blocks a booking on missing host data. */
+  const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
+  useEffect(() => {
+    const id = holdListingId != null ? Number(holdListingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return;
+    const controller = new AbortController();
+    void fetchListingCheckoutInfo(id, effectiveTenantSlug, controller.signal).then((info) => {
+      if (!controller.signal.aborted) setCheckoutInfo(info);
+    });
+    return () => controller.abort();
+  }, [holdListingId, effectiveTenantSlug]);
   // TASK-10050 (DPDP guarded consent): transactional WhatsApp must NOT be pre-checked.
   // The previous `true` default meant consent was assumed unless the guest actively
   // opted out — a dark pattern that fails DPDP §6 "free, specific, informed" and
@@ -543,14 +600,16 @@ const GuestDetailsPage: React.FC = () => {
   }, [formData, phoneDialCode]);
 
   useEffect(() => {
-    if (!holdId || !holdExpiresAt) {
+    // Persist the stay draft from Reserve onward (the hold fields join it once the guest has tapped Pay).
+    if (!(holdListingId || holdId) || !booking.checkIn || !booking.checkOut) {
       try { window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY); } catch { /* ignore */ }
       return;
     }
     const payload: CheckoutHoldCache = {
-      holdId: Number(holdId),
-      holdExpiresAt,
+      holdId: holdId ? Number(holdId) : null,
+      holdExpiresAt: holdExpiresAt ?? null,
       holdToken: holdToken ?? null,
+      savedAt: Date.now(),
       holdListingId: holdListingId ?? null,
       holdPropertySlug: booking.holdPropertySlug ?? propertySlug ?? null,
       holdUnitSlug: booking.holdUnitSlug ?? unitSlug ?? null,
@@ -723,6 +782,14 @@ const GuestDetailsPage: React.FC = () => {
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderErrorIs409, setOrderErrorIs409] = useState(false);
   const [paymentCancelled, setPaymentCancelled] = useState(false);
+  /** FOUNDER RULED 2026-10-19: set by the first `payment.failed`; drives the "Payment didn't go through" panel. */
+  const [paymentFailure, setPaymentFailure] = useState<{ reasonText: string; code: string; at: number } | null>(null);
+  /** True once the order API said this listing's host cannot take an online payment (422 provider not configured). */
+  const [hostOffline, setHostOffline] = useState(false);
+  /** Funnel: `enter_contact` fires once per page visit, the first time the guest gets through the form and taps Pay. */
+  const contactTrackedRef = useRef(false);
+  /** Stable key so a lost response on the hold-start call can be retried without creating a second hold (TASK-8218). */
+  const holdIdempotencyKeyRef = useRef<string | null>(null);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
   // PAISE. The value the API hands us is RUPEES — see razorpayOrderAmountInrToPaise,
   // which is the single boundary where that conversion happens.
@@ -814,6 +881,10 @@ const GuestDetailsPage: React.FC = () => {
     if (!consentAccepted) { setConsentError('Please accept the consent to continue.'); valid = false; }
     else { setConsentError(''); }
 
+    // FOUNDER RULED 2026-10-19: "I accept the house rules" is required before Pay — when the host wrote rules.
+    if (houseRulesRequired && !houseRulesAccepted) { setHouseRulesError('Please accept the house rules to continue.'); valid = false; }
+    else { setHouseRulesError(''); }
+
     setFormErrors(errors);
     if (!valid) {
       requestAnimationFrame(() => {
@@ -836,6 +907,11 @@ const GuestDetailsPage: React.FC = () => {
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
+        if (houseRulesRequired && !houseRulesAccepted) {
+          houseRulesRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          houseRulesRowRef.current?.querySelector('input')?.focus();
+          return;
+        }
         if (!consentAccepted) {
           consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           consentRowRef.current?.querySelector('input')?.focus();
@@ -843,7 +919,7 @@ const GuestDetailsPage: React.FC = () => {
       });
     }
     return valid;
-  }, [formData, phoneDialCode, consentAccepted]);
+  }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted]);
 
   // ── Promo blur handler ────────────────────────────────────────────────────
   const handlePromoBlur = useCallback(async () => {
@@ -911,25 +987,74 @@ const GuestDetailsPage: React.FC = () => {
     }, 300);
   }, [referralCode, referralDiscountAmount]);
 
+  // ── Start the hold (at Pay) ──────────────────────────────────────────────────
+  // FOUNDER RULED 2026-10-19: the 10-minute hold — which also closes the night on every OTA — starts when the guest taps Pay,
+  // after the details and the required house-rules tick. The API re-checks the nights under the listing row lock and starts
+  // the hold in one step; if the nights are gone it answers 409 AVAILABILITY_CONFLICT, which handleSubmit turns into
+  // "Sorry, these dates were just booked" BEFORE any money moves. Errors propagate as the axios error so the caller's
+  // catch can map them.
+  const startHoldAtPay = useCallback(async (): Promise<{ holdId: number; holdToken: string | null; holdExpiresAt: string }> => {
+    const listingIdNum = Number(holdListingId);
+    if (!Number.isFinite(listingIdNum) || listingIdNum <= 0 || !booking.checkIn || !booking.checkOut) {
+      throw new Error('We could not find your stay. Please go back and select dates again.');
+    }
+    // The context carries IST-midnight instants (see UnitBookingWidget); read them back as the IST civil date.
+    const checkinDate = toCalendarISO(getIstCalendarDate(new Date(booking.checkIn)));
+    const checkoutDate = toCalendarISO(getIstCalendarDate(new Date(booking.checkOut)));
+    let key = holdIdempotencyKeyRef.current;
+    if (!key) {
+      key = crypto.randomUUID();
+      holdIdempotencyKeyRef.current = key;
+    }
+    const response = await axios.post(
+      buildApiUrl('/api/Razorpay/order'),
+      {
+        bookingDraft: {
+          listingId: listingIdNum,
+          checkinDate,
+          checkoutDate,
+          guests: booking.guests ?? 1,
+          ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+        },
+        currency: 'INR',
+        // GuestInfo absent => init-hold mode on the API (it creates the hold; no Razorpay order yet).
+        guestConsentAccepted: false,
+      },
+      { headers: getOrderRequestHeaders(key, effectiveTenantSlug), timeout: 15000 },
+    );
+    const { holdId: newHoldId, holdExpiresAt: newExpiry, prepToken } = response.data ?? {};
+    if (!newHoldId || !newExpiry) {
+      throw new Error('Hold could not be created. Please try again.');
+    }
+    holdIdempotencyKeyRef.current = null; // a later hold (after this one lapses) must not reuse this key
+    checkoutSettledRef.current = false; // a new hold starts a new abandon/settle cycle
+    const expiresIso = typeof newExpiry === 'string' ? newExpiry : new Date(newExpiry).toISOString();
+    const token = typeof prepToken === 'string' ? prepToken : null;
+    updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
+    return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
+  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, effectiveTenantSlug, updateBooking]);
+
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (isSubmitting || holdExpired) return;
+      // A lapsed hold (holdExpired) no longer blocks Pay: the next tap simply starts a fresh hold after re-checking the nights.
+      if (isSubmitting) return;
       if (isTenantNotTakingBookings(getTenantContext())) {
         setOrderError(NOT_TAKING_BOOKINGS_COPY);
         return;
       }
       if (!validateForm()) return;
       // TASK-8048: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
-      if (!hasOnlinePaymentRail(getTenantContext())) {
+      // 2026-10-19: also fail closed on the LISTING OWNER's own answer (checkout-info) — on the atlastays.com marketplace the
+      // site's tenant is the platform, so a host with no payment provider looked payable and a guest reached the order API.
+      if (!hasOnlinePaymentRail(getTenantContext()) || checkoutInfo?.onlinePaymentsAvailable === false) {
         setOrderError('Online payment is not available for this property. Please contact the host on WhatsApp to complete your booking.');
         return;
       }
 
-      const numericHoldId = holdId != null ? Number(holdId) : NaN;
-      if (!Number.isFinite(numericHoldId)) {
-        setOrderError('Hold not found. Please go back and select dates again.');
+      if (!hasDraft) {
+        setOrderError('We could not find your stay. Please go back and select dates again.');
         return;
       }
 
@@ -937,6 +1062,12 @@ const GuestDetailsPage: React.FC = () => {
       setOrderError(null);
       setOrderErrorIs409(false);
       setPaymentCancelled(false);
+      setPaymentFailure(null);
+      // Funnel: the guest got through name / phone / email / consents / house rules and tapped Pay.
+      if (!contactTrackedRef.current) {
+        contactTrackedRef.current = true;
+        track('enter_contact', holdListingId ? Number(holdListingId) : 0);
+      }
 
       const dial = getGuestDialOption(phoneDialCode);
       const e164Phone = toGuestPhoneE164(phoneDialCode, clampNationalDigits(formData.phone, dial.maxDigits));
@@ -945,12 +1076,15 @@ const GuestDetailsPage: React.FC = () => {
         .filter((ao) => (selectedAddOns[ao.addOnServiceId] ?? 0) > 0)
         .map((ao) => ({ addOnServiceId: ao.addOnServiceId, quantity: selectedAddOns[ao.addOnServiceId] }));
 
-      const payload = {
-        holdId: numericHoldId,
+      // The final-charge body. holdId / holdToken are filled in below, once the hold exists (it may be started by this very tap).
+      const buildPayload = (activeHoldId: number, activeHoldToken: string | null) => ({
+        holdId: activeHoldId,
         // TASK-4354: prove ownership of the hold — server rejects a guessed holdId without this token.
-        holdToken: holdToken ?? undefined,
+        holdToken: activeHoldToken ?? undefined,
         currency: 'INR',
         guestConsentAccepted: consentAccepted,
+        // FOUNDER RULED 2026-10-19: the server re-checks this when the listing has house rules.
+        houseRulesAccepted,
         guestPurposeConsents: {
           booking_contact: consentAccepted,
           transactional_whatsapp: whatsappOptIn,
@@ -971,10 +1105,34 @@ const GuestDetailsPage: React.FC = () => {
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
         },
-      };
+      });
 
       try {
-        const numericListingId = holdListingId ? Number(holdListingId) : 0;
+        // ── FOUNDER RULED 2026-10-19: the 10-minute hold starts HERE, at Pay ─────────────────────────
+        // Details and house rules carried no clock and closed no OTA night. A live hold is reused as is
+        // ("Try again" keeps the same hold — no fresh clock per try). Otherwise the nights are re-checked and the
+        // hold started right now; if the nights are gone the 409 below says so BEFORE any money moves.
+        let activeHoldId: number | null = holdId != null ? Number(holdId) : null;
+        let activeHoldToken: string | null = holdToken ?? null;
+        let activeHoldExpiresAt: string | null = holdExpiresAt ?? null;
+        const holdIsLive =
+          activeHoldId != null &&
+          activeHoldExpiresAt != null &&
+          new Date(activeHoldExpiresAt).getTime() > Date.now() + 5_000;
+        if (!holdIsLive) {
+          // A lapsed hold takes its order with it: never reuse an order or a launch stashed for a released hold.
+          pendingRazorpayLaunchRef.current = null;
+          currentAttemptIdempotencyKeyRef.current = null;
+          setServerTotalConfirmRequired(false);
+          setRazorpayOrderId(null);
+          const started = await startHoldAtPay();
+          activeHoldId = started.holdId;
+          activeHoldToken = started.holdToken;
+          activeHoldExpiresAt = started.holdExpiresAt;
+        }
+        const numericHoldId = activeHoldId as number;
+        const payload = buildPayload(numericHoldId, activeHoldToken);
+
         let keyId: string;
         let orderId: string;
         let bookingId: number;
@@ -1001,7 +1159,7 @@ const GuestDetailsPage: React.FC = () => {
             idempotencyKey = crypto.randomUUID();
             currentAttemptIdempotencyKeyRef.current = idempotencyKey;
           }
-          track('start_checkout', numericListingId);
+          // (start_checkout is tracked ONCE per stay, at Reserve — re-firing it on every Pay tap inflated "checkouts started".)
 
           const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
             headers: getOrderRequestHeaders(idempotencyKey, effectiveTenantSlug),
@@ -1282,15 +1440,14 @@ const GuestDetailsPage: React.FC = () => {
                 },
               };
 
-              // TASK-4541: gate opening Razorpay if hold has expired or insufficient time remains
-              if (holdExpired) {
-                throw new Error('Hold expired — please re-select your dates.');
-              }
-              if (holdExpiresAt) {
-                const remainingMs = new Date(holdExpiresAt).getTime() - Date.now();
+              // TASK-4541: gate opening Razorpay if the hold has expired or insufficient time remains.
+              // Uses the hold THIS tap is working with (it may have been started a moment ago), not the render's stale copy.
+              const expiresAtIso = activeHoldExpiresAt as string;
+              {
+                const remainingMs = new Date(expiresAtIso).getTime() - Date.now();
                 // Require ≥ 30 seconds remaining to open checkout (guest has time to pay)
                 if (remainingMs < 30000) {
-                  throw new Error(`Hold expires in ${Math.ceil(remainingMs / 1000)} seconds — please re-select your dates to avoid an interruption during payment.`);
+                  throw new Error(`Your hold ends in ${Math.max(0, Math.ceil(remainingMs / 1000))} seconds. Wait a few seconds, then tap Pay to start a fresh one.`);
                 }
               }
 
@@ -1308,32 +1465,27 @@ const GuestDetailsPage: React.FC = () => {
               // TASK-4541: monitor hold expiry while payment modal is open and close on expiry
               // TASK-8222: hard-close the modal on expiry — the hold-expiry gate exists but without
               // closing Razorpay the guest can still pay into a released slot.
+              const holdEndedDuringPayment = () => {
+                paymentCompleted = true;
+                checkoutSettledRef.current = true;
+                try { rzp.close(); } catch { /* ignore */ }
+                abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
+                // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
+                track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
+                // The 10 minutes are over and the nights are released: drop the lapsed hold so the next Pay tap re-checks the
+                // dates and starts a fresh one (the details the guest typed stay on the page).
+                currentAttemptIdempotencyKeyRef.current = null;
+                pendingRazorpayLaunchRef.current = null;
+                setRazorpayOrderId(null);
+                updateBooking({ holdId: null, holdToken: null, holdExpiresAt: null });
+                setOrderError('Your 10 minutes ended while payment was in progress, so the dates were released. If your payment went through you will get a confirmation. Otherwise tap Pay and we will check the dates again.');
+                setIsSubmitting(false);
+              };
               const expireCheckInterval = setInterval(() => {
-                if (holdExpired || !holdExpiresAt) {
+                const remainingMs = new Date(expiresAtIso).getTime() - Date.now();
+                if ((holdExpiredRef.current || remainingMs <= 0) && !paymentCompleted) {
                   clearInterval(expireCheckInterval);
-                  if (holdExpired && !paymentCompleted) {
-                    paymentCompleted = true;
-                    checkoutSettledRef.current = true;
-                    try { rzp.close(); } catch { /* ignore */ }
-                    abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
-                    // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
-                    track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
-                    setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
-                    setIsSubmitting(false);
-                  }
-                  return;
-                }
-                const remainingMs = new Date(holdExpiresAt).getTime() - Date.now();
-                if (remainingMs <= 0 && !paymentCompleted) {
-                  clearInterval(expireCheckInterval);
-                  paymentCompleted = true;
-                  checkoutSettledRef.current = true;
-                  try { rzp.close(); } catch { /* ignore */ }
-                  abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
-                  // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
-                  track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
-                  setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
-                  setIsSubmitting(false);
+                  holdEndedDuringPayment();
                 }
               }, 1000);
 
@@ -1349,8 +1501,11 @@ const GuestDetailsPage: React.FC = () => {
                 // or back-to-property. TTL worker remains the backstop if they leave mid-failure.
                 // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
                 track(TerminalCheckoutOutcomeEvents.PaymentFailed, holdListingId ? Number(holdListingId) : 0);
-                setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
-                // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
+                // FOUNDER RULED 2026-10-19: after the FIRST failed payment show "Payment didn't go through" with
+                // [Try again] and [Message the host on WhatsApp]. The dates stay held until the 10-minute mark.
+                setOrderError(null);
+                setPaymentFailure({ reasonText: mapRazorpayFailureCode(code, desc), code, at: Date.now() });
+                // TASK-2906: Store the order ID and amount so "Try again" can reuse the same order inside the window
                 setRazorpayOrderId(orderId);
                 setRazorpayAmountPaise(amountPaise);
                 setPaymentCancelled(false);
@@ -1384,9 +1539,25 @@ const GuestDetailsPage: React.FC = () => {
 
         // Detect timeout errors
         const isTimeout = axiosErr?.code === 'ECONNABORTED' || axiosErr?.message?.includes('timeout');
+        const apiCode = typeof data?.code === 'string' ? data.code : '';
 
         if (isTimeout) {
           setOrderError('Payment initialization timed out. Please check your connection and try again.');
+        } else if (isProviderNotConfiguredError(err)) {
+          // The host cannot take an online payment (the API checks this BEFORE it holds the nights): hand the guest to the host.
+          setHostOffline(true);
+          setOrderError(null);
+        } else if (status === 409 && apiCode === 'CHECKOUT_HOLD_EXPIRED') {
+          // The 10 minutes ended before this call: the nights were released. Drop the lapsed hold; the next Pay tap re-checks the
+          // dates and starts a fresh one. No money moved.
+          updateBooking({ holdId: null, holdToken: null, holdExpiresAt: null });
+          pendingRazorpayLaunchRef.current = null;
+          currentAttemptIdempotencyKeyRef.current = null;
+          setRazorpayOrderId(null);
+          setOrderError('Your 10 minutes ended, so the dates were released. Tap Pay and we will check them again. No payment was taken.');
+        } else if (status === 422 && apiCode === 'HOUSE_RULES_NOT_ACCEPTED') {
+          setHouseRulesError('Please accept the house rules to continue.');
+          setOrderError('Please accept the house rules to continue. No payment was taken.');
         } else if (status === 409) {
           // TASK-4537: Distinguish the guest's OWN confirmed booking from an availability race.
           // If the message mentions "confirmed booking" or "already exists", this is likely
@@ -1408,8 +1579,9 @@ const GuestDetailsPage: React.FC = () => {
               booking.checkIn && booking.checkOut
                 ? `${checkInDisplay} – ${checkOutDisplay}`
                 : 'those dates';
+            // FOUNDER RULED 2026-10-19: said at Pay, BEFORE any money moves.
             setOrderError(
-              `Someone else just booked these dates. We couldn't confirm ${datesLabel}. Pick different dates to continue. No payment was taken.`,
+              `Sorry, these dates were just booked. We couldn't hold ${datesLabel} — someone else got there first. Pick different dates to continue. No payment was taken.`,
             );
             setOrderErrorIs409(true);
           }
@@ -1426,8 +1598,9 @@ const GuestDetailsPage: React.FC = () => {
       }
     },
     [
-      isSubmitting, holdExpired, validateForm, holdId, holdToken, phoneDialCode, formData,
+      isSubmitting, validateForm, holdId, holdToken, holdExpiresAt, phoneDialCode, formData,
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
+      houseRulesAccepted, checkoutInfo, hasDraft, startHoldAtPay,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
     ],
@@ -1475,11 +1648,17 @@ const GuestDetailsPage: React.FC = () => {
   // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
   // it while consent is unchecked scrolls the consent box into view and flashes it.
   const scrollToConsent = useCallback(() => {
+    // The house-rules tick (when the host wrote rules) comes first on the page, so point at it first.
+    if (houseRulesRequired && !houseRulesAccepted) {
+      setHouseRulesError('Please accept the house rules to continue.');
+      houseRulesRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     setConsentError('Please accept the consent to continue.');
     consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setConsentFlash(true);
     window.setTimeout(() => setConsentFlash(false), 1200);
-  }, []);
+  }, [houseRulesRequired, houseRulesAccepted]);
 
   // TASK-4537: Determine if the error message indicates a charged-but-unconfirmed state
   // that warrants showing clickable support affordance.
@@ -1499,6 +1678,21 @@ const GuestDetailsPage: React.FC = () => {
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
   }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken, effectiveTenantSlug]);
+
+  // FOUNDER RULED 2026-10-19: the 10 minutes after Pay are over and the nights are released. Drop the lapsed hold and keep
+  // every detail on the page; the next Pay tap re-checks the dates and starts a fresh hold.
+  const handleRestartHold = useCallback(() => {
+    abandonPaymentPendingCheckout(holdId, holdToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
+    pendingRazorpayLaunchRef.current = null;
+    currentAttemptIdempotencyKeyRef.current = null;
+    setServerTotalConfirmRequired(false);
+    setRazorpayOrderId(null);
+    setPaymentFailure(null);
+    setPaymentCancelled(false);
+    setOrderError(null);
+    setOrderErrorIs409(false);
+    updateBooking({ holdId: null, holdToken: null, holdExpiresAt: null });
+  }, [holdId, holdToken, effectiveTenantSlug, updateBooking]);
 
   // TASK-8219: a guest who leaves /details via browser Back, mobile swipe-back, or tab-close
   // never routed through handleClose or handleBackToProperty, so abandonPaymentPendingCheckout
@@ -1580,8 +1774,8 @@ const GuestDetailsPage: React.FC = () => {
     );
   }
 
-  // No active hold after rehydrate attempt — show pick-dates card (PII still in sessionStorage).
-  if (!holdId || !holdExpiresAt) {
+  // No stay draft after rehydrate attempt — show pick-dates card (PII still in sessionStorage).
+  if (!hasDraft) {
     return (
       <div className="gd-page">
         <div ref={noHoldDialogRef} className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-nohold-title">
@@ -1589,8 +1783,8 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-modal-icon"><IconClock size={22} /></div>
             <h3 id="gd-nohold-title">Let's pick your dates again</h3>
             <p>
-              Your {CHECKOUT_HOLD_MINUTES}-minute hold has expired or was cleared. Pick your dates again to start a
-              fresh hold — any details you entered are saved and will be waiting for you.
+              We couldn't find the stay you were booking (the page may have been open for a while). Pick your dates again
+              — any details you entered are saved and will be waiting for you.
             </p>
             <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
               Choose dates
@@ -1604,27 +1798,52 @@ const GuestDetailsPage: React.FC = () => {
 
   const tenantCtx = getTenantContext();
   const brandInitial = brandName.charAt(0).toUpperCase();
-  const whatsappNumber = tenantCtx?.whatsappBookingPhone ?? '';
+  // The HOST's own WhatsApp: the listing owner's checkout-info first; the site's own tenant number only when the site IS
+  // the host's (never on the marketplace, where the site tenant is the platform). Never Atlas's default number.
+  const siteHostWhatsapp = isMarketplaceMode() ? '' : (tenantCtx?.whatsappBookingPhone ?? '');
+  // Once checkout-info has loaded it is the ONLY source (it already falls back to the owner's phone); the site number is used only
+  // when checkout-info could not be loaded at all.
+  const whatsappNumber = checkoutInfo ? (checkoutInfo.hostWhatsAppDigits ?? '') : siteHostWhatsapp;
   const consentEntityName = getGuestDataProcessingEntityName();
   // TASK-8048: single choke-point — do not offer a Razorpay pay rail when no online provider is configured.
   // hasOnlinePaymentRail() mirrors GET /tenants/from-domain's bookingMode derivation (TENANT vs WHATSAPP).
-  const hasOnlineRail = hasOnlinePaymentRail(tenantCtx);
+  // 2026-10-19: the LISTING OWNER's own answer (checkout-info, or the order API's refusal) also closes the rail, because on
+  // the marketplace the site's tenant is the platform and says nothing about this host.
+  const hasOnlineRail =
+    hasOnlinePaymentRail(tenantCtx) && !hostOffline && checkoutInfo?.onlinePaymentsAvailable !== false;
   const notTakingBookings = isTenantNotTakingBookings(tenantCtx);
   const trialPayAtProperty = isTenantTrialPayAtPropertyOnly(tenantCtx);
   const whatsappHandoffUrl = (() => {
     const digits = (whatsappNumber || '').replace(/\D/g, '');
     const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
     if (digits) return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-    return `${getWhatsAppLink()}?text=${encodeURIComponent(text)}`;
+    // No host number known: on the host's own site the site contact is the host's; on the marketplace there is no safe number.
+    return isMarketplaceMode() ? '' : `${getWhatsAppLink()}?text=${encodeURIComponent(text)}`;
   })();
+  // FOUNDER RULED 2026-10-19: the failed-payment contact is the HOST's WhatsApp (pre-written with the room, dates, guests,
+  // amount and the guest's name; the guest only taps Send), else a call link to the host's phone, else nothing.
+  const failedPaymentContact = buildHostFailureContact({
+    hostWhatsAppDigits: whatsappNumber,
+    hostPhoneDigits: checkoutInfo ? checkoutInfo.hostPhoneDigits : (isMarketplaceMode() ? null : getTelLink().replace(/\D/g, '')),
+    roomName: [propertyName, unitName].filter(Boolean).join(' · ') || null,
+    checkInLabel: checkInDisplay,
+    checkOutLabel: checkOutDisplay,
+    nights,
+    guests: booking.guests ?? 1,
+    amountInr: chargeInr,
+    guestName: formData.name,
+  });
+  // Charged-but-unconfirmed (the money WAS taken) keeps the site-level support links below; only the failed-payment panel is host-first.
   const paymentFailureWhatsAppUrl = `${getWhatsAppLink()}?text=${encodeURIComponent(
-    'Hi, my payment just failed while booking. Can you help?',
+    'Hi, my payment went through but my booking is not confirmed yet. Can you help?',
   )}`;
   const paymentFailureTelLink = getTelLink();
   const paymentFailureEmail = getContactEmail();
-  const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment failed — need help')}`;
+  const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment received — booking not confirmed')}`;
 
-  const payDisabled = isSubmitting || holdExpired || !consentAccepted || notTakingBookings;
+  /** Pay needs the consent tick, and the house-rules tick when the host wrote rules. */
+  const readyToPay = consentAccepted && (!houseRulesRequired || houseRulesAccepted);
+  const payDisabled = isSubmitting || !readyToPay || notTakingBookings;
 
   return (
     <div className="gd-page">
@@ -1633,11 +1852,17 @@ const GuestDetailsPage: React.FC = () => {
         <div className="gd-desktop-strip-inner">
           <div className="gd-desktop-strip-left">
             <IconClock size={15}/>
-            <span>
-              Your dates are reserved for the next{' '}
-              <b className="gd-strip-timer">{countdown}</b>.
-              {'  '}Finish payment to confirm — we won't release them while you're here.
-            </span>
+            {holdLive ? (
+              <span>
+                Your dates are reserved for the next{' '}
+                <b className="gd-strip-timer">{countdown}</b>.
+                {'  '}Finish payment to confirm — we won't release them while you're here.
+              </span>
+            ) : (
+              <span data-testid="hold-strip-no-clock">
+                Take your time — nothing is held yet. Your dates are held for {CHECKOUT_HOLD_MINUTES} minutes only once you tap Pay.
+              </span>
+            )}
           </div>
           <div className="gd-desktop-strip-right">
             <span>Step <b>2</b> of 2 · Details &amp; payment</span>
@@ -1658,28 +1883,39 @@ const GuestDetailsPage: React.FC = () => {
           <IconChevronLeft size={18}/>
         </Link>
         <div className="gd-hold-body">
-          <div className="gd-hold-title">
-            Dates held for <b>{countdown}</b>
+          {holdLive ? (
+            <>
+              <div className="gd-hold-title">
+                Dates held for <b>{countdown}</b>
+              </div>
+              <div className="gd-hold-sub">Finish payment to lock them in</div>
+            </>
+          ) : (
+            <>
+              <div className="gd-hold-title" data-testid="hold-header-no-clock">Confirm your details</div>
+              <div className="gd-hold-sub">Nothing is held until you tap Pay</div>
+            </>
+          )}
+        </div>
+        {holdLive && (
+          <div className="gd-hold-track">
+            <span style={{ width: (holdPct * 100) + '%' }} />
           </div>
-          <div className="gd-hold-sub">Finish payment to lock them in</div>
-        </div>
-        <div className="gd-hold-track">
-          <span style={{ width: (holdPct * 100) + '%' }} />
-        </div>
+        )}
       </div>
 
-      {/* ── Hold expired modal ── */}
+      {/* ── Hold expired modal (the 10 minutes after Pay ended) ── */}
       {holdExpired && (
         <div ref={expiredDialogRef} className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-expired-title">
           <div className="gd-modal">
             <div className="gd-modal-icon"><IconClock size={22}/></div>
-            <h3 id="gd-expired-title">Your hold just expired.</h3>
+            <h3 id="gd-expired-title">Your {CHECKOUT_HOLD_MINUTES} minutes are over.</h3>
             <p>
-              The {CHECKOUT_HOLD_MINUTES}-minute reservation has ended and those dates are back on the calendar.
-              Re-select to continue — your details aren't lost.
+              The dates are open again for other guests. Your details are saved — tap below and we will check the dates
+              again, then you can pay.
             </p>
-            <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
-              Choose dates again
+            <button type="button" className="gd-modal-cta" onClick={handleRestartHold} data-testid="hold-expired-check-again">
+              Check the dates again
             </button>
           </div>
         </div>
@@ -2134,6 +2370,18 @@ const GuestDetailsPage: React.FC = () => {
               />
             </div>
 
+            {/* FOUNDER RULED 2026-10-19: the host's own house rules, with a REQUIRED "I accept" tick before Pay.
+                Renders nothing when the host wrote no rules (a listing with no rules never blocks a booking). */}
+            <div ref={houseRulesRowRef}>
+              <HouseRulesAcceptance
+                info={checkoutInfo}
+                accepted={houseRulesAccepted}
+                onChange={(next) => { setHouseRulesAccepted(next); if (next) setHouseRulesError(''); }}
+                error={houseRulesError}
+                variant="details"
+              />
+            </div>
+
             {/* Native consent controls keep one focus stop per choice and independent policy links. */}
             <div className="gd-consent">
               <div ref={consentRowRef} className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`} data-testid="guest-booking-consent-row">
@@ -2163,6 +2411,23 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* FOUNDER RULED 2026-10-19: after the FIRST failed payment — "Payment didn't go through" with [Try again]
+                and [Message the host on WhatsApp] (the HOST's number, pre-written; never Atlas's). */}
+            {paymentFailure && !isSubmitting && (
+              <PaymentFailedPanel
+                reasonText={paymentFailure.reasonText}
+                countdown={countdown}
+                holdActive={holdLive}
+                contact={failedPaymentContact}
+                onTryAgain={() => {
+                  setPaymentFailure(null);
+                  // Same hold, same window: handleSubmit reuses a live hold and starts a new one only after the 10 minutes ended.
+                  void handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                }}
+                variant="details"
+              />
+            )}
+
             {/* Error banners */}
             {serverTotalConfirmRequired && razorpayAmountPaise != null && (
               <div
@@ -2183,41 +2448,30 @@ const GuestDetailsPage: React.FC = () => {
                   <b>
                     {orderError.startsWith('Couldn')
                       ? 'Payment cancelled — no money taken.'
-                      : orderError.startsWith('No money was taken')
-                        ? 'Payment failed — no money taken.'
-                        : isChargedUnconfirmed
-                          ? 'Payment received — we\'re confirming your booking.'
-                          : 'Something went wrong.'}
+                      : isChargedUnconfirmed
+                        ? 'Payment received — we\'re confirming your booking.'
+                        : 'Something went wrong.'}
                   </b><br/>
                   <span>{orderError}</span>
-                  {/* TASK-4537: Show support affordance for both "No money taken" (need to retry)
-                      and charged-unconfirmed (already charged, monitoring for confirmation). */}
-                  {(orderError.startsWith('No money was taken') || isChargedUnconfirmed) && (
+                  {/* TASK-4537: Show a support affordance while a charged-but-unconfirmed payment is monitored.
+                      (The plain "payment failed" case now has its own host-first panel above.) */}
+                  {isChargedUnconfirmed && (
                     <div style={{ marginTop: 12 }} data-testid="payment-failed-support">
                       <p style={{ margin: '0 0 8px', fontSize: 14 }}>
-                        {isChargedUnconfirmed
-                          ? chargedUnconfirmedPollExhausted
-                            ? 'Automatic checks have paused — tap Check again or reach out if you need help.'
-                            : 'We\'re still checking automatically — no need to pay again.'
-                          : 'Need help finishing your booking?'}
+                        {chargedUnconfirmedPollExhausted
+                          ? 'Automatic checks have paused — tap Check again or reach out if you need help.'
+                          : 'We\'re still checking automatically — no need to pay again.'}
                       </p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'center' }}>
-                        {isChargedUnconfirmed && (
-                          <button
-                            type="button"
-                            className="gd-resume-btn"
-                            onClick={() => { void handleChargedUnconfirmedRecheck(); }}
-                            disabled={chargedUnconfirmedChecking}
-                            data-testid="charged-unconfirmed-recheck"
-                          >
-                            {chargedUnconfirmedChecking ? 'Checking…' : 'Check again'}
-                          </button>
-                        )}
-                        {!isChargedUnconfirmed && razorpayOrderId && (
-                          <button type="button" className="gd-resume-btn" onClick={handleResume}>
-                            Resume payment
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="gd-resume-btn"
+                          onClick={() => { void handleChargedUnconfirmedRecheck(); }}
+                          disabled={chargedUnconfirmedChecking}
+                          data-testid="charged-unconfirmed-recheck"
+                        >
+                          {chargedUnconfirmedChecking ? 'Checking…' : 'Check again'}
+                        </button>
                         <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
                           <IconWhatsApp size={14} /> WhatsApp us
                         </a>
@@ -2235,7 +2489,7 @@ const GuestDetailsPage: React.FC = () => {
               <div className="gd-banner" role="alert">
                 <IconAlert size={16}/>
                 <div>
-                  <b>Someone else just booked these dates.</b><br/>
+                  <b>Sorry, these dates were just booked.</b><br/>
                   <span>{orderError}</span>
                   <div style={{ marginTop: 10 }}>
                     <button type="button" className="gd-modal-cta" style={{ marginTop: 0 }} onClick={handleBackToProperty}>
@@ -2294,13 +2548,22 @@ const GuestDetailsPage: React.FC = () => {
         {/* ── Right: sticky aside ── */}
         <aside className="gd-aside">
           {/* Hold chip in aside */}
-          <div className="gd-hold-chip">
-            <div className="gd-hold-chip-clock">{countdown}</div>
-            <div className="gd-hold-chip-text">
-              <b>Dates held</b><br/>
-              Finish to confirm
+          {holdLive ? (
+            <div className="gd-hold-chip">
+              <div className="gd-hold-chip-clock">{countdown}</div>
+              <div className="gd-hold-chip-text">
+                <b>Dates held</b><br/>
+                Finish to confirm
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="gd-hold-chip" data-testid="aside-no-hold-chip">
+              <div className="gd-hold-chip-text">
+                <b>Nothing is held yet</b><br/>
+                We hold your dates for {CHECKOUT_HOLD_MINUTES} minutes when you tap Pay
+              </div>
+            </div>
+          )}
 
           {/* Aside recap */}
           <div className="gd-aside-recap">
@@ -2430,10 +2693,16 @@ const GuestDetailsPage: React.FC = () => {
               </button>
 
               {/* Pay microcopy */}
-              {!consentAccepted && (
-                <div className="gd-pay-microcopy">Tick the consent box to enable payment.</div>
+              {!readyToPay && (
+                <div className="gd-pay-microcopy">
+                  {houseRulesRequired && !houseRulesAccepted && !consentAccepted
+                    ? 'Tick the house rules and the consent box to enable payment.'
+                    : houseRulesRequired && !houseRulesAccepted
+                      ? 'Tick the house rules to enable payment.'
+                      : 'Tick the consent box to enable payment.'}
+                </div>
               )}
-              {consentAccepted && (
+              {readyToPay && (
                 <div className="gd-pay-microcopy">
                   You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
                   {freeCancellationCopy?.deadlineFormatted
@@ -2494,7 +2763,7 @@ const GuestDetailsPage: React.FC = () => {
                 <IconWhatsApp size={16}/>
                 <div>
                   <b>Online payment is not available for this property.</b><br/>
-                  <span>Contact the host on WhatsApp to confirm your dates — your hold is reserved for {countdown}.</span>
+                  <span>Contact the host on WhatsApp to confirm your dates.</span>
                   {trialPayAtProperty && (
                     <div data-testid="guest-trial-pay-at-property-notice" style={{ marginTop: 4 }}>
                       {TRIAL_PAY_AT_PROPERTY_COPY}
@@ -2502,17 +2771,25 @@ const GuestDetailsPage: React.FC = () => {
                   )}
                 </div>
               </div>
-              <a
-                href={whatsappHandoffUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="gd-pay"
-                style={{ textDecoration: 'none' }}
-                data-testid="guest-booking-whatsapp-cta"
-              >
-                <IconWhatsApp size={16}/> WhatsApp host to confirm
-              </a>
-              <div className="gd-pay-microcopy">You'll be connected directly to the host — no payment taken on this site.</div>
+              {whatsappHandoffUrl ? (
+                <>
+                  <a
+                    href={whatsappHandoffUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="gd-pay"
+                    style={{ textDecoration: 'none' }}
+                    data-testid="guest-booking-whatsapp-cta"
+                  >
+                    <IconWhatsApp size={16}/> WhatsApp host to confirm
+                  </a>
+                  <div className="gd-pay-microcopy">You'll be connected directly to the host — no payment taken on this site.</div>
+                </>
+              ) : (
+                <div className="gd-pay-microcopy" data-testid="guest-booking-no-host-number">
+                  Please contact the host directly to make a reservation.
+                </div>
+              )}
             </>
           )}
 
@@ -2537,17 +2814,19 @@ const GuestDetailsPage: React.FC = () => {
 
       {/* ── Mobile sticky bottom bar — TASK-8048: offline tenants show WhatsApp CTA, not a pay rail. */}
       <div className="gd-mobile-bar">
-        <div className="gd-mobile-bar-clock">
-          <b>{countdown}</b>
-          <small>Held</small>
-        </div>
+        {holdLive && (
+          <div className="gd-mobile-bar-clock">
+            <b>{countdown}</b>
+            <small>Held</small>
+          </div>
+        )}
         {hasOnlineRail ? (
           <button
-            type={consentAccepted ? 'submit' : 'button'}
+            type={readyToPay ? 'submit' : 'button'}
             form="gd-details-form"
             className="gd-mobile-bar-cta"
-            disabled={isSubmitting || holdExpired}
-            onClick={consentAccepted ? undefined : scrollToConsent}
+            disabled={isSubmitting}
+            onClick={readyToPay ? undefined : scrollToConsent}
             data-testid="guest-booking-submit-mobile"
           >
             {isSubmitting
@@ -2566,7 +2845,7 @@ const GuestDetailsPage: React.FC = () => {
           >
             Not taking bookings right now
           </button>
-        ) : (
+        ) : whatsappHandoffUrl ? (
           <a
             href={whatsappHandoffUrl}
             target="_blank"
@@ -2577,6 +2856,10 @@ const GuestDetailsPage: React.FC = () => {
           >
             <IconWhatsApp size={14}/> WhatsApp host
           </a>
+        ) : (
+          <button type="button" className="gd-mobile-bar-cta" disabled data-testid="guest-booking-no-host-number-mobile">
+            Contact the host directly
+          </button>
         )}
       </div>
 
@@ -3603,6 +3886,47 @@ const gdStyles = `
 .gd-banner svg { color: var(--gd-danger); margin-top: 2px; }
 .gd-banner b { color: #6b1e1a; font-weight: 700; }
 .gd-banner a { color: var(--gd-danger); font-weight: 600; text-decoration: underline; }
+
+/* Founder ruling 2026-10-19: house rules card (required tick before Pay) */
+.gd-rules {
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid var(--gd-line-strong);
+  border-radius: 14px;
+  background: #fff;
+  display: grid;
+  gap: 10px;
+}
+.gd-rules-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--gd-ink); }
+.gd-rules-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.gd-rules-chip {
+  font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--gd-line-strong); color: var(--gd-ink-soft); background: var(--gd-ivory);
+}
+.gd-rules-chip--no { color: #8a2a17; background: #fff1ec; border-color: #f1c2b3; }
+.gd-rules-chip--ok { color: var(--gd-success); background: var(--gd-success-bg); border-color: var(--gd-success-border); }
+.gd-rules-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--gd-ink-soft); white-space: pre-line; }
+.gd-rules-more { background: none; border: none; padding: 0; color: var(--gd-accent-text); font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: underline; }
+.gd-rules-pdf { margin: 0; font-size: 13px; }
+.gd-rules-pdf a { color: var(--gd-accent-text); font-weight: 600; }
+.gd-rules .gd-consent-row { margin-top: 2px; }
+
+/* Founder ruling 2026-10-19: "Payment didn't go through" panel (Try again + message the host) */
+.gd-banner.gd-fail { grid-template-columns: 1fr; padding: 16px; }
+.gd-fail-title { display: block; font-size: 16px; margin-bottom: 2px; }
+.gd-fail-sub, .gd-fail-hold, .gd-fail-note { display: block; }
+.gd-fail-hold { margin-top: 4px; font-weight: 600; }
+.gd-fail-note { margin-top: 8px; font-size: 12px; color: var(--gd-muted); }
+.gd-fail-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.gd-fail-try {
+  min-height: 44px; padding: 0 20px; border-radius: 10px; border: none; cursor: pointer;
+  background: var(--gd-coral); color: #fff; font-weight: 700; font-size: 14px;
+}
+.gd-fail-try:disabled { opacity: .6; cursor: default; }
+.gd-banner a.gd-fail-host {
+  min-height: 44px; padding: 0 18px; border-radius: 10px; display: inline-flex; align-items: center;
+  border: 1.5px solid var(--gd-ink); color: var(--gd-ink); background: #fff; text-decoration: none; font-weight: 700; font-size: 14px;
+}
 
 /* Resume payment button */
 .gd-resume-btn {

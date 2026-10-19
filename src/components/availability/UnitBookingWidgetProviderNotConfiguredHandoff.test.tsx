@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, format, nextFriday } from 'date-fns';
@@ -7,13 +7,11 @@ import { toISODate } from '@/utils/dateRange';
 import { getIstStartOfDay } from '@/utils/date';
 import { settle } from '../../test/settle';
 
-// No-task fix (found 2026-10-06 by p0d-20261006b). Since TASK-101182 the Reserve step's init-hold call
-// (POST /api/Razorpay/order, bookingDraft only) fails closed with 422 PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT
-// for a tenant with no usable payment provider — exactly the tenants the API reports as
-// bookingMode "WHATSAPP". Before the fix the widget answered that 422 with the GENERIC "We couldn't start
-// checkout…" line and a dead end. It must instead hand the guest to the host's WhatsApp (the contract on
-// TenantInfo.bookingMode: "hand off to host's WhatsApp with prefilled booking details"), keep the dates the
-// guest already picked, and never print raw server text.
+// FOUNDER RULED 2026-10-19 (website booking overhaul). Reserve no longer calls POST /api/Razorpay/order at all: the 10-minute
+// hold starts at Pay on the details page. A host the API reports as bookingMode "WHATSAPP" (no usable payment provider) is
+// handed to its WhatsApp straight from Reserve, BEFORE any network call (TASK-8048 fail-closed; the 2026-10-19 07:16 UTC guest of
+// a host with no provider reached the order endpoint). The contract on TenantInfo.bookingMode: "hand off to host's WhatsApp with
+// prefilled booking details"; the guest's dates stay on screen and no raw server text is ever printed.
 
 const navigateSpy = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -88,29 +86,7 @@ vi.mock('@/utils/analytics', async (importOriginal) => ({
 }));
 vi.mock('./AtlasBookingCalendar', () => ({ AtlasBookingCalendar: () => null }));
 
-// The raw server text that must NEVER reach a guest. `message` is the API's own English sentence and
-// `details` carries the internal routing reason + an admin-portal path — both are server text.
-const RAW_MESSAGE = 'Online payment is not configured for this property.';
-const RAW_DETAILS =
-  'PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT: Payment provider not configured for this tenant. ' +
-  'Missing: [TenantPaymentProvider row missing]. Configure at /settings/payments';
 const GENERIC_CHECKOUT_ERROR = "We couldn't start checkout";
-
-/** The exact wire shape RazorpayController.BuildError produces (camelCase JSON). */
-function apiError(status: number, code: string, message: string, details = RAW_DETAILS) {
-  return new AxiosError(`Request failed with status code ${status}`, 'ERR_BAD_REQUEST', undefined, undefined, {
-    status,
-    statusText: 'Unprocessable Entity',
-    data: {
-      code,
-      message,
-      details,
-      recoveryActions: [{ actionType: 'CONTACT_SUPPORT', actionLabel: 'Contact support', actionUrl: '/contact' }],
-    },
-    headers: {},
-    config: {} as never,
-  });
-}
 
 const friday = getIstStartOfDay(nextFriday(addDays(new Date(), 14)));
 const sunday = addDays(friday, 2);
@@ -152,7 +128,7 @@ const clickReserve = async (reserve: HTMLElement) => {
   await settle();
 };
 
-describe('UnitBookingWidget - Reserve 422 PAYMENT_PROVIDER_NOT_CONFIGURED_* hands the guest to the host on WhatsApp', () => {
+describe('UnitBookingWidget - Reserve hands a host with no online payment to WhatsApp BEFORE any network call (2026-10-19)', () => {
   beforeEach(() => {
     ctx.tenant.slug = 'staybycf';
     ctx.tenant.name = 'Stay By CF';
@@ -173,16 +149,14 @@ describe('UnitBookingWidget - Reserve 422 PAYMENT_PROVIDER_NOT_CONFIGURED_* hand
     navigateSpy.mockReset();
   });
 
-  it.each([
-    ['PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT', RAW_MESSAGE],
-    ['PAYMENT_PROVIDER_NOT_CONFIGURED', 'Online booking is currently unavailable.'],
-  ])('422 %s shows the WhatsApp hand-off with a pre-filled booking request, not the generic checkout error', async (code, message) => {
-    const postSpy = vi.spyOn(axios, 'post').mockRejectedValueOnce(apiError(422, code, message));
+  it('a WHATSAPP host shows the hand-off with a pre-filled booking request and never reaches POST /api/Razorpay/order', async () => {
+    const postSpy = vi.spyOn(axios, 'post');
     const reserve = await renderWidget();
 
     await clickReserve(reserve);
 
-    expect(postSpy).toHaveBeenCalledTimes(1);
+    // Fail closed (TASK-8048): the guest of a host with no payment provider must not reach the order API at all.
+    expect(postSpy).not.toHaveBeenCalled();
     const handoff = screen.getByTestId('reserve-whatsapp-handoff');
     expect(handoff).toHaveTextContent('Online payment is not available for this property.');
     expect(handoff).toHaveTextContent('Contact the host on WhatsApp to confirm your dates.');
@@ -202,27 +176,40 @@ describe('UnitBookingWidget - Reserve 422 PAYMENT_PROVIDER_NOT_CONFIGURED_* hand
     expect(text).toContain('2 nights');
     expect(text).toContain('2 guests');
 
-    // The generic dead-end copy is gone, and no raw server text is ever shown to the guest.
     expect(screen.queryByText(new RegExp(GENERIC_CHECKOUT_ERROR))).toBeNull();
-    const shown = document.body.textContent ?? '';
-    expect(shown).not.toContain(message);
-    expect(shown).not.toContain('PAYMENT_PROVIDER_NOT_CONFIGURED');
-    expect(shown).not.toContain('Configure at');
-    expect(shown).not.toContain('/settings/payments');
-    expect(shown).not.toContain('TenantPaymentProvider');
-
     // No hold exists, so nothing is stored in the booking context and the guest is not sent anywhere.
     expect(ctx.updateBooking).not.toHaveBeenCalled();
     expect(navigateSpy).not.toHaveBeenCalled();
-    // The retired full-widget "opening soon" banner (503 PLATFORM only) must not take over the form.
-    expect(screen.queryByTestId('provider-blocked-banner')).toBeNull();
   });
 
-  it('keeps the guest\'s dates and guest count: the form stays mounted and a retry re-posts the SAME booking draft', async () => {
-    const postSpy = vi.spyOn(axios, 'post')
-      .mockRejectedValueOnce(apiError(422, 'PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT', RAW_MESSAGE))
-      // The host reconnects a payment provider; the next Reserve click succeeds.
-      .mockResolvedValueOnce({ data: { holdId: 901, holdExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString() } });
+  it('an ONLINE host: Reserve makes NO network call, starts NO hold and hands the stay to the details page (the hold starts at Pay)', async () => {
+    ctx.tenant.bookingMode = 'ONLINE';
+    ctx.tenant.paymentProvider = 'RAZORPAY';
+    const postSpy = vi.spyOn(axios, 'post');
+    const reserve = await renderWidget();
+
+    await clickReserve(reserve);
+
+    // FOUNDER RULED 2026-10-19: details and house rules carry no clock and close no OTA night.
+    expect(postSpy).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('reserve-whatsapp-handoff')).toBeNull();
+    expect(ctx.updateBooking).toHaveBeenCalledTimes(1);
+    const draft = ctx.updateBooking.mock.calls[0][0] as Record<string, unknown>;
+    expect(draft).toMatchObject({
+      holdId: null,
+      holdToken: null,
+      holdExpiresAt: null,
+      holdListingId: 7,
+      holdListingName: 'Atlas 501 PH',
+      guests: 2,
+    });
+    expect(draft.checkIn).toEqual(expect.any(String));
+    expect(draft.checkOut).toEqual(expect.any(String));
+    expect(navigateSpy).toHaveBeenCalledWith('/book/atlas501-ph/ph/details');
+  });
+
+  it("keeps the guest's dates and guest count: the form stays mounted, and once the host can take payment the next Reserve proceeds", async () => {
+    const postSpy = vi.spyOn(axios, 'post');
     const reserve = await renderWidget();
 
     await clickReserve(reserve);
@@ -232,76 +219,50 @@ describe('UnitBookingWidget - Reserve 422 PAYMENT_PROVIDER_NOT_CONFIGURED_* hand
     expect(screen.getByTestId('unit-booking-checkout-cell')).not.toHaveTextContent('Add date');
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
 
+    // The host connects a payment provider; the next Reserve click succeeds and the stale hand-off is gone.
+    ctx.tenant.bookingMode = 'ONLINE';
     await clickReserve(screen.getByTestId('guest-booking-submit'));
-    expect(postSpy).toHaveBeenCalledTimes(2);
-    expect(postSpy.mock.calls[1][1]).toEqual(postSpy.mock.calls[0][1]);
-    expect(postSpy.mock.calls[0][1]).toMatchObject({
-      bookingDraft: { listingId: 7, checkinDate: toISODate(friday), checkoutDate: toISODate(sunday), guests: 2 },
-    });
-
-    // The recovered attempt proceeds to the details page and the stale hand-off is gone.
+    expect(postSpy).not.toHaveBeenCalled();
     expect(navigateSpy).toHaveBeenCalledWith('/book/atlas501-ph/ph/details');
     expect(screen.queryByTestId('reserve-whatsapp-handoff')).toBeNull();
   });
 
   it('with no host WhatsApp number it shows the message only - never a recipient-less wa.me link', async () => {
-    ctx.tenant.bookingMode = undefined;
+    ctx.tenant.bookingMode = 'WHATSAPP';
     ctx.tenant.whatsappBookingPhone = undefined;
-    vi.spyOn(axios, 'post').mockRejectedValueOnce(apiError(422, 'PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT', RAW_MESSAGE));
+    const postSpy = vi.spyOn(axios, 'post');
     const reserve = await renderWidget();
 
     await clickReserve(reserve);
 
+    expect(postSpy).not.toHaveBeenCalled();
     const handoff = screen.getByTestId('reserve-whatsapp-handoff');
     expect(handoff).toHaveTextContent('Online payment is not available for this property.');
     expect(handoff).toHaveTextContent('Please contact the host directly to make a reservation.');
     expect(screen.queryByTestId('reserve-whatsapp-handoff-cta')).toBeNull();
     expect(document.querySelector('a[href*="wa.me"]')).toBeNull();
-    expect(document.body.textContent ?? '').not.toContain(RAW_MESSAGE);
   });
 
-  it('uses the LISTING host\'s number from the tenantContext prop (marketplace), never the ambient tenant\'s', async () => {
-    // Ambient tenant = the marketplace root with its own number; the listing belongs to another host.
+  it("uses the LISTING host's number from the tenantContext prop (marketplace), never the ambient tenant's", async () => {
+    // Ambient tenant = the marketplace root with its own number and an online rail; the listing belongs to another host with no provider.
     ctx.tenant.slug = 'marketplace';
+    ctx.tenant.bookingMode = 'ONLINE';
     ctx.tenant.whatsappBookingPhone = '917032493290';
-    vi.spyOn(axios, 'post').mockRejectedValueOnce(apiError(422, 'PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT', RAW_MESSAGE));
+    const postSpy = vi.spyOn(axios, 'post');
     const reserve = await renderWidget({
       tenantContext: { slug: 'coorgstay', name: 'Coorg Stay', bookingMode: 'WHATSAPP', whatsappBookingPhone: '919123456789' },
     });
 
     await clickReserve(reserve);
 
+    // The marketplace guest of a host with NO payment provider never reaches POST /api/Razorpay/order.
+    expect(postSpy).not.toHaveBeenCalled();
     const cta = screen.getByTestId('reserve-whatsapp-handoff-cta') as HTMLAnchorElement;
     expect(new URL(cta.href).pathname).toBe('/919123456789');
     expect(cta.href).not.toContain('917032493290');
   });
 
-  it('a non-provider 422 (PAYMENT_VALIDATION_ERROR) keeps the generic error - the match is on the API code, not the bare status', async () => {
-    vi.spyOn(axios, 'post').mockRejectedValueOnce(
-      apiError(422, 'PAYMENT_VALIDATION_ERROR', 'We could not start payment. Please review your booking details.', 'Listing with ID 7 does not exist'),
-    );
-    const reserve = await renderWidget();
-
-    await clickReserve(reserve);
-
-    expect(screen.queryByTestId('reserve-whatsapp-handoff')).toBeNull();
-    expect(screen.getByText(new RegExp(GENERIC_CHECKOUT_ERROR))).toBeInTheDocument();
-  });
-
-  it('503 PAYMENT_PROVIDER_NOT_CONFIGURED_PLATFORM keeps its existing "Bookings opening soon" banner (unchanged)', async () => {
-    vi.spyOn(axios, 'post').mockRejectedValueOnce(
-      apiError(503, 'PAYMENT_PROVIDER_NOT_CONFIGURED_PLATFORM', 'Payment service is temporarily unavailable.'),
-    );
-    const reserve = await renderWidget();
-
-    await clickReserve(reserve);
-
-    expect(screen.getByTestId('provider-blocked-banner')).toBeInTheDocument();
-    expect(screen.queryByTestId('reserve-whatsapp-handoff')).toBeNull();
-  });
-
   it('tapping the hand-off CTA fires the existing whatsapp_cta_click analytics event', async () => {
-    vi.spyOn(axios, 'post').mockRejectedValueOnce(apiError(422, 'PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT', RAW_MESSAGE));
     const reserve = await renderWidget();
     await clickReserve(reserve);
 

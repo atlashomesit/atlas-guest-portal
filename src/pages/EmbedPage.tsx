@@ -10,6 +10,11 @@ import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { formatCurrency } from '@/utils/formatting';
 import { razorpayOrderAmountInrToPaise } from '@/utils/razorpayOrderAmount';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
+import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
+import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
+import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -479,6 +484,19 @@ function GuestDetailsForm({
   const [isPrefilledFromSaved, setIsPrefilledFromSaved] = useState(savedInitial.hasSaved);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [depositAccepted, setDepositAccepted] = useState(false);
+  // FOUNDER RULED 2026-10-19: the host's own house rules (required tick before Pay, only when the host wrote rules) and the host's
+  // own WhatsApp / phone for the failed-payment fallback, read from the LISTING OWNER (never Atlas's own number).
+  const [checkoutInfo, setCheckoutInfo] = useState<ListingCheckoutInfo | null>(null);
+  const [houseRulesAccepted, setHouseRulesAccepted] = useState(false);
+  const [paymentFailure, setPaymentFailure] = useState<{ reasonText: string } | null>(null);
+  const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchListingCheckoutInfo(listing.id, undefined, controller.signal).then((info) => {
+      if (!controller.signal.aborted) setCheckoutInfo(info);
+    });
+    return () => controller.abort();
+  }, [listing.id]);
   const [pricing, setPricing] = useState<GuestPriceBreakdown | null>(null);
   const [loadingPricing, setLoadingPricing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -552,7 +570,12 @@ function GuestDetailsForm({
       setError('Please accept the refundable security deposit terms to continue.');
       return;
     }
+    if (houseRulesRequired && !houseRulesAccepted) {
+      setError('Please accept the house rules to continue.');
+      return;
+    }
     setError(null);
+    setPaymentFailure(null);
     setSubmitting(true);
     try {
       const idempotencyKey = crypto.randomUUID();
@@ -582,6 +605,10 @@ function GuestDetailsForm({
         });
         if (!holdRes.ok) {
           const body = await holdRes.json().catch(() => ({}));
+          // FOUNDER RULED 2026-10-19: the hold starts at Pay, so a lost night is told here, BEFORE any money moves.
+          if (holdRes.status === 409 && String(body.code ?? '') === 'AVAILABILITY_CONFLICT') {
+            throw new Error('Sorry, these dates were just booked. No payment was taken. Please pick different dates.');
+          }
           throw new Error(String(body.message ?? body.error ?? 'Failed to create hold'));
         }
         hold = (await holdRes.json()) as { holdId: number; holdExpiresAt: string; prepToken: string };
@@ -599,10 +626,16 @@ function GuestDetailsForm({
           guestInfo: { name: name.trim(), email: email.trim(), phone: phone.trim() },
           guestConsentAccepted: consentAccepted,
           securityDepositAccepted: depositRequired ? depositAccepted : false,
+          houseRulesAccepted,
         }),
       });
       if (!orderRes.ok) {
         const body = await orderRes.json().catch(() => ({}));
+        if (orderRes.status === 409 && String(body.code ?? '') === 'CHECKOUT_HOLD_EXPIRED') {
+          // The 10 minutes ended and the nights were released: drop the lapsed hold; the next Pay re-checks the dates and starts a fresh one.
+          setHeldHold(null);
+          throw new Error('Your 10 minutes ended, so the dates were released. Tap Pay and we will check them again. No payment was taken.');
+        }
         throw new Error(String(body.message ?? body.error ?? 'Failed to create payment order'));
       }
       // `amount` off this response is RUPEES, while the Razorpay order it created is
@@ -657,8 +690,10 @@ function GuestDetailsForm({
         theme: { color: brand },
       });
       rzp.on('payment.failed', (resp) => {
-        const r = resp as { error?: { description?: string } };
-        setError(r.error?.description ?? 'Payment failed. Please try again.');
+        const r = resp as { error?: { code?: string; description?: string } };
+        // FOUNDER RULED 2026-10-19: "Payment didn't go through" with [Try again] and [Message the host on WhatsApp].
+        setError(null);
+        setPaymentFailure({ reasonText: mapRazorpayFailureCode(r.error?.code, r.error?.description) });
         setSubmitting(false);
       });
       rzp.open();
@@ -766,6 +801,13 @@ function GuestDetailsForm({
         />
       </div>
 
+      <HouseRulesAcceptance
+        info={checkoutInfo}
+        accepted={houseRulesAccepted}
+        onChange={setHouseRulesAccepted}
+        variant="embed"
+      />
+
       <label className="mb-3 flex items-start gap-2 text-xs text-text-secondary">
         <input
           type="checkbox"
@@ -797,6 +839,27 @@ function GuestDetailsForm({
         </label>
       )}
 
+      {paymentFailure && !submitting && (
+        <PaymentFailedPanel
+          reasonText={paymentFailure.reasonText}
+          countdown={holdCountdown}
+          holdActive={heldHold != null && new Date(heldHold.holdExpiresAt).getTime() > Date.now()}
+          contact={buildHostFailureContact({
+            hostWhatsAppDigits: checkoutInfo?.hostWhatsAppDigits,
+            hostPhoneDigits: checkoutInfo?.hostPhoneDigits,
+            roomName: listing.name,
+            checkInLabel: format(checkIn, 'EEE, d MMM yyyy'),
+            checkOutLabel: format(checkOut, 'EEE, d MMM yyyy'),
+            nights,
+            guests,
+            amountInr: pricing?.finalAmount ?? null,
+            guestName: name,
+          })}
+          onTryAgain={() => { void handleSubmit(); }}
+          variant="embed"
+        />
+      )}
+
       {error && (
         <div role="alert" className="mb-3 rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-700">
           {error}
@@ -805,7 +868,7 @@ function GuestDetailsForm({
 
       <button
         type="button"
-        disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted)}
+        disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted) || (houseRulesRequired && !houseRulesAccepted)}
         onClick={handleSubmit}
         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
         style={ctaStyle(brand)}
