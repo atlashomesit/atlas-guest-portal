@@ -113,6 +113,13 @@ export type BookingStickySummary = {
   freeCancelUntil: string | null;
   /** DESIGN-030: selected range cannot be booked — sticky must not show a bookable total. */
   datesUnavailable?: boolean;
+  /** Navigation readiness from the same state that enables the existing Reserve action. */
+  canReviewBooking?: boolean;
+  /** GUEST-022: selected rate plan name and meal badge for mobile sticky bar visibility. */
+  ratePlanLabel?: string | null;
+  mealPlanCode?: string | null;
+  mealPlanLabel?: string | null;
+  hasMultipleRatePlans?: boolean;
 };
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
@@ -249,6 +256,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
+  // TASK-1039690: per-date minStayArrival overrides from GET /api/public/listings/{id}/availability-calendar
+  // when GapNightDirectMinStay is enabled for the tenant.
+  const [perDateMinStayMap, setPerDateMinStayMap] = useState<Map<string, number>>(new Map());
   // TASK-7491 (Rate Sync Authority opt-out): per-date `bookable` flag from GET
   // /api/pricing/availability-rates. `false` = fail-closed — no usable inbound rate for that
   // date (beyond the carry-forward cap, or none at all) — never render a price or allow
@@ -392,6 +402,20 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   ]);
 
   const minStayNights = resolvedMinStay;
+  const getEffectiveMinStayForDate = useCallback(
+    (checkInDate?: Date | null): number => {
+      if (checkInDate && !Number.isNaN(checkInDate.getTime())) {
+        const iso = toCalendarISO(startOfCalendarDay(checkInDate));
+        const override = perDateMinStayMap.get(iso);
+        if (override != null && Number.isFinite(override) && override >= 1) {
+          return override;
+        }
+      }
+      return minStayNights;
+    },
+    [perDateMinStayMap, minStayNights],
+  );
+  const effectiveMinStayNights = getEffectiveMinStayForDate(dateRange.startDate);
   const effectiveMaxGuests = maxGuests;
   /** RA-006: payment provider not configured for this tenant. */
   const [providerBlocked, setProviderBlocked] = useState(false);
@@ -575,11 +599,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       hydratedRangeRef.current = { start, end };
       return;
     }
-    // TASK-4556: enforce min-stay on URL-hydrated dates
+    // TASK-4556 / TASK-1039690: enforce min-stay (including per-date minStayArrival) on URL-hydrated dates
     const nights = calculateNights(start, end);
-    if (minStayNights > 1 && nights < minStayNights) {
+    const effectiveHydratedMinStay = getEffectiveMinStayForDate(start);
+    if (effectiveHydratedMinStay > 1 && nights < effectiveHydratedMinStay) {
       setDateRange({ startDate: start, endDate: end });
-      setDateError(`Minimum stay is ${minStayNights} nights.`);
+      setDateError(`Minimum stay is ${effectiveHydratedMinStay} nights.`);
       hasHydratedFromContextRef.current = true;
       hydratedRangeRef.current = { start, end };
       return;
@@ -598,7 +623,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
     hydratedRangeRef.current = { start, end };
-  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights]);
+  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights, getEffectiveMinStayForDate]);
 
   // TASK-4726 fix: re-validate a URL-hydrated range against interior-night overlaps once the
   // availability-calendar fetch (blockedSet/dateStatusMap) has actually loaded. The hydration
@@ -620,8 +645,17 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
     if (checkInteriorNightOverlap(hydrated.start, hydrated.end)) {
       setDateConflictError('These dates overlap an existing booking or hold.');
+      return;
     }
-  }, [blockedSet, dateStatusMap, dateRange.startDate, dateRange.endDate]);
+    // TASK-1039690: re-evaluate per-date minStayArrival once availability-calendar settles
+    const nights = calculateNights(hydrated.start, hydrated.end);
+    const effectiveHydratedMinStay = getEffectiveMinStayForDate(hydrated.start);
+    if (effectiveHydratedMinStay > 1 && nights < effectiveHydratedMinStay) {
+      setDateError(`Minimum stay is ${effectiveHydratedMinStay} nights.`);
+    } else if (dateError?.startsWith('Minimum stay is ')) {
+      setDateError(null);
+    }
+  }, [blockedSet, dateStatusMap, perDateMinStayMap, dateRange.startDate, dateRange.endDate, getEffectiveMinStayForDate, dateError, setDateError, setDateConflictError]);
 
   useEffect(() => {
     const g = booking.guests;
@@ -670,13 +704,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json() as unknown;
-        const entries = Array.isArray(data) ? (data as Array<{ date?: string; status?: string }>) : [];
+        const entries = Array.isArray(data)
+          ? (data as Array<{ date?: string; status?: string; minStayArrival?: number | null }>)
+          : [];
         
         if (!isActive) return;
         
         // Filter out past dates and process availability with status
         const newBlockedDates = new Set<string>();
         const newDateStatusMap = new Map<string, ListingCalendarDayStatus>();
+        const newPerDateMinStayMap = new Map<string, number>();
         
         entries.forEach((item) => {
           const dateStr = item?.date;
@@ -706,6 +743,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           // Store status for rendering
           newDateStatusMap.set(itemISO, status);
 
+          if (
+            typeof item?.minStayArrival === 'number' &&
+            Number.isFinite(item.minStayArrival) &&
+            item.minStayArrival >= 1
+          ) {
+            newPerDateMinStayMap.set(itemISO, Math.max(1, Math.floor(item.minStayArrival)));
+          }
+
           // Update blockedSet for backward compatibility with existing logic
           // Booked, Blocked and Hold dates should be in blockedSet (all are non-selectable). Turnover is bookable.
           const isBlocked =
@@ -719,6 +764,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         
         setBlockedSet(newBlockedDates);
         setDateStatusMap(newDateStatusMap);
+        setPerDateMinStayMap(newPerDateMinStayMap);
         // TASK-4830: a successful load means the maps are authoritative again — clear any
         // prior failure so Reserve is re-enabled (or correctly gated by real blocked dates).
         setAvailabilityFailed(false);
@@ -1024,6 +1070,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       gstRangeEndIso,
       controller.signal,
       selectedRatePlanId,
+      guests,
     )
       .then((b) => {
         setServerPriceBreakdown(b);
@@ -1032,7 +1079,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setServerPriceBreakdown(null);
       });
     return () => controller.abort();
-  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests]);
 
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
@@ -1165,8 +1212,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // differenceInCalendarDays, not an epoch-millis divide: on the calendar basis a guest whose
   // local zone crosses a DST boundary mid-stay has days that are 23h or 25h long.
   const selectedNights = differenceInCalendarDays(endCal, startCal);
-  if (minStayNights > 1 && selectedNights < minStayNights) {
-    setDateError(`Minimum stay is ${minStayNights} nights.`);
+  const effectiveRangeMinStay = getEffectiveMinStayForDate(startCal);
+  if (effectiveRangeMinStay > 1 && selectedNights < effectiveRangeMinStay) {
+    setDateError(`Minimum stay is ${effectiveRangeMinStay} nights.`);
     return;
   }
 
@@ -1484,9 +1532,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? lastSettledHeadlineRef.current
       : finalTotal;
 
+  // Keep the navigation shortcut tied to the authoritative form eligibility.
+  const reserveDisabled =
+    isSubmitting ||
+    isBookingDisabled ||
+    (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
+    // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
+    datesUnavailable ||
+    // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
+    // reserving now would seed holdPriceBreakdown's client fallback with the provisional
+    // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
+    // stay clickable (TASK-4277): rangePricingPending is false without both dates.
+    // Do NOT gate on availability-fetch loading — that violated TASK-4277 on F1 (2026-07-12).
+    rangePricingPending ||
+    // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
+    (hasSelectedRange && calendarPricingFailed) ||
+    // TASK-4729: guard against NaN pricing (non-numeric server response)
+    (hasSelectedRange && !rangePricingPending && isNaN(finalTotal));
+  const canReviewBooking = hasSelectedRange && !reserveDisabled && !calendarOpenPricingPending && displayFinalTotal > 0;
+
   useEffect(() => {
     onStickySummaryChange?.({
       hasCompleteDates: hasSelectedRange,
+      canReviewBooking,
       // DESIGN-030: never feed the sticky a bookable total for unavailable dates.
       totalAmount:
         hasSelectedRange && !datesUnavailable && displayFinalTotal > 0 ? displayFinalTotal : null,
@@ -1495,15 +1563,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? null
         : freeCancellationCopy?.deadlineFormatted ?? null,
       datesUnavailable,
+      ratePlanLabel: publicRatePlans.length > 0 ? (selectedRatePlan?.name ?? null) : null,
+      mealPlanCode: publicRatePlans.length > 0 ? (selectedRatePlan?.mealPlanCode ?? null) : null,
+      mealPlanLabel: publicRatePlans.length > 0 ? (selectedRatePlan?.mealPlanLabel ?? null) : null,
+      hasMultipleRatePlans: publicRatePlans.length > 1,
     });
   }, [
     onStickySummaryChange,
+    canReviewBooking,
     hasSelectedRange,
     datesUnavailable,
     displayFinalTotal,
     rangePricingPending,
     calendarOpenPricingPending,
     freeCancellationCopy?.deadlineFormatted,
+    publicRatePlans.length,
+    selectedRatePlan?.name,
+    selectedRatePlan?.mealPlanCode,
+    selectedRatePlan?.mealPlanLabel,
   ]);
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
@@ -1601,9 +1678,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setDateError('Check-out must be after check-in.');
       return;
     }
-    // TASK-4556: enforce min-stay on handleReserve (like handleRangeChange does)
-    if (minStayNights > 1 && stayNights < minStayNights) {
-      setDateError(`Minimum stay is ${minStayNights} nights.`);
+    // TASK-4556 / TASK-1039690: enforce min-stay (including per-date minStayArrival) on handleReserve
+    const effectiveReserveMinStay = getEffectiveMinStayForDate(checkinIst);
+    if (effectiveReserveMinStay > 1 && stayNights < effectiveReserveMinStay) {
+      setDateError(`Minimum stay is ${effectiveReserveMinStay} nights.`);
       return;
     }
 
@@ -1847,7 +1925,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   return (
     // TASK-2612: fragment wrapper intentional — avoids extra DOM nesting
     <>
-      <form id="booking-form" onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
+      <form id="booking-form" tabIndex={-1} data-booking-widget="true" data-can-review-booking={canReviewBooking ? "true" : "false"} onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">
@@ -1952,13 +2030,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (2) + (3): Date range card + Guests card */}
       <div className="lv-booking-form">
-        {minStayNights > 1 && (
+        {effectiveMinStayNights > 1 && (
           <p
             className="inline-flex items-center rounded-full bg-[#ffe4d6] px-3 py-1.5 text-sm font-medium text-[#4a3535] border border-[#e5cfc0]"
             style={{ marginBottom: 8 }}
             data-testid="min-stay-badge"
           >
-            Minimum {minStayNights} night{minStayNights !== 1 ? 's' : ''}
+            Minimum {effectiveMinStayNights} night{effectiveMinStayNights !== 1 ? 's' : ''}
           </p>
         )}
         {/* v2 date card */}
@@ -2433,23 +2511,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         // handleReserve can surface the inline "Add a check-in/check-out date to continue."
         // validation (and focus the missing field) instead of the button silently swallowing
         // the click. Genuine blockers (service down, invalid range) still disable it.
-        disabled={
-          isSubmitting ||
-          isBookingDisabled ||
-          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
-          // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
-          datesUnavailable ||
-          // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
-          // reserving now would seed holdPriceBreakdown's client fallback with the provisional
-          // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
-          // stay clickable (TASK-4277): rangePricingPending is false without both dates.
-          // Do NOT gate on availability-fetch loading — that violated TASK-4277 on F1 (2026-07-12).
-          rangePricingPending ||
-          // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
-          (hasSelectedRange && calendarPricingFailed) ||
-          // TASK-4729: guard against NaN pricing (non-numeric server response)
-          (hasSelectedRange && !rangePricingPending && isNaN(finalTotal))
-        }
+        disabled={reserveDisabled}
         title={datesUnavailable ? 'These dates aren’t available. Please select different dates.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"

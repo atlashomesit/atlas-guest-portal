@@ -15,6 +15,8 @@ import { usePushNotifications } from "./hooks/usePushNotifications"
 import NativeShellBridge from "./native/NativeShellBridge"
 import { trackEvent } from "./utils/analytics"
 import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "./tenant/tenantResolver"
+import { getTenantContext } from "./tenant/tenantContext"
+import { isTenantNotTakingBookings, NOT_TAKING_BOOKINGS_COPY } from "./tenant/paymentRail"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
 import InternalTenantRobotsMeta from "./components/InternalTenantRobotsMeta"
 // TASK-4903 (ADR-0081): the theme mount point. Sole allowed import of `./themes/registry`
@@ -182,6 +184,23 @@ function AppWrapper() {
         Skip to main content
       </a>
       {!shouldHideNavbar && <Navbar />}
+      {isTenantNotTakingBookings(getTenantContext()) && (
+        <div
+          role="status"
+          data-testid="tenant-not-taking-bookings-banner"
+          style={{
+            background: '#fef3c7',
+            color: '#92400e',
+            borderBottom: '1px solid #f59e0b',
+            padding: '10px 16px',
+            textAlign: 'center',
+            fontWeight: 600,
+            fontSize: '14px',
+          }}
+        >
+          {NOT_TAKING_BOOKINGS_COPY}
+        </div>
+      )}
       <ScrollToTop />
       <ErrorBoundary name="router">
         <main

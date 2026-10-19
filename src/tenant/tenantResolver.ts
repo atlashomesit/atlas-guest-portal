@@ -22,8 +22,19 @@ export function _resetTenantResolutionForTests(): void {
   _marketplaceMode = false;
 }
 
+function hasMarketplaceBrandParam(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const search = window.location?.search ?? '';
+    if (!search) return false;
+    return new URLSearchParams(search).get('brand')?.trim().toLowerCase() === 'atlastays';
+  } catch {
+    return false;
+  }
+}
+
 export function isMarketplaceMode(): boolean {
-  return _marketplaceMode;
+  return _marketplaceMode || hasMarketplaceBrandParam();
 }
 
 /** Hostnames that render the multi-tenant marketplace homepage (atlastays.com apex). */
@@ -31,6 +42,7 @@ const MARKETPLACE_HOSTS = new Set([
   'atlastays.com',
   'www.atlastays.com',
   'dev.atlastays.com',
+  'qa.atlastays.com',
 ]);
 
 /** True when the hostname is the marketplace apex (used as boot fallback before API deploy). */
@@ -44,7 +56,7 @@ export function isMarketplaceHostname(hostname?: string): boolean {
  * domains — not on tenant white-label / custom domains. Local dev hosts are allowed for testing.
  */
 export function isAtlastaysMarketplaceSurface(hostname?: string): boolean {
-  if (isMarketplaceHostname(hostname)) return true;
+  if (isMarketplaceHostname(hostname) || hasMarketplaceBrandParam()) return true;
   return import.meta.env.DEV && isLocalDev();
 }
 

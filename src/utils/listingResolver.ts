@@ -78,8 +78,9 @@ const isAbortLikeError = (error: unknown, signal?: AbortSignal) => {
 export const resolveListing = async (
   param: string,
   signal?: AbortSignal,
+  tenantSlug?: string | null,
 ): Promise<ListingDetail | null> => {
-  const headers = getApiHeaders();
+  const headers = getApiHeaders(tenantSlug);
 
   const attemptResolveListing = async (): Promise<{
     listing: ListingDetail | null;

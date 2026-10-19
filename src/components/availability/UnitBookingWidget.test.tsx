@@ -542,7 +542,9 @@ describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pr
       content.indexOf('data-testid="guest-booking-submit"') - 1400,
       content.indexOf('data-testid="guest-booking-submit"'),
     );
-    expect(buttonSection).toContain('rangePricingPending');
+    expect(buttonSection).toContain('disabled={reserveDisabled}');
+    const disabledExpression = content.slice(content.indexOf('  const reserveDisabled ='), content.indexOf('  const canReviewBooking ='));
+    expect(disabledExpression).toContain('rangePricingPending ||');
   });
 });
 
@@ -1565,3 +1567,86 @@ describe('UnitBookingWidget - availability legend layout (render)', () => {
     expect(guests!.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
+
+describe('UnitBookingWidget - TASK-1039690: per-date minStayArrival parity with server', () => {
+  beforeEach(() => {
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 0, gstAmount: 0, finalAmount: 0 });
+  });
+
+  afterEach(() => {
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('allows a 1-night stay on a gap date with minStayArrival=1 while still enforcing minStayNights=2 on normal dates', async () => {
+    const todayIst = getIstStartOfDay();
+    const gapDate = addDays(todayIst, 5);
+    const gapDateOut = addDays(todayIst, 6);
+    const normalDate = addDays(todayIst, 8);
+    const normalDateOut = addDays(todayIst, 9);
+    const gapIso = toISODate(gapDate);
+    const normalIso = toISODate(normalDate);
+
+    availabilityMock.fetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify([
+            { date: gapIso, status: 'available', minStayArrival: 1 },
+            { date: normalIso, status: 'available', minStayArrival: null },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    );
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+
+    // 1. Hydrate a 1-night stay on the gap date (minStayArrival = 1)
+    task4303.booking.checkIn = gapIso;
+    task4303.booking.checkOut = toISODate(gapDateOut);
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+          minStayNights={2}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    expect(screen.queryByText(/Minimum stay is 2 nights/i)).toBeNull();
+    expect(screen.queryByTestId('min-stay-badge')).toBeNull();
+    unmount();
+
+    // 2. Hydrate a 1-night stay on a normal date (no override -> minStayNights = 2 applies)
+    task4303.booking.checkIn = normalIso;
+    task4303.booking.checkOut = toISODate(normalDateOut);
+
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+          minStayNights={2}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    expect(screen.getByText(/Minimum stay is 2 nights/i)).toBeInTheDocument();
+    expect(screen.getByTestId('min-stay-badge')).toHaveTextContent('Minimum 2 nights');
+  });
+});
+

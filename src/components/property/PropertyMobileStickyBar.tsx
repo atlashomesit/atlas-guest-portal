@@ -97,11 +97,35 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
   onReserveClick,
 }) => {
   const pastHero = useStickyBarVisibility();
+  const canReviewBooking = Boolean(summary?.canReviewBooking && summary.hasCompleteDates && !summary.datesUnavailable && !summary.pricingPending && summary.totalAmount != null && summary.totalAmount > 0);
 
   const handleReserve = React.useCallback(() => {
+    if (canReviewBooking) {
+      const form =
+        document.querySelector<HTMLElement>(STICKY_BAR_BOOKING_FORM_SELECTOR) ??
+        document.querySelector<HTMLElement>("[data-booking-widget]");
+      const submit = form?.querySelector<HTMLButtonElement>('[data-testid="guest-booking-submit"]');
+      // The form reflects the current widget render even before its summary effect propagates.
+      if (form?.dataset.canReviewBooking === "true" && submit && !submit.disabled) {
+        submit.click();
+        return;
+      }
+    }
     // Primary: open the existing date-picker bottom sheet directly. It renders
     // fixed on mobile, so no scroll is needed. Fallback: scroll to the form.
     if (tryOpenPropertyDateSheet()) return;
+    onReserveClick();
+  }, [canReviewBooking, onReserveClick]);
+
+  const handleChangePlan = React.useCallback(() => {
+    const form =
+      document.querySelector<HTMLElement>(STICKY_BAR_BOOKING_FORM_SELECTOR) ??
+      document.querySelector<HTMLElement>("[data-booking-widget]");
+    if (form) {
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      form.focus({ preventScroll: true });
+      return;
+    }
     onReserveClick();
   }, [onReserveClick]);
 
@@ -127,6 +151,12 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
     summary.totalAmount != null &&
     summary.totalAmount > 0;
   const pricingPending = summary?.pricingPending;
+  const ratePlanBadgeText = [
+    summary?.ratePlanLabel?.trim() || null,
+    summary?.mealPlanLabel?.trim() || summary?.mealPlanCode?.trim() || null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div
@@ -154,6 +184,15 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
           <>
             <b data-testid="mobile-sticky-total">{formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })}</b>
             <span> total</span>
+            {ratePlanBadgeText && (
+              <span
+                className="pp-m-sticky-rate-plan"
+                data-testid="mobile-sticky-rate-plan"
+                style={{ display: "block", fontSize: 11, fontWeight: 600 }}
+              >
+                {ratePlanBadgeText}
+              </span>
+            )}
             {summary?.freeCancelUntil ? (
               <span className="pp-m-sticky-taxes" data-testid="mobile-sticky-cancel-deadline">
                 Free cancel until {summary.freeCancelUntil}
@@ -162,6 +201,25 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
               <span className="pp-m-sticky-taxes" data-testid="mobile-sticky-fees-included">
                 all fees included
               </span>
+            )}
+            {summary?.hasMultipleRatePlans && (
+              <button
+                type="button"
+                data-testid="mobile-sticky-change-plan"
+                onClick={handleChangePlan}
+                style={{
+                  background: "none",
+                  border: 0,
+                  padding: 0,
+                  fontSize: 11,
+                  textDecoration: "underline",
+                  color: "inherit",
+                  cursor: "pointer",
+                  textAlign: "left",
+                }}
+              >
+                Change plan / details
+              </button>
             )}
           </>
         ) : showLiveTotal && pricingPending ? (
@@ -173,7 +231,7 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
           <>
             <b>{nightlyIsSynthetic ? "from " : ""}{formatCurrency(nightlyFallback, { maximumFractionDigits: 0 })}</b>
             <span>/ night</span>
-            <span className="pp-m-sticky-taxes">+ taxes &amp; fees</span>
+            <span className="pp-m-sticky-taxes">all fees included</span>
           </>
         )}
       </div>
@@ -183,9 +241,9 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
         data-testid="mobile-sticky-book-now"
         onClick={handleReserve}
         tabIndex={pastHero ? 0 : -1}
-        aria-label={datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
+        aria-label={canReviewBooking ? "Review selected dates and price" : datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
       >
-        {datesUnavailable ? "Change dates" : "Reserve"}
+        {canReviewBooking ? "Review booking" : datesUnavailable ? "Change dates" : "Reserve"}
       </button>
     </div>
   );
