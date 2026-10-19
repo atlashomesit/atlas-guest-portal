@@ -130,21 +130,22 @@ describe('RESERVE_HANDOFF_COPY stays pinned to the sentences it reuses (drift gu
     expect(details).toContain(RESERVE_HANDOFF_COPY.title);
     expect(details).toContain(RESERVE_HANDOFF_COPY.cta);
     expect(details).toContain(RESERVE_HANDOFF_COPY.reassurance);
-    // The widget sentence is the details-page sentence minus its "— your hold is reserved for {countdown}"
-    // clause: there is no hold at the Reserve step, so claiming one would be false.
-    expect(details).toContain(
-      `${RESERVE_HANDOFF_COPY.withHostNumber.slice(0, -1)} — your hold is reserved for`,
-    );
+    // FOUNDER RULED 2026-10-19: the hold now starts at Pay, so there is no hold on the details page either and the
+    // "— your hold is reserved for {countdown}" clause is gone: the two sentences are now identical.
+    expect(details).toContain(RESERVE_HANDOFF_COPY.withHostNumber);
+    expect(details).not.toContain('your hold is reserved for');
   });
 
-  it('mirrors the widget\'s existing "Bookings opening soon" banner sentence', () => {
-    expect(read('./UnitBookingWidget.tsx')).toContain(RESERVE_HANDOFF_COPY.withoutHostNumber);
+  it('mirrors the details page sentence for a host with no number to share', () => {
+    expect(read('../../pages/booking/GuestDetailsPage.tsx')).toContain(RESERVE_HANDOFF_COPY.withoutHostNumber);
   });
 
-  it('the widget renders the hand-off component and matches the 422 by API code (not a bare status)', () => {
+  it('the widget renders the hand-off component and hands off from the host\'s bookingMode BEFORE any network call', () => {
     const widget = read('./UnitBookingWidget.tsx');
     expect(widget).toContain('<ReserveWhatsAppHandoff');
-    expect(widget).toContain('isProviderNotConfiguredError(error)');
+    expect(widget).toContain("hostCtx?.bookingMode === 'WHATSAPP'");
     expect(widget).toContain('buildReserveWhatsAppUrl');
+    // Reserve never calls the order endpoint any more: the hold starts at Pay.
+    expect(widget).not.toContain('/api/Razorpay/order');
   });
 });

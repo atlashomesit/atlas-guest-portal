@@ -3,8 +3,7 @@ import { feePercent, feeAmount } from "../../utils/paymentFeeCopy";
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { addDays, differenceInCalendarDays, format, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { NETWORK_ERROR_MESSAGE, isProviderNotConfiguredError } from './unitBookingPaymentOrderErrors';
+import { NETWORK_ERROR_MESSAGE } from './unitBookingPaymentOrderErrors';
 import { ReserveWhatsAppHandoff } from './ReserveWhatsAppHandoff';
 import { buildReserveWhatsAppUrl } from './reserveHandoffLink';
 import { Button } from '@/components/ui/Button';
@@ -13,7 +12,7 @@ import { AtlasBookingCalendar } from './AtlasBookingCalendar';
 import { useBooking } from '@/contexts/BookingContext';
 import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
-import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
+import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
 // CALENDAR basis throughout this widget — see the header comment in utils/date.ts. Every
 // Date held in widget state (today, dateRange, shownDate, availabilityRange) is a
@@ -296,13 +295,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const listingLookupFailed = lookupFailed && listingId == null;
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
-  // TASK-8218: stable idempotency key for the CURRENT reserve attempt (listingId, checkIn,
-  // checkOut, guests). Without this, handleReserve minted a fresh crypto.randomUUID() on every
-  // click, so a retry after a lost/timed-out init-hold response sent a different key, missed the
-  // server's replay ledger, and 409'd against the guest's OWN just-created hold. Mirrors
-  // currentAttemptIdempotencyKeyRef in GuestDetailsPage.tsx (TASK-4536): generate lazily when
-  // null, reuse otherwise, and invalidate below whenever the keying inputs change.
-  const reserveIdempotencyKeyRef = useRef<string | null>(null);
   const hasHydratedFromContextRef = useRef(false);
   // TASK-4726 fix: the URL-hydration effect below runs as soon as ?checkIn=/?checkOut= are
   // parsed — typically before the async availability-calendar GET (fetchBlockedDates) has
@@ -428,12 +420,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   );
   const effectiveMinStayNights = getEffectiveMinStayForDate(dateRange.startDate);
   const effectiveMaxGuests = maxGuests;
-  /** RA-006: payment provider not configured for this tenant. */
-  const [providerBlocked, setProviderBlocked] = useState(false);
   /**
    * The Reserve init-hold answered 422 PAYMENT_PROVIDER_NOT_CONFIGURED_*: this tenant cannot take an online
    * payment (TASK-101182's fail-closed guard), so the guest is handed to the host on WhatsApp instead of
-   * the generic "couldn't start checkout" line. Unlike `providerBlocked` this NEVER replaces the form -
+   * the generic "couldn't start checkout" line. It NEVER replaces the form -
    * the dates and guest count the guest picked stay on screen. Reset on every new Reserve attempt.
    */
   const [providerHandoff, setProviderHandoff] = useState(false);
@@ -1619,16 +1609,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
-  // TASK-8218: invalidate the reserve idempotency key whenever what's actually being booked
-  // changes, so a key minted for one (listingId, checkIn, checkOut, guests) combination is never
-  // reused for a different one — that would dedupe a genuinely new booking attempt against an
-  // old hold. Mirrors the cart-change key clear in GuestDetailsPage.tsx (TASK-4536/4607).
-  useEffect(() => {
-    reserveIdempotencyKeyRef.current = null;
-  }, [listingId, dateRange.startDate, dateRange.endDate, guests, selectedRatePlanId]);
-
   // TASK-2612: handleReserve replaces the old handleSubmit.
-  // Calls init-hold mode (GuestInfo absent), stores holdId+holdExpiresAt in context, navigates to details page.
+  // FOUNDER RULED 2026-10-19: Reserve no longer calls the API or starts a hold. It stores the stay draft in context and
+  // navigates to the details page; the 10-minute hold starts when the guest taps Pay there.
   const handleReserve = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -1734,110 +1717,59 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
-    let orderUrl: string;
-    try {
-      orderUrl = buildApiUrl('/api/Razorpay/order');
-    } catch {
-      setFormError('Unable to start checkout. Please try again later.');
+    // FOUNDER RULED 2026-10-19 (website booking overhaul): Reserve no longer starts the 10-minute hold, which also closes the
+    // night on every OTA. The hold starts when the guest taps PAY on the details page, after the details and the required
+    // house-rules tick. Reserve only hands the stay to that page through BookingContext: listing, dates, guests, rate plan,
+    // the quote the guest is looking at, and the cancellation terms. There is no network call here, so nothing is held and no
+    // OTA night closes while the guest types details or reads the house rules.
+    //
+    // A host that cannot take an online payment is handed off HERE, before anything else (TASK-8048 fail-closed, extended to
+    // Reserve): the same WhatsApp hand-off the order API's 422 used to trigger only after the guest had already reached it.
+    const hostCtx = tenantContext !== undefined ? tenantContext : getTenantContext();
+    if (hostCtx?.bookingMode === 'WHATSAPP') {
+      setProviderHandoff(true);
       return;
     }
 
     setIsSubmitting(true);
+    // Funnel: a guest started checkout. Fired once per Reserve; the Pay taps on the details page do not re-fire it.
     track('start_checkout', numericListingId);
 
     try {
-      const orderPayload = {
-        bookingDraft: {
-          listingId: numericListingId,
-          checkinDate: toCalendarISO(checkinIst),
-          checkoutDate: toCalendarISO(checkoutIst),
-          guests,
-          ...(selectedRatePlanId != null ? { listingRatePlanId: selectedRatePlanId } : {}),
-        },
-        currency: 'INR',
-        // GuestInfo absent — init-hold mode
-        guestConsentAccepted: false,
-      };
-
-      // TASK-8218: reuse the stable key for this attempt if one already exists (i.e. this is a
-      // retry after a lost/timed-out response for the SAME listing/dates/guests — the
-      // invalidation effect above already cleared it if anything keying-relevant changed).
-      // Generate lazily only when starting a fresh attempt, mirroring
-      // currentAttemptIdempotencyKeyRef in GuestDetailsPage.tsx.
-      let idempotencyKey = reserveIdempotencyKeyRef.current;
-      if (!idempotencyKey) {
-        idempotencyKey = crypto.randomUUID();
-        reserveIdempotencyKeyRef.current = idempotencyKey;
-      }
-      // TASK-10298823: Pass the listing's verified tenant slug in request headers (tenantContext?.slug or ?tenant=),
-      // ensuring the API context receives the listing owner tenant rather than the marketplace platform tenant.
-      const initialHoldHeaders = getOrderRequestHeaders(idempotencyKey, verifiedTenantSlug);
-      const response = await axios.post(orderUrl, orderPayload, {
-        headers: initialHoldHeaders,
-        timeout: 15000,
-      });
-
-      // TASK-4111: read server-authoritative breakdown so GuestDetailsPage renders
-      // the correct quote on first paint. Fall back to client sums when absent.
-      const {
-        holdId,
-        holdExpiresAt,
-        prepToken,
-        baseAmount: serverBaseAmount,
-        convenienceFeeAmount: serverConvFee,
-        convenienceFeePercent: serverConvPercent,
-        finalAmount: serverFinalAmount,
-        touristTaxAmount: serverTouristTax,
-        TouristTaxAmount: serverTouristTaxPascal,
-      } = response.data ?? {};
-      if (!holdId || !holdExpiresAt) {
-        throw new Error('Hold could not be created. Please try again.');
-      }
-
-      const resolvedTouristTax =
-        typeof serverTouristTax === 'number' && serverTouristTax > 0
-          ? serverTouristTax
-          : typeof serverTouristTaxPascal === 'number' && serverTouristTaxPascal > 0
-            ? serverTouristTaxPascal
-            : 0;
-
-      // TASK-102017 / TASK-10298823: derive the tenant slug owning this hold so the details route and final-charge
-      // calls send the identical X-Tenant-Slug header instead of 422ing against the apex tenant.
       const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
       const tenantFromUrl = typeof window !== 'undefined'
         ? new URLSearchParams(currentSearch).get('tenant')
         : null;
-      const holdTenantSlug = verifiedTenantSlug || tenantFromUrl || initialHoldHeaders['X-Tenant-Slug'] || null;
+      // TASK-102017 / TASK-10298823: the tenant slug owning this stay, so the details route and the Pay-time calls send the identical
+      // X-Tenant-Slug header instead of 422ing against the apex tenant. On the marketplace that is the LISTING OWNER's slug
+      // (`verifiedTenantSlug`: the `tenantContext` prop, else ?tenant=), not the platform's.
+      const holdTenantSlug = verifiedTenantSlug || tenantFromUrl || getApiHeaders(verifiedTenantSlug)['X-Tenant-Slug'] || null;
 
-      // Store hold state in context and navigate to details page
+      // Store the stay draft in context and navigate to the details page. holdId / holdToken / holdExpiresAt stay null.
       updateBooking({
-        holdId: Number(holdId),
-        // TASK-4354: keep the hold ownership token so the final-charge call can prove it owns the hold.
-        holdToken: typeof prepToken === 'string' ? prepToken : null,
-        holdExpiresAt: typeof holdExpiresAt === 'string' ? holdExpiresAt : new Date(holdExpiresAt).toISOString(),
+        holdId: null,
+        holdToken: null,
+        holdExpiresAt: null,
         holdPropertySlug: propertySlug ?? null,
         holdUnitSlug: unitSlug ?? null,
         holdTenantSlug,
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
         holdPriceBreakdown: {
-          paymentFeeDisplay: { percent: feePercent(serverConvPercent), amount: feeAmount(serverConvFee) },
-          baseAmount: typeof serverBaseAmount === 'number' && serverBaseAmount > 0 ? serverBaseAmount : breakdownPrice,
+          paymentFeeDisplay: {
+            percent: feePercent(Number((convenienceFeePercent * 100).toFixed(2))),
+            amount: feeAmount(breakdownConvenienceFee),
+          },
+          baseAmount: breakdownPrice,
           discountAmount: 0,
-          // TASK-4286: only trust server convenienceFeeAmount when it is a positive number.
-          // The init-hold mode API returns convenienceFeeAmount=0 (a valid JS number) when
-          // it doesn't compute the fee, which caused the checkout page to show ₹0 processing
-          // fee and a total ₹378 lower than the listing widget. Fall back to the client-computed
-          // breakdownConvenienceFee so both surfaces agree.
-          convenienceFeeAmount: !showOnlinePaymentProcessing
-            ? 0
-            : (typeof serverConvFee === 'number' && serverConvFee > 0 ? serverConvFee : breakdownConvenienceFee),
+          // TASK-4286: the fee line follows the quote the guest is looking at, and is zero when no online gateway charges them.
+          convenienceFeeAmount: !showOnlinePaymentProcessing ? 0 : breakdownConvenienceFee,
           finalAmount: !showOnlinePaymentProcessing
             ? (finalTotal > 0 ? finalTotal : breakdownPrice)
-            : (typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal)),
+            : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
           nights: stayNights,
           currency: 'INR',
-          touristTaxAmount: resolvedTouristTax,
+          touristTaxAmount: touristTaxLineAmount,
         },
         holdCancellationTier: effectiveRatePlanCancellationTier,
         holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
@@ -1853,13 +1785,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ratePlanName: selectedRatePlan?.name ?? null,
       });
 
-      // TASK-8218: the hold succeeded and its ownership token is now in BookingContext — clear
-      // the reserve key so a LATER, unrelated Reserve click (after navigating back) never reuses
-      // a key that already has a completed hold behind it.
-      reserveIdempotencyKeyRef.current = null;
-
       // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
-      // getApiHeaders() resolves the same tenant on final charge and page refreshes.
+      // getApiHeaders() resolves the same tenant at Pay and on page refreshes.
       let navSearch = currentSearch;
       if (!tenantFromUrl && holdTenantSlug && isMarketplaceMode() && holdTenantSlug !== 'atlas') {
         const sp = new URLSearchParams(currentSearch);
@@ -1869,34 +1796,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       navigate(`/book/${targetSlug}/${targetUnit}/details${navSearch}`);
     } catch (error: unknown) {
       console.error('[UnitBookingWidget] Reserve error:', error);
-      const data = (error as { response?: { data?: { code?: string; Code?: string } } })?.response?.data;
-      const code = (typeof data?.code === 'string' ? data.code : typeof data?.Code === 'string' ? data.Code : '') || '';
-      const status = (error as { response?: { status?: number } })?.response?.status;
-      if (status === 503 && code === 'PAYMENT_PROVIDER_NOT_CONFIGURED_PLATFORM') {
-        setProviderBlocked(true);
-      } else if (isProviderNotConfiguredError(error)) {
-        // 422 PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT / PAYMENT_PROVIDER_NOT_CONFIGURED: no hold was
-        // created (the API checks the provider BEFORE it holds inventory), the tenant cannot take an
-        // online payment. Matched on the API code - never raw server text - and never a dead end.
-        setProviderHandoff(true);
-      } else {
-        setFormError(getBookingErrorMessage(error, 'order'));
-        // AVAILABILITY_CONFLICT (409): the dates were just taken by another in-flight checkout.
-        // Force-refresh the calendar so the now-unavailable dates show as blocked and the guest
-        // isn't re-picking the same taken dates from a stale calendar.
-        if (status === 409 || code === 'AVAILABILITY_CONFLICT') {
-          lastAvailabilityKeyRef.current = null;
-          setAvailabilityRefreshNonce((n) => n + 1);
-        }
-      }
+      setFormError(getBookingErrorMessage(error, 'order'));
     } finally {
       setIsSubmitting(false);
     }
   }, [
     isSubmitting, isBookingDisabled, availabilityFailed, dateRange, dateStatusMap, blockedSet,
-    dateBookabilityMap, today,
+    dateBookabilityMap, today, tenantContext, verifiedTenantSlug,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
-    breakdownFinalTotal, finalTotal, updateBooking, navigate,
+    breakdownFinalTotal, finalTotal, updateBooking, navigate, showOnlinePaymentProcessing,
+    convenienceFeePercent, touristTaxLineAmount,
     resolvedCancellationWindowHours, resolvedGraceHours,
     selectedRatePlanId, selectedRatePlan, effectiveRatePlanCancellationTier, isSelectedRatePlanNonRefundable,
   ]);
@@ -1924,18 +1833,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       listingId: listingId != null ? Number(listingId) : undefined,
     });
   }, [listingId]);
-
-  if (providerBlocked) {
-    return (
-      <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-8 text-center space-y-3" data-testid="provider-blocked-banner">
-        <div className="text-4xl">🔒</div>
-        <h2 className="text-lg font-semibold text-text-primary">Bookings opening soon</h2>
-        <p className="text-sm text-text-secondary">
-          Online booking is temporarily unavailable for this property. Please contact the host directly to make a reservation.
-        </p>
-      </div>
-    );
-  }
 
   return (
     // TASK-2612: fragment wrapper intentional — avoids extra DOM nesting

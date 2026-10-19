@@ -3,7 +3,7 @@ import axios from 'axios';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
-import { BookingProvider } from '@/contexts/BookingContext';
+import { BookingProvider, useBooking } from '@/contexts/BookingContext';
 import UnitBookingWidget from '@/components/availability/UnitBookingWidget';
 import GuestDetailsPage from './GuestDetailsPage';
 import { toISODate } from '@/utils/dateRange';
@@ -70,6 +70,12 @@ vi.mock('@/hooks/useDailyPricingSummary', () => ({
 vi.mock('@/components/FomoBar', () => ({ default: () => null }));
 vi.mock('@/lib/events', () => ({ track: vi.fn(), TerminalCheckoutOutcomeEvents: {} }));
 vi.mock('@/components/availability/AtlasBookingCalendar', () => ({ AtlasBookingCalendar: () => null }));
+
+/** Stands in for GuestDetailsPage: shows which tenant slug the stay draft carries into the Pay-time calls. */
+function DetailsStub() {
+  const { booking } = useBooking();
+  return <div data-testid="guest-details-stub" data-tenant={booking.holdTenantSlug ?? ''}>Details</div>;
+}
 
 describe('TASK-102017: Guest checkout carries ?tenant= through storefront to details and final-charge', () => {
   const originalLocation = window.location;
@@ -213,11 +219,9 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
       fireEvent.click(reserveButton);
     });
 
-    // 1. Assert init-hold call occurred and sent X-Tenant-Slug: qa-bot-c59de6
+    // 1. FOUNDER RULED 2026-10-19: Reserve makes NO order/hold call - the 10-minute hold starts at Pay.
     await settle();
-    expect(postSpy).toHaveBeenCalledTimes(1);
-    const initHoldHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
-    expect(initHoldHeaders['X-Tenant-Slug']).toBe(tenantSlug);
+    expect(postSpy).not.toHaveBeenCalled();
 
     // 2. Assert navigation transitioned to GuestDetailsPage
     await settle();
@@ -238,11 +242,15 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
       fireEvent.click(payButton);
     });
 
-    // 3. Assert final-charge call occurred and ALSO sent X-Tenant-Slug: qa-bot-c59de6!
+    // 3. Pay starts the hold (init-hold) and THEN charges (final-charge); BOTH carry X-Tenant-Slug: qa-bot-c59de6.
     await settle();
     expect(postSpy).toHaveBeenCalledTimes(2);
+    const initHoldHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
+    expect(initHoldHeaders['X-Tenant-Slug']).toBe(tenantSlug);
+    expect((postSpy.mock.calls[0][1] as { guestInfo?: unknown }).guestInfo).toBeUndefined();
     const finalChargeHeaders = postSpy.mock.calls[1][2]?.headers as Record<string, string>;
     expect(finalChargeHeaders['X-Tenant-Slug']).toBe(tenantSlug);
+    expect((postSpy.mock.calls[1][1] as { holdId?: number }).holdId).toBe(59514);
   });
 
   it('preserves tenant slug on final-charge even if details page URL query string is missing but BookingContext holds it', async () => {
@@ -383,7 +391,7 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
             />
             <Route
               path="/book/:propertySlug/:unitSlug/details"
-              element={<div data-testid="guest-details-stub">Details</div>}
+              element={<DetailsStub />}
             />
           </Routes>
         </MemoryRouter>
@@ -400,8 +408,9 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
     });
 
     await settle();
-    expect(postSpy).toHaveBeenCalledTimes(1);
-    const initHoldHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
-    expect(initHoldHeaders['X-Tenant-Slug']).toBe(tenantSlug);
+    // FOUNDER RULED 2026-10-19: Reserve makes no order/hold call (the hold starts at Pay). The LISTING OWNER's slug rides in the stay
+    // draft instead, so the Pay-time hold and charge send the owner's X-Tenant-Slug rather than the marketplace platform's.
+    expect(postSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('guest-details-stub')).toHaveAttribute('data-tenant', tenantSlug);
   });
 });
