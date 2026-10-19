@@ -171,13 +171,14 @@ export async function fetchPublicListingRatePlans(
   checkOut?: string | null,
   guests?: number | null,
   signal?: AbortSignal,
+  tenantSlug?: string | null,
 ): Promise<PublicListingRatePlanDto[]> {
   const url = new URL(buildApiUrl(`/api/listings/${Number(listingId)}/rate-plans/public`));
   if (checkIn) url.searchParams.set('checkIn', checkIn);
   if (checkOut) url.searchParams.set('checkOut', checkOut);
   if (guests != null && guests > 0) url.searchParams.set('guests', String(guests));
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
   }
@@ -217,6 +218,7 @@ export async function fetchPublicListingRatePlans(
  * GET /pricing/guest-breakdown?listingId=&checkIn=&checkOut= — authoritative pre-checkout quote.
  * TASK-7016: widget totals must derive from this, not from GET /pricing/breakdown calendar rows.
  * MRP-002: optional `listingRatePlanId` selects a specific rate plan's pricing.
+ * TASK-10298823: optional `tenantSlug` passes explicit listing owner tenant in headers.
  */
 export async function fetchGuestPriceBreakdown(
   listingId: string | number,
@@ -225,6 +227,7 @@ export async function fetchGuestPriceBreakdown(
   signal?: AbortSignal,
   listingRatePlanId?: number | null,
   guests?: number | null,
+  tenantSlug?: string | null,
 ): Promise<GuestPriceBreakdown> {
   const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(listingId));
@@ -237,7 +240,7 @@ export async function fetchGuestPriceBreakdown(
     url.searchParams.set('guests', String(Math.floor(guests)));
   }
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
   }
@@ -279,8 +282,12 @@ export async function fetchGuestGstBreakdown(
   checkOut: string,
   signal?: AbortSignal,
   listingRatePlanId?: number | null,
+  guestsOrTenantSlug?: number | string | null,
+  tenantSlug?: string | null,
 ): Promise<GuestGstBreakdown> {
-  const b = await fetchGuestPriceBreakdown(listingId, checkIn, checkOut, signal, listingRatePlanId);
+  const guests = typeof guestsOrTenantSlug === 'number' ? guestsOrTenantSlug : null;
+  const effectiveTenant = typeof guestsOrTenantSlug === 'string' ? guestsOrTenantSlug : tenantSlug;
+  const b = await fetchGuestPriceBreakdown(listingId, checkIn, checkOut, signal, listingRatePlanId, guests, effectiveTenant);
   return {
     gstPercent: b.gstPercent,
     gstAmount: b.gstAmount,
@@ -291,13 +298,14 @@ export async function fetchGuestGstBreakdown(
 export async function fetchPricingBreakdown(
   params: PricingBreakdownParams,
   signal?: AbortSignal,
+  tenantSlug?: string | null,
 ): Promise<PricingBreakdown> {
   const url = new URL(buildApiUrl(BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(params.listingId));
   url.searchParams.set('startDate', params.checkIn);
   url.searchParams.set('months', '1');
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
 
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
@@ -368,13 +376,14 @@ export async function fetchCalendarPricing(
   startDate: string,
   months: number = 2,
   signal?: AbortSignal,
+  tenantSlug?: string | null,
 ): Promise<CalendarPricingResult> {
   const url = new URL(buildApiUrl(BREAKDOWN_ENDPOINT));
   url.searchParams.set('startDate', startDate);
   url.searchParams.set('listingId', String(listingId));
   url.searchParams.set('months', String(Math.max(1, Math.min(12, months))));
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
   }

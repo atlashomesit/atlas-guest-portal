@@ -316,4 +316,91 @@ describe('TASK-102017: Guest checkout carries ?tenant= through storefront to det
     const finalChargeHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
     expect(finalChargeHeaders['X-Tenant-Slug']).toBe(tenantSlug);
   });
+
+  it('TASK-10298823: passes listing tenant slug in request headers when tenantContext prop is provided without ?tenant= in URL', async () => {
+    const tenantSlug = 'host-listing-owner';
+    const propertySlug = 'the-grand-villa';
+    const unitSlug = '101';
+    const initialUrl = `/homes/${propertySlug}/${unitSlug}`;
+
+    delete (window as { location?: unknown }).location;
+    window.location = new URL(`https://qa.atlashomestays.com${initialUrl}`) as unknown as Location;
+
+    const friday = getIstStartOfDay(nextFriday(addDays(new Date(), 14)));
+    const sunday = addDays(friday, 2);
+    const fridayISO = toISODate(friday);
+    const sundayISO = toISODate(sunday);
+
+    window.localStorage.setItem(
+      'atlasHeroSearch',
+      JSON.stringify({
+        checkIn: fridayISO,
+        checkOut: sundayISO,
+        guests: 2,
+      }),
+    );
+
+    pricingMock.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[fridayISO, 3500], [toISODate(addDays(friday, 1)), 3500]]),
+      convenienceFeePercent: 3,
+    });
+    pricingMock.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 0, gstAmount: 0, finalAmount: 7210 });
+
+    const postSpy = vi.spyOn(axios, 'post');
+    postSpy.mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes('/api/Razorpay/order')) {
+        return {
+          data: {
+            holdId: 60001,
+            holdExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+            prepToken: 'prep-token-60001',
+            baseAmount: 7000,
+            convenienceFeeAmount: 210,
+            finalAmount: 7210,
+          },
+        };
+      }
+      return { data: {} };
+    });
+
+    render(
+      <BookingProvider>
+        <MemoryRouter initialEntries={[initialUrl]}>
+          <Routes>
+            <Route
+              path="/homes/:propertySlug/:unitSlug"
+              element={
+                <UnitBookingWidget
+                  listingId={101}
+                  propertyId={100}
+                  listingName="Grand Villa"
+                  propertySlug={propertySlug}
+                  unitSlug={unitSlug}
+                  tenantContext={{ slug: tenantSlug, name: 'Grand Villa Host' }}
+                />
+              }
+            <Route
+              path="/book/:propertySlug/:unitSlug/details"
+              element={<div data-testid="guest-details-stub">Details</div>}
+            />
+          </Routes>
+        </MemoryRouter>
+      </BookingProvider>,
+    );
+
+    await settle();
+    const reserveButton = screen.getByTestId('guest-booking-submit');
+    await settle();
+    expect(reserveButton).toBeEnabled();
+
+    await act(async () => {
+      fireEvent.click(reserveButton);
+    });
+
+    await settle();
+    expect(postSpy).toHaveBeenCalledTimes(1);
+    const initHoldHeaders = postSpy.mock.calls[0][2]?.headers as Record<string, string>;
+    expect(initHoldHeaders['X-Tenant-Slug']).toBe(tenantSlug);
+  });
 });
