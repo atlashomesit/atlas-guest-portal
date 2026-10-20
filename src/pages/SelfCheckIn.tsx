@@ -419,7 +419,8 @@ export default function SelfCheckIn() {
     try {
       const form = new FormData();
       form.append("signatureType", payload.signatureType);
-      if (payload.typedName) form.append("typedName", payload.typedName);
+      const effectiveTypedName = payload.typedName?.trim() || details?.guestName || "";
+      if (effectiveTypedName) form.append("typedName", effectiveTypedName);
       if (payload.signatureBlob) form.append("signatureBlob", payload.signatureBlob, "signature.png");
 
       const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";

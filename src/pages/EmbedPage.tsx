@@ -595,7 +595,7 @@ function GuestDetailsForm({
         // Step 1: init-hold (only when no live hold exists or it has expired)
         const holdRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
           method: 'POST',
-          headers: getOrderRequestHeaders(idempotencyKey),
+          headers: getOrderRequestHeaders(idempotencyKey, config.tenantSlug),
           body: JSON.stringify({
             bookingDraft: {
               listingId: listing.id,
@@ -620,7 +620,7 @@ function GuestDetailsForm({
       // Step 2: final-charge (Razorpay order)
       const orderRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
         method: 'POST',
-        headers: getOrderRequestHeaders(idempotencyKey),
+        headers: getOrderRequestHeaders(idempotencyKey, config.tenantSlug),
         body: JSON.stringify({
           holdId: hold.holdId,
           holdToken: hold.prepToken,
@@ -667,7 +667,7 @@ function GuestDetailsForm({
           try {
             const verifyRes = await fetch(buildApiUrl('/api/Razorpay/verify'), {
               method: 'POST',
-              headers: getOrderRequestHeaders(crypto.randomUUID()),
+              headers: getOrderRequestHeaders(crypto.randomUUID(), config.tenantSlug),
               body: JSON.stringify({
                 bookingId: order.bookingId,
                 razorpayOrderId: response.razorpay_order_id,
