@@ -389,7 +389,8 @@ const MonthGrid: React.FC<MonthProps> = ({
           } else if (isDisabledByWidget) {
             state = 'unavailable';
           } else if (apiStatus === 'Turnover') {
-            state = 'turnover';
+            // Founder ruling 2026-10-21: a turnover night is just a night the guest can book — same look.
+            state = 'available';
           } else {
             state = 'available';
           }
@@ -890,12 +891,8 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
             Available
           </div>
           <div className="bc-legend-item">
-            <span className="bc-sw bc-sw-turnover" />
-            Turnover · bookable
-          </div>
-          <div className="bc-legend-item">
             <span className="bc-sw bc-sw-unavail" />
-            Unavailable
+            Not available
           </div>
           <div className="bc-legend-item">
             <span className="bc-sw bc-sw-selected" />
