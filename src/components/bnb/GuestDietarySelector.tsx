@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 export type DietaryOption = 'Veg' | 'Jain' | 'Vegan' | 'Gluten-Free' | 'Early Packed Breakfast';
 

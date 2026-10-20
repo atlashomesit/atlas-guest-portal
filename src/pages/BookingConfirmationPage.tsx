@@ -1417,7 +1417,7 @@ export default function BookingConfirmationPage() {
 
         {/* BNB-002: Pre-arrival dietary and breakfast time preferences feeding 7:00 AM breakfast manifest */}
         {!isCancelled && (
-          <GuestDietarySelector bookingRef={String(booking.id ?? bookingId ?? '')} />
+          <GuestDietarySelector bookingRef={String(booking.bookingId ?? bookingId ?? '')} />
         )}
 
         {/* TASK-4510: Digital Guest Guidebook — host-authored content sections */}
