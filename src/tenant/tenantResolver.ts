@@ -8,33 +8,65 @@
 let _domainResolvedSlug: string | null = null;
 let _marketplaceMode = false;
 
+const MARKETPLACE_SESSION_STORAGE_KEY = 'atlas_marketplace_mode';
+
+function getSessionMarketplaceMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage?.getItem(MARKETPLACE_SESSION_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function setSessionMarketplaceMode(enabled: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (enabled) {
+      window.sessionStorage?.setItem(MARKETPLACE_SESSION_STORAGE_KEY, 'true');
+    } else {
+      window.sessionStorage?.removeItem(MARKETPLACE_SESSION_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage unavailable
+  }
+}
+
 export function setDomainResolvedSlug(slug: string): void {
   _domainResolvedSlug = slug;
 }
 
 export function setMarketplaceMode(enabled: boolean): void {
   _marketplaceMode = enabled;
+  setSessionMarketplaceMode(enabled);
 }
 
 /** Test-only: clear boot-time resolution state (module state outlives test files under isolate:false). */
 export function _resetTenantResolutionForTests(): void {
   _domainResolvedSlug = null;
   _marketplaceMode = false;
+  setSessionMarketplaceMode(false);
 }
 
 function hasMarketplaceBrandParam(): boolean {
   if (typeof window === 'undefined') return false;
   try {
     const search = window.location?.search ?? '';
-    if (!search) return false;
-    return new URLSearchParams(search).get('brand')?.trim().toLowerCase() === 'atlastays';
+    if (search) {
+      const isBrand = new URLSearchParams(search).get('brand')?.trim().toLowerCase() === 'atlastays';
+      if (isBrand) {
+        setSessionMarketplaceMode(true);
+        return true;
+      }
+    }
+    return getSessionMarketplaceMode();
   } catch {
     return false;
   }
 }
 
 export function isMarketplaceMode(): boolean {
-  return _marketplaceMode || hasMarketplaceBrandParam();
+  return _marketplaceMode || getSessionMarketplaceMode() || hasMarketplaceBrandParam();
 }
 
 /** Hostnames that render the multi-tenant marketplace homepage (atlastays.com apex). */

@@ -62,6 +62,18 @@ function deleteGuestBreakdown(params: URLSearchParams) {
   params.delete("children");
 }
 
+/**
+ * TASK-10298822: Prevents double question mark URLs when canonicalPath already includes
+ * query parameters (e.g. ?tenant=...) and querySuffix is appended.
+ */
+export function appendQuerySuffix(basePath: string, suffix: string): string {
+  if (!suffix) return basePath;
+  const cleanSuffix = suffix.startsWith('?') ? suffix.slice(1) : suffix;
+  if (!cleanSuffix) return basePath;
+  const separator = basePath.includes('?') ? '&' : '?';
+  return `${basePath}${separator}${cleanSuffix}`;
+}
+
 type NormalizedListing = {
   id: string;
   numericId: number;
@@ -1517,7 +1529,7 @@ const SearchPage = () => {
                           );
                         })()}
                         <Link
-                          to={`${unit.canonicalPath}${querySuffix}`}
+                          to={appendQuerySuffix(unit.canonicalPath, querySuffix)}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
                         >
                           {`View ${unitNoun.singular}`}
@@ -1594,7 +1606,7 @@ const SearchPage = () => {
               {sortedUnits.slice(0, 16).map((unit) => (
                 <Link
                   key={`map-strip-${unit.id}`}
-                  to={`${unit.canonicalPath}${querySuffix}`}
+                  to={appendQuerySuffix(unit.canonicalPath, querySuffix)}
                   className="flex w-32 shrink-0 flex-col gap-1 rounded-xl border border-border-subtle bg-bg-surface p-2 shadow-sm"
                 >
                   <div className="h-16 w-full overflow-hidden rounded-lg bg-bg-muted">
@@ -1804,7 +1816,7 @@ const SearchPage = () => {
                         />
                       )}
                     </div>
-                    <Link to={`${unit.canonicalPath}${querySuffix}`} className="search-card__cta">
+                    <Link to={appendQuerySuffix(unit.canonicalPath, querySuffix)} className="search-card__cta">
                       {`View ${unitNoun.singular}`}
                     </Link>
                   </div>

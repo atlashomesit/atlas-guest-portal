@@ -61,6 +61,10 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isTenantHome = location.pathname === '/' && !(isMarketplaceMode() && isAtlastaysMarketplaceSurface());
+  const isMarketplaceBrand =
+    location.search.includes('brand=atlastays') ||
+    (typeof window !== 'undefined' && (window.location?.search ?? '').includes('brand=atlastays')) ||
+    isMarketplaceMode();
   const { booking } = useBooking();
   const { language, changeLanguage, availableLanguages, getLanguageName } = useTranslation();
 
@@ -118,7 +122,8 @@ const Navbar = () => {
       pets: booking.pets ?? undefined,
     };
 
-    const destination = isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : ctaNav.to;
+    const searchDestination = isMarketplaceBrand && ctaNav.to === '/search' ? '/search?brand=atlastays' : ctaNav.to;
+    const destination = isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : searchDestination;
 
     trackEvent(
       'cta_book_now_clicked',
@@ -152,7 +157,7 @@ const Navbar = () => {
       }
     }
 
-    navigate(ctaNav.to, {
+    navigate(searchDestination, {
       state: { bookingPrefill: bookingState },
     });
 
@@ -244,7 +249,7 @@ const Navbar = () => {
         {/* LEFT - Logo and Mobile Menu Button */}
         <div className="flex items-center justify-between w-full lg:w-auto">
           <Link
-            to="/"
+            to={isMarketplaceBrand ? "/?brand=atlastays" : "/"}
             className="flex items-center gap-2 navbar-brand-link"
             // TASK-8215: the accessible name must not depend on visible text — the logo's
             // alt is decorative ("") and .navbar-logo-text is display:none below 640px, so
@@ -298,7 +303,11 @@ const Navbar = () => {
 
         {/* CENTER - Desktop Navigation: Stays | Hyderabad | Trips | Help */}
         <div className="hidden lg:flex items-center flex-1 justify-center">
-          <Link to="/search" className="navbar-search-pill" data-testid="navbar-search-pill">
+          <Link
+            to={isMarketplaceBrand ? "/search?brand=atlastays" : "/search"}
+            className="navbar-search-pill"
+            data-testid="navbar-search-pill"
+          >
             <span className="navbar-search-pill__label">Where to?</span>
             <span className="navbar-search-pill__hint">Search stays</span>
           </Link>
@@ -335,7 +344,7 @@ const Navbar = () => {
                   {tripsMenuNav.map((item) => (
                     <Link
                       key={item.to}
-                      to={item.to}
+                      to={item.to === '/search' && isMarketplaceBrand ? '/search?brand=atlastays' : item.to}
                       role="menuitem"
                       className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
                       onClick={() => setTripsMenuOpen(false)}
@@ -392,7 +401,7 @@ const Navbar = () => {
                 {tripsMenuNav.map((item) => (
                   <Link
                     key={item.to}
-                    to={item.to}
+                    to={item.to === '/search' && isMarketplaceBrand ? '/search?brand=atlastays' : item.to}
                     role="menuitem"
                     className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
                     onClick={() => setAccountMenuOpen(false)}
@@ -464,7 +473,7 @@ const Navbar = () => {
               <NavLink
                 key={item.to}
                 onClick={closeMobile}
-                to={item.to}
+                to={item.to === '/search' && isMarketplaceBrand ? '/search?brand=atlastays' : item.to}
                 className="block py-2 pl-2 font-semibold"
                 data-testid={item.to === '/search' ? 'navbar-search-pill-mobile' : undefined}
               >

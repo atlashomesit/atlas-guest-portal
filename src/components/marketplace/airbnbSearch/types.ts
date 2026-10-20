@@ -7,15 +7,15 @@ export type GuestCounts = {
 
 export type AirbnbSearchValues = {
   destination: string;
-  checkIn: string;
-  checkOut: string;
+  checkIn?: string;
+  checkOut?: string;
   guests: GuestCounts;
 };
 
 export type RecentSearch = {
   destination: string;
-  checkIn: string;
-  checkOut: string;
+  checkIn?: string;
+  checkOut?: string;
   guests: number;
 };
 

@@ -41,4 +41,29 @@ describe('TASK-101380 star-rating distribution', () => {
     // Screen readers hear the exclusion as part of the figure's name, not just sighted users.
     expect(screen.getByRole('figure', { name: 'Star ratings from 3 reviews on this site 1 review from other sites not included' })).toBeInTheDocument();
   });
+
+  describe('REV-030 blended ratingStarCounts from PublicListingDto', () => {
+    test('renders blended star counts without exclusion notice even when otherSourcesCount is given', () => {
+      // 5 counts corresponding to [1★, 2★, 3★, 4★, 5★]
+      render(
+        <RatingDistribution
+          totalCount={10}
+          starCounts={[0, 0, 1, 3, 6]}
+          otherSourcesCount={4}
+        />
+      );
+      const figure = screen.getByRole('figure', { name: 'Star ratings from 10 reviews' });
+      expect(figure).toBeInTheDocument();
+      expect(figure).not.toHaveTextContent('other sites not included');
+      const rows = within(figure).getAllByRole('listitem');
+      expect(rows.map((row) => row.getAttribute('aria-label'))).toEqual([
+        '5 stars: 6 reviews',
+        '4 stars: 3 reviews',
+        '3 stars: 1 review',
+        '2 stars: 0 reviews',
+        '1 star: 0 reviews',
+      ]);
+    });
+  });
 });
+

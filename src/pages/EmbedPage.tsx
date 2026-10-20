@@ -9,6 +9,14 @@ import { getIstCalendarDate, toCalendarISO } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { formatCurrency } from '@/utils/formatting';
 import { razorpayOrderAmountInrToPaise } from '@/utils/razorpayOrderAmount';
+import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
+import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import { failureDetailsFromRazorpayEvent, reportPaymentFailure } from '@/api/paymentFailureClient';
+import { createRazorpayWindowWatch, isRazorpayContainerVisible } from '@/utils/razorpayWindowWatch';
+import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
+import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
+import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +32,8 @@ type EmbedListingSummary = {
   checkOutTime: string | null;
   timezoneId: string | null;
   securityDepositAmount: number | null;
+  cancellationTier?: string | null;
+  cancellationWindowHours?: number | null;
 };
 
 type EmbedConfig = {
@@ -177,6 +187,10 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
       timezoneId: (r.timezoneId ?? r.TimezoneId) as string | null,
       securityDepositAmount: r.securityDepositAmount != null || r.SecurityDepositAmount != null
         ? Number(r.securityDepositAmount ?? r.SecurityDepositAmount)
+        : null,
+      cancellationTier: (r.cancellationTier ?? r.CancellationTier) as string | null,
+      cancellationWindowHours: r.cancellationWindowHours != null || r.CancellationWindowHours != null
+        ? Number(r.cancellationWindowHours ?? r.CancellationWindowHours)
         : null,
     })),
   };
@@ -472,6 +486,19 @@ function GuestDetailsForm({
   const [isPrefilledFromSaved, setIsPrefilledFromSaved] = useState(savedInitial.hasSaved);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [depositAccepted, setDepositAccepted] = useState(false);
+  // FOUNDER RULED 2026-10-19: the host's own house rules (required tick before Pay, only when the host wrote rules) and the host's
+  // own WhatsApp / phone for the failed-payment fallback, read from the LISTING OWNER (never Atlas's own number).
+  const [checkoutInfo, setCheckoutInfo] = useState<ListingCheckoutInfo | null>(null);
+  const [houseRulesAccepted, setHouseRulesAccepted] = useState(false);
+  const [paymentFailure, setPaymentFailure] = useState<{ reasonText: string } | null>(null);
+  const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchListingCheckoutInfo(listing.id, undefined, controller.signal).then((info) => {
+      if (!controller.signal.aborted) setCheckoutInfo(info);
+    });
+    return () => controller.abort();
+  }, [listing.id]);
   const [pricing, setPricing] = useState<GuestPriceBreakdown | null>(null);
   const [loadingPricing, setLoadingPricing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -545,7 +572,12 @@ function GuestDetailsForm({
       setError('Please accept the refundable security deposit terms to continue.');
       return;
     }
+    if (houseRulesRequired && !houseRulesAccepted) {
+      setError('Please accept the house rules to continue.');
+      return;
+    }
     setError(null);
+    setPaymentFailure(null);
     setSubmitting(true);
     try {
       const idempotencyKey = crypto.randomUUID();
@@ -575,6 +607,10 @@ function GuestDetailsForm({
         });
         if (!holdRes.ok) {
           const body = await holdRes.json().catch(() => ({}));
+          // FOUNDER RULED 2026-10-19: the hold starts at Pay, so a lost night is told here, BEFORE any money moves.
+          if (holdRes.status === 409 && String(body.code ?? '') === 'AVAILABILITY_CONFLICT') {
+            throw new Error('Sorry, these dates were just booked. No payment was taken. Please pick different dates.');
+          }
           throw new Error(String(body.message ?? body.error ?? 'Failed to create hold'));
         }
         hold = (await holdRes.json()) as { holdId: number; holdExpiresAt: string; prepToken: string };
@@ -592,10 +628,16 @@ function GuestDetailsForm({
           guestInfo: { name: name.trim(), email: email.trim(), phone: phone.trim() },
           guestConsentAccepted: consentAccepted,
           securityDepositAccepted: depositRequired ? depositAccepted : false,
+          houseRulesAccepted,
         }),
       });
       if (!orderRes.ok) {
         const body = await orderRes.json().catch(() => ({}));
+        if (orderRes.status === 409 && String(body.code ?? '') === 'CHECKOUT_HOLD_EXPIRED') {
+          // The 10 minutes ended and the nights were released: drop the lapsed hold; the next Pay re-checks the dates and starts a fresh one.
+          setHeldHold(null);
+          throw new Error('Your 10 minutes ended, so the dates were released. Tap Pay and we will check them again. No payment was taken.');
+        }
         throw new Error(String(body.message ?? body.error ?? 'Failed to create payment order'));
       }
       // `amount` off this response is RUPEES, while the Razorpay order it created is
@@ -611,6 +653,8 @@ function GuestDetailsForm({
       const loaded = await loadRazorpayScript();
       if (!loaded) throw new Error('Payment script failed to load. Please try again.');
 
+      // Set by whichever Razorpay event ends this attempt; the "window never opened" watchdog below stops once it is set.
+      let windowSettled = false;
       const rzp = new window.Razorpay({
         key: order.keyId,
         amount: amountPaise,
@@ -619,6 +663,7 @@ function GuestDetailsForm({
         description: `${listing.name} — ${formatNightCount(calculateNights(checkIn, checkOut))}`,
         order_id: order.orderId,
         handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+          windowSettled = true;
           try {
             const verifyRes = await fetch(buildApiUrl('/api/Razorpay/verify'), {
               method: 'POST',
@@ -644,17 +689,41 @@ function GuestDetailsForm({
           }
         },
         modal: {
-          ondismiss: () => { setSubmitting(false); },
+          ondismiss: () => { windowSettled = true; setSubmitting(false); },
         },
         prefill: { name, email, contact: phone },
         theme: { color: brand },
       });
       rzp.on('payment.failed', (resp) => {
-        const r = resp as { error?: { description?: string } };
-        setError(r.error?.description ?? 'Payment failed. Please try again.');
+        windowSettled = true;
+        const r = resp as { error?: { code?: string; description?: string } };
+        // GUEST-028: keep what Razorpay said (and which website this ran on), so a refusal that blocks every guest is seen.
+        reportPaymentFailure(order.bookingId, order.bookingToken, null, { ...failureDetailsFromRazorpayEvent(resp), orderId: order.orderId });
+        // FOUNDER RULED 2026-10-19: "Payment didn't go through" with [Try again] and [Message the host on WhatsApp].
+        setError(null);
+        setPaymentFailure({ reasonText: mapRazorpayFailureCode(r.error?.code, r.error?.description) });
         setSubmitting(false);
       });
       rzp.open();
+
+      // Razorpay's window can die without telling the page (an in-app browser that blocks it, an order the gateway rejects): without this the
+      // Pay button would stay on "Securing..." for the rest of the hold. Same way out as a failed payment.
+      const windowWatch = createRazorpayWindowWatch(Date.now());
+      const openWatchdog = window.setInterval(() => {
+        // The widget being gone (the guest left) also ends the watch: a departed guest gets no late failure report.
+        if (windowSettled || !document.querySelector('[data-testid="embed-guest-details"]')) { window.clearInterval(openWatchdog); return; }
+        if (!windowWatch.tick(isRazorpayContainerVisible(), Date.now())) return;
+        window.clearInterval(openWatchdog);
+        windowSettled = true;
+        reportPaymentFailure(order.bookingId, order.bookingToken, null, {
+          code: 'CHECKOUT_DID_NOT_OPEN',
+          description: 'The Razorpay payment window did not open or closed without telling the page',
+          orderId: order.orderId,
+        });
+        setError(null);
+        setPaymentFailure({ reasonText: 'The payment window did not open in this browser. Try again, or open this page in Chrome or Safari.' });
+        setSubmitting(false);
+      }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
       setSubmitting(false);
@@ -708,6 +777,14 @@ function GuestDetailsForm({
         </div>
       ) : null}
 
+      {/* GUEST-024: Visual cancellation policy milestone timeline */}
+      <CancellationMilestoneTimeline
+        checkInDate={checkIn}
+        cancellationTier={listing.cancellationTier}
+        windowHoursOverride={listing.cancellationWindowHours}
+        className="mb-3"
+      />
+
       <div className="mb-3 grid gap-2">
         {isPrefilledFromSaved && (
           <div className="flex items-center justify-between rounded-md bg-bg-muted px-2.5 py-1.5 text-xs text-text-secondary">
@@ -751,6 +828,13 @@ function GuestDetailsForm({
         />
       </div>
 
+      <HouseRulesAcceptance
+        info={checkoutInfo}
+        accepted={houseRulesAccepted}
+        onChange={setHouseRulesAccepted}
+        variant="embed"
+      />
+
       <label className="mb-3 flex items-start gap-2 text-xs text-text-secondary">
         <input
           type="checkbox"
@@ -782,6 +866,27 @@ function GuestDetailsForm({
         </label>
       )}
 
+      {paymentFailure && !submitting && (
+        <PaymentFailedPanel
+          reasonText={paymentFailure.reasonText}
+          countdown={holdCountdown}
+          holdActive={heldHold != null && new Date(heldHold.holdExpiresAt).getTime() > Date.now()}
+          contact={buildHostFailureContact({
+            hostWhatsAppDigits: checkoutInfo?.hostWhatsAppDigits,
+            hostPhoneDigits: checkoutInfo?.hostPhoneDigits,
+            roomName: listing.name,
+            checkInLabel: format(checkIn, 'EEE, d MMM yyyy'),
+            checkOutLabel: format(checkOut, 'EEE, d MMM yyyy'),
+            nights,
+            guests,
+            amountInr: pricing?.finalAmount ?? null,
+            guestName: name,
+          })}
+          onTryAgain={() => { void handleSubmit(); }}
+          variant="embed"
+        />
+      )}
+
       {error && (
         <div role="alert" className="mb-3 rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-700">
           {error}
@@ -790,7 +895,7 @@ function GuestDetailsForm({
 
       <button
         type="button"
-        disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted)}
+        disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted) || (houseRulesRequired && !houseRulesAccepted)}
         onClick={handleSubmit}
         className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
         style={ctaStyle(brand)}
