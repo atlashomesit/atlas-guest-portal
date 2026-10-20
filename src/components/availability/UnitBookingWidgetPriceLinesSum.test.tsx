@@ -153,7 +153,16 @@ async function renderBreakdown(scenario: Scenario) {
 
   return {
     total: money(totalRow.querySelector('.lv-num')?.textContent),
-    lineTotal: itemRows.reduce((sum, r) => sum + money(r.querySelector('.lv-num')?.textContent), 0),
+    // Founder ruling 2026-10-21: the direct-booking discount is its own line ("−₹2,100"), so a minus row
+    // subtracts — exactly as a guest reading the breakdown would add it up.
+    lineTotal: itemRows.reduce((sum, r) => {
+      const text = r.querySelector('.lv-num')?.textContent ?? '';
+      const sign = /^s*[−-]/.test(text) ? -1 : 1;
+      return sum + sign * money(text);
+    }, 0),
+    directDiscount: money(
+      rowsContainer.querySelector('[data-testid="bw-bd-direct-discount"] .lv-num')?.textContent,
+    ),
     accommodation: money(
       rowsContainer.querySelector('[data-testid="price-line-base"] .lv-num')?.textContent,
     ),
@@ -287,7 +296,9 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
     // The other half of the asymmetry, guarding the over-correction: a fix that simply returned
     // `baseAmount` would render 21,000 against a Total of 19,467 and break this case.
     // BaseAmount 21,000 gross of the global discount; discountAmount 2,100 → net 18,900.
-    const { total, lineTotal, accommodation } = await renderBreakdown({
+    // Founder ruling 2026-10-21: the breakdown now shows the standard 21,000 and the 2,100 direct-booking
+    // discount as its own minus line, instead of a nightly rate with the discount silently netted in.
+    const { total, lineTotal, accommodation, directDiscount } = await renderBreakdown({
       nights: 7,
       calendarPerNight: 2700, // the calendar DOES net the global discount per day
       quote: {
@@ -305,7 +316,8 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
       },
     });
 
-    expect(accommodation).toBe(18900);
+    expect(accommodation).toBe(21000);
+    expect(directDiscount).toBe(2100);
     expect(lineTotal).toBe(total);
     expect(total).toBe(19467);
   });

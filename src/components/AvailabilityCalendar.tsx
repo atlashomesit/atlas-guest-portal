@@ -295,9 +295,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
         text = 'text-gray-700 line-through';
         extra = '';
       } else if (status === 'turnover') {
-        // Turnover day allows same-day check-in but should be visually distinct.
-        bg = 'bg-amber-50 hover:bg-amber-100 cursor-pointer border-amber-300';
-        text = 'text-amber-800';
+        // Founder ruling 2026-10-21: a turnover day is bookable, so it keeps the available-day look set above.
       }
 
       const dayClickable = selectableDates.has(ymd);
@@ -305,7 +303,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
         : loading ? 'Loading availability'
           : isPast ? 'Past date'
             : status === 'available' ? 'Available for check-in'
-              : status === 'turnover' ? 'Turnover, check-in allowed'
+              : status === 'turnover' ? 'Available for check-in'
                 : status === 'booked' ? 'Booked, unavailable'
                   : status === 'blocked' ? 'Blocked, unavailable'
                     : status === 'hold' ? 'On hold, unavailable' : 'Unavailable';
@@ -437,10 +435,7 @@ export default function AvailabilityCalendar({ listingId, onDateSelect, onRetry 
           <span className="inline-block w-3 h-3 rounded bg-white border border-green-200" /> Available
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded bg-amber-50 border border-amber-300" /> Turnover (check-in allowed)
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded bg-gray-100" /> Unavailable
+          <span className="inline-block w-3 h-3 rounded bg-gray-100" /> Not available
         </span>
       </div>
     </div>

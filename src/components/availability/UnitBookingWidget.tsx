@@ -34,6 +34,8 @@ import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
+import DirectSavingRow from '@/components/pricing/DirectSavingRow';
+import { directPriceDisplay, plainMealLabel } from '@/utils/directBookingPrice';
 import {
   fetchCalendarPricing,
   fetchGuestPriceBreakdown,
@@ -778,13 +780,11 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // prior failure so Reserve is re-enabled (or correctly gated by real blocked dates).
         setAvailabilityFailed(false);
         setBookedDates(Array.from(newBlockedDates).map(date => new Date(date)));
-        const hasTurnover = Array.from(newDateStatusMap.values()).some((s) => s === 'Turnover');
+        // Founder ruling 2026-10-21: plain words — no "Turnover", "blocked" or "on hold" in front of guests.
         setStatusMessage(
-          hasTurnover
-            ? '“Turnover” nights are cleaning windows — still bookable. Striped grey is unavailable (blocked or on hold).'
-            : newBlockedDates.size > 0
-              ? 'Striped grey dates are unavailable (blocked or on hold) and cannot be selected.'
-              : 'All dates shown are available to book.'
+          newBlockedDates.size > 0
+            ? 'Grey dates are not available and cannot be selected.'
+            : 'All dates shown are available to book.'
         );
       } catch (error) {
         // A cancelled request (StrictMode double-mount / unmount abort) is NOT a real
@@ -1543,6 +1543,43 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? lastSettledHeadlineRef.current
       : finalTotal;
 
+  // Founder ruling 2026-10-21: the struck standard nightly rate, the real one and the direct-booking saving,
+  // from the same server quote the Total comes from — so the saving the guest sees is the one they get.
+  const headlineDirectPrice = useMemo(
+    () =>
+      serverGstMatchesSelection && serverPriceBreakdown && priceDetails.nights > 0
+        ? directPriceDisplay({
+            baseAmount: serverPriceBreakdown.baseAmount,
+            discountAmount: serverPriceBreakdown.discountAmount,
+            finalAmount: serverPriceBreakdown.finalAmount,
+            nights: priceDetails.nights,
+          })
+        : null,
+    [serverGstMatchesSelection, serverPriceBreakdown, priceDetails.nights],
+  );
+  // The direct-booking discount the server quote applies for the selected stay (0 when none / not loaded).
+  const directDiscountAmount =
+    serverChargeableBase != null && serverPriceBreakdown && serverPriceBreakdown.discountAmount > 0
+      ? serverPriceBreakdown.discountAmount
+      : 0;
+  const directDiscountPercent =
+    directDiscountAmount > 0 && serverPriceBreakdown && serverPriceBreakdown.baseAmount > 0
+      ? Math.round((serverPriceBreakdown.discountAmount / serverPriceBreakdown.baseAmount) * 100)
+      : 0;
+  // Before dates are picked: tonight's row from daily-summary, which the API builds from the same quote.
+  const tonightDirectPrice = useMemo(
+    () =>
+      effectiveDailyPricing
+        ? directPriceDisplay({
+            baseAmount: effectiveDailyPricing.baseAmount,
+            discountAmount: effectiveDailyPricing.baseAmount - effectiveDailyPricing.actualPrice,
+            finalAmount: effectiveDailyPricing.finalAmount,
+            nights: 1,
+          })
+        : null,
+    [effectiveDailyPricing],
+  );
+
   // Keep the navigation shortcut tied to the authoritative form eligibility.
   const reserveDisabled =
     isSubmitting ||
@@ -1574,9 +1611,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? null
         : freeCancellationCopy?.deadlineFormatted ?? null,
       datesUnavailable,
-      ratePlanLabel: publicRatePlans.length > 0 ? (selectedRatePlan?.name ?? null) : null,
-      mealPlanCode: publicRatePlans.length > 0 ? (selectedRatePlan?.mealPlanCode ?? null) : null,
-      mealPlanLabel: publicRatePlans.length > 0 ? (selectedRatePlan?.mealPlanLabel ?? null) : null,
+      // Founder ruling 2026-10-21: never show an internal/OTA plan name ("Atlas501_PH . Double") to a guest.
+      // A label appears only when the guest actually chose between real options, in plain words.
+      ratePlanLabel: publicRatePlans.length > 1 ? plainMealLabel(selectedRatePlan?.mealPlanLabel) : null,
+      mealPlanCode: publicRatePlans.length > 1 ? (selectedRatePlan?.mealPlanCode ?? null) : null,
+      mealPlanLabel: null,
       hasMultipleRatePlans: publicRatePlans.length > 1,
     });
   }, [
@@ -1883,6 +1922,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </>
         ) : hasSelectedRange && !invalidIstStayRange && displayFinalTotal > 0 ? (
           <>
+            {headlineDirectPrice && headlineDirectPrice.standardNightly != null && (
+              <DirectSavingRow display={headlineDirectPrice} formatAmount={displayPrice} />
+            )}
             <div className="lv-booking-total">
               <b data-testid="bw-per-night-price">{displayPrice(displayFinalTotal)}</b>
               <span>total · {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}</span>
@@ -1895,6 +1937,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </>
         ) : (
           <>
+            {!hasSelectedRange && tonightDirectPrice && tonightDirectPrice.standardNightly != null && (
+              <DirectSavingRow display={tonightDirectPrice} formatAmount={(n) => formatCurrency(n, { maximumFractionDigits: 0 })} />
+            )}
             <div className="lv-booking-total">
               <span className="lv-booking-from-prefix">From </span>
               <b data-testid="bw-per-night-price">
@@ -2106,11 +2151,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               gap: 8,
             }}
           >
+            {/* Founder ruling 2026-10-21: the API now offers only genuinely different deals (meals or a
+                cancellation rule), so each choice is named in plain words — never the internal/OTA plan name —
+                and priced with its own checkout quote, all fees included. */}
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary, #475569)' }}>
-              Choose your rate option
+              Choose one
             </div>
             {publicRatePlans.map((plan) => {
               const isSelected = (selectedRatePlan?.id ?? publicRatePlans[0]?.id) === plan.id;
+              const planQuoteTotal = plan.guestQuote?.finalAmount != null && plan.guestQuote.finalAmount > 0
+                ? plan.guestQuote.finalAmount
+                : null;
               return (
                 <button
                   key={plan.id}
@@ -2135,31 +2186,22 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
-                      {plan.name}
+                    <div
+                      data-testid={`rate-plan-meal-badge-${plan.id}`}
+                      style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}
+                    >
+                      {plainMealLabel(plan.mealPlanLabel)}
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
-                      <span data-testid={`rate-plan-meal-badge-${plan.id}`}>
-                        {plan.mealPlanCode && ['BB', 'CP'].includes(plan.mealPlanCode.toUpperCase())
-                          ? `☕ ${plan.mealPlanLabel}`
-                          : plan.mealPlanCode && ['MAP', 'HB', 'AP', 'FB', 'AI'].includes(plan.mealPlanCode.toUpperCase())
-                            ? `🍽️ ${plan.mealPlanLabel}`
-                            : plan.mealPlanLabel}
-                      </span>
-                      <span>·</span>
-                      <span>{plan.cancellationSummary}</span>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
+                      {plan.cancellationSummary}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
-                      {displayPrice(
-                        plan.totalStayAmount != null && plan.totalStayAmount > 0
-                          ? plan.totalStayAmount
-                          : plan.effectiveNightlyRate,
-                      )}
+                      {displayPrice(planQuoteTotal ?? plan.effectiveNightlyRate)}
                     </div>
                     <div style={{ fontSize: 10, color: 'var(--text-secondary, #64748b)' }}>
-                      {plan.totalStayAmount != null && plan.totalStayAmount > 0 ? 'total base' : '/ night'}
+                      {planQuoteTotal != null ? 'total, all fees included' : '/ night'}
                     </div>
                   </div>
                 </button>
@@ -2189,19 +2231,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </span>
             <span className="bw-legend-desc">Open for booking</span>
           </li>
-          <li className="bw-legend-item">
-            <span className="bw-legend-label">
-              <span className="bc-sw bc-sw-turnover" aria-hidden="true" />
-              Turnover
-            </span>
-            <span className="bw-legend-desc">Cleaning window (still bookable)</span>
-          </li>
+          {/* Founder ruling 2026-10-21: no "Turnover" in front of guests — a turnover night is simply a night
+              they can book, so it is drawn and described as available. */}
           <li className="bw-legend-item">
             <span className="bw-legend-label">
               <span className="bc-sw bc-sw-unavail" aria-hidden="true" />
-              Unavailable
+              Not available
             </span>
-            <span className="bw-legend-desc">Booked, blocked, or on hold</span>
+            <span className="bw-legend-desc">Already booked or closed</span>
           </li>
         </ul>
         {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
@@ -2277,19 +2314,43 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     <span className="font-semibold">Subtotal</span>
                     <span className="lv-num font-semibold">{displayPrice(breakdownPrice)}</span>
                   </div>
+                  {/* Founder ruling 2026-10-21: the nightly rows above already include the direct-booking
+                      discount, so say so — the saving is never netted in silently. */}
+                  {directDiscountAmount > 0 && (
+                    <p
+                      className="text-xs"
+                      data-testid="bw-bd-direct-saving-note"
+                      style={{ color: '#157046', margin: '2px 0 0' }}
+                    >
+                      Includes {directDiscountPercent}% off for booking direct — you save {displayPrice(directDiscountAmount)}
+                    </p>
+                  )}
                 </>
               );
             } else {
-              // Show averaged format (original behavior)
+              // Founder ruling 2026-10-21: show the standard rate × nights, then the direct-booking discount as
+              // its own line — instead of a nightly rate that already had the discount netted in silently.
+              const standardStay = directDiscountAmount > 0 && serverPriceBreakdown ? serverPriceBreakdown.baseAmount : null;
+              const nightlyShown = standardStay != null && priceDetails.nights > 0
+                ? Math.round(standardStay / priceDetails.nights)
+                : perNightForDisplay;
               return (
-                <div className="lv-price-row" data-testid="price-line-base">
-                  <span>
-                    {priceDetails.nights > 0 && perNightForDisplay > 0
-                      ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
-                      : 'Accommodation'}
-                  </span>
-                  <span className="lv-num">{displayPrice(breakdownPrice)}</span>
-                </div>
+                <>
+                  <div className="lv-price-row" data-testid="price-line-base">
+                    <span>
+                      {priceDetails.nights > 0 && nightlyShown > 0
+                        ? `${displayPrice(nightlyShown)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+                        : 'Accommodation'}
+                    </span>
+                    <span className="lv-num">{displayPrice(standardStay ?? breakdownPrice)}</span>
+                  </div>
+                  {standardStay != null && (
+                    <div className="lv-price-row" data-testid="bw-bd-direct-discount" data-sign="negative">
+                      <span style={{ color: '#157046' }}>Direct booking discount ({directDiscountPercent}%)</span>
+                      <span className="lv-num" style={{ color: '#157046' }}>−{displayPrice(directDiscountAmount)}</span>
+                    </div>
+                  )}
+                </>
               );
             }
           })()}

@@ -53,7 +53,7 @@ describe('GUEST-011 listing calendar keyboard navigation', () => {
     fireEvent.keyDown(dateCell(28), { key: 'ArrowRight' });
     expect(dateCell(2, 'October')).toHaveFocus();
     expect(dateCell(2, 'October')).toHaveAttribute('tabindex', '0');
-    expect(dateCell(2, 'October')).toHaveAccessibleName('Friday, 2 October 2026: Turnover, check-in allowed');
+    expect(dateCell(2, 'October')).toHaveAccessibleName('Friday, 2 October 2026: Available for check-in');
     expect(select).not.toHaveBeenCalled();
     fireEvent.keyDown(dateCell(2, 'October'), { key: 'Enter' });
     expect(select).toHaveBeenNthCalledWith(1, '2026-10-02');

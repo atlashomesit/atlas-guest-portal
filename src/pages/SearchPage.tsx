@@ -7,6 +7,7 @@ import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getListingDisplayName } from "../lib/listingDisplayName";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
+import { directSavingsLabel } from "../utils/directBookingPrice";
 import { parseDate } from "../utils/formatting";
 import { toCalendarISO } from "../utils/date";
 import { useCurrency } from "../contexts/CurrencyContext";
@@ -1787,6 +1788,19 @@ const SearchPage = () => {
 
                   <div className="search-card__foot">
                     <div className="search-card__price">
+                      {/* Founder ruling 2026-10-21: show the direct-booking saving next to the real price —
+                          the daily-summary row is built from the checkout quote. */}
+                      {dailyBreakdown && dailyBreakdown.baseAmount > dailyBreakdown.actualPrice && dailyBreakdown.actualPrice > 0 && (
+                        <p className="text-xs" data-testid="guest-listing-direct-saving" style={{ margin: 0 }}>
+                          <span className="sr-only">Standard price </span>
+                          <span style={{ textDecoration: 'line-through', color: 'var(--text-muted, #6b5a55)' }}>
+                            {formatDisplayCurrency(dailyBreakdown.baseAmount)}
+                          </span>{' '}
+                          <span style={{ fontWeight: 600, color: '#b8472f' }}>
+                            {directSavingsLabel(Math.round(((dailyBreakdown.baseAmount - dailyBreakdown.actualPrice) / dailyBreakdown.baseAmount) * 100))}
+                          </span>
+                        </p>
+                      )}
                       <p className="search-card__price-amt" data-testid="guest-listing-nightly-price">
                         {formatDisplayCurrency(displayedPrice)}
                       </p>
