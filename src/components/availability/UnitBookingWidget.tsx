@@ -48,6 +48,7 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
+import ParentChildCrossSellBanner, { isParentListing } from '../cluster/ParentChildCrossSellBanner';
 import { track } from '@/lib/events'; // TASK-1480
 import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
@@ -104,6 +105,10 @@ interface UnitBookingWidgetProps {
   lookupFailed?: boolean;
   /** MKT-011: optional listing tenant context (used on marketplace to match listing host's bookingMode) */
   tenantContext?: TenantInfo | null;
+  /** CLU-004: parent cluster indicator for child room cross-sell */
+  isParentCluster?: boolean;
+  clusterRole?: string | null;
+  accommodationType?: string | null;
 }
 
 export type BookingStickySummary = {
@@ -192,6 +197,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   onStickySummaryChange,
   lookupFailed = false,
   tenantContext,
+  isParentCluster,
+  clusterRole,
+  accommodationType,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -2435,6 +2443,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
+
+      {/* CLU-004: Parent whole-villa blocked -> available child private rooms cross-sell alert */}
+      {datesUnavailable && (
+        <div className="mt-3">
+          <ParentChildCrossSellBanner
+            isParentCluster={Boolean(isParentCluster || isParentListing({ name: listingName, clusterRole, accommodationType }))}
+            isUnavailable={Boolean(datesUnavailable)}
+            parentName={listingName}
+            onBrowseRooms={() => navigate('/search')}
+          />
+        </div>
+      )}
+
       {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
       {!datesUnavailable && (
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>

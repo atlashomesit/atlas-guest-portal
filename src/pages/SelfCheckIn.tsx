@@ -4,6 +4,7 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
+import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
 
 interface CheckinDetails {
@@ -1495,6 +1496,11 @@ export default function SelfCheckIn() {
               {details.wifiPassword && <InfoRow label="WiFi password" value={details.wifiPassword} />}
               {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
               {details.emergencyContactPhone && <InfoRow label="Emergency contact" value={details.emergencyContactPhone} />}
+            </div>
+
+            {/* BNB-002: Pre-arrival dietary and breakfast time preferences */}
+            <div className="mb-6">
+              <GuestDietarySelector bookingRef={bookingRef} />
             </div>
 
             {/* TASK-4510: Digital Guest Guidebook — shown after successful check-in */}

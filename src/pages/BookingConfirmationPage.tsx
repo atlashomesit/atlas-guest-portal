@@ -22,6 +22,7 @@ import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
+import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
 import {
   buildReceiptHtml,
   buildStayGuideHtml,
@@ -1412,6 +1413,11 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary mb-1">📶 WiFi</h2>
             <p className="text-sm text-text-secondary">WiFi details will appear here closer to your check-in date.</p>
           </div>
+        )}
+
+        {/* BNB-002: Pre-arrival dietary and breakfast time preferences feeding 7:00 AM breakfast manifest */}
+        {!isCancelled && (
+          <GuestDietarySelector bookingRef={String(booking.id ?? bookingId ?? '')} />
         )}
 
         {/* TASK-4510: Digital Guest Guidebook — host-authored content sections */}

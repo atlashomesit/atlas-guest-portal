@@ -1,4 +1,5 @@
 import HostIdentityLabel from '@/components/property/HostIdentityLabel';
+import HostelDormBadge from '../hostel/HostelDormBadge';
 import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 import React, { useMemo, useState } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
@@ -32,6 +33,7 @@ type ListingCardProps = {
   /** TASK-4012: review count for rating chip */
   reviewCount?: number | null;
   propertyType: string;
+  accommodationType?: string;
   guests: number;
   bedrooms?: number | null;
   hasWifi?: boolean;
@@ -86,6 +88,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   reviews,
   reviewCount,
   propertyType,
+  accommodationType,
   guests,
   bedrooms,
   hasWifi,
@@ -303,6 +306,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
         </div>
 
         <HostIdentityLabel marketplace={marketplace} verified={hostIdentityVerified} />
+
+        <HostelDormBadge accommodationType={accommodationType || propertyType} propertyType={propertyType} name={name} />
 
         {/* TASK-1360: Last-booked social-proof badge */}
         {lastBookedLabel && (
