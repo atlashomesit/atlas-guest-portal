@@ -62,17 +62,8 @@ function deleteGuestBreakdown(params: URLSearchParams) {
   params.delete("children");
 }
 
-/**
- * TASK-10298822: Prevents double question mark URLs when canonicalPath already includes
- * query parameters (e.g. ?tenant=...) and querySuffix is appended.
- */
-export function appendQuerySuffix(basePath: string, suffix: string): string {
-  if (!suffix) return basePath;
-  const cleanSuffix = suffix.startsWith('?') ? suffix.slice(1) : suffix;
-  if (!cleanSuffix) return basePath;
-  const separator = basePath.includes('?') ? '&' : '?';
-  return `${basePath}${separator}${cleanSuffix}`;
-}
+import { appendQuerySuffix } from "../utils/navigation";
+export { appendQuerySuffix };
 
 type NormalizedListing = {
   id: string;
@@ -312,7 +303,7 @@ const SearchPage = () => {
   const guestsParam = searchParams.get("guests");
   const adultsParam = searchParams.get("adults");
   const childrenParam = searchParams.get("children");
-  const destinationParam = searchParams.get("destination") ?? searchParams.get("city");
+  const destinationParam = searchParams.get("destination") ?? searchParams.get("city") ?? searchParams.get("location");
 
   const loadFromMarketplace = useCallback(async (signal: AbortSignal) => {
     setApiError(false);

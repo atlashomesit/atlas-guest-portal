@@ -17,6 +17,8 @@ import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
+import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
+import { matchesAmenityFilter } from '@/utils/amenityFilters';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
 import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
@@ -63,6 +65,10 @@ type MarketplaceItem = {
   // Missing metadata must remain unknown, without a platform-wide percentage fallback.
   chargesOnlinePaymentFee?: boolean;
   convenienceFeePercent?: number;
+  // TASK-10298932: Amenity filtering support
+  amenityCodes?: string[];
+  amenities?: (string | { code?: string; name?: string; title?: string })[];
+  description?: string;
 };
 
 function marketplaceListingPath(
@@ -313,15 +319,7 @@ export default function MarketplaceHomepage() {
       });
     }
     if (selectedAmenity) {
-      const term = selectedAmenity.toLowerCase();
-      result = result.filter((item) => {
-        const text = `${item.title} ${item.slug} ${item.city ?? ''}`.toLowerCase();
-        if (term === 'pool') return text.includes('pool') || text.includes('swimming');
-        if (term === 'pet friendly') return text.includes('pet') || text.includes('dog');
-        if (term === 'beachfront') return text.includes('beach') || text.includes('sea') || text.includes('ocean');
-        if (term === 'mountain view') return text.includes('mountain') || text.includes('hill') || text.includes('valley');
-        return text.includes(term);
-      });
+      result = result.filter((item) => matchesAmenityFilter(item, selectedAmenity));
     }
     return result;
   }, [items, minPrice, maxPrice, selectedAmenity]);
@@ -521,43 +519,11 @@ export default function MarketplaceHomepage() {
         )}
       </div>
 
-      {/* MKT-023: Top amenities quick filter pills */}
-      <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="marketplace-amenities-pills">
-        <span className="text-xs font-semibold text-text-muted uppercase tracking-wider mr-1">Amenities:</span>
-        {[
-          { label: 'Pool', icon: '🏊' },
-          { label: 'Pet Friendly', icon: '🐾' },
-          { label: 'Beachfront', icon: '🏖️' },
-          { label: 'Mountain View', icon: '🏔️' },
-        ].map(({ label, icon }) => {
-          const isSelected = selectedAmenity === label;
-          return (
-            <button
-              key={label}
-              type="button"
-              data-testid={`marketplace-amenity-${label.toLowerCase().replace(/\s+/g, '-')}`}
-              className={`min-h-[38px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
-                isSelected
-                  ? 'bg-black text-white border-black'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
-              }`}
-              onClick={() => setSelectedAmenity((prev) => (prev === label ? null : label))}
-            >
-              <span aria-hidden="true">{icon}</span>
-              <span>{label}</span>
-            </button>
-          );
-        })}
-        {selectedAmenity && (
-          <button
-            type="button"
-            className="text-xs text-text-muted hover:text-black underline ml-1"
-            onClick={() => setSelectedAmenity(null)}
-          >
-            Clear
-          </button>
-        )}
-      </div>
+      {/* MKT-023 / TASK-10298932: Top amenities quick filter pills */}
+      <AmenityFilterPills
+        selectedAmenity={selectedAmenity}
+        onSelectAmenity={setSelectedAmenity}
+      />
 
       {/* TASK-4413: price-range control — client-side filter over the fetched grid. */}
       <div className="mt-3 flex flex-wrap items-center gap-2">

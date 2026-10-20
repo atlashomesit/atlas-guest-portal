@@ -35,6 +35,7 @@ const mockListings = [
     slug: '101',
     rating: 4.8,
     reviewCount: 12,
+    amenityCodes: ['swimming_pool', 'wifi'],
   },
   {
     id: 202,
@@ -47,6 +48,7 @@ const mockListings = [
     slug: '202',
     rating: 3.6,
     reviewCount: 5,
+    amenityCodes: ['ac', 'wifi'],
   },
 ];
 
@@ -156,5 +158,31 @@ describe('MKT-020 marketplace map pin filtering & TASK-10298776 < 4★ rating gu
     await settle();
     expect(screen.getByText('4.8')).toBeInTheDocument();
     expect(screen.queryByText('3.6')).not.toBeInTheDocument();
+  });
+
+  it('filters grid cleanly using amenity filter pills via amenityCodes (TASK-10298932)', async () => {
+    render(
+      <MemoryRouter>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    expect(screen.getByText('Goa Beach Villa')).toBeInTheDocument();
+    expect(screen.getByText('Hyderabad Penthouse')).toBeInTheDocument();
+
+    // Click 'Pool' pill
+    fireEvent.click(screen.getByTestId('marketplace-amenity-pool'));
+    await settle();
+
+    // Only Goa Beach Villa (amenityCodes: ['swimming_pool']) should be visible
+    expect(screen.getByText('Goa Beach Villa')).toBeInTheDocument();
+    expect(screen.queryByText('Hyderabad Penthouse')).not.toBeInTheDocument();
+
+    // Clear amenity filter restores all
+    fireEvent.click(screen.getByRole('button', { name: /clear/i }));
+    await settle();
+    expect(screen.getByText('Goa Beach Villa')).toBeInTheDocument();
+    expect(screen.getByText('Hyderabad Penthouse')).toBeInTheDocument();
   });
 });
