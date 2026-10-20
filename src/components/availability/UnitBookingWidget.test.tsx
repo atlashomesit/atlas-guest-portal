@@ -1525,7 +1525,8 @@ describe('UnitBookingWidget - availability legend layout (render)', () => {
     vi.clearAllMocks();
   });
 
-  it('lists Available → Turnover → Unavailable, each label separate from its description, below an unbroken dates + guests card', async () => {
+  // Founder ruling 2026-10-21: no "Turnover" in front of guests — a turnover night is just an available night.
+  it('lists Available → Not available in plain words, each label separate from its description, below an unbroken dates + guests card', async () => {
     const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
     const { container } = render(
       <MemoryRouter>
@@ -1544,18 +1545,15 @@ describe('UnitBookingWidget - availability legend layout (render)', () => {
     const items = Array.from(legend.querySelectorAll('li'));
     expect(items.map((li) => li.querySelector('.bw-legend-label')?.textContent?.trim())).toEqual([
       'Available',
-      'Turnover',
-      'Unavailable',
+      'Not available',
     ]);
     expect(items.map((li) => li.querySelector('.bw-legend-desc')?.textContent?.trim())).toEqual([
       'Open for booking',
-      'Cleaning window (still bookable)',
-      'Booked, blocked, or on hold',
+      'Already booked or closed',
     ]);
     // Same swatches as the calendar popover's own legend, so the colours match the day cells.
     expect(items.map((li) => li.querySelector('.bc-sw')?.className)).toEqual([
       'bc-sw bc-sw-available',
-      'bc-sw bc-sw-turnover',
       'bc-sw bc-sw-unavail',
     ]);
 

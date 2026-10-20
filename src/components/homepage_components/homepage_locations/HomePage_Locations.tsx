@@ -21,6 +21,7 @@ import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOv
 import { useCurrency } from "../../../contexts/CurrencyContext";
 import { getListingDisplayName } from "../../../lib/listingDisplayName";
 import { getHomeDescriptor } from "../../../content/homeDescriptors";
+import { allInTotalLabel, directPriceDisplay, directSavingsLabel } from "../../../utils/directBookingPrice";
 
 import "./homepage_location.css";
 import "../atlas-home-v2.css";
@@ -243,6 +244,47 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
       return (
         <div className="ahv2-price">
           <span className="ahv2-price-meta">Loading price…</span>
+        </div>
+      );
+    }
+
+    // Founder ruling 2026-10-21: show tonight's real price with the direct-booking saving and the all-in total —
+    // the daily-summary row is built from the checkout quote, so this is what the guest is charged.
+    const display = todayBreakdown
+      ? directPriceDisplay({
+          baseAmount: todayBreakdown.baseAmount,
+          discountAmount: todayBreakdown.baseAmount - todayBreakdown.actualPrice,
+          finalAmount: todayBreakdown.finalAmount,
+          nights: 1,
+        })
+      : null;
+
+    if (display) {
+      return (
+        <div className="ahv2-price" data-testid="home-card-price">
+          <div className="ahv2-price-row">
+            {display.standardNightly != null && (
+              <span className="ahv2-price-strike" data-testid="home-card-standard-price">
+                <span className="sr-only">Standard price </span>
+                {formatCurrency(display.standardNightly)}
+              </span>
+            )}
+            <span className="ahv2-price-amt" data-testid="home-card-real-price">
+              {formatCurrency(display.realNightly)}
+            </span>
+            <span className="ahv2-price-meta">/ night</span>
+          </div>
+          {display.savingsPercent > 0 && (
+            <span className="ahv2-price-save" data-testid="home-card-saving">
+              {directSavingsLabel(display.savingsPercent)}
+            </span>
+          )}
+          <span className="ahv2-price-meta" data-testid="home-card-total">
+            {allInTotalLabel(formatCurrency(display.total), display.nights)}
+            {hasSpecialDateMultiplier || specialLabel
+              ? ` · ${specialLabel ?? priceDisplayConfig.defaultSpecialLabel}`
+              : ""}
+          </span>
         </div>
       );
     }

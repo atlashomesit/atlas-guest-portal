@@ -97,7 +97,8 @@ export function getFaqHighlights(): FaqHighlight[] {
       id: "checkin-checkout",
       question: "How do check-in and check-out work?",
       answer:
-        "Standard check-in is 2:00 PM (3:00 PM for the penthouse) and check-out is 11:00 AM (12:00 PM for the penthouse). Self check-in with ID is supported, and early/late slots depend on availability.",
+        // Founder ruling 2026-10-21: no hard-coded times that can contradict a home's own page.
+        "Each home's page shows its check-in and check-out times. Self check-in with ID is supported, and early or late times depend on availability.",
     },
     {
       id: "changes-cancellations",
@@ -109,7 +110,8 @@ export function getFaqHighlights(): FaqHighlight[] {
       id: "extra-guests-fees",
       question: "Can I add extra guests or pay additional fees?",
       answer:
-        "Base occupancy covers two guests (four in the penthouse). Extra adults are allowed within the max capacity and incur a per-guest nightly fee as shown during checkout.",
+        // Founder ruling 2026-10-21: matches the pricing (two guests included in every home, ruled 2026-07-08).
+        "The price you see includes two guests. Extra guests are welcome up to each home's limit for a small nightly fee per guest, and the price updates as soon as you add them.",
     },
     {
       id: "wifi-parking",

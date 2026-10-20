@@ -2624,7 +2624,8 @@ useEffect(() => {
                     {/* Base occupancy card */}
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2UsersIcon /></div>
-                      <small>Base occupancy</small>
+                      {/* Founder ruling 2026-10-21: plain words — this is the most guests the home sleeps. */}
+                      <small>Sleeps up to</small>
                       <strong>
                         {data.maxGuests != null && data.maxGuests > 0 ? `${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'}` : 'Ask host'}
                       </strong>

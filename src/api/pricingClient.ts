@@ -46,6 +46,11 @@ export type TodayBreakdown = {
   baseAmount: number;
   actualPrice: number;
   globalDiscountPercent: number;
+  /**
+   * Founder ruling 2026-10-21: the all-in total for tonight (payment fee included) — the API builds the
+   * daily-summary row from the checkout quote, so cards can show what the guest is actually charged.
+   */
+  finalAmount: number;
 };
 
 /** Per-day row from GET /pricing/breakdown (calendar view). */
@@ -92,6 +97,8 @@ export type GuestGstBreakdown = {
 export type GuestPriceBreakdown = {
   baseAmount: number;
   discountAmount: number;
+  /** The tenant's direct-booking discount percent the quote applied (optional for older fixtures). */
+  globalDiscountPercent?: number;
   losDiscountAmount: number;
   lastMinuteDiscountAmount: number;
   repeatGuestDiscountAmount: number;
@@ -160,6 +167,11 @@ export type PublicListingRatePlanDto = {
   mealPlanCode: string | null;
   mealPlanLabel: string | null;
   isDerived: boolean;
+  /**
+   * Founder ruling 2026-10-21: the checkout quote for this plan, dates and guest count (same engine as
+   * GET /api/pricing/guest-breakdown). Null without dates or from an API that predates the field.
+   */
+  guestQuote: GuestPriceBreakdown | null;
 };
 
 /**
@@ -210,6 +222,10 @@ export async function fetchPublicListingRatePlans(
       mealPlanCode: typeof mealCodeRaw === 'string' && mealCodeRaw.trim() ? mealCodeRaw : null,
       mealPlanLabel: typeof mealLabelRaw === 'string' && mealLabelRaw.trim() ? mealLabelRaw : null,
       isDerived: Boolean(r.isDerived ?? r.IsDerived),
+      guestQuote: (() => {
+        const q = r.guestQuote ?? r.GuestQuote;
+        return q && typeof q === 'object' ? mapGuestPriceBreakdown(q as Record<string, unknown>) : null;
+      })(),
     };
   });
 }
@@ -246,6 +262,11 @@ export async function fetchGuestPriceBreakdown(
   }
 
   const raw = (await response.json()) as Record<string, unknown>;
+  return mapGuestPriceBreakdown(raw);
+}
+
+/** Maps a raw PriceBreakdownDto (camel or Pascal case) to {@link GuestPriceBreakdown}. */
+export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPriceBreakdown {
   const num = (camel: string, pascal: string) => {
     const v = raw[camel] ?? raw[pascal];
     return v !== undefined && v !== null ? Number(v) : 0;
@@ -257,6 +278,7 @@ export async function fetchGuestPriceBreakdown(
   return {
     baseAmount: num('baseAmount', 'BaseAmount'),
     discountAmount: num('discountAmount', 'DiscountAmount'),
+    globalDiscountPercent: num('globalDiscountPercent', 'GlobalDiscountPercent'),
     losDiscountAmount: num('losDiscountAmount', 'LosDiscountAmount'),
     lastMinuteDiscountAmount: num('lastMinuteDiscountAmount', 'LastMinuteDiscountAmount'),
     repeatGuestDiscountAmount: num('repeatGuestDiscountAmount', 'RepeatGuestDiscountAmount'),
@@ -464,9 +486,11 @@ export function getTodayBreakdownFromListing(listing: DailyListingPricingDto): T
   const baseAmount = Number(listing.baseAmount);
   const discountAmount = Number(listing.discountAmount ?? 0);
   const actualPrice = baseAmount - discountAmount;
+  const finalAmount = Number(listing.finalAmount ?? 0);
   return {
     baseAmount,
     actualPrice,
     globalDiscountPercent: Number(listing.globalDiscountPercent ?? 0),
+    finalAmount: finalAmount > 0 ? finalAmount : actualPrice,
   };
 }
