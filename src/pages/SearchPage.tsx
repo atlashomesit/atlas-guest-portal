@@ -217,6 +217,11 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
     .filter((l) => l.numericId > 0);
 }
 
+/** GUEST-033: a "group home" sleeps 5+; a 1-2 guest search gets a hint that smaller homes cost less. */
+const GROUP_HOME_MIN_GUESTS = 5;
+const isSmallParty = (guests: number | null | undefined): boolean => guests != null && guests >= 1 && guests <= 2;
+const isGroupHome = (u: { maxGuests: number }): boolean => u.maxGuests >= GROUP_HOME_MIN_GUESTS;
+
 type MarketplaceApiItem = {
   id: number;
   tenantSlug: string;
@@ -771,10 +776,20 @@ const SearchPage = () => {
       }
       case "rating_desc": return s.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
       case "newest":      return s.sort((a, b) => b.numericId - a.numericId);
-      default:            return s; // "recommended" — preserve Atlas weighting
+      default:
+        // GUEST-033: for 1-2 guests, homes sized for them come first (stable); otherwise preserve Atlas weighting.
+        return isSmallParty(guests) ? [...s.filter((u) => !isGroupHome(u)), ...s.filter(isGroupHome)] : s;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredUnits, sortBy, getDailyListingPricing, stayPrices, quoteStay]);
+  }, [filteredUnits, sortBy, getDailyListingPricing, stayPrices, quoteStay, guests]);
+
+  /** GUEST-033: cheapest per-night price among the homes a couple fits (from the quote when dates are searched). */
+  const smallHomesFrom = useMemo(() => {
+    if (!isSmallParty(guests)) return null;
+    const prices = filteredUnits.filter((u) => !isGroupHome(u)).map((u) => nightlyPriceFor(u)).filter((n) => n > 0);
+    return prices.length > 0 ? Math.min(...prices) : null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredUnits, guests, stayPrices, quoteStay, getDailyListingPricing]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
@@ -1811,6 +1826,22 @@ const SearchPage = () => {
                       </span>
                     )}
                   </div>
+
+                  {isSmallParty(guests) && isGroupHome(unit) && (
+                    <div className="text-xs text-text-muted" data-testid="guest-listing-group-hint">
+                      <p style={{ margin: 0 }}>Best for groups of 4–{unit.maxGuests}</p>
+                      {smallHomesFrom != null && (
+                        <button
+                          type="button"
+                          className="underline font-semibold"
+                          data-testid="guest-listing-small-homes-link"
+                          onClick={() => updateParam("sortBy", "price_asc")}
+                        >
+                          See homes for two from {formatDisplayCurrency(smallHomesFrom)}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <OwnerShareBadge className="self-start" />
 
