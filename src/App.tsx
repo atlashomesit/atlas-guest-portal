@@ -74,6 +74,7 @@ const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPa
 const EmbedPage = React.lazy(() => import("./pages/EmbedPage"))
 // TASK-4017: Guest OTP login
 const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
+const QrMenuPage = React.lazy(() => import("./pages/QrMenuPage"))
 
 function LazyFallback() {
   // TASK-7822: 50vh left the site footer in the first desktop viewport. Home then
@@ -135,11 +136,12 @@ function AppWrapper() {
   const hideNavbarRoutes = ['/property_LocationDetails/:id'];
   // TASK-8093: embed widget runs inside an iframe on a host's own site — no Atlas chrome.
   const isEmbedRoute = Boolean(matchPath('/embed/:embedKey', location.pathname));
+  const isQrMenuRoute = Boolean(matchPath('/qr-menu/:tenantSlug', location.pathname));
 
-  const shouldHideNavbar = isEmbedRoute || hideNavbarRoutes.some((pattern) =>
+  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || hideNavbarRoutes.some((pattern) =>
     Boolean(matchPath(pattern, location.pathname))
   );
-  const shouldHideFooter = isEmbedRoute;
+  const shouldHideFooter = isEmbedRoute || isQrMenuRoute;
   // Classic tenant home owns the inline consent region immediately after its search.
   // Other themes/routes keep the global consent banner; no tenant resolution changes.
   const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
@@ -274,6 +276,8 @@ function AppWrapper() {
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Suspense fallback={<LazyFallback />}><Homepage_LocationDetails /></Suspense>, "location-details-route")} />
           {/* TASK-2612: Guest details step — MUST be before /:shortCode catch-all */}
           <Route path="/book/:propertySlug/:unitSlug/details" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestDetailsPage /></Suspense>, "guest-details-route")} />
+          {/* TASK-10298855: Guest Room & Table QR Self-Ordering Web App */}
+          <Route path="/qr-menu/:tenantSlug" element={withBoundary(<Suspense fallback={<LazyFallback />}><QrMenuPage /></Suspense>, "qr-menu-route")} />
           {/* TASK-4308: human-readable sitemap page — MUST be before /:shortCode catch-all */}
           <Route path="/sitemap" element={withBoundary(<Suspense fallback={<LazyFallback />}><SitemapPage /></Suspense>, "sitemap-route")} />
           <Route path="/:shortCode" element={withBoundary(<Suspense fallback={<LazyFallback />}><ShortLinkRedirect /></Suspense>, "shortlink-route")} />
