@@ -8,6 +8,7 @@ import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getListingDisplayName } from "../lib/listingDisplayName";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { allInTotalLabel, directSavingsLabel, type DirectPriceDisplay } from "../utils/directBookingPrice";
+import { isGroupHome, isSmallParty, sizedForPartyFirst } from "../utils/smallParty";
 import { useMarketplaceCardPrices, type MarketplaceCardPriceItem } from "../hooks/useMarketplaceCardPrices";
 import { hasOnlinePaymentRail } from "../tenant/paymentRail";
 import { parseDate } from "../utils/formatting";
@@ -216,11 +217,6 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
     })
     .filter((l) => l.numericId > 0);
 }
-
-/** GUEST-033: a "group home" sleeps 5+; a 1-2 guest search gets a hint that smaller homes cost less. */
-const GROUP_HOME_MIN_GUESTS = 5;
-const isSmallParty = (guests: number | null | undefined): boolean => guests != null && guests >= 1 && guests <= 2;
-const isGroupHome = (u: { maxGuests: number }): boolean => u.maxGuests >= GROUP_HOME_MIN_GUESTS;
 
 type MarketplaceApiItem = {
   id: number;
@@ -778,7 +774,7 @@ const SearchPage = () => {
       case "newest":      return s.sort((a, b) => b.numericId - a.numericId);
       default:
         // GUEST-033: for 1-2 guests, homes sized for them come first (stable); otherwise preserve Atlas weighting.
-        return isSmallParty(guests) ? [...s.filter((u) => !isGroupHome(u)), ...s.filter(isGroupHome)] : s;
+        return sizedForPartyFirst(s, guests);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredUnits, sortBy, getDailyListingPricing, stayPrices, quoteStay, guests]);

@@ -11,6 +11,7 @@ import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
 import { useMarketplaceCardPrices, type MarketplaceCardPrice } from '@/hooks/useMarketplaceCardPrices'; // TASK-10298999
+import { sizedForPartyFirst } from '@/utils/smallParty'; // GUEST-033
 import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
@@ -333,8 +334,9 @@ export default function MarketplaceHomepage() {
     if (selectedAmenity) {
       result = result.filter((item) => matchesAmenityFilter(item, selectedAmenity));
     }
-    return result;
-  }, [items, minPrice, maxPrice, selectedAmenity]);
+    // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
+    return sizedForPartyFirst(result, cardStay.guests);
+  }, [items, minPrice, maxPrice, selectedAmenity, cardStay.guests]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
