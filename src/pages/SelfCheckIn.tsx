@@ -97,6 +97,11 @@ export default function SelfCheckIn() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // GUEST-030: a /check-in/{ref}?t=... link opens straight into the stay summary on the token
+  // alone; the last-name form is only the fallback when that link is invalid or expired.
+  const [autoVerifying, setAutoVerifying] = useState(Boolean(urlRef && token));
+  const [tokenFallbackNotice, setTokenFallbackNotice] = useState(false);
+  const autoVerifyStartedRef = useRef(false);
   const [govtIdType, setGovtIdType] = useState("");
   const [govtIdNumber, setGovtIdNumber] = useState("");
   const [rulesAccepted, setRulesAccepted] = useState(false);
@@ -444,6 +449,27 @@ export default function SelfCheckIn() {
       setBusy(false);
     }
   };
+  const applyVerifiedDetails = (data: CheckinDetails) => {
+    setDetails(data);
+    setAlreadySigned(!!data.houseRulesSignedAt);
+    const countStr = data.guestCount ? String(data.guestCount) : (guestCount || "1");
+    setGuestCount(countStr);
+    const initialCount = parseInt(countStr, 10) || 1;
+    const initialGuests: GuestInfo[] = [];
+    for (let i = 0; i < initialCount; i++) {
+      initialGuests.push({
+        name: i === 0 && data.guestName ? data.guestName : "",
+        govtIdType: "",
+        govtIdNumber: "",
+        phoneNumber: "",
+        isVerified: false,
+        activeVerifyTab: "digilocker",
+      });
+    }
+    setGuests(initialGuests);
+    setStep("summary");
+  };
+
   const handleVerify = async () => {
     if (!bookingRef.trim() || !lastName.trim()) {
       setError("Please enter your booking reference and last name.");
@@ -461,30 +487,46 @@ export default function SelfCheckIn() {
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: CheckinDetails = await res.json();
-      setDetails(data);
-      setAlreadySigned(!!data.houseRulesSignedAt);
-      const countStr = data.guestCount ? String(data.guestCount) : (guestCount || "1");
-      setGuestCount(countStr);
-      const initialCount = parseInt(countStr, 10) || 1;
-      const initialGuests: GuestInfo[] = [];
-      for (let i = 0; i < initialCount; i++) {
-        initialGuests.push({
-          name: i === 0 && data.guestName ? data.guestName : "",
-          govtIdType: "",
-          govtIdNumber: "",
-          phoneNumber: "",
-          isVerified: false,
-          activeVerifyTab: "digilocker",
-        });
-      }
-      setGuests(initialGuests);
-      setStep("summary");
+      setTokenFallbackNotice(false);
+      applyVerifiedDetails(data);
     } catch {
       setError("Could not verify your booking. Please try again.");
     } finally {
       setBusy(false);
     }
   };
+
+  // GUEST-030: token-only auto-verify on mount. The API resolves the details READ on a valid
+  // booking-link token alone. The later steps (ID upload, waiver, complete) still send the last
+  // name, so it is taken from the verified booking's guest name the same way the API matches it
+  // (last word). Any failure drops quietly to the last-name form with a gentle notice.
+  useEffect(() => {
+    if (!urlRef || !token || autoVerifyStartedRef.current) return;
+    autoVerifyStartedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(urlRef.trim())}?t=${encodeURIComponent(token)}`);
+        const res = await fetch(url, { headers: getApiHeaders() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data: CheckinDetails = await res.json();
+        const derivedLastName = (data.guestName ?? "").trim().split(/\s+/).filter(Boolean).pop() ?? "";
+        if (!derivedLastName) throw new Error("no guest name");
+        if (cancelled) return;
+        setLastName(derivedLastName);
+        applyVerifiedDetails(data);
+      } catch {
+        if (!cancelled) setTokenFallbackNotice(true);
+      } finally {
+        if (!cancelled) setAutoVerifying(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      autoVerifyStartedRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per link (ref + token)
+  }, [urlRef, token]);
 
   const handleComplete = async () => {
     if (!details) return;
@@ -641,10 +683,31 @@ export default function SelfCheckIn() {
         )}
 
         {/* ── Step: Auth ─────────────────────────────────────────── */}
-        {step === "auth" && (
+        {step === "auth" && autoVerifying && (
+          <div
+            data-testid="checkin-auto-verifying"
+            role="status"
+            className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1 text-center"
+          >
+            <h1 className="text-2xl font-bold text-text-primary mb-1">Welcome</h1>
+            <p className="text-text-secondary text-sm">Opening your check-in…</p>
+          </div>
+        )}
+
+        {step === "auth" && !autoVerifying && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1">
             <h1 className="text-2xl font-bold text-text-primary mb-1">Welcome</h1>
             <p className="text-text-secondary text-sm mb-6">Enter your booking details to access check-in instructions.</p>
+
+            {tokenFallbackNotice && (
+              <p
+                data-testid="checkin-token-fallback-notice"
+                role="status"
+                className="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 mb-4"
+              >
+                We couldn&apos;t open your check-in from this link — it may have expired. Enter your last name below to continue.
+              </p>
+            )}
 
             {error && (
               <p id="checkin-auth-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
