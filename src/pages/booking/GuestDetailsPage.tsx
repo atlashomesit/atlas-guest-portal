@@ -73,6 +73,9 @@ import CancellationMilestoneTimeline from '@/components/booking/CancellationMile
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
+import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
+import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
+import { reportUpiPaid } from '@/api/payment';
 import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
 import { getIstCalendarDate, toCalendarISO } from '@/utils/date';
 import { isMarketplaceMode } from '@/tenant/tenantResolver';
@@ -1038,6 +1041,48 @@ const GuestDetailsPage: React.FC = () => {
     return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
   }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, effectiveTenantSlug, updateBooking]);
 
+  // ── PAY-010: UPI_QR / UPI_DEEPLINK checkout ──────────────────────────────────
+  const [upiCheckout, setUpiCheckout] = useState<{
+    order: UpiOrder;
+    amountInr: number;
+    bookingId: number;
+    bookingToken: string | null;
+  } | null>(null);
+  const [upiReportBusy, setUpiReportBusy] = useState(false);
+  const [upiReportError, setUpiReportError] = useState<string | null>(null);
+
+  /** "I have paid": tell the host, then show the booking page's "waiting for the host to confirm" state. Never marks it paid. */
+  const handleUpiIHavePaid = useCallback(async () => {
+    if (!upiCheckout || upiReportBusy) return;
+    setUpiReportBusy(true);
+    setUpiReportError(null);
+    try {
+      await reportUpiPaid(upiCheckout.bookingId, upiCheckout.bookingToken, effectiveTenantSlug);
+      try {
+        sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+        sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+      } catch { /* ignore */ }
+      updateBooking({
+        holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+        holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
+        holdListingName: null, holdCancellationTier: null,
+        holdCancellationWindowHours: null, holdGraceHours: null,
+        paymentHoldBookingId: null, paymentHoldToken: null,
+      });
+      const token = upiCheckout.bookingToken;
+      navigate(
+        token
+          ? `/booking/${upiCheckout.bookingId}?t=${encodeURIComponent(token)}`
+          : `/booking/${upiCheckout.bookingId}`,
+        { replace: true },
+      );
+    } catch (err) {
+      setUpiReportError(err instanceof Error ? err.message : 'Could not tell the host. Please try again.');
+    } finally {
+      setUpiReportBusy(false);
+    }
+  }, [upiCheckout, upiReportBusy, effectiveTenantSlug, updateBooking, navigate]);
+
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -1256,6 +1301,22 @@ const GuestDetailsPage: React.FC = () => {
           setRazorpayAmountPaise(amountPaise);
           pendingBookingTokenRef.current = bookingToken;
           pendingBookingIdRef.current = bookingId; // TASK-8219: available to the pagehide/unmount abandon guard
+
+          // PAY-010: a UPI_QR / UPI_DEEPLINK host gets no Razorpay order — show the UPI link / QR instead of launching
+          // Razorpay with the host's UPI address as the key (which failed, so these guests could not pay at all). The
+          // panel shows the amount the order charged, so the price shown is the price paid.
+          const upiOrder = parseUpiOrder(responseData);
+          if (upiOrder) {
+            // The guest may pay from their UPI app at any moment from here on: never abandon (release) this hold from
+            // the page. The server's 10-minute sweep still releases it if nobody says they paid.
+            checkoutSettledRef.current = true;
+            currentAttemptIdempotencyKeyRef.current = null;
+            setUpiReportError(null);
+            setUpiCheckout({ order: upiOrder, amountInr: Number(respAmountInr), bookingId, bookingToken });
+            track('payment_init', holdListingId ? Number(holdListingId) : 0);
+            setIsSubmitting(false);
+            return;
+          }
 
           if (isServerTotalConfirmRequired(amountPaise, displayTotal)) {
             pendingRazorpayLaunchRef.current = {
@@ -1950,8 +2011,9 @@ const GuestDetailsPage: React.FC = () => {
         )}
       </div>
 
-      {/* ── Hold expired modal (the 10 minutes after Pay ended) ── */}
-      {holdExpired && (
+      {/* ── Hold expired modal (the 10 minutes after Pay ended) ──
+          PAY-010: not over the UPI panel — a guest who already paid by UPI must still be able to tap "I have paid". */}
+      {holdExpired && !upiCheckout && (
         <div ref={expiredDialogRef} className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-expired-title">
           <div className="gd-modal">
             <div className="gd-modal-icon"><IconClock size={22}/></div>
@@ -2484,6 +2546,21 @@ const GuestDetailsPage: React.FC = () => {
                 </label>
               </div>
             </div>
+
+            {/* PAY-010: UPI_QR / UPI_DEEPLINK host — pay by UPI link / QR, then "I have paid" (host confirms). */}
+            {upiCheckout && (
+              <UpiPaymentPanel
+                order={upiCheckout.order}
+                amountInr={upiCheckout.amountInr}
+                payeeName={getTenantContext()?.displayMerchantName ?? brandName}
+                countdown={countdown}
+                holdActive={holdLive}
+                isMobile={isMobileCheckoutUserAgent(typeof navigator !== 'undefined' ? navigator.userAgent : '')}
+                onIHavePaid={() => void handleUpiIHavePaid()}
+                busy={upiReportBusy}
+                error={upiReportError}
+              />
+            )}
 
             {/* FOUNDER RULED 2026-10-19: after the FIRST failed payment — "Payment didn't go through" with [Try again]
                 and [Message the host on WhatsApp] (the HOST's number, pre-written; never Atlas's). */}

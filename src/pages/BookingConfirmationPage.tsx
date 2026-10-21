@@ -208,6 +208,8 @@ interface BookingSummary {
   cancellationPolicy?: string | null;
   /** PAY-009: refunds on this booking (newest first); empty/absent = no tracker. */
   refunds?: GuestRefund[];
+  /** PAY-010: the guest said they paid the host's UPI link / QR; the host has not confirmed yet. NOT paid. */
+  awaitingHostPaymentConfirmation?: boolean;
   /** TASK-1296: guest referral code (e.g. FRIEND42) for the WhatsApp share button. */
   guestReferralCode?: string;
   /** TASK-1490: ISO dates + coordinates for Open-Meteo weather widget. */
@@ -1034,7 +1036,22 @@ export default function BookingConfirmationPage() {
         {/* PAY-009: live refund status with the bank reference Razorpay sent (never an invented one). */}
         <RefundStatusTracker refunds={booking.refunds} currency={booking.currency} />
 
-        {paymentStatus === "pending" && (
+        {/* PAY-010: direct-UPI payment the guest says they made — only the host can confirm it arrived. */}
+        {booking.awaitingHostPaymentConfirmation && !isCancelled && (
+          <div
+            className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1"
+            role="status"
+            data-testid="upi-awaiting-host-confirmation"
+          >
+            <p className="text-sm text-amber-900 font-semibold">Waiting for the host to confirm your payment</p>
+            <p className="text-sm text-amber-800">
+              You told the host you paid by UPI. Your booking is confirmed once the host sees the money arrive; you will
+              get a confirmation then. No need to pay again.
+            </p>
+          </div>
+        )}
+
+        {paymentStatus === "pending" && !booking.awaitingHostPaymentConfirmation && (
           <div
             className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1"
             data-testid="payment-polling-status"
