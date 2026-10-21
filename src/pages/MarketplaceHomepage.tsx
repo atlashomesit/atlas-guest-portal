@@ -10,7 +10,8 @@ import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
-import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
+import { useMarketplaceCardPrices, type MarketplaceCardPrice } from '@/hooks/useMarketplaceCardPrices'; // TASK-10298999
+import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
@@ -308,6 +309,17 @@ export default function MarketplaceHomepage() {
       })
       .finally(() => setLoadingMore(false));
   }, [buildPagePath, filterQuery, hasMore, items, loadingMore, page]);
+
+  // TASK-10298999: one checkout quote per card, for the searched dates when given (tonight otherwise).
+  const cardStay = useMemo(() => {
+    const g = Number(searchParams.get('guests'));
+    return {
+      checkIn: searchParams.get('checkIn'),
+      checkOut: searchParams.get('checkOut'),
+      guests: Number.isFinite(g) && g > 0 ? Math.floor(g) : null,
+    };
+  }, [searchParams]);
+  const cardPrices = useMarketplaceCardPrices(items, cardStay);
 
   const visibleItems = useMemo(() => {
     let result = items;
@@ -715,27 +727,10 @@ export default function MarketplaceHomepage() {
                       renders only when the summary's verified-stay count agrees with the card. */}
                   <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} />
 
-                  {/* TASK-1872: formatCurrency replaces raw 'INR X' */}
-                  <p className="text-xl font-bold text-text-primary">
-                    {formatCurrency(item.pricePerNight, { maximumFractionDigits: 0 })}
-                    <span className="ml-1 text-sm font-normal text-text-muted">/ night</span>
-                  </p>
-
-                  {/* TASK-1873/TASK-2903: GST-inclusive estimate — use shared utility for consistency; TASK-4312: respect listing GST status */}
-                  <p className="text-xs text-text-muted">
-                    {formatEstTotalInclGst(
-                      item.pricePerNight,
-                      2,
-                      (amount) => formatCurrency(amount, { maximumFractionDigits: 0 }),
-                      // MKT-001 / TASK-7428 "no processor, no fee": a WHATSAPP-tenant listing
-                      // takes no online payment and must not be quoted a processing fee. The
-                      // fields are not deployed on the API yet, so `chargesOnlinePaymentFee`
-                      // Missing row metadata stays unknown until the guest receives a quote.
-                      item.chargesOnlinePaymentFee === false ? 0 : feePercent(item.convenienceFeePercent),
-                      item.isGstRegistered,
-                      item.pricePerNight,
-                    )}
-                  </p>
+                  {/* TASK-10298999 (founder ruling 2026-10-21: price shown = price charged): the card reads the
+                      same checkout quote as the listing page and the booking box — never the listing's
+                      standard rate plus a client-side fee estimate. */}
+                  <MarketplaceCardPriceBlock price={cardPrices.get(item.id)} />
 
                   {/* TASK-4511: Owner-share trust badge — no nightlyPrice prop (matches SearchPage.tsx's
                       BUG-7 fix; avoids leaking a fabricated host payout figure). */}
@@ -823,5 +818,55 @@ export default function MarketplaceHomepage() {
       )}
     </section>
     </>
+  );
+}
+
+/**
+ * TASK-10298999: the marketplace card price, in the same words as the tenant homepage card —
+ * struck standard rate, real nightly price, the direct-booking saving and the all-in total.
+ * Without a quote it shows no number: a guessed price is exactly what this task removed.
+ */
+function MarketplaceCardPriceBlock({ price }: { price: MarketplaceCardPrice | undefined }) {
+  if (!price || price.status === 'loading') {
+    return (
+      <p className="text-sm text-text-muted" data-testid="marketplace-card-price-loading">
+        Loading price…
+      </p>
+    );
+  }
+  if (price.status === 'unavailable') {
+    return (
+      <p className="text-sm text-text-muted" data-testid="marketplace-card-price-unavailable">
+        Choose dates to see the price.
+      </p>
+    );
+  }
+  const { display } = price;
+  return (
+    <div data-testid="marketplace-card-price">
+      <p className="text-xl font-bold text-text-primary">
+        {display.standardNightly != null && (
+          <span
+            className="mr-2 text-base font-normal text-text-muted line-through"
+            data-testid="marketplace-card-standard-price"
+          >
+            <span className="sr-only">Standard price </span>
+            {formatCurrency(display.standardNightly, { maximumFractionDigits: 0 })}
+          </span>
+        )}
+        <span data-testid="marketplace-card-real-price">
+          {formatCurrency(display.realNightly, { maximumFractionDigits: 0 })}
+        </span>
+        <span className="ml-1 text-sm font-normal text-text-muted">/ night</span>
+      </p>
+      {display.savingsPercent > 0 && (
+        <p className="text-xs font-semibold text-green-700" data-testid="marketplace-card-saving">
+          {directSavingsLabel(display.savingsPercent)}
+        </p>
+      )}
+      <p className="text-xs text-text-muted" data-testid="marketplace-card-total">
+        {allInTotalLabel(formatCurrency(display.total, { maximumFractionDigits: 0 }), display.nights)}
+      </p>
+    </div>
   );
 }
