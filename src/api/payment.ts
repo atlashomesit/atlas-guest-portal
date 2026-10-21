@@ -77,3 +77,30 @@ export async function initiateUpiDeeplink(
   }
   return res.json() as Promise<UpiDeeplinkInitiateResponse>;
 }
+
+export interface UpiGuestReportedPaidResponse {
+  /** Always `awaiting_host_confirmation`: the guest's word never marks a booking paid. */
+  status: string;
+  holdExpiresAtUtc?: string | null;
+}
+
+/**
+ * PAY-010: the guest tapped "I have paid" after paying the host's UPI link / QR. Records the claim for the host to
+ * confirm; the booking stays unpaid until the host does. `bookingToken` is the order response's `bookingToken`.
+ */
+export async function reportUpiPaid(
+  bookingId: number,
+  bookingToken: string | null,
+  tenantSlug?: string | null
+): Promise<UpiGuestReportedPaidResponse> {
+  const res = await fetch(buildApiUrl('/api/upi-deeplink/guest-reported-paid'), {
+    method: 'POST',
+    headers: { ...getApiHeaders(tenantSlug), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bookingId, bookingToken }),
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.message || errorBody.error || `Could not tell the host (status ${res.status}). Please try again.`);
+  }
+  return res.json() as Promise<UpiGuestReportedPaidResponse>;
+}
