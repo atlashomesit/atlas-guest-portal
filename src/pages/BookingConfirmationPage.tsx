@@ -20,6 +20,7 @@ import {
 } from "../config/refundPolicyTimelines";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
+import { resolveBookingPlanTerms } from "../utils/bookingPlanTerms";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
@@ -200,6 +201,10 @@ interface BookingSummary {
   checkInTime?: string;
   checkOutTime?: string;
   nearbyLandmarks?: string[];
+  /** GUEST-029: plan terms on the booking; rendered as plain words, ratePlanName is never shown. */
+  ratePlanName?: string | null;
+  mealPlanCode?: string | null;
+  cancellationPolicy?: string | null;
   /** TASK-1296: guest referral code (e.g. FRIEND42) for the WhatsApp share button. */
   guestReferralCode?: string;
   /** TASK-1490: ISO dates + coordinates for Open-Meteo weather widget. */
@@ -712,6 +717,7 @@ export default function BookingConfirmationPage() {
   }
 
   const isCancelled = booking.status === "Cancelled";
+  const planTerms = resolveBookingPlanTerms(booking.mealPlanCode, booking.cancellationPolicy);
   // TASK-2071: pick language strings from guest profile preference
   const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
   const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
@@ -1142,6 +1148,24 @@ export default function BookingConfirmationPage() {
               <p className="text-base font-semibold text-text-primary mt-0.5" data-testid="confirmation-checkout">{booking.checkoutDate}</p>
             </div>
           </div>
+          {planTerms && (planTerms.mealLabel || planTerms.cancellationHeadline) && (
+            <div className="py-4 space-y-2" data-testid="confirmation-plan-terms">
+              {planTerms.mealLabel && (
+                <p className="text-sm font-medium text-text-primary" data-testid="confirmation-meal-plan">
+                  <span aria-hidden="true">🍳 </span>{planTerms.mealLabel}
+                </p>
+              )}
+              {planTerms.cancellationHeadline && (
+                <div data-testid="confirmation-cancellation-terms">
+                  <p className="text-xs text-text-muted uppercase tracking-wider font-medium">Cancellation</p>
+                  <p className="text-sm text-text-primary mt-0.5">{planTerms.cancellationHeadline}</p>
+                  {planTerms.cancellationDetail && (
+                    <p className="text-sm text-text-secondary">{planTerms.cancellationDetail}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div className="pt-4 flex justify-between items-center">
             <span className="text-sm text-text-secondary">
               {booking.nights} {booking.nights === 1 ? "night" : "nights"}
