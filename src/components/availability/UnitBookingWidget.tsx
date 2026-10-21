@@ -1553,9 +1553,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             discountAmount: serverPriceBreakdown.discountAmount,
             finalAmount: serverPriceBreakdown.finalAmount,
             nights: priceDetails.nights,
+            // TASK-10298998: same rule as the Total below — no gateway, no payment fee.
+            paymentFeeCharged: showOnlinePaymentProcessing,
+            paymentFeeAmount: serverPriceBreakdown.convenienceFeeAmount,
           })
         : null,
-    [serverGstMatchesSelection, serverPriceBreakdown, priceDetails.nights],
+    [serverGstMatchesSelection, serverPriceBreakdown, priceDetails.nights, showOnlinePaymentProcessing],
   );
   // The direct-booking discount the server quote applies for the selected stay (0 when none / not loaded).
   const directDiscountAmount =
@@ -1575,9 +1578,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             discountAmount: effectiveDailyPricing.baseAmount - effectiveDailyPricing.actualPrice,
             finalAmount: effectiveDailyPricing.finalAmount,
             nights: 1,
+            paymentFeeCharged: showOnlinePaymentProcessing,
+            paymentFeeAmount:
+              (effectiveDailyPricing.actualPrice * (effectiveDailyPricing.convenienceFeePercent ?? 0)) / 100,
           })
         : null,
-    [effectiveDailyPricing],
+    [effectiveDailyPricing, showOnlinePaymentProcessing],
   );
 
   // Keep the navigation shortcut tied to the authoritative form eligibility.

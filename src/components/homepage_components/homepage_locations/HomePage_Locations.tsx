@@ -16,6 +16,7 @@ import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/use
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../../../utils/guestImageUrl";
 import { compareAtlasHomesBuildingOrder } from "../../../utils/atlasHomesBuildingOrder";
 import { getTenantContext } from "../../../tenant/tenantContext";
+import { hasOnlinePaymentRail } from "../../../tenant/paymentRail";
 import { getTenantBrandName } from "../../../tenant/displayBrand";
 import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOverrides } from "../../../tenant/tenantOverrides";
 import { useCurrency } from "../../../contexts/CurrencyContext";
@@ -131,6 +132,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const tenant = getTenantContext();
   const tenantOverrides = getTenantOverrides(tenant?.slug);
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, tenantOverrides);
+  // TASK-10298998: a host with no online gateway (WhatsApp hand-off / pay at property) never charges the 3%
+  // payment fee, so the card's all-in total must match the booking box, which leaves it out.
+  const paymentFeeCharged = hasOnlinePaymentRail(tenant);
   const unitNoun = getUnitNoun(tenantOverrides);
   const { format: formatCurrency } = useCurrency();
   const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
@@ -256,6 +260,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
           discountAmount: todayBreakdown.baseAmount - todayBreakdown.actualPrice,
           finalAmount: todayBreakdown.finalAmount,
           nights: 1,
+          paymentFeeCharged,
+          paymentFeeAmount:
+            (todayBreakdown.actualPrice * (todayBreakdown.convenienceFeePercent ?? 0)) / 100,
         })
       : null;
 
