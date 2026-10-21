@@ -57,7 +57,6 @@ import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantContext, type TenantInfo } from '@/tenant/tenantContext';
 import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
-  ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
 
 declare global {
@@ -1648,18 +1647,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const promoDiscountApplied = 0;
   const addOnsTotal = 0;
 
-  // v2: "Why book direct" block removed from widget JSX. Calculation kept (prefixed _) for future
-  // OTA comparison card on the listing page. TASK-2576 context: data was used to show OTA fee delta.
-  const illustrativeOtaGuestFeeComparison = useMemo(() => {
-    // DESIGN-030: no "Save ~₹…" confidence line for dates that cannot be booked.
-    if (!hasSelectedRange || datesUnavailable || breakdownPrice <= 0) return null;
-    const illustrativeGuestFee = Math.round((breakdownPrice * ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT) / 100);
-    return {
-      illustrativeGuestFee,
-      illustrativeRoomPlusFee: breakdownPrice + illustrativeGuestFee,
-    };
-  }, [hasSelectedRange, datesUnavailable, breakdownPrice]);
-
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
   // TASK-2612: handleReserve replaces the old handleSubmit.
@@ -1992,8 +1979,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
       )}
 
-      {/* v2: "Why book direct" info collapsed — illustrativeOtaGuestFeeComparison kept for outer page
-          comparison card usage. Reference kept alive by the calculation above (line ~870). */}
       {/* Price loading state — shown inline in breakdown when loading */}
       {dailyPricingLoading && (
         <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Loading price…</p>
@@ -2528,16 +2513,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>
         You won&apos;t be charged yet
       </p>
-      )}
-
-      {!datesUnavailable && illustrativeOtaGuestFeeComparison && illustrativeOtaGuestFeeComparison.illustrativeGuestFee > 0 && (
-        <p
-          className="bw-direct-savings"
-          data-testid="bw-direct-savings-line"
-          style={{ textAlign: 'center', fontSize: 12, color: '#157046', marginTop: 6, lineHeight: 1.45 }}
-        >
-          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — direct booking, lower fees than OTAs.
-        </p>
       )}
 
       {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline

@@ -153,12 +153,16 @@ const Slider = () => {
               Instant confirmation
             </li>
           )}
-          <li role="listitem" className="ahv2-chip" data-testid="hero-refund-processing-chip">
-            <span className="ahv2-tick" aria-hidden="true">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </span>
-            {resolveHeroRefundProcessingChip()}
-          </li>
+          {/* GUEST-037: Atlas only approves refunds within 24h where it processes the payment (online
+              rail). Pay-at-host tenants arrange refunds directly, so the chip must not show there. */}
+          {hasOnlinePaymentRail(tenant) && (
+            <li role="listitem" className="ahv2-chip" data-testid="hero-refund-processing-chip">
+              <span className="ahv2-tick" aria-hidden="true">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              </span>
+              {resolveHeroRefundProcessingChip()}
+            </li>
+          )}
           <li role="listitem" className="ahv2-chip">
             <span className="ahv2-tick" aria-hidden="true">
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>

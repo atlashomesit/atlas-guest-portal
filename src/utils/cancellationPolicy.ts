@@ -310,8 +310,13 @@ export function resolveFreeCancellationTrustCopy(input: {
     return { trustMessage: null, deadlineFormatted: null, applicableGraceHours };
   }
 
+  // GUEST-037: name the listing's actual policy instead of a vague "standard policy" line, so this
+  // strip can never disagree with the policy card on the same page.
+  const policy = describeCancellationPolicy(input.tier);
+  const effectiveTier = resolveEffectiveCancellationTier(input.tier);
+  const afterWindow = policy.afterWindowCopy ? ` ${policy.afterWindowCopy}` : '';
   return {
-    trustMessage: 'Standard cancellation policy applies for this stay.',
+    trustMessage: `${effectiveTier} policy: ${policy.headline}.${afterWindow}`,
     deadlineFormatted: null,
     applicableGraceHours: null,
   };

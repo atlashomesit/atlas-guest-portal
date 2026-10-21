@@ -45,6 +45,18 @@ describe("resolveDirectBookingPromo (TASK-101158)", () => {
     expect(resolved.sub).toBe("Custom host-authored subline");
   });
 
+  it("GUEST-037: the strip line never claims a fixed savings percentage", () => {
+    for (const t of [
+      tenant({ paymentProvider: "RAZORPAY", bookingMode: "ONLINE" }),
+      tenant({ paymentProvider: undefined, bookingMode: "WHATSAPP" }),
+    ]) {
+      const { savingsStripLine } = resolveDirectBookingPromo(t, noOverrides);
+      expect(savingsStripLine).not.toMatch(/\d+\s*[–-]\s*\d+\s*%/);
+      expect(savingsStripLine).not.toMatch(/18|30|%/);
+      expect(savingsStripLine).not.toMatch(/illustrative/i);
+    }
+  });
+
   it("a tenant-authored subline override wins over the ONLINE default too", () => {
     const resolved = resolveDirectBookingPromo(
       tenant({ paymentProvider: "RAZORPAY", bookingMode: "ONLINE" }),
