@@ -7,7 +7,7 @@
 // MKT-002 — "N Verified homes" claims a verification that has never happened
 // (`Listings.PhotosVerifiedAt` unset on 0 of 136 prod listings). RED before the fix: the trust
 // strip always rendered "0 Verified homes" rather than omitting the claim.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -53,84 +53,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('MKT-001: marketplace card fee honesty', () => {
-  beforeEach(() => {
-    // Non-GST listing so the est-total is a pure base×nights check unaffected by GST rounding.
-  });
-
-  it('a WHATSAPP-tenant listing (chargesOnlinePaymentFee=false) shows no payment-processing fee text', async () => {
-    stubMarketplaceListings([
-      {
-        id: 45,
-        tenantSlug: 'staybycf',
-        tenantName: 'Stay by City Focus',
-        title: 'Elsiya loft',
-        city: 'Goa',
-        pricePerNight: 5000,
-        maxGuests: 2,
-        slug: '45',
-        isGstRegistered: false,
-        chargesOnlinePaymentFee: false,
-        convenienceFeePercent: 0,
-      },
-    ]);
-
-    renderPage();
-    await settle();
-    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
-
-    expect(screen.queryByText(/payment processing/i)).not.toBeInTheDocument();
-    // Base ₹5,000 × 2 nights, no GST (unregistered), no fee — total must equal base×nights exactly.
-    expect(screen.getByText(/₹10,000 est\. total/)).toBeInTheDocument();
-  });
-
-  it('an ONLINE-tenant listing (chargesOnlinePaymentFee=true) still shows its processing fee', async () => {
-    stubMarketplaceListings([
-      {
-        id: 1,
-        tenantSlug: 'nightnest',
-        tenantName: 'Nightnest',
-        title: 'City View Suite',
-        city: 'Hyderabad',
-        pricePerNight: 5000,
-        maxGuests: 2,
-        slug: '1',
-        isGstRegistered: false,
-        chargesOnlinePaymentFee: true,
-        convenienceFeePercent: 3,
-      },
-    ]);
-
-    renderPage();
-    await settle();
-    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
-
-    expect(screen.getByText(/3% payment processing/)).toBeInTheDocument();
-  });
-
-  it('an item with no fee metadata keeps the total unknown instead of inventing a percentage', async () => {
-    stubMarketplaceListings([
-      {
-        id: 2,
-        tenantSlug: 'atlas',
-        tenantName: 'Atlas',
-        title: 'Legacy listing',
-        city: 'Goa',
-        pricePerNight: 5000,
-        maxGuests: 2,
-        slug: '2',
-        isGstRegistered: false,
-      },
-    ]);
-
-    renderPage();
-    await settle();
-    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
-
-    expect(screen.getByText('Total confirmed after choosing dates.')).toBeInTheDocument();
-    expect(screen.queryByText(/3% payment processing/)).not.toBeInTheDocument();
-  });
-});
+// MKT-001 card-fee cases moved to MarketplaceHomepageCardPrice.test.tsx (TASK-10298999): the card no longer
+// estimates a total from the listing's standard rate + a fee percent; it shows the checkout quote, and a
+// no-gateway host's card leaves out the quote's payment fee ("no processor, no fee", TASK-7428).
 
 describe('MKT-002: marketplace verified-homes trust strip honesty', () => {
   it('omits the "Verified homes" item when the count is 0', async () => {

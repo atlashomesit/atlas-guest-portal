@@ -449,12 +449,17 @@ export async function fetchCalendarPricing(
 
 /** GET /pricing/daily-summary. Uses server's current date.
  * TASK-7823: pass listingId so a property page does not price the whole catalog. */
-export async function fetchDailySummary(signal?: AbortSignal, listingId?: string | number): Promise<DailyPricingSummaryDto> {
+export async function fetchDailySummary(
+  signal?: AbortSignal,
+  listingId?: string | number,
+  /** TASK-10298999: the listing owner's tenant — marketplace cards price homes of many hosts on one page. */
+  tenantSlug?: string | null,
+): Promise<DailyPricingSummaryDto> {
   const url = new URL(buildApiUrl(DAILY_SUMMARY_ENDPOINT));
   if (listingId != null && String(listingId).trim() !== '') {
     url.searchParams.set('listingId', String(listingId));
   }
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
 
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
