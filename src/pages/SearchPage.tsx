@@ -7,7 +7,9 @@ import { propertyData } from "../data";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getListingDisplayName } from "../lib/listingDisplayName";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
-import { directSavingsLabel } from "../utils/directBookingPrice";
+import { allInTotalLabel, directSavingsLabel, type DirectPriceDisplay } from "../utils/directBookingPrice";
+import { useMarketplaceCardPrices, type MarketplaceCardPriceItem } from "../hooks/useMarketplaceCardPrices";
+import { hasOnlinePaymentRail } from "../tenant/paymentRail";
 import { parseDate } from "../utils/formatting";
 import { toCalendarISO } from "../utils/date";
 import { useCurrency } from "../contexts/CurrencyContext";
@@ -629,7 +631,8 @@ const SearchPage = () => {
     return codes.some((code) => amenityCodeMatchesCategory(code, amenity));
   };
 
-  const filteredUnits = useMemo(() => {
+  /** Every filter except price: the price filter needs the stay quote, which is fetched for these homes. */
+  const unitsBeforePriceFilter = useMemo(() => {
     if (hasInvalidDates) return [];
 
     return listings.filter((unit) => {
@@ -639,13 +642,6 @@ const SearchPage = () => {
         if (!haystack.includes(dest)) return false;
       }
       if (guests && guests > unit.maxGuests) return false;
-      // TASK-4555: Use displayed price (actualPrice with fallback to pricePerNight) for filter,
-      // not the base rate, so discounted listings sort/filter by the shown price.
-      const displayedPrice = (getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0
-        ? getDailyListingPricing(unit.numericId)!.actualPrice
-        : unit.pricePerNight;
-      if (minPrice && displayedPrice > 0 && displayedPrice < minPrice) return false;
-      if (maxPrice && displayedPrice > maxPrice) return false;
       // TASK-1865: exclude listings confirmed unavailable for selected dates; skip when still loading or fetch failed
       if (checkIn && checkOut && !dateAvailLoading && dateAvailableIds !== null) {
         if (!dateAvailableIds.has(unit.numericId)) return false;
@@ -692,14 +688,11 @@ const SearchPage = () => {
     dateAvailableIds,
     dateAvailLoading,
     destinationParam,
-    getDailyListingPricing,
     guests,
     hasInvalidDates,
     isMarketplaceSearch,
     listings,
     longStay,
-    maxPrice,
-    minPrice,
     monthlyStay,
     nomadWifi,
     nomadWorkspace,
@@ -709,6 +702,53 @@ const SearchPage = () => {
     tonightProbeLoading,
   ]);
 
+  // GUEST-034 (founder ruling 2026-10-21 point 1): with dates in the search box every card shows the
+  // checkout quote for THOSE dates and guests (GET /api/pricing/guest-breakdown), not tonight's rate times
+  // the nights. Without dates the card keeps tonight's daily-summary price.
+  const quoteStay = useMemo(() => {
+    if (!checkIn || !checkOut || hasInvalidDates) return null;
+    return { checkIn: toCalendarISO(checkIn), checkOut: toCalendarISO(checkOut), guests };
+  }, [checkIn, checkOut, hasInvalidDates, guests]);
+  const priceDrivenView = Boolean(minPrice || maxPrice || sortBy === "price_asc" || sortBy === "price_desc");
+  const quoteItems = useMemo<MarketplaceCardPriceItem[]>(() => {
+    if (!quoteStay) return [];
+    // Price filter/sort needs every candidate's number; otherwise one quote per VISIBLE card.
+    const scope = priceDrivenView ? unitsBeforePriceFilter : unitsBeforePriceFilter.slice(0, visibleCount);
+    const feeCharged = isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext());
+    return scope.map((unit) => ({
+      id: unit.numericId,
+      tenantSlug: new URLSearchParams(unit.canonicalPath.split("?")[1] ?? "").get("tenant") ?? tenant?.slug ?? "",
+      chargesOnlinePaymentFee: feeCharged,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteStay, priceDrivenView, unitsBeforePriceFilter, visibleCount, isMarketplaceSearch]);
+  const stayPrices = useMarketplaceCardPrices(quoteItems, quoteStay ?? { checkIn: null, checkOut: null, guests: null });
+  /** The quote for the searched stay, when we have one for this home. */
+  const stayDisplayFor = (id: number): DirectPriceDisplay | null => {
+    if (!quoteStay) return null;
+    const p = stayPrices.get(id);
+    return p?.status === "ready" ? p.display : null;
+  };
+  /** Per-night price used by filter and sort: the stay quote when dates are searched, else tonight's price. */
+  const nightlyPriceFor = (unit: NormalizedListing): number => {
+    const quoted = stayDisplayFor(unit.numericId);
+    if (quoted) return quoted.realNightly;
+    const tonight = getDailyListingPricing(unit.numericId)?.actualPrice ?? 0;
+    return tonight > 0 ? tonight : unit.pricePerNight;
+  };
+
+  const filteredUnits = useMemo(() => {
+    return unitsBeforePriceFilter.filter((unit) => {
+      // A home whose stay quote is still loading is kept, never filtered on a stale tonight number.
+      if (quoteStay && !stayDisplayFor(unit.numericId) && stayPrices.get(unit.numericId)?.status !== "unavailable") return true;
+      const displayedPrice = nightlyPriceFor(unit);
+      if (minPrice && displayedPrice > 0 && displayedPrice < minPrice) return false;
+      if (maxPrice && displayedPrice > maxPrice) return false;
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitsBeforePriceFilter, quoteStay, stayPrices, getDailyListingPricing, minPrice, maxPrice]);
+
   /** TASK-1714: Apply chosen sort order on top of filtered results. */
   const sortedUnits = useMemo(() => {
     const s = [...filteredUnits];
@@ -716,24 +756,16 @@ const SearchPage = () => {
       case "price_asc": {
         // TASK-4555: Sort by displayed price (actualPrice with fallback), not base rate.
         return s.sort((a, b) => {
-          const priceA = (getDailyListingPricing(a.numericId)?.actualPrice ?? 0) > 0
-            ? getDailyListingPricing(a.numericId)!.actualPrice
-            : a.pricePerNight;
-          const priceB = (getDailyListingPricing(b.numericId)?.actualPrice ?? 0) > 0
-            ? getDailyListingPricing(b.numericId)!.actualPrice
-            : b.pricePerNight;
+          const priceA = nightlyPriceFor(a);
+          const priceB = nightlyPriceFor(b);
           return priceA - priceB;
         });
       }
       case "price_desc": {
         // TASK-4555: Sort by displayed price (actualPrice with fallback), not base rate.
         return s.sort((a, b) => {
-          const priceA = (getDailyListingPricing(a.numericId)?.actualPrice ?? 0) > 0
-            ? getDailyListingPricing(a.numericId)!.actualPrice
-            : a.pricePerNight;
-          const priceB = (getDailyListingPricing(b.numericId)?.actualPrice ?? 0) > 0
-            ? getDailyListingPricing(b.numericId)!.actualPrice
-            : b.pricePerNight;
+          const priceA = nightlyPriceFor(a);
+          const priceB = nightlyPriceFor(b);
           return priceB - priceA;
         });
       }
@@ -741,7 +773,8 @@ const SearchPage = () => {
       case "newest":      return s.sort((a, b) => b.numericId - a.numericId);
       default:            return s; // "recommended" — preserve Atlas weighting
     }
-  }, [filteredUnits, sortBy, getDailyListingPricing]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredUnits, sortBy, getDailyListingPricing, stayPrices, quoteStay]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
@@ -1681,8 +1714,13 @@ const SearchPage = () => {
                 .filter((x): x is { key: string; label: string } => Boolean(x))
                 .slice(0, 4);
               const dailyBreakdown = getDailyListingPricing(unit.numericId);
-              const displayedPrice =
-                (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
+              // GUEST-034: with dates searched the card shows the quote for those dates and guests.
+              const stayQuote = stayDisplayFor(unit.numericId);
+              const stayPriceLoading = Boolean(quoteStay) && stayPrices.get(unit.numericId)?.status !== "ready"
+                && stayPrices.get(unit.numericId)?.status !== "unavailable";
+              const displayedPrice = stayQuote
+                ? stayQuote.realNightly
+                : (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
               // TASK-7543: GST slab is selected off the CHARGED (discounted) rate, matching the
               // server — see accommodationGstSlabPercentForChargedRate's doc comment.
               // `displayedPrice` is already that charged value, so the default (no override)
@@ -1788,6 +1826,40 @@ const SearchPage = () => {
 
                   <div className="search-card__foot">
                     <div className="search-card__price">
+                      {quoteStay ? (
+                        stayPriceLoading ? (
+                          <span className="inline-block h-12 w-28 rounded bg-bg-muted" data-testid="guest-listing-price-loading" aria-hidden />
+                        ) : stayQuote ? (
+                          <>
+                            {stayQuote.standardNightly != null && stayQuote.savingsPercent > 0 && (
+                              <p className="text-xs" data-testid="guest-listing-direct-saving" style={{ margin: 0 }}>
+                                <span className="sr-only">Standard price </span>
+                                <span style={{ textDecoration: 'line-through', color: 'var(--text-muted, #6b5a55)' }}>
+                                  {formatDisplayCurrency(stayQuote.standardNightly)}
+                                </span>{' '}
+                                <span style={{ fontWeight: 600, color: '#b8472f' }}>
+                                  {directSavingsLabel(stayQuote.savingsPercent)}
+                                </span>
+                              </p>
+                            )}
+                            <p className="search-card__price-amt" data-testid="guest-listing-nightly-price">
+                              {formatDisplayCurrency(stayQuote.realNightly)}
+                            </p>
+                            {isConverted && (
+                              <p className="mt-0.5 text-xs text-text-muted">{formatINR(stayQuote.realNightly)} on payment</p>
+                            )}
+                            <p className="mt-0.5 text-sm text-text-muted">per night</p>
+                            <p className="text-xs text-text-muted" data-testid="guest-listing-stay-total">
+                              {allInTotalLabel(formatDisplayCurrency(stayQuote.total), stayQuote.nights)}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-text-muted" data-testid="guest-listing-price-unavailable">
+                            Open to see the price for your dates
+                          </p>
+                        )
+                      ) : (
+                      <>
                       {/* Founder ruling 2026-10-21: show the direct-booking saving next to the real price —
                           the daily-summary row is built from the checkout quote. */}
                       {dailyBreakdown && dailyBreakdown.baseAmount > dailyBreakdown.actualPrice && dailyBreakdown.actualPrice > 0 && (
@@ -1811,6 +1883,8 @@ const SearchPage = () => {
                       <p className="text-xs text-text-muted">
                         {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, processingFeePercent, unit.isGstRegistered)}
                       </p>
+                      </>
+                      )}
                       {longStay && (
                         <LongStayCalculator
                           pricePerNight={unit.pricePerNight}
