@@ -24,6 +24,7 @@ import { resolveBookingPlanTerms } from "../utils/bookingPlanTerms";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
+import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
 import {
   buildReceiptHtml,
   buildStayGuideHtml,
@@ -205,6 +206,8 @@ interface BookingSummary {
   ratePlanName?: string | null;
   mealPlanCode?: string | null;
   cancellationPolicy?: string | null;
+  /** PAY-009: refunds on this booking (newest first); empty/absent = no tracker. */
+  refunds?: GuestRefund[];
   /** TASK-1296: guest referral code (e.g. FRIEND42) for the WhatsApp share button. */
   guestReferralCode?: string;
   /** TASK-1490: ISO dates + coordinates for Open-Meteo weather widget. */
@@ -1027,6 +1030,9 @@ export default function BookingConfirmationPage() {
             This booking has been cancelled. If you have questions, please contact us at the number below.
           </div>
         )}
+
+        {/* PAY-009: live refund status with the bank reference Razorpay sent (never an invented one). */}
+        <RefundStatusTracker refunds={booking.refunds} currency={booking.currency} />
 
         {paymentStatus === "pending" && (
           <div
