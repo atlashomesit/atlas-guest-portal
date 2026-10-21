@@ -26,6 +26,47 @@ describe('directPriceDisplay', () => {
     expect(directPriceDisplay({ baseAmount: 4000, discountAmount: 1000, finalAmount: null, nights: 1 })?.total).toBe(3000);
   });
 
+  // TASK-10298998: a WhatsApp hand-off / pay-at-property host has no gateway, so the 3% fee inside the quote's
+  // FinalAmount is never charged — the card total must equal the booking box (room price), not the quote.
+  it('leaves the payment fee out when no gateway charges it (no direct discount)', () => {
+    // Comfort Cove tonight: ₹4,500, fee 3% ₹135, quote ₹4,635 — the card said ₹4,635 while the box said ₹4,500.
+    const d = directPriceDisplay({
+      baseAmount: 4500, discountAmount: 0, finalAmount: 4635, nights: 1, paymentFeeCharged: false, paymentFeeAmount: 135,
+    });
+    expect(d?.total).toBe(4500);
+    expect(d?.standardNightly).toBeNull();
+  });
+
+  it('leaves the payment fee out when no gateway charges it (with a direct discount)', () => {
+    const d = directPriceDisplay({
+      baseAmount: 10000, discountAmount: 2500, finalAmount: 7725, nights: 2, paymentFeeCharged: false, paymentFeeAmount: 225,
+    });
+    expect(d).toEqual({ standardNightly: 5000, realNightly: 3750, savingsPercent: 25, total: 7500, nights: 2 });
+  });
+
+  it('keeps the payment fee in when a gateway charges it (default and explicit)', () => {
+    expect(directPriceDisplay({ baseAmount: 10000, discountAmount: 0, finalAmount: 10300, nights: 2 })?.total).toBe(10300);
+    expect(
+      directPriceDisplay({
+        baseAmount: 10000, discountAmount: 2500, finalAmount: 7725, nights: 2, paymentFeeCharged: true, paymentFeeAmount: 225,
+      })?.total,
+    ).toBe(7725);
+  });
+
+  it('keeps tourist tax and never drops below the room price when taking the fee out', () => {
+    // net 10,000 + fee 300 + tourist tax 500 = 10,800 -> no gateway: 10,500.
+    expect(
+      directPriceDisplay({
+        baseAmount: 10000, discountAmount: 0, finalAmount: 10800, nights: 2, paymentFeeCharged: false, paymentFeeAmount: 300,
+      })?.total,
+    ).toBe(10500);
+    expect(
+      directPriceDisplay({
+        baseAmount: 10000, discountAmount: 0, finalAmount: 10300, nights: 2, paymentFeeCharged: false, paymentFeeAmount: 99999,
+      })?.total,
+    ).toBe(10000);
+  });
+
   it('returns null for an unpriced quote', () => {
     expect(directPriceDisplay({ baseAmount: 0, discountAmount: 0, finalAmount: 0, nights: 1 })).toBeNull();
     expect(directPriceDisplay(null)).toBeNull();

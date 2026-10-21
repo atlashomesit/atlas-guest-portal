@@ -30,6 +30,15 @@ export type DirectPriceQuote = {
   /** The quote's all-in FinalAmount. Falls back to base − discount when missing. */
   finalAmount: number | null | undefined;
   nights: number;
+  /**
+   * TASK-10298998: false when no online gateway will charge this guest (`hasOnlinePaymentRail()` — a
+   * WhatsApp hand-off or pay-at-property host). The quote's FinalAmount still carries the 3% payment fee
+   * (`feeMode` CustomerPays), but nothing on the site ever charges it, so the all-in total must leave it out
+   * — exactly as the booking box does (TASK-7428: no processor, no fee). Defaults to true.
+   */
+  paymentFeeCharged?: boolean;
+  /** The payment fee inside `finalAmount` (the quote's ConvenienceFeeAmount); removed when `paymentFeeCharged` is false. */
+  paymentFeeAmount?: number | null;
 };
 
 export function directPriceDisplay(quote: DirectPriceQuote | null | undefined): DirectPriceDisplay | null {
@@ -40,7 +49,13 @@ export function directPriceDisplay(quote: DirectPriceQuote | null | undefined): 
   const discount = Math.min(base, Math.max(0, Number(quote.discountAmount) || 0));
   const net = base - discount;
   const final = Number(quote.finalAmount);
-  const total = Number.isFinite(final) && final > 0 ? final : net;
+  const quotedTotal = Number.isFinite(final) && final > 0 ? final : net;
+  const fee = Math.max(0, Number(quote.paymentFeeAmount) || 0);
+  // No gateway, no fee: take the payment fee back out of the quote's all-in total (never below the room price).
+  const total =
+    quote.paymentFeeCharged === false && Number.isFinite(final) && final > 0
+      ? Math.max(net, final - fee)
+      : quotedTotal;
   const savingsPercent = discount > 0 ? Math.round((discount / base) * 100) : 0;
   return {
     standardNightly: savingsPercent > 0 ? Math.round(base / nights) : null,

@@ -51,6 +51,11 @@ export type TodayBreakdown = {
    * daily-summary row from the checkout quote, so cards can show what the guest is actually charged.
    */
   finalAmount: number;
+  /**
+   * TASK-10298998: the payment-fee percent inside `finalAmount` (0 when none), so a no-gateway host's card can
+   * take it back out — nothing on that site charges it.
+   */
+  convenienceFeePercent?: number;
 };
 
 /** Per-day row from GET /pricing/breakdown (calendar view). */
@@ -492,5 +497,6 @@ export function getTodayBreakdownFromListing(listing: DailyListingPricingDto): T
     actualPrice,
     globalDiscountPercent: Number(listing.globalDiscountPercent ?? 0),
     finalAmount: finalAmount > 0 ? finalAmount : actualPrice,
+    convenienceFeePercent: Math.max(0, Number(listing.convenienceFeePercent ?? 0) || 0),
   };
 }
