@@ -329,6 +329,51 @@ describe('GuestDetailsPage - the hold starts at Pay (2026-10-19)', () => {
     expect(rzp.opened).toBe(2);
   });
 
+  it('PAY-004: Try again reuses the SAME hold (id + token) and the guest details already typed - one hold ever created, nothing re-typed', async () => {
+    const post = vi.spyOn(axios, 'post');
+    mockOrderApi(post);
+    await renderPage();
+    fillDetails();
+    fireEvent.click(screen.getByTestId('guest-booking-consent'));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('guest-booking-submit'));
+    });
+    await settle();
+    await settle();
+
+    await act(async () => {
+      rzp.handlers['payment.failed']({ error: { code: 'SERVER_ERROR', description: 'Server error' } });
+    });
+    await settle();
+    // The failure panel now points at another way to pay.
+    expect(screen.getByTestId('payment-failed-panel')).toHaveTextContent(/UPI QR/i);
+
+    // The details are still in the form: the guest re-types nothing.
+    expect((screen.getByTestId('guest-booking-name') as HTMLInputElement).value).toBe('Asha Rao');
+    expect((screen.getByTestId('guest-booking-email') as HTMLInputElement).value).toBe('asha@example.com');
+    expect((screen.getByTestId('guest-booking-phone') as HTMLInputElement).value).toBe('9876543210');
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('payment-failed-try-again'));
+    });
+    await settle();
+    await settle();
+
+    type Body = { holdId?: number; holdToken?: string; guestInfo?: { name: string; email: string; phone: string } };
+    const bodies = post.mock.calls.map((c) => c[1] as Body);
+    const holdStarts = bodies.filter((b) => !b.guestInfo);
+    const charges = bodies.filter((b) => b.guestInfo);
+    expect(holdStarts).toHaveLength(1); // the hold was started once, at the first Pay, never again
+    expect(charges).toHaveLength(2); // first try + Try again
+    expect(charges[1].holdId).toBe(7001);
+    expect(charges[1].holdId).toBe(charges[0].holdId);
+    expect(charges[1].holdToken).toBe('prep-7001');
+    expect(charges[1].holdToken).toBe(charges[0].holdToken);
+    expect(charges[1].guestInfo).toMatchObject({ name: 'Asha Rao', email: 'asha@example.com' });
+    expect(charges[1].guestInfo).toEqual(charges[0].guestInfo);
+    expect(rzp.opened).toBe(2);
+  });
+
   it('with no WhatsApp number the host button is a call link; with no number at all there is no contact button (never Atlas\'s)', async () => {
     ctx.info = baseInfo({ hostWhatsAppDigits: null, hostPhoneDigits: '919123456780' });
     const post = vi.spyOn(axios, 'post');
