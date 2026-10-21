@@ -77,6 +77,10 @@ export default function AirbnbSearchBar() {
     startDate: null,
     endDate: null,
   });
+  // GUEST-036: the month the calendar is paging through is view state, kept apart from the stay
+  // dates. It used to be written into dateRange.startDate, which planted a phantom check-in on
+  // every month change and snapped the grid forward again.
+  const [shownDate, setShownDate] = useState<Date>(today);
   const [guestCounts, setGuestCounts] = useState<GuestCounts>({
     adults: 2,
     children: 0,
@@ -445,8 +449,8 @@ export default function AirbnbSearchBar() {
             minDate={today}
             disabledDay={(date) => startOfCalendarDay(date) < today}
             months={typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2}
-            shownDate={dateRange.startDate ?? today}
-            onShownDateChange={(d) => setDateRange((r) => ({ ...r, startDate: r.startDate ?? startOfMonth(d) }))}
+            shownDate={shownDate}
+            onShownDateChange={(d) => setShownDate(startOfMonth(d))}
             activeField={activeDateField}
             // TASK-102076: same keep-open contract as SearchAvailabilityWidget —
             // the picker's check-out auto-advance holds step 2, so stay open with
