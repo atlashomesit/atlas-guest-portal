@@ -9,6 +9,7 @@ import { X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
 import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useBookingContentVisible } from '../hooks/useBookingContentVisible';
 
 interface FaqEntry {
   q: string;
@@ -26,6 +27,7 @@ interface GuestAssistantProps {
  */
 export default function GuestAssistant({ listingId }: GuestAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const bookingContentVisible = useBookingContentVisible();
   const [faqs, setFaqs] = useState<FaqEntry[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -133,7 +135,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
   return (
     <>
       {/* Floating trigger — bottom-left to avoid collision with SupportWidget (bottom-right) */}
-      {!isOpen && (
+      {!isOpen && !bookingContentVisible && (
         <button
           ref={triggerRef}
           type="button"

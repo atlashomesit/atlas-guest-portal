@@ -10,6 +10,7 @@
  * It NEVER invents or hardcodes a number: with no number supplied it renders nothing
  * (graceful degradation — hidden, never a recipient-less wa.me link).
  */
+import { useBookingContentVisible } from '@/hooks/useBookingContentVisible';
 import React from "react";
 
 import { trackEvent } from "@/utils/analytics";
@@ -65,9 +66,10 @@ export const ListingWhatsAppFloat: React.FC<ListingWhatsAppFloatProps> = ({
   brandName,
   listingId,
 }) => {
+  const bookingContentVisible = useBookingContentVisible();
   const url = buildListingWhatsAppUrl(phoneDigits, listingName, brandName);
   // Graceful degradation: no host number on the page → hidden, never a blank wa.me link.
-  if (!url) return null;
+  if (!url || bookingContentVisible) return null;
 
   const label = `Chat with host on WhatsApp about ${(listingName ?? "").trim() || "this property"}`;
 
