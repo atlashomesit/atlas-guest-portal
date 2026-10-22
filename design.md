@@ -81,3 +81,9 @@ Sreekar said “i approve” while viewing the immutable [five-proposal r2](http
 UXV-2026-10-18-04 changes the phone sticky shortcut to Review booking only when the existing booking form is enabled and its selected-date price is ready. Real React summary state shares the authoritative Reserve disabled expression and calendar-pricing state. It focuses the same dates/price/Reserve form below the header; it never submits, creates a hold or starts payment. Missing/unavailable/pending/error states retain the date-picker path, while desktop, imagery, tenant colors, fees, cancellation and validation stay unchanged.
 
 This supersedes only the identified placement/presentation/navigation decisions. The rejected r1 remains rejected. Actual current baseline / approved proposal / implementation comparisons and independent per-ID verdicts belong in private 2026-10-17-next-ten/implemented-r1. Hold draft PRs with auto-merge off until Sreekar gives separate final approval of actual results and exact PR heads.
+
+## Approved daily UX restoration — 22 October 2026
+
+The founder's approval of the proposals presented during 18–22 October includes [21 October r2](https://github.com/atlashomesit/atlas-ux-evidence/blob/main/docs/ux/daily-five/2026-10-21/r2/index.html#guest-property): WIDE-PROPERTY-SINGLE-R2-A places the existing booking column beside the single-photo gallery at desktop widths. UXV-2026-10-18-04 restores the ready phone shortcut's focus-only behavior without submitting. Existing pricing/availability guards, calendar fallback, rate-plan badge and Change plan control, imagery, colors, fees and checkout remain intact. Zero/multiple-photo layouts are outside this single-photo CSS rule.
+
+This is implementation authorization only. The actual comparison bundle and independent per-ID verdicts remain required; hold the draft PR with auto-merge disabled until Sreekar explicitly approves the exact final head.
