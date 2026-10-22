@@ -107,7 +107,8 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
       const submit = form?.querySelector<HTMLButtonElement>('[data-testid="guest-booking-submit"]');
       // The form reflects the current widget render even before its summary effect propagates.
       if (form?.dataset.canReviewBooking === "true" && submit && !submit.disabled) {
-        submit.click();
+        form.scrollIntoView({ behavior: "smooth", block: "start" });
+        form.focus({ preventScroll: true });
         return;
       }
     }
