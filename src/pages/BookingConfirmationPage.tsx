@@ -149,27 +149,6 @@ function buildBookingIcsContent(args: {
   ].join("\r\n");
 }
 
-/** TASK-2490: guest web self-check-in form — posts arrival time + party size + optional ID link. */
-function SelfCheckInCard({ bookingRef, token }: { bookingRef?: string; token?: string | null }) {
-  // TASK-4514: Card is now a status + CTA into canonical SelfCheckIn flow
-  // The divergent /api/guest/bookings/{bookingId}/check-in endpoint is superseded by the canonical flow
-  const checkinPath = bookingRef
-    ? `/check-in/${encodeURIComponent(bookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ''}`
-    : `/check-in${token ? `?t=${encodeURIComponent(token)}` : ''}`;
-  return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5" data-testid="self-checkin-done">
-      <h2 className="text-sm font-semibold text-text-primary mb-1">Complete your check-in</h2>
-      <p className="text-sm text-text-secondary mb-3">Share your arrival details and verify your ID through our secure check-in process.</p>
-      <a
-        href={checkinPath}
-        className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:bg-brand-primary/90 transition-colors"
-      >
-        Start check-in →
-      </a>
-    </div>
-  );
-}
-
 interface BookingSummary {
   bookingId: number;
   /** Omitted on very old API responses; pre-arrival link hidden if missing. */
@@ -753,6 +732,10 @@ export default function BookingConfirmationPage() {
     `Hi, I have a confirmed booking (#${booking.bookingId})${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Looking forward to my stay!`
   );
   const messageHostWhatsappUrl = hasWhatsAppContact ? `https://wa.me/${whatsappDigits}?text=${messageHostWhatsappText}` : "";
+  // GUEST-031/GUEST-030: canonical check-in deep-link, carries the booking token.
+  const hubCheckinPath = booking.bookingRef && (token || booking.status === "Confirmed" || booking.status === "CheckedIn")
+    ? `/check-in/${encodeURIComponent(booking.bookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ""}`
+    : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
   const hasPendingModRequest = modRequests.some((r) => r.status === "Pending");
@@ -1211,6 +1194,75 @@ export default function BookingConfirmationPage() {
           )}
         </div>
 
+        {/* GUEST-031: one "Your Stay & Arrival Hub" replaces the duplicate Self Check-In (x2),
+            Trip Preparation and Calendar cards. Check-in CTA keeps the GUEST-030 token deep-link. */}
+        {!isCancelled && (
+          <section
+            className="rounded-2xl border border-brand-primary/40 bg-brand-primary/5 p-5 space-y-4"
+            data-testid="stay-arrival-hub"
+            aria-labelledby="stay-arrival-hub-title"
+          >
+            <div>
+              <h2 id="stay-arrival-hub-title" className="text-base font-semibold text-text-primary">Your Stay &amp; Arrival Hub</h2>
+              <p className="text-sm text-text-secondary mt-0.5">
+                Check in online, save your stay to your calendar, message your host and print your stay guide.
+              </p>
+            </div>
+            {hubCheckinPath && (
+              <Link
+                to={hubCheckinPath}
+                data-testid="stay-hub-checkin"
+                className="flex items-center justify-between gap-4 rounded-xl bg-brand-primary text-white px-4 py-3.5 hover:bg-brand-primary/90 transition-colors"
+              >
+                <span className="text-sm font-semibold">Complete Web Check-In &amp; Get Door Code</span>
+                <span className="shrink-0 text-lg" aria-hidden>→</span>
+              </Link>
+            )}
+            <div className="flex flex-wrap gap-2.5">
+              {hasWhatsAppContact && (
+                <a
+                  href={messageHostWhatsappUrl || whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="stay-hub-whatsapp"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-50 text-emerald-800 text-sm font-medium px-4 py-3 hover:bg-emerald-100 transition-colors"
+                  aria-label="Message Host on WhatsApp"
+                >
+                  💬 Message Host on WhatsApp
+                </a>
+              )}
+              <a
+                href={googleCalendarUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="confirmation-add-google-calendar"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+                aria-label="Add your stay to Google Calendar"
+              >
+                🗓️ Add to Google Calendar
+              </a>
+              <button
+                type="button"
+                onClick={downloadCalendar}
+                data-testid="confirmation-download-ics"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+                aria-label="Download calendar file for Apple Calendar"
+              >
+                📅 Download .ics (Apple Calendar)
+              </button>
+              <button
+                type="button"
+                onClick={openStayGuide}
+                data-testid="download-stay-guide-btn"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+                aria-label={`Print or save stay guide for booking #${booking.bookingId}`}
+              >
+                🖨️ Print / Save Stay Guide
+              </button>
+            </div>
+          </section>
+        )}
+
         {checkoutBriefingVisible && (
           <section
             aria-labelledby="checkout-briefing-title"
@@ -1356,7 +1408,7 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="stay-documents-section">
             <h2 className="text-sm font-semibold text-text-primary">Stay documents</h2>
             <p className="text-sm text-text-secondary">
-              Save a copy of your stay receipt or print a check-in guide with WiFi, directions and host contacts.
+              Save a copy of your stay receipt.
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -1367,15 +1419,6 @@ export default function BookingConfirmationPage() {
                 aria-label={`Download stay receipt for booking #${booking.bookingId}`}
               >
                 🧾 Download Stay Receipt
-              </button>
-              <button
-                type="button"
-                onClick={openStayGuide}
-                data-testid="download-stay-guide-btn"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
-                aria-label={`Download printable stay guide for booking #${booking.bookingId}`}
-              >
-                🗺️ Download Stay Guide
               </button>
             </div>
           </div>
@@ -1425,11 +1468,6 @@ export default function BookingConfirmationPage() {
               )}
             </div>
           </div>
-        )}
-
-        {/* TASK-2490: guest web self-check-in */}
-        {!isCancelled && bookingId && token && (
-          <SelfCheckInCard bookingRef={booking?.bookingRef} token={token} />
         )}
 
         {/* TASK-4333: guest-facing messages thread — read + reply to host */}
@@ -1584,22 +1622,6 @@ export default function BookingConfirmationPage() {
               </Link>
             )}
           </section>
-        )}
-
-        {/* TASK-1254: Self check-in card — available any time after confirmation */}
-        {!isCancelled && booking.bookingRef &&
-          (booking.status === 'Confirmed' || booking.status === 'CheckedIn') && (
-          <Link
-            to={`/check-in/${encodeURIComponent(booking.bookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ''}`}
-            data-testid="self-checkin-link"
-            className="flex items-center justify-between gap-4 rounded-2xl border border-brand-primary/40 bg-brand-primary/5 p-5 hover:bg-brand-primary/10 transition-colors"
-          >
-            <div className="space-y-0.5">
-              <p className="text-sm font-semibold text-text-primary">Self check-in</p>
-              <p className="text-xs text-text-secondary">Skip the queue — submit your ID and sign house rules online before you arrive.</p>
-            </div>
-            <span className="shrink-0 text-brand-primary text-lg" aria-hidden>→</span>
-          </Link>
         )}
 
         {/* TASK-2082: PWA install nudge — only within 72h of check-in, only when prompt is available */}
@@ -1788,70 +1810,6 @@ export default function BookingConfirmationPage() {
                 {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
               </a>
             )}
-          </div>
-        )}
-
-        {/* GUEST-026: Trip Preparation card */}
-        {!isCancelled && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-4" data-testid="trip-preparation-card">
-            <div>
-              <h2 className="text-sm font-semibold text-text-primary">Trip Preparation</h2>
-              <p className="text-sm text-text-secondary mt-0.5">
-                Save your stay to your calendar and message your host directly to coordinate check-in and directions.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2.5">
-              <button
-                type="button"
-                onClick={downloadCalendar}
-                data-testid="trip-prep-add-calendar"
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-90 transition-opacity"
-                aria-label="Add to Calendar (.ics)"
-              >
-                📅 Add to Calendar (.ics)
-              </button>
-              {hasWhatsAppContact && (
-                <a
-                  href={messageHostWhatsappUrl || whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  data-testid="trip-prep-message-host-whatsapp"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-50 text-emerald-800 text-sm font-medium px-4 py-3 hover:bg-emerald-100 transition-colors"
-                  aria-label="Message Host on WhatsApp"
-                >
-                  💬 Message Host on WhatsApp
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Add to Calendar (TASK-333 .ics + TASK-102114 Google Calendar 1-click) */}
-        {!isCancelled && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="confirmation-calendar-section">
-            <h2 className="text-sm font-semibold text-text-primary">Add to your calendar</h2>
-            <p className="text-sm text-text-secondary">Save your check-in date and property details to your phone calendar.</p>
-            <div className="flex flex-wrap gap-2">
-              <a
-                href={googleCalendarUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="confirmation-add-google-calendar"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
-                aria-label="Add your stay to Google Calendar"
-              >
-                🗓️ Add to Google Calendar
-              </a>
-              <button
-                type="button"
-                onClick={downloadCalendar}
-                data-testid="confirmation-download-ics"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
-                aria-label="Download calendar file for Apple Calendar"
-              >
-                📅 Download .ics (Apple Calendar)
-              </button>
-            </div>
           </div>
         )}
 
