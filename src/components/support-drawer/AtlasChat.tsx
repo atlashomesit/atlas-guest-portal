@@ -4,8 +4,13 @@ import ReactMarkdown from 'react-markdown';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { SUPPORT_DRAWER_COPY } from '@/config/supportDrawerCopy';
 
-type ChatReply = { reply?: unknown; source?: unknown };
-type ChatMessage = { question: string; reply: string; source: 'faq' | 'ai' | 'fallback' };
+type ChatReply = { reply?: unknown; source?: unknown; hostPhone?: unknown; whatsappUrl?: unknown };
+type ChatMessage = { question: string; reply: string; source: 'faq' | 'ai' | 'fallback'; whatsappUrl?: string };
+
+// ASK-017: the API only ever sends a digits-only https://wa.me/ link; anything else is ignored (no button).
+const WHATSAPP_URL_PATTERN = /^https:\/\/wa\.me\/\d{6,15}(\?text=\S*)?$/;
+const safeWhatsappUrl = (value: unknown): string | undefined =>
+  typeof value === 'string' && WHATSAPP_URL_PATTERN.test(value) ? value : undefined;
 
 const sourceLabel = (source: ChatMessage['source']) => {
   if (source === 'faq') return SUPPORT_DRAWER_COPY.assistant.faqSource;
@@ -68,7 +73,8 @@ const AtlasChat = ({ listingId, onBack }: { listingId?: string | null; onBack: (
       if (controller.signal.aborted) return;
       if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('empty reply');
       const source = data.source === 'faq' || data.source === 'ai' ? data.source : 'fallback';
-      setMessages((previous) => [...previous, { question, reply: data.reply as string, source }]);
+      const whatsappUrl = source === 'fallback' ? safeWhatsappUrl(data.whatsappUrl) : undefined;
+      setMessages((previous) => [...previous, { question, reply: data.reply as string, source, whatsappUrl }]);
       setInput((current) => current.trim() === question ? '' : current);
     } catch {
       if (controller.signal.aborted) return;
@@ -146,6 +152,16 @@ const AtlasChat = ({ listingId, onBack }: { listingId?: string | null; onBack: (
             <div className="break-words text-text-primary [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5">
               <ReactMarkdown allowedElements={['p', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'code', 'br']} unwrapDisallowed components={{ a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}>{message.reply}</ReactMarkdown>
             </div>
+            {message.whatsappUrl && (
+              <a
+                href={message.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-flex min-h-11 items-center justify-center rounded-lg bg-cta-primary px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cta-primary"
+              >
+                {SUPPORT_DRAWER_COPY.assistant.whatsappHostCta}
+              </a>
+            )}
           </div>
         ))}
       </div>

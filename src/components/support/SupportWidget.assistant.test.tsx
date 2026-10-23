@@ -142,5 +142,35 @@ describe('GUEST-004 Stay assistant', () => {
     await settle();
     expect(screen.getByText('Please check with the host.')).toBeVisible();
     expect(screen.getByText(label)).toBeVisible();
+    expect(screen.queryByRole('link', { name: /whatsapp/i })).toBeNull();
+  });
+
+  const askFallback = async (body: Record<string, unknown>) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => body }));
+    open('/homes/quiet-house/271?tenant=quiet-house');
+    fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+    fireEvent.change(screen.getByRole('textbox', { name: /ask the stay assistant/i }), { target: { value: 'Helicopter?' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await settle();
+  };
+
+  test('ASK-017: fallback with whatsappUrl renders a WhatsApp action button for the host', async () => {
+    const url = 'https://wa.me/919812345678?text=Hi%2C%20I%20have%20a%20question%20about%20my%20stay.';
+    await askFallback({ reply: 'For assistance, please contact the host directly.', source: 'fallback', hostPhone: '+919812345678', whatsappUrl: url });
+    const link = screen.getByRole('link', { name: /chat with the host on whatsapp/i });
+    expect(link).toHaveAttribute('href', url);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  test.each([
+    ['null whatsappUrl', { whatsappUrl: null }],
+    ['absent whatsappUrl', {}],
+    ['non-wa.me url', { whatsappUrl: 'javascript:alert(1)' }],
+    ['other host url', { whatsappUrl: 'https://evil.example/919812345678' }],
+  ])('ASK-017: no WhatsApp button for %s', async (_name, extra) => {
+    await askFallback({ reply: 'For assistance, please contact the host directly.', source: 'fallback', ...extra });
+    expect(screen.getByText('For assistance, please contact the host directly.')).toBeVisible();
+    expect(screen.queryByRole('link', { name: /whatsapp/i })).toBeNull();
   });
 });

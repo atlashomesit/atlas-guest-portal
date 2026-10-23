@@ -87,6 +87,7 @@ export const SUPPORT_DRAWER_COPY = {
     inputPlaceholder: "Ask about your stay...",
     backLabel: "Back to support",
     humanHelp: "Need a person? Go back for WhatsApp or callback.",
+    whatsappHostCta: "Chat with the host on WhatsApp",
   },
 } as const;
 
