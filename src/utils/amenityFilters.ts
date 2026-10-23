@@ -13,6 +13,25 @@ export const DEFAULT_MARKETPLACE_AMENITY_PILLS: AmenityFilterPillItem[] = [
   { label: 'Mountain View', icon: '🏔️', categoryKey: 'mountain-view' },
 ];
 
+/**
+ * MKT-026: pill category → the API's AmenityMaster codes. Sent as `amenities=` (comma-separated,
+ * ANY match) on GET /marketplace/listings so the server filters across ALL pages. A pill with no
+ * master code (Pet Friendly - the master list has none) is intentionally absent: it stays a
+ * client-side filter over the loaded page.
+ */
+export const AMENITY_PILL_SERVER_CODES: Record<string, string[]> = {
+  pool: ['swimming_pool', 'pool_private'],
+  beachfront: ['beach_access', 'waterfront'],
+  'mountain-view': ['mountain_view'],
+};
+
+/** Server amenity codes for the selected pill label (e.g. "Mountain View"); empty when client-only. */
+export function serverAmenityCodesFor(selectedAmenity: string | null): string[] {
+  if (!selectedAmenity) return [];
+  const key = selectedAmenity.trim().toLowerCase().replace(/\s+/g, '-');
+  return AMENITY_PILL_SERVER_CODES[key] ?? [];
+}
+
 export type ListingWithAmenities = {
   title?: string | null;
   slug?: string | null;

@@ -20,7 +20,7 @@ import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
-import { matchesAmenityFilter } from '@/utils/amenityFilters';
+import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
 import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
@@ -204,6 +204,7 @@ export default function MarketplaceHomepage() {
   // TASK-101491: the FILTER half of the query only - deliberately excludes page/pageSize so that
   // changing a filter produces a new key (resetting paging) while paging does not re-trigger the
   // first-page effect.
+  const serverAmenityCodes = useMemo(() => serverAmenityCodesFor(selectedAmenity), [selectedAmenity]);
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
@@ -219,8 +220,10 @@ export default function MarketplaceHomepage() {
     if (guests) p.set('guests', guests);
     if (minPrice != null) p.set('minPrice', String(minPrice));
     if (maxPrice != null) p.set('maxPrice', String(maxPrice));
+    // MKT-026: the server filters on real amenity codes before pagination, so page 2+ is filtered too.
+    if (serverAmenityCodes.length > 0) p.set('amenities', serverAmenityCodes.join(','));
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -332,11 +335,19 @@ export default function MarketplaceHomepage() {
       });
     }
     if (selectedAmenity) {
-      result = result.filter((item) => matchesAmenityFilter(item, selectedAmenity));
+      // MKT-026: when this pill maps to master codes AND the item carries amenityCodes (a current
+      // API), match those exact codes - the same set the server filtered on, so nothing the server
+      // returned is dropped and a non-filtering API is still caught. The title/text guess is kept
+      // only for an older API (no amenityCodes) or a client-only pill (Pet Friendly).
+      result = result.filter((item) =>
+        serverAmenityCodes.length > 0 && Array.isArray(item.amenityCodes)
+          ? item.amenityCodes.some((c) => typeof c === 'string' && serverAmenityCodes.includes(c.trim().toLowerCase()))
+          : matchesAmenityFilter(item, selectedAmenity),
+      );
     }
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, minPrice, maxPrice, selectedAmenity, cardStay.guests]);
+  }, [items, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
