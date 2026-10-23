@@ -2283,7 +2283,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             const uniquePrices = new Set(dailyPrices.map(dp => dp.price));
             const ratesVary = uniquePrices.size > 1;
 
-            if (ratesVary && dailyPrices.length > 0) {
+            // HSL-010: a dorm's per-night rows are PER BED (calendar rate) while the subtotal is beds x that — rows
+            // that cannot sum to the subtotal read as a hidden fee, so a dorm always uses the single priced line.
+            const isBedPricedStay = serverGstMatchesSelection && !!serverPriceBreakdown?.priceLine;
+
+            if (ratesVary && dailyPrices.length > 0 && !isBedPricedStay) {
               // Show per-night breakdown
               return (
                 <>
@@ -2329,9 +2333,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <>
                   <div className="lv-price-row" data-testid="price-line-base">
                     <span>
-                      {priceDetails.nights > 0 && nightlyShown > 0
-                        ? `${displayPrice(nightlyShown)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
-                        : 'Accommodation'}
+                      {serverGstMatchesSelection && serverPriceBreakdown?.priceLine
+                        ? /* HSL-010: a dorm stay is priced per bed — the server's own line ("3 beds x Rs 799 x 2 nights")
+                             explains the total instead of a misleading per-night average. */
+                          serverPriceBreakdown.priceLine
+                        : priceDetails.nights > 0 && nightlyShown > 0
+                          ? `${displayPrice(nightlyShown)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+                          : 'Accommodation'}
                     </span>
                     <span className="lv-num">{displayPrice(standardStay ?? breakdownPrice)}</span>
                   </div>

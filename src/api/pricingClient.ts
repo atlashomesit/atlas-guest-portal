@@ -114,6 +114,8 @@ export type GuestPriceBreakdown = {
   gstPercent: number | null;
   gstAmount: number | null;
   finalAmount: number | null;
+  /** HSL-010: HostelDorm stay price line from the server, e.g. "3 beds x Rs 799 x 2 nights". Absent for every other listing type. */
+  priceLine?: string;
 };
 
 /**
@@ -280,6 +282,9 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
   const gstAmount = raw.gstAmount ?? raw.GstAmount;
   const finalAmount = raw.finalAmount ?? raw.FinalAmount;
 
+  const priceLineRaw = raw.priceLine ?? raw.PriceLine;
+  const priceLine = typeof priceLineRaw === 'string' && priceLineRaw.trim() !== '' ? priceLineRaw.trim() : undefined;
+
   return {
     baseAmount: num('baseAmount', 'BaseAmount'),
     discountAmount: num('discountAmount', 'DiscountAmount'),
@@ -294,6 +299,7 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
     gstPercent: gstPercent !== undefined && gstPercent !== null ? Number(gstPercent) : null,
     gstAmount: gstAmount !== undefined && gstAmount !== null ? Number(gstAmount) : null,
     finalAmount: finalAmount !== undefined && finalAmount !== null ? Number(finalAmount) : null,
+    ...(priceLine ? { priceLine } : {}),
   };
 }
 
