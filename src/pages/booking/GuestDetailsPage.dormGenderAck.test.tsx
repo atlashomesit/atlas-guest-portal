@@ -6,7 +6,8 @@
  * The policy reaches the page the way it does in production: Reserve stores it on the checkout draft
  * (`holdDormGenderPolicy`), which the page rehydrates into BookingContext.
  */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import axios from 'axios';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingProvider } from '@/contexts/BookingContext';
@@ -124,6 +125,37 @@ describe('GuestDetailsPage - HSL-011 dorm gender rule tick before Pay', () => {
     expect(screen.getByTestId('guest-booking-submit')).toBeDisabled();
     fireEvent.click(screen.getByTestId('dorm-gender-ack-checkbox'));
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
+  });
+
+  it('the order request carries dormGenderAcknowledged: true once the rule is ticked', async () => {
+    class MockRazorpay {
+      on() {}
+      open() {}
+      close() {}
+    }
+    window.Razorpay = MockRazorpay as unknown as typeof window.Razorpay;
+    const post = vi.spyOn(axios, 'post').mockImplementation((async (_url: string, body: unknown) => {
+      if (!(body as { guestInfo?: unknown }).guestInfo) {
+        return { data: { holdId: 7001, holdExpiresAt: new Date(Date.now() + 10 * 60_000).toISOString(), prepToken: 'prep-7001', finalAmount: 4938 } };
+      }
+      return { data: { keyId: 'rzp_test_x', orderId: 'order_x', bookingId: 7001, bookingToken: 'tok', amount: 4938 } };
+    }) as never);
+    seedDraft('MaleOnly');
+    await renderPage();
+    fillDetails();
+    fireEvent.click(screen.getByTestId('guest-booking-consent'));
+    fireEvent.click(screen.getByTestId('dorm-gender-ack-checkbox'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('guest-booking-submit'));
+    });
+    await settle();
+    await settle();
+
+    const charge = post.mock.calls.map((c) => c[1] as { guestInfo?: unknown; dormGenderAcknowledged?: boolean }).find((b) => b.guestInfo);
+    expect(charge?.dormGenderAcknowledged).toBe(true);
+    post.mockRestore();
+    delete (window as { Razorpay?: unknown }).Razorpay;
   });
 
   it('the mobile Pay bar does not submit while the rule tick is open', async () => {

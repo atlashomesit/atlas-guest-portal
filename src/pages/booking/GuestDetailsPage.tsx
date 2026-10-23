@@ -582,7 +582,7 @@ const GuestDetailsPage: React.FC = () => {
   /** A listing with no host-written rules shows no tick and never blocks a booking on missing host data. */
   const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
   // HSL-011: a women-only / men-only dorm (policy straight from the listing API, carried by Reserve) needs a required
-  // tick before Pay. The booking request has no field for it yet, so it gates the Pay button only - see the API follow-up.
+  // tick before Pay. It gates the Pay button and is sent as `dormGenderAcknowledged`; the API stores it with the listing's policy.
   const dormAckRequired = dormNeedsGenderAcknowledgement(booking.holdDormGenderPolicy);
   const [dormAckAccepted, setDormAckAccepted] = useState(false);
   const [dormAckError, setDormAckError] = useState('');
@@ -1156,6 +1156,9 @@ const GuestDetailsPage: React.FC = () => {
         guestConsentAccepted: consentAccepted,
         // FOUNDER RULED 2026-10-19: the server re-checks this when the listing has house rules.
         houseRulesAccepted,
+        // HSL-011: the dorm gender-rule tick. The API requires it (400 DORM_GENDER_ACK_REQUIRED) on women-only / men-only dorms,
+        // stores it with the policy it read from the listing, and ignores it everywhere else.
+        dormGenderAcknowledged: dormAckAccepted,
         guestPurposeConsents: {
           booking_contact: consentAccepted,
           transactional_whatsapp: whatsappOptIn,
