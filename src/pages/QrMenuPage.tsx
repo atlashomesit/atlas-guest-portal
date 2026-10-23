@@ -58,7 +58,7 @@ export interface MenuResponse {
 export interface OrderStatus {
   orderNumber: string;
   status: string;
-  liveStep: "Order Received" | "Preparing in Kitchen" | "Out for Delivery" | "Served";
+  liveStep: "Scheduled" | "Order Received" | "Preparing in Kitchen" | "Out for Delivery" | "Served";
   targetLabel: string;
   settlementMethod: string;
   totalAmount: number;
@@ -67,6 +67,8 @@ export interface OrderStatus {
   estimatedMinutes: number;
   kotNumber?: string;
   kotStatus?: string;
+  /** POS-003: UTC serve-at time of a "Schedule for Later" order; absent for as soon as possible. */
+  scheduledFor?: string | null;
   whatsAppUpdates?: boolean;
   lines: Array<{
     id?: number;
@@ -174,6 +176,26 @@ const FALLBACK_MENU: MenuResponse = {
   ],
 };
 
+// POS-003: "Fulfill At" slots. Times are the guest's local clock; the API receives UTC.
+type FulfillAtMode = "NOW" | "LUNCH" | "HIGH_TEA" | "DINNER" | "CUSTOM";
+const FULFILL_SLOTS: { mode: Exclude<FulfillAtMode, "NOW" | "CUSTOM">; label: string; time: string }[] = [
+  { mode: "LUNCH", label: "Lunch 1:30 PM", time: "13:30" },
+  { mode: "HIGH_TEA", label: "High Tea 5:00 PM", time: "17:00" },
+  { mode: "DINNER", label: "Dinner 8:30 PM", time: "20:30" },
+];
+
+/** null = as soon as possible; undefined = a custom time was chosen but is missing/invalid; else the next local occurrence as UTC ISO. */
+function resolveFulfillAtIso(mode: FulfillAtMode, customTime: string, now: Date = new Date()): string | null | undefined {
+  if (mode === "NOW") return null;
+  const time = mode === "CUSTOM" ? customTime : FULFILL_SLOTS.find((s) => s.mode === mode)?.time ?? "";
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+  if (!m) return undefined;
+  const target = new Date(now);
+  target.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
+  return target.toISOString();
+}
+
 export default function QrMenuPage() {
   const { tenantSlug = "atlas" } = useParams<{ tenantSlug: string }>();
   const [searchParams] = useSearchParams();
@@ -202,6 +224,9 @@ export default function QrMenuPage() {
   const [guestPhone, setGuestPhone] = useState<string>("");
   const [whatsAppUpdates, setWhatsAppUpdates] = useState<boolean>(true);
   const [orderNotes, setOrderNotes] = useState<string>("");
+  // POS-003: "Fulfill At" - as soon as possible, or a time slot / custom time later (local clock).
+  const [fulfillAt, setFulfillAt] = useState<FulfillAtMode>("NOW");
+  const [customFulfillTime, setCustomFulfillTime] = useState<string>("");
 
   const [submitting, setSubmitting] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
@@ -353,6 +378,11 @@ export default function QrMenuPage() {
     if (cartLines.length === 0) return;
 
     setVerificationError(null);
+    const scheduledForIso = resolveFulfillAtIso(fulfillAt, customFulfillTime);
+    if (scheduledForIso === undefined) {
+      setVerificationError("Please pick the time you would like your order served, or choose 'As soon as possible'.");
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -365,6 +395,7 @@ export default function QrMenuPage() {
         guestPhone: guestPhone.trim() || undefined,
         whatsAppUpdates,
         notes: orderNotes.trim() || undefined,
+        scheduledFor: scheduledForIso ?? undefined,
         lines: cartLines.map((l) => ({
           addOnServiceId: l.item.id,
           itemName: l.item.name,
@@ -400,6 +431,8 @@ export default function QrMenuPage() {
       const orderData: OrderStatus = await res.json();
       setActiveOrder(orderData);
       setCart({});
+      setFulfillAt("NOW");
+      setCustomFulfillTime("");
     } catch (err: any) {
       setVerificationError(err?.message || "Failed to submit order. Please try again.");
     } finally {
@@ -525,6 +558,21 @@ export default function QrMenuPage() {
                 <Clock size={14} /> Est. {activeOrder.estimatedMinutes} mins
               </span>
             </div>
+
+            {activeOrder.liveStep === "Scheduled" && (
+              <div
+                style={{ margin: "12px 0", padding: "10px 12px", borderRadius: "8px", backgroundColor: "#eff6ff", color: "#1e40af", fontSize: "13px" }}
+                data-testid="pos-qr-scheduled-note"
+              >
+                Scheduled for{" "}
+                <strong>
+                  {activeOrder.scheduledFor
+                    ? new Date(activeOrder.scheduledFor).toLocaleString("en-IN", { weekday: "short", hour: "numeric", minute: "2-digit" })
+                    : "later"}
+                </strong>
+                . The kitchen starts preparing shortly before that time.
+              </div>
+            )}
 
             {/* Live Status Tracker Step progression */}
             <div style={{ margin: "24px 0" }}>
@@ -1077,6 +1125,51 @@ export default function QrMenuPage() {
 
               {/* Special Instructions & WhatsApp Option */}
               <div style={{ marginBottom: "12px" }}>
+                <label style={{ display: "block", fontSize: "12px", color: "#475569", marginBottom: "4px" }} htmlFor="pos-qr-fulfill-at">
+                  Fulfill at
+                </label>
+                <select
+                  id="pos-qr-fulfill-at"
+                  value={fulfillAt}
+                  onChange={(e) => setFulfillAt(e.target.value as FulfillAtMode)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13px",
+                    marginBottom: "8px",
+                    boxSizing: "border-box",
+                    backgroundColor: "#fff",
+                  }}
+                  data-testid="pos-qr-fulfill-at"
+                >
+                  <option value="NOW">As soon as possible (Now)</option>
+                  {FULFILL_SLOTS.map((s) => (
+                    <option key={s.mode} value={s.mode}>
+                      Schedule for Later: {s.label}
+                    </option>
+                  ))}
+                  <option value="CUSTOM">Schedule for Later: Custom time</option>
+                </select>
+                {fulfillAt === "CUSTOM" && (
+                  <input
+                    type="time"
+                    value={customFulfillTime}
+                    onChange={(e) => setCustomFulfillTime(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "13px",
+                      marginBottom: "8px",
+                      boxSizing: "border-box",
+                    }}
+                    data-testid="pos-qr-fulfill-custom-time"
+                    aria-label="Serve at"
+                  />
+                )}
                 <input
                   type="text"
                   placeholder="Kitchen instructions (e.g. less spicy, extra cutlery)"

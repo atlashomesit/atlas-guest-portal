@@ -276,4 +276,45 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
       expect(screen.getByText("POS-20261021-001")).toBeTruthy();
     });
   });
+  test("POS-003: Schedule for Later sends scheduledFor and shows the scheduled note; ASAP sends none", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await waitFor(() => expect(screen.getByTestId("add-to-cart-1")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("add-to-cart-1"));
+    fireEvent.click(screen.getByTestId("settle-pay-on-delivery"));
+
+    fireEvent.change(screen.getByTestId("pos-qr-fulfill-at"), { target: { value: "DINNER" } });
+    (global.fetch as any).mockImplementation((url: string, options?: any) => {
+      if (url.includes("/order") && options?.method === "POST") {
+        const body = JSON.parse(options.body);
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            orderNumber: "POS-20261024-007", status: "KOT_Fired", liveStep: "Scheduled", targetLabel: "Table T4",
+            settlementMethod: body.settlementMethod, totalAmount: 480, gstAmount: 24, createdAtUtc: new Date().toISOString(),
+            estimatedMinutes: 15, kotNumber: "KOT-20261024-007", kotStatus: "Scheduled", scheduledFor: body.scheduledFor, lines: body.lines,
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unhandled URL: ${url}`));
+    });
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+
+    await waitFor(() => expect(screen.getByTestId("pos-qr-scheduled-note")).toBeTruthy());
+    const call = (global.fetch as any).mock.calls.find((c: any[]) => c[1]?.method === "POST");
+    const body = JSON.parse(call[1].body);
+    expect(Number.isNaN(Date.parse(body.scheduledFor))).toBe(false);
+    expect(Date.parse(body.scheduledFor)).toBeGreaterThan(Date.now());
+  });
+
+  test("POS-003: as soon as possible sends no scheduledFor", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await waitFor(() => expect(screen.getByTestId("add-to-cart-1")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("add-to-cart-1"));
+    fireEvent.click(screen.getByTestId("settle-pay-on-delivery"));
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await waitFor(() => expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy());
+    const call = (global.fetch as any).mock.calls.find((c: any[]) => c[1]?.method === "POST");
+    expect(JSON.parse(call[1].body).scheduledFor).toBeUndefined();
+  });
 });
