@@ -33,6 +33,12 @@ interface CheckinDetails {
   guestCount?: number | null;
   guestName?: string | null;
   /**
+   * NOTIF-048: whether we can already reach the guest on WhatsApp / email. Booleans only, the API never
+   * returns the contact itself. When `guestHasDeliverablePhone` is false the WhatsApp number is required.
+   */
+  guestHasDeliverablePhone?: boolean;
+  guestHasUsableEmail?: boolean;
+  /**
    * TASK-102915: split-stay legs, in date order. The public check-in endpoint
    * returns every leg with its dates plus the door code for the CURRENT leg
    * only — a leg the guest has not moved into yet never carries a code, so this
@@ -80,6 +86,21 @@ export interface GuestInfo {
   activeVerifyTab?: "digilocker" | "otp" | "photo";
 }
 
+/**
+ * NOTIF-048: quick client-side shape checks so an obvious typo is caught before the long flow finishes.
+ * The server (GuestPhoneNormalizer / EmailAddressRules) stays authoritative. Phone: an Indian mobile
+ * (10 digits starting 6-9, optionally with 0 or 91 in front) or an international +country-code number.
+ */
+function isPlausibleGuestPhone(raw: string): boolean {
+  const stripped = raw.trim().replace(/[\s\-().]/g, "");
+  if (stripped.startsWith("+")) return /^\+[1-9]\d{7,14}$/.test(stripped);
+  return /^(?:0|91)?[6-9]\d{9}$/.test(stripped);
+}
+
+function isPlausibleGuestEmail(raw: string): boolean {
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(raw.trim());
+}
+
 type Step = "auth" | "summary" | "id-upload" | "house-rules" | "damage-waiver" | "done";
 
 export default function SelfCheckIn() {
@@ -123,6 +144,11 @@ export default function SelfCheckIn() {
   // TASK-4514: Collect arrival time and guest count in canonical flow
   const [arrivalTime, setArrivalTime] = useState("");
   const [guestCount, setGuestCount] = useState("");
+  // NOTIF-048: contact details typed on the summary step. Held in memory only (never logged or stored).
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhoneError, setContactPhoneError] = useState("");
+  const [contactEmailError, setContactEmailError] = useState("");
   // TASK-5125 / TASK-101110: do not default to India — a blank field must not overwrite a
   // host-set foreign nationality on complete (API also preserves host-set when nationality omitted).
   const [nationality, setNationality] = useState("");
@@ -325,6 +351,22 @@ export default function SelfCheckIn() {
       setError("Please enter the number of guests (at least 1) to continue.");
       return;
     }
+    // NOTIF-048: contact checks. The phone is required only when we have no number we can message.
+    let phoneMsg = "";
+    let emailMsg = "";
+    if (!contactPhone.trim()) {
+      if (details?.guestHasDeliverablePhone === false) {
+        phoneMsg = "Please enter your WhatsApp mobile number. We need it to send your Wi-Fi details, arrival directions and door passkey.";
+      }
+    } else if (!isPlausibleGuestPhone(contactPhone)) {
+      phoneMsg = "Please enter a valid WhatsApp mobile number. For a number outside India, start with + and the country code.";
+    }
+    if (contactEmail.trim() && !isPlausibleGuestEmail(contactEmail)) {
+      emailMsg = "Please enter a valid email address, for example name@example.com.";
+    }
+    setContactPhoneError(phoneMsg);
+    setContactEmailError(emailMsg);
+    if (phoneMsg || emailMsg) return;
     setError("");
     setGuests((prev) => {
       const updated: GuestInfo[] = [];
@@ -643,9 +685,33 @@ export default function SelfCheckIn() {
           isVerified: primary ? primary.isVerified : aadhaarVcVerified,
           verificationMethod: primary ? primary.verificationMethod : (aadhaarVcVerified ? "DigiLocker" : null),
           additionalGuests: additionalGuestsPayload.length > 0 ? additionalGuestsPayload : null,
+          // NOTIF-048: only sent when the guest typed something; the API validates and nothing is saved on a 400.
+          ...(contactPhone.trim() ? { guestPhone: contactPhone.trim() } : {}),
+          ...(contactEmail.trim() ? { guestEmail: contactEmail.trim() } : {}),
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        if (res.status === 400) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          if (body?.error === "INVALID_GUEST_PHONE" || body?.error === "INVALID_GUEST_EMAIL") {
+            // Nothing was saved. Take the guest back to the field so they can fix it.
+            setContactPhoneError(
+              body.error === "INVALID_GUEST_PHONE"
+                ? "That WhatsApp number doesn't look right. Please check it. For a number outside India, start with + and the country code."
+                : "",
+            );
+            setContactEmailError(
+              body.error === "INVALID_GUEST_EMAIL"
+                ? "That email address doesn't look right. Please enter your own email, for example name@example.com."
+                : "",
+            );
+            setShowSignModal(false);
+            setStep("summary");
+            return;
+          }
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
       setStep("done");
     } catch {
       setError("Could not save your check-in. Please try again.");
@@ -845,6 +911,64 @@ export default function SelfCheckIn() {
                 placeholder="e.g. 2"
                 className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-brand-primary"
               />
+            </div>
+
+            {/* NOTIF-048: contact details. No marketing consent is implied or pre-ticked. */}
+            <div className="mb-5 pt-4 border-t border-border-subtle" data-testid="checkin-contact-section">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Your contact details</h3>
+              <label htmlFor="checkin-contact-phone" className="block text-sm font-medium text-text-primary mb-1">
+                {details.guestHasDeliverablePhone === false ? "WhatsApp mobile number *" : "WhatsApp mobile number (optional)"}
+              </label>
+              <input
+                id="checkin-contact-phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                required={details.guestHasDeliverablePhone === false}
+                aria-required={details.guestHasDeliverablePhone === false ? true : undefined}
+                aria-invalid={contactPhoneError ? true : undefined}
+                aria-describedby={contactPhoneError ? "checkin-contact-phone-error" : "checkin-contact-phone-help"}
+                value={contactPhone}
+                onChange={(e) => {
+                  setContactPhone(e.target.value);
+                  if (contactPhoneError) setContactPhoneError("");
+                }}
+                placeholder="e.g. 98765 43210 or +44 7911 123456"
+                className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+              <p id="checkin-contact-phone-help" className="text-xs text-text-secondary mb-1">
+                {details.guestHasDeliverablePhone === false
+                  ? "Required to receive your Wi-Fi details, arrival directions and door passkey on WhatsApp."
+                  : "We already have a WhatsApp number for you. Add one here only if you want us to use a different number."}
+              </p>
+              {contactPhoneError && (
+                <p id="checkin-contact-phone-error" role="alert" className="text-xs text-red-700 mb-2">{contactPhoneError}</p>
+              )}
+
+              <label htmlFor="checkin-contact-email" className="block text-sm font-medium text-text-primary mb-1 mt-3">
+                Email address (optional)
+              </label>
+              <input
+                id="checkin-contact-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                aria-invalid={contactEmailError ? true : undefined}
+                aria-describedby={contactEmailError ? "checkin-contact-email-error" : "checkin-contact-email-help"}
+                value={contactEmail}
+                onChange={(e) => {
+                  setContactEmail(e.target.value);
+                  if (contactEmailError) setContactEmailError("");
+                }}
+                placeholder="name@example.com"
+                className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+              <p id="checkin-contact-email-help" className="text-xs text-text-secondary mb-1">
+                Used to send your stay invoice.
+              </p>
+              {contactEmailError && (
+                <p id="checkin-contact-email-error" role="alert" className="text-xs text-red-700 mb-2">{contactEmailError}</p>
+              )}
             </div>
 
             {error && (
