@@ -8,6 +8,8 @@ import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BN
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
 
 interface CheckinDetails {
+  /** BNB-009: lets the page reach the booking-link-token guest endpoints (meal preferences). */
+  bookingId?: number;
   bookingRef: string;
   listingName: string;
   propertyAddress: string;
@@ -1562,9 +1564,9 @@ export default function SelfCheckIn() {
               {details.emergencyContactPhone && <InfoRow label="Emergency contact" value={details.emergencyContactPhone} />}
             </div>
 
-            {/* BNB-002: Pre-arrival dietary and breakfast time preferences */}
+            {/* BNB-009: meal choices saved to the host; the selector loads the summary and hides itself unless the server says to ask */}
             <div className="mb-6">
-              <GuestDietarySelector bookingRef={bookingRef} />
+              <GuestDietarySelector bookingId={details.bookingId} token={token} />
             </div>
 
             {/* TASK-4510: Digital Guest Guidebook — shown after successful check-in */}

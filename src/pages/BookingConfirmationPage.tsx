@@ -23,7 +23,7 @@ import { formatCurrency } from "../utils/formatting";
 import { resolveBookingPlanTerms } from "../utils/bookingPlanTerms";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
-import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
+import GuestDietarySelector, { type GuestMealPreferences } from "../components/bnb/GuestDietarySelector"; // BNB-002 / BNB-009
 import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
 import {
   buildReceiptHtml,
@@ -185,6 +185,8 @@ interface BookingSummary {
   ratePlanName?: string | null;
   mealPlanCode?: string | null;
   cancellationPolicy?: string | null;
+  /** BNB-009: saved meal choices + whether to ask + the API's one list of options. Absent on older API builds (selector hidden). */
+  mealPreferences?: GuestMealPreferences | null;
   /** PAY-009: refunds on this booking (newest first); empty/absent = no tracker. */
   refunds?: GuestRefund[];
   /** PAY-010: the guest said they paid the host's UPI link / QR; the host has not confirmed yet. NOT paid. */
@@ -1500,9 +1502,13 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {/* BNB-002: Pre-arrival dietary and breakfast time preferences feeding 7:00 AM breakfast manifest */}
+        {/* BNB-009: meal choices saved to the host with the booking-link token; shown only when the server says to ask */}
         {!isCancelled && (
-          <GuestDietarySelector bookingRef={String(booking.bookingId ?? bookingId ?? '')} />
+          <GuestDietarySelector
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            mealPreferences={booking.mealPreferences ?? null}
+          />
         )}
 
         {/* TASK-4510: Digital Guest Guidebook — host-authored content sections */}
