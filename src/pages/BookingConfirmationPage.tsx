@@ -20,6 +20,7 @@ import {
 } from "../config/refundPolicyTimelines";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
+import { DormGenderAckLine } from "../components/hostel/DormGenderAckLine";
 import { resolveBookingPlanTerms } from "../utils/bookingPlanTerms";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
@@ -208,6 +209,9 @@ interface BookingSummary {
   guidebookTrashParkingText?: string | null;
   guidebookCheckoutChecklistText?: string | null;
   guidebookFoodThingsTodoText?: string | null;
+  /** HSL-011: when the guest confirmed the dorm gender rule (ISO) and which rule. */
+  dormGenderAckAtUtc?: string | null;
+  dormGenderAckPolicy?: "FemaleOnly" | "MaleOnly" | null;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -1156,6 +1160,7 @@ export default function BookingConfirmationPage() {
               <p className="text-base font-semibold text-text-primary mt-0.5" data-testid="confirmation-checkout">{booking.checkoutDate}</p>
             </div>
           </div>
+          <DormGenderAckLine ackAtUtc={booking.dormGenderAckAtUtc} policy={booking.dormGenderAckPolicy} />
           {planTerms && (planTerms.mealLabel || planTerms.cancellationHeadline) && (
             <div className="py-4 space-y-2" data-testid="confirmation-plan-terms">
               {planTerms.mealLabel && (
