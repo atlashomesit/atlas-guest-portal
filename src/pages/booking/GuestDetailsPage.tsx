@@ -72,6 +72,8 @@ import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
+import { dormNeedsGenderAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
 import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
 import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
@@ -211,6 +213,8 @@ type CheckoutHoldCache = {
   holdCancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
   holdCancellationWindowHours?: number | null;
   holdGraceHours?: number | null;
+  /** HSL-011: the dorm's gender rule, so a reload keeps asking the tick. */
+  holdDormGenderPolicy?: DormGenderPolicy | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
@@ -358,6 +362,7 @@ const GuestDetailsPage: React.FC = () => {
           holdCancellationTier: cached.holdCancellationTier ?? null,
           holdCancellationWindowHours: cached.holdCancellationWindowHours ?? null,
           holdGraceHours: cached.holdGraceHours ?? null,
+          holdDormGenderPolicy: cached.holdDormGenderPolicy ?? null,
           checkIn: cached.checkIn ?? null,
           checkOut: cached.checkOut ?? null,
           guests: cached.guests ?? booking.guests,
@@ -576,6 +581,12 @@ const GuestDetailsPage: React.FC = () => {
   const houseRulesRowRef = useRef<HTMLDivElement>(null);
   /** A listing with no host-written rules shows no tick and never blocks a booking on missing host data. */
   const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
+  // HSL-011: a women-only / men-only dorm (policy straight from the listing API, carried by Reserve) needs a required
+  // tick before Pay. The booking request has no field for it yet, so it gates the Pay button only - see the API follow-up.
+  const dormAckRequired = dormNeedsGenderAcknowledgement(booking.holdDormGenderPolicy);
+  const [dormAckAccepted, setDormAckAccepted] = useState(false);
+  const [dormAckError, setDormAckError] = useState('');
+  const dormAckRowRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
@@ -624,6 +635,7 @@ const GuestDetailsPage: React.FC = () => {
       holdCancellationTier: booking.holdCancellationTier ?? null,
       holdCancellationWindowHours: booking.holdCancellationWindowHours ?? null,
       holdGraceHours: booking.holdGraceHours ?? null,
+      holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
@@ -637,7 +649,7 @@ const GuestDetailsPage: React.FC = () => {
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
     booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
-    booking.holdGraceHours, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
+    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
@@ -892,6 +904,10 @@ const GuestDetailsPage: React.FC = () => {
     if (houseRulesRequired && !houseRulesAccepted) { setHouseRulesError('Please accept the house rules to continue.'); valid = false; }
     else { setHouseRulesError(''); }
 
+    // HSL-011: women-only / men-only dorm - the guest must confirm the rule before Pay.
+    if (dormAckRequired && !dormAckAccepted) { setDormAckError('Please confirm the dorm rule to continue.'); valid = false; }
+    else { setDormAckError(''); }
+
     setFormErrors(errors);
     if (!valid) {
       requestAnimationFrame(() => {
@@ -914,6 +930,11 @@ const GuestDetailsPage: React.FC = () => {
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
+        if (dormAckRequired && !dormAckAccepted) {
+          dormAckRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          dormAckRowRef.current?.querySelector('input')?.focus();
+          return;
+        }
         if (houseRulesRequired && !houseRulesAccepted) {
           houseRulesRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           houseRulesRowRef.current?.querySelector('input')?.focus();
@@ -926,7 +947,7 @@ const GuestDetailsPage: React.FC = () => {
       });
     }
     return valid;
-  }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted]);
+  }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted]);
 
   // ── Promo blur handler ────────────────────────────────────────────────────
   const handlePromoBlur = useCallback(async () => {
@@ -1755,6 +1776,12 @@ const GuestDetailsPage: React.FC = () => {
   // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
   // it while consent is unchecked scrolls the consent box into view and flashes it.
   const scrollToConsent = useCallback(() => {
+    // HSL-011: the dorm rule tick sits above the house rules, so point at it first.
+    if (dormAckRequired && !dormAckAccepted) {
+      setDormAckError('Please confirm the dorm rule to continue.');
+      dormAckRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     // The house-rules tick (when the host wrote rules) comes first on the page, so point at it first.
     if (houseRulesRequired && !houseRulesAccepted) {
       setHouseRulesError('Please accept the house rules to continue.');
@@ -1765,7 +1792,7 @@ const GuestDetailsPage: React.FC = () => {
     consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setConsentFlash(true);
     window.setTimeout(() => setConsentFlash(false), 1200);
-  }, [houseRulesRequired, houseRulesAccepted]);
+  }, [houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted]);
 
   // TASK-4537: Determine if the error message indicates a charged-but-unconfirmed state
   // that warrants showing clickable support affordance.
@@ -1949,7 +1976,7 @@ const GuestDetailsPage: React.FC = () => {
   const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment received — booking not confirmed')}`;
 
   /** Pay needs the consent tick, and the house-rules tick when the host wrote rules. */
-  const readyToPay = consentAccepted && (!houseRulesRequired || houseRulesAccepted);
+  const readyToPay = consentAccepted && (!houseRulesRequired || houseRulesAccepted) && (!dormAckRequired || dormAckAccepted);
   const payDisabled = isSubmitting || !readyToPay || notTakingBookings;
 
   return (
@@ -2506,6 +2533,16 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* HSL-011: women-only / men-only dorm - REQUIRED rule tick before Pay. Renders nothing for any other listing. */}
+            <div ref={dormAckRowRef}>
+              <DormGenderAcknowledgement
+                policy={booking.holdDormGenderPolicy}
+                accepted={dormAckAccepted}
+                onChange={(next) => { setDormAckAccepted(next); if (next) setDormAckError(''); }}
+                error={dormAckError}
+              />
+            </div>
+
             {/* FOUNDER RULED 2026-10-19: the host's own house rules, with a REQUIRED "I accept" tick before Pay.
                 Renders nothing when the host wrote no rules (a listing with no rules never blocks a booking). */}
             <div ref={houseRulesRowRef}>
@@ -2846,11 +2883,13 @@ const GuestDetailsPage: React.FC = () => {
               {/* Pay microcopy */}
               {!readyToPay && (
                 <div className="gd-pay-microcopy">
-                  {houseRulesRequired && !houseRulesAccepted && !consentAccepted
-                    ? 'Tick the house rules and the consent box to enable payment.'
-                    : houseRulesRequired && !houseRulesAccepted
-                      ? 'Tick the house rules to enable payment.'
-                      : 'Tick the consent box to enable payment.'}
+                  {dormAckRequired && !dormAckAccepted
+                    ? 'Confirm the dorm rule and tick the consent box to enable payment.'
+                    : houseRulesRequired && !houseRulesAccepted && !consentAccepted
+                      ? 'Tick the house rules and the consent box to enable payment.'
+                      : houseRulesRequired && !houseRulesAccepted
+                        ? 'Tick the house rules to enable payment.'
+                        : 'Tick the consent box to enable payment.'}
                 </div>
               )}
               {readyToPay && (

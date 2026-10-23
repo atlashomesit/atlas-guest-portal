@@ -13,6 +13,7 @@ import {
   getTenantPublicListingIdAllowlist,
 } from "@/tenant/tenantOverrides";
 import { resolveEffectiveListingAddress } from "@/utils/listingAddress";
+import type { DormGenderPolicy } from "@/utils/dormListing";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -58,6 +59,9 @@ export type TenantPropertyRecord = {
   /** TASK-102020: listing check-in/out times for property page display. */
   checkInTime?: string | null;
   checkOutTime?: string | null;
+  /** HSL-011: dorm facts from the public listing DTO (API only; null for every non-dorm listing). */
+  accommodationType?: string | null;
+  dormGenderPolicy?: DormGenderPolicy | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -162,6 +166,8 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     cancellationTier: dto.cancellationTier ?? null,
     checkInTime: dto.checkInTime?.trim() || null,
     checkOutTime: dto.checkOutTime?.trim() || null,
+    accommodationType: dto.accommodationType ?? null,
+    dormGenderPolicy: dto.dormGenderPolicy ?? null,
   };
 };
 

@@ -1,6 +1,7 @@
 import type { PaymentFeeDisplay } from "../utils/paymentFeeCopy";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { CancellationTier } from '@/utils/cancellationPolicy';
+import type { DormGenderPolicy } from '@/utils/dormListing';
 
 /** Price breakdown forwarded from the widget to GuestDetailsPage (session-only, not persisted). */
 export type BookingPriceBreakdown = {
@@ -59,6 +60,8 @@ type BookingState = {
   holdCancellationTier: CancellationTier | null;
   holdCancellationWindowHours: number | null;
   holdGraceHours: number | null;
+  /** HSL-011: the dorm's gender rule (from the listing API) forwarded from UnitBookingWidget; null for a non-dorm or a mixed-unstated listing (session-only). */
+  holdDormGenderPolicy?: DormGenderPolicy | null;
   /** MRP-002: Selected rate plan ID and display name forwarded from UnitBookingWidget (session-only). */
   listingRatePlanId?: number | null;
   ratePlanName?: string | null;

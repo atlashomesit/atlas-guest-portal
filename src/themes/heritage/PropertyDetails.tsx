@@ -64,6 +64,7 @@ import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
 import { centroidForCity } from '@/utils/mapCoords';
+import { readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
@@ -378,6 +379,11 @@ interface Property {
     city?: string | null;
     state?: string | null;
     country?: string | null;
+    /** HSL-011: dorm facts from GET /listings/{id} (API only; null for every non-dorm listing). */
+    accommodationType?: string | null;
+    dormGenderPolicy?: DormGenderPolicy | null;
+    /** HSL-011: total beds in the dorm (Listing.Quantity). */
+    dormBedCount?: number | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -417,6 +423,9 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         city: item.city ?? ((item as unknown as Record<string, unknown>).City as string | undefined),
         state: item.state ?? ((item as unknown as Record<string, unknown>).State as string | undefined),
         country: item.country ?? ((item as unknown as Record<string, unknown>).Country as string | undefined),
+        accommodationType: item.accommodationType ?? null,
+        dormGenderPolicy: item.dormGenderPolicy ?? null,
+        dormBedCount: item.dormBedCount ?? null,
     };
 }
 
@@ -817,6 +826,7 @@ const PropertyDetails = () => {
                 // TASK-2739-v1: GET /listings/{id} also carries publishStatus; keep state in sync.
                 if (typeof d.publishStatus === 'string') setPublishStatus(d.publishStatus);
                 const mg = parseMaxGuestsFromPayload(d);
+                const dorm = readDormListingFields(d);
                 const rawPhone = d.hostPhone ?? d.contactPhone;
                 const phone = typeof rawPhone === 'string' && rawPhone.trim() ? rawPhone.trim() : null;
 
@@ -842,6 +852,10 @@ const PropertyDetails = () => {
                     if (phone !== null && !prev.hostPhone) {
                         updates.hostPhone = phone;
                     }
+                    // HSL-011: dorm facts (type, gender rule, bed count) come from the listing detail payload only.
+                    if (dorm.accommodationType !== (prev.accommodationType ?? null)) updates.accommodationType = dorm.accommodationType;
+                    if (dorm.dormGenderPolicy !== (prev.dormGenderPolicy ?? null)) updates.dormGenderPolicy = dorm.dormGenderPolicy;
+                    if (dorm.bedCount !== (prev.dormBedCount ?? null)) updates.dormBedCount = dorm.bedCount;
                     const prevGallery = filterGuestImageUrls(prev.property_img ?? []);
                     if (hydratedImages.length > prevGallery.length) {
                         updates.property_img = hydratedImages;
@@ -1263,6 +1277,15 @@ const PropertyDetails = () => {
                         country: (() => {
                             const raw = (apiListing as Record<string, unknown>).country ?? (apiListing as Record<string, unknown>).Country;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        // HSL-011: dorm facts, API payload only.
+                        ...(() => {
+                            const dorm = readDormListingFields(apiListing as Record<string, unknown>);
+                            return {
+                                accommodationType: dorm.accommodationType,
+                                dormGenderPolicy: dorm.dormGenderPolicy,
+                                dormBedCount: dorm.bedCount,
+                            };
                         })(),
                     };
                     const images = filterGuestImageUrls(
@@ -2790,6 +2813,9 @@ useEffect(() => {
                         cancellationTier={data.cancellationTier ?? null}
                         cancellationWindowHours={data.cancellationWindowHours ?? null}
                         graceHours={data.graceHours ?? null}
+                        accommodationType={data.accommodationType ?? null}
+                        dormGenderPolicy={data.dormGenderPolicy ?? null}
+                        dormBedCount={data.dormBedCount ?? null}
                         onStickySummaryChange={setStickyBookingSummary}
                         tenantContext={effectiveTenantCtx}
                       />

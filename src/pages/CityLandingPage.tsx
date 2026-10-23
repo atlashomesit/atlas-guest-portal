@@ -79,6 +79,9 @@ function toListingCardModel(listing: PublicListing) {
     rating: hasVerifiedReviews ? rating : 0,
     reviews: hasVerifiedReviews ? reviews : 0,
     propertyType: "Homestay",
+    // HSL-011: dorm facts straight from the API payload (undefined for every non-dorm listing).
+    accommodationType: listing.accommodationType ?? undefined,
+    dormGenderPolicy: listing.dormGenderPolicy ?? null,
     guests: listing.maxGuests > 0 ? listing.maxGuests : 2,
     bedrooms: null as number | null,
     hasWifi: (listing.wifiSpeedMbps ?? 0) > 0,
@@ -164,6 +167,9 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     rating: hasVerifiedReviews ? rating : 0,
     reviews: hasVerifiedReviews ? reviews : 0,
     propertyType: "Homestay",
+    // HSL-011: the marketplace row does not carry dorm facts; no badge until it does (never guessed from the title).
+    accommodationType: undefined,
+    dormGenderPolicy: null,
     guests: item.maxGuests > 0 ? item.maxGuests : 2,
     bedrooms: null,
     hasWifi: false,
@@ -359,6 +365,8 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
                   rating={c.rating}
                   reviews={c.reviews}
                   propertyType={c.propertyType}
+                  accommodationType={c.accommodationType}
+                  dormGenderPolicy={c.dormGenderPolicy}
                   guests={c.guests}
                   bedrooms={c.bedrooms}
                   hasWifi={c.hasWifi}

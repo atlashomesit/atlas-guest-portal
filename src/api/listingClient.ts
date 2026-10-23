@@ -5,6 +5,7 @@ import { getAccessibilityDeclarations } from '@/utils/amenityCodes';
 import { getTenantContext } from '@/tenant/tenantContext';
 import { getTenantOverrides, getTenantListingAddress } from '@/tenant/tenantOverrides';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { readDormListingFields } from '@/utils/dormListing';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -183,6 +184,10 @@ export type PublicListing = {
    * for booking" notice. Undefined on legacy payloads (treated as published/live).
    */
   publishStatus?: string;
+  /** HSL-011: `Listing.AccommodationType` ("HostelDorm" sells a bed, not a room). Absent for non-dorm payloads. */
+  accommodationType?: string | null;
+  /** HSL-011: `Listing.DormGenderPolicy` - FemaleOnly / MaleOnly / Mixed. Null when the API states none. */
+  dormGenderPolicy?: 'FemaleOnly' | 'MaleOnly' | 'Mixed' | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -306,6 +311,11 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     })(),
     // TASK-2739-v1: publish state drives noindex + the "not yet available" notice on Draft detail pages.
     publishStatus: typeof payload.publishStatus === 'string' ? payload.publishStatus : undefined,
+    // HSL-011: dorm facts come from the API only (never guessed from the listing name).
+    ...(() => {
+      const dorm = readDormListingFields(payload);
+      return { accommodationType: dorm.accommodationType, dormGenderPolicy: dorm.dormGenderPolicy };
+    })(),
   };
 }
 

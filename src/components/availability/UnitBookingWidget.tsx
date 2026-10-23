@@ -51,6 +51,8 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import ParentChildCrossSellBanner, { isParentListing } from '../cluster/ParentChildCrossSellBanner';
+import HostelDormBadge from '../hostel/HostelDormBadge';
+import { bedsLeftForNights, isHostelDormType, type DormGenderPolicy } from '@/utils/dormListing';
 import { track } from '@/lib/events'; // TASK-1480
 import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
@@ -110,6 +112,10 @@ interface UnitBookingWidgetProps {
   isParentCluster?: boolean;
   clusterRole?: string | null;
   accommodationType?: string | null;
+  /** HSL-011: `Listing.DormGenderPolicy` from the API (HostelDorm only). Never guessed from the listing name. */
+  dormGenderPolicy?: DormGenderPolicy | null;
+  /** HSL-011: total beds in the dorm (`Listing.Quantity`) - the "Y" of "X of Y beds left". */
+  dormBedCount?: number | null;
 }
 
 export type BookingStickySummary = {
@@ -201,6 +207,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   isParentCluster,
   clusterRole,
   accommodationType,
+  dormGenderPolicy = null,
+  dormBedCount = null,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -286,6 +294,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Set would be wrong here. Additive/empty for every tenant that never opts out (zero
   // behaviour change — nothing in this Map, every read below is a no-op `=== false` miss).
   const [dateBookabilityMap, setDateBookabilityMap] = useState<Map<string, boolean>>(new Map());
+  // HSL-011: per-date `roomsAvailable` from the same /api/pricing/availability-rates call. For a HostelDorm that is the
+  // number of beds still free that night; it feeds the "X of Y beds left" line and is never read for any other listing.
+  const [dateRoomsAvailableMap, setDateRoomsAvailableMap] = useState<Map<string, number>>(new Map());
   // Availability fetch must NOT gate Reserve (TASK-4277 / 2026-07-12 hosted-dev: a prior
   // `isLoading` flag left Reserve disabled during F1 availability latency after check-in-only).
   //
@@ -429,6 +440,25 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   );
   const effectiveMinStayNights = getEffectiveMinStayForDate(dateRange.startDate);
   const effectiveMaxGuests = maxGuests;
+  // HSL-011: a HostelDorm sells BEDS. The type comes from the listing API only (never the listing name).
+  const isDorm = isHostelDormType(accommodationType);
+  const dormBedsLeft = useMemo(() => {
+    if (!isDorm || !dateRange.startDate || !dateRange.endDate) return null;
+    const nights: string[] = [];
+    let d = startOfCalendarDay(dateRange.startDate);
+    const end = startOfCalendarDay(dateRange.endDate);
+    while (d.getTime() < end.getTime()) {
+      nights.push(toCalendarISO(d));
+      d = addDays(d, 1);
+    }
+    const left = bedsLeftForNights(nights, dateRoomsAvailableMap);
+    // Never print a count the data contradicts (more free than the dorm has): show nothing instead of a guess.
+    if (left == null || (dormBedCount != null && left > dormBedCount)) return null;
+    return left;
+  }, [isDorm, dateRange.startDate, dateRange.endDate, dateRoomsAvailableMap, dormBedCount]);
+  /** Beds the guest may ask for: the dorm's cap, and no more than are free when that is known. */
+  const dormMaxBeds = dormBedsLeft != null ? Math.max(1, Math.min(effectiveMaxGuests, dormBedsLeft)) : effectiveMaxGuests;
+  const dormOverBeds = isDorm && dormBedsLeft != null && guests > dormBedsLeft;
   /**
    * The Reserve init-hold answered 422 PAYMENT_PROVIDER_NOT_CONFIGURED_*: this tenant cannot take an online
    * payment (TASK-101182's fail-closed guard), so the guest is handed to the host on WhatsApp instead of
@@ -961,14 +991,25 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // whatever's already known in place) rather than fail-closing Reserve the way TASK-4830's
   // availability-calendar failure does — that flag is reserved for the booking-CONFLICT source
   // of truth, not this rate-usability signal.
-  const mergeAvailabilityRates = useCallback((days: { date: string; bookable: boolean }[]) => {
+  const mergeAvailabilityRates = useCallback((days: { date: string; bookable: boolean; roomsAvailable?: number }[]) => {
     if (days.length === 0) return;
     setDateBookabilityMap((prev) => {
       const next = new Map(prev);
       for (const day of days) next.set(day.date, day.bookable);
       return next;
     });
-  }, []);
+    // HSL-011: remember the per-night free count - beds, for a dorm only. Same last-write-wins merge as above.
+    if (!isDorm) return;
+    setDateRoomsAvailableMap((prev) => {
+      const next = new Map(prev);
+      for (const day of days) {
+        if (typeof day.roomsAvailable === 'number' && Number.isFinite(day.roomsAvailable)) {
+          next.set(day.date, day.roomsAvailable);
+        }
+      }
+      return next;
+    });
+  }, [isDorm]);
 
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') return;
@@ -1741,6 +1782,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+    // HSL-011: never hand a dorm stay to checkout for more beds than the dates have free.
+    if (isDorm && dormBedsLeft != null && guests > dormBedsLeft) {
+      setFormError(`Only ${dormBedsLeft} ${dormBedsLeft === 1 ? 'bed' : 'beds'} left on these dates. Please choose fewer beds.`);
+      return;
+    }
+
     const numericListingId = listingId != null ? Number(listingId) : NaN;
     if (!Number.isFinite(numericListingId)) {
       setFormError('Property could not be loaded. Please refresh the page and try again.');
@@ -1814,6 +1861,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdCancellationTier: effectiveRatePlanCancellationTier,
         holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
         holdGraceHours: isSelectedRatePlanNonRefundable ? null : resolvedGraceHours,
+        // HSL-011: the checkout page asks the gender-rule tick from this (API value; null for every non-dorm listing).
+        holdDormGenderPolicy: isDorm ? dormGenderPolicy : null,
         // Forward dates/guests into context for the details page. BookingContext's wire format
         // is an ISO instant, and the hydration effect above reads it back as an IST civil date —
         // so emit the IST-midnight instant (unchanged format, correct day) rather than
@@ -1848,6 +1897,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     convenienceFeePercent, touristTaxLineAmount,
     resolvedCancellationWindowHours, resolvedGraceHours,
     selectedRatePlanId, selectedRatePlan, effectiveRatePlanCancellationTier, isSelectedRatePlanNonRefundable,
+    isDorm, dormBedsLeft, dormGenderPolicy,
   ]);
 
   // Hand-off link for the Reserve 422 above. Derived at render, not captured in handleReserve, so it
@@ -1986,6 +2036,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (2) + (3): Date range card + Guests card */}
       <div className="lv-booking-form">
+        {/* HSL-011: a dorm says so before the guest picks anything, with the host's gender rule when the API states one. */}
+        {isDorm && (
+          <HostelDormBadge accommodationType={accommodationType} genderPolicy={dormGenderPolicy} className="mb-2" />
+        )}
         {effectiveMinStayNights > 1 && (
           <p
             className="inline-flex items-center rounded-full bg-[#ffe4d6] px-3 py-1.5 text-sm font-medium text-[#4a3535] border border-[#e5cfc0]"
@@ -2085,34 +2139,42 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             // dead. minHeight restores a 44px hit area (WCAG 2.2 SC 2.5.5 / Apple HIG) without
             // re-introducing double padding. Applies on desktop too — it was ~38px there as well.
             style={{ padding: 0, minHeight: 44, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-            aria-label={`Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
+            aria-label={isDorm
+              ? `Beds: ${guests} ${guests === 1 ? 'bed' : 'beds'}. Click to change.`
+              : `Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >
             <div>
-              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>Guests</small>
-              <span className="lv-guest-val">{guests} {guests === 1 ? 'adult' : 'adults'}</span>
+              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>{isDorm ? 'Beds' : 'Guests'}</small>
+              <span className="lv-guest-val">
+                {isDorm ? `${guests} ${guests === 1 ? 'bed' : 'beds'}` : `${guests} ${guests === 1 ? 'adult' : 'adults'}`}
+              </span>
               {guests >= effectiveMaxGuests && (
                 <small style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}>
-                  Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'} for this home
+                  {isDorm
+                    ? `Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'} per booking`
+                    : `Maximum ${effectiveMaxGuests} guest${effectiveMaxGuests === 1 ? '' : 's'} for this home`}
                 </small>
               )}
             </div>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--text-muted, #6b5a55)', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
           </button>
           {guestsOpen && (
-            <div className="bw-guests-pop" role="group" aria-label="Guest count">
+            <div className="bw-guests-pop" role="group" aria-label={isDorm ? 'Bed count' : 'Guest count'}>
               <div className="bw-guest-row">
                 <div>
-                  <div className="bw-guest-label">Guests</div>
+                  <div className="bw-guest-label">{isDorm ? 'Beds' : 'Guests'}</div>
                   <div className="bw-guest-sub">
-                    Ages 2+ · Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'}
+                    {isDorm
+                      ? `One bed per guest · Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'}`
+                      : `Ages 2+ · Maximum ${effectiveMaxGuests} guest${effectiveMaxGuests === 1 ? '' : 's'}`}
                   </div>
                 </div>
                 <div className="bw-counter">
                   <button
                     type="button"
                     className="bw-counter-btn"
-                    aria-label="Decrease guests"
+                    aria-label={isDorm ? 'Decrease beds' : 'Decrease guests'}
                     disabled={guests <= 1}
                     onClick={() => setGuests((current) => Math.max(1, current - 1))}
                   >−</button>
@@ -2120,15 +2182,33 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   <button
                     type="button"
                     className="bw-counter-btn"
-                    aria-label="Increase guests"
-                    disabled={guests >= effectiveMaxGuests}
-                    onClick={() => setGuests((current) => Math.min(effectiveMaxGuests, current + 1))}
+                    aria-label={isDorm ? 'Increase beds' : 'Increase guests'}
+                    disabled={guests >= (isDorm ? dormMaxBeds : effectiveMaxGuests)}
+                    onClick={() => setGuests((current) => Math.min(isDorm ? dormMaxBeds : effectiveMaxGuests, current + 1))}
                   >+</button>
                 </div>
               </div>
             </div>
           )}
         </div>
+        {/* HSL-011: live beds-left for the chosen nights (smallest free count across them). Only printed when the
+            availability data gave a count for every night; never a guess. */}
+        {isDorm && dormBedsLeft != null && (
+          <p
+            className="text-xs"
+            data-testid="dorm-beds-left"
+            style={{ margin: '6px 0 0', fontWeight: 600, color: dormBedsLeft <= 2 ? '#b45309' : 'var(--text-muted, #6b5a55)' }}
+          >
+            {dormBedCount != null
+              ? `${dormBedsLeft} of ${dormBedCount} ${dormBedCount === 1 ? 'bed' : 'beds'} left`
+              : `${dormBedsLeft} ${dormBedsLeft === 1 ? 'bed' : 'beds'} left`}
+          </p>
+        )}
+        {dormOverBeds && (
+          <p className="text-xs text-support-error" role="alert" data-testid="dorm-over-beds" style={{ margin: '4px 0 0' }}>
+            Only {dormBedsLeft} {dormBedsLeft === 1 ? 'bed' : 'beds'} left on these dates. Please choose fewer beds.
+          </p>
+        )}
         {publicRatePlans.length > 1 && (
           <div
             className="bw-rate-plan-selector"
@@ -2420,6 +2500,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <span>Total</span>
             <span className="lv-num">{displayPrice(isNaN(finalTotal) ? 0 : Math.max(1, finalTotal))}</span>
           </div>
+          {/* HSL-011: the all-in Total above divided by the beds, so a group sees what ONE bed costs them. */}
+          {isDorm && guests > 1 && !isNaN(finalTotal) && finalTotal > 0 && (
+            <p className="text-xs" data-testid="dorm-per-bed-total" style={{ margin: '4px 0 0', color: 'var(--text-muted, #6b5a55)' }}>
+              About {displayPrice(Math.round(finalTotal / guests))} per bed, all in
+            </p>
+          )}
         </div>
         )}
         </div>

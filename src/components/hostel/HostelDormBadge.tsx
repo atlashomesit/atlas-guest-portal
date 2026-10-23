@@ -1,25 +1,25 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { parseDormGenderPolicy, type DormGenderPolicy } from '@/utils/dormListing';
 
-export type GenderPolicy = 'FemaleOnly' | 'MaleOnly' | 'Mixed';
+export type GenderPolicy = DormGenderPolicy;
 
 export interface HostelDormBadgeProps {
   accommodationType?: string | null;
   propertyType?: string | null;
-  name?: string | null;
+  /**
+   * HSL-011: `Listing.DormGenderPolicy` straight from the API. Missing / unrecognised = the host has not
+   * stated a rule, so NO gender chip is shown (the listing name is never read to guess one).
+   */
   genderPolicy?: GenderPolicy | string | null;
-  showPolicyConfirmation?: boolean;
-  onPolicyConfirmed?: (confirmed: boolean) => void;
   className?: string;
 }
 
 export function isHostelDorm(props: {
   accommodationType?: string | null;
   propertyType?: string | null;
-  name?: string | null;
 }): boolean {
   const acc = (props.accommodationType || '').toLowerCase();
   const prop = (props.propertyType || '').toLowerCase();
-  const n = (props.name || '').toLowerCase();
 
   return (
     acc === 'hosteldorm' ||
@@ -27,50 +27,28 @@ export function isHostelDorm(props: {
     acc.includes('dorm') ||
     prop.includes('dorm') ||
     acc.includes('hostel') ||
-    prop.includes('hostel') ||
-    /\b(dorm|dormitory|bunk bed|bed in dorm)\b/i.test(n)
+    prop.includes('hostel')
   );
 }
 
-export function resolveGenderPolicy(
-  policy?: string | null,
-  name?: string | null
-): GenderPolicy {
-  const pol = (policy || '').toLowerCase();
-  const n = (name || '').toLowerCase();
-
-  if (pol === 'femaleonly' || pol.includes('female') || /\b(female[- ]only|women[- ]only|girls)\b/i.test(n)) {
-    return 'FemaleOnly';
-  }
-  if (pol === 'maleonly' || (pol.includes('male') && !pol.includes('female')) || /\b(male[- ]only|men[- ]only|boys)\b/i.test(n)) {
-    return 'MaleOnly';
-  }
-  return 'Mixed';
+/** The API's own value, or null when it states none. Never inferred from the listing name. */
+export function resolveGenderPolicy(policy?: string | null): GenderPolicy | null {
+  return parseDormGenderPolicy(policy);
 }
 
 export const HostelDormBadge: React.FC<HostelDormBadgeProps> = ({
   accommodationType,
   propertyType,
-  name,
-  genderPolicy: explicitPolicy,
-  showPolicyConfirmation = false,
-  onPolicyConfirmed,
+  genderPolicy,
   className = '',
 }) => {
-  const isDorm = isHostelDorm({ accommodationType, propertyType, name });
-  const [confirmed, setConfirmed] = useState(false);
+  const isDorm = isHostelDorm({ accommodationType, propertyType });
 
   if (!isDorm) {
     return null;
   }
 
-  const gender = resolveGenderPolicy(explicitPolicy, name);
-
-  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const isChecked = e.target.checked;
-    setConfirmed(isChecked);
-    onPolicyConfirmed?.(isChecked);
-  };
+  const gender = resolveGenderPolicy(genderPolicy);
 
   return (
     <div className={`space-y-2 ${className}`} data-testid="hostel-dorm-container">
@@ -113,38 +91,6 @@ export const HostelDormBadge: React.FC<HostelDormBadgeProps> = ({
           </span>
         )}
       </div>
-
-      {showPolicyConfirmation && (gender === 'FemaleOnly' || gender === 'MaleOnly') && (
-        <div
-          className="rounded-lg border border-amber-300 bg-amber-50/70 p-3 text-xs text-amber-950 space-y-2"
-          data-testid="hostel-gender-policy-notice"
-        >
-          <div className="font-semibold text-amber-900 flex items-center gap-1.5">
-            <span>⚠️</span>
-            <span>
-              {gender === 'FemaleOnly' ? 'Strict Female-Only Policy' : 'Strict Male-Only Policy'}
-            </span>
-          </div>
-          <p className="leading-relaxed">
-            {gender === 'FemaleOnly'
-              ? 'This dormitory bed is strictly reserved for female travelers. Male guests will not be permitted to check in to this room and bookings are non-refundable for gender policy violations.'
-              : 'This dormitory bed is strictly reserved for male travelers. Female guests will not be permitted to check in to this room and bookings are non-refundable for gender policy violations.'}
-          </p>
-          <label className="flex items-start gap-2 pt-1 cursor-pointer font-medium">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={handleCheckboxChange}
-              data-testid="hostel-gender-policy-checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-700 focus:ring-amber-500"
-            />
-            <span>
-              I confirm that all guests staying in this dorm bed comply with the{' '}
-              {gender === 'FemaleOnly' ? 'female-only' : 'male-only'} policy.
-            </span>
-          </label>
-        </div>
-      )}
     </div>
   );
 };
