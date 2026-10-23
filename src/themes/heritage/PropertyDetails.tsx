@@ -65,6 +65,7 @@ import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
 import { centroidForCity } from '@/utils/mapCoords';
 import { readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
+import { readClusterListingFields } from '@/utils/clusterListing';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
@@ -384,6 +385,9 @@ interface Property {
     dormGenderPolicy?: DormGenderPolicy | null;
     /** HSL-011: total beds in the dorm (Listing.Quantity). */
     dormBedCount?: number | null;
+    /** CLU-011: `PublicListingDto.ClusterRole` / `.ClusterId` (API only). */
+    clusterRole?: string | null;
+    clusterId?: number | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -426,6 +430,8 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         accommodationType: item.accommodationType ?? null,
         dormGenderPolicy: item.dormGenderPolicy ?? null,
         dormBedCount: item.dormBedCount ?? null,
+        clusterRole: item.clusterRole ?? null,
+        clusterId: item.clusterId ?? null,
     };
 }
 
@@ -856,6 +862,10 @@ const PropertyDetails = () => {
                     if (dorm.accommodationType !== (prev.accommodationType ?? null)) updates.accommodationType = dorm.accommodationType;
                     if (dorm.dormGenderPolicy !== (prev.dormGenderPolicy ?? null)) updates.dormGenderPolicy = dorm.dormGenderPolicy;
                     if (dorm.bedCount !== (prev.dormBedCount ?? null)) updates.dormBedCount = dorm.bedCount;
+                    // CLU-011: cluster role/id from the listing detail payload only.
+                    const cluster = readClusterListingFields(d);
+                    if (cluster.clusterRole !== (prev.clusterRole ?? null)) updates.clusterRole = cluster.clusterRole;
+                    if (cluster.clusterId !== (prev.clusterId ?? null)) updates.clusterId = cluster.clusterId;
                     const prevGallery = filterGuestImageUrls(prev.property_img ?? []);
                     if (hydratedImages.length > prevGallery.length) {
                         updates.property_img = hydratedImages;
@@ -1287,6 +1297,8 @@ const PropertyDetails = () => {
                                 dormBedCount: dorm.bedCount,
                             };
                         })(),
+                        // CLU-011: cluster role/id, API payload only.
+                        ...readClusterListingFields(apiListing as Record<string, unknown>),
                     };
                     const images = filterGuestImageUrls(
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
@@ -2816,6 +2828,8 @@ useEffect(() => {
                         accommodationType={data.accommodationType ?? null}
                         dormGenderPolicy={data.dormGenderPolicy ?? null}
                         dormBedCount={data.dormBedCount ?? null}
+                        clusterRole={data.clusterRole ?? null}
+                        clusterId={data.clusterId ?? null}
                         onStickySummaryChange={setStickyBookingSummary}
                         tenantContext={effectiveTenantCtx}
                       />

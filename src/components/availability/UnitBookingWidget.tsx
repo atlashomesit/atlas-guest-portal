@@ -50,7 +50,8 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
-import ParentChildCrossSellBanner, { isParentListing } from '../cluster/ParentChildCrossSellBanner';
+import ParentChildCrossSellBanner, { isParentListing, type ChildRoomPreview } from '../cluster/ParentChildCrossSellBanner';
+import { fetchClusterChildrenAvailability, type ClusterChildrenAvailability } from '@/api/clusterChildrenClient';
 import HostelDormBadge from '../hostel/HostelDormBadge';
 import { bedsLeftForNights, isHostelDormType, type DormGenderPolicy } from '@/utils/dormListing';
 import { track } from '@/lib/events'; // TASK-1480
@@ -111,6 +112,8 @@ interface UnitBookingWidgetProps {
   /** CLU-004: parent cluster indicator for child room cross-sell */
   isParentCluster?: boolean;
   clusterRole?: string | null;
+  /** CLU-011: `PublicListingDto.ClusterId` - a Parent only has Children to offer when it belongs to a cluster. */
+  clusterId?: number | null;
   accommodationType?: string | null;
   /** HSL-011: `Listing.DormGenderPolicy` from the API (HostelDorm only). Never guessed from the listing name. */
   dormGenderPolicy?: DormGenderPolicy | null;
@@ -206,6 +209,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   tenantContext,
   isParentCluster,
   clusterRole,
+  clusterId,
   accommodationType,
   dormGenderPolicy = null,
   dormBedCount = null,
@@ -1443,6 +1447,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const datesUnavailable =
     availabilityConflict || checkinUnavailable || availabilityFailed || listingLookupFailed;
 
+  // CLU-011: role comes from the public listing payload only (no name guessing).
+  const isParentOfCluster =
+    clusterId != null && isParentListing({ isParentCluster, clusterRole, accommodationType });
+  const crossSellCheckIn = dateRange.startDate ? toCalendarISO(dateRange.startDate) : null;
+  const crossSellCheckOut = dateRange.endDate ? toCalendarISO(dateRange.endDate) : null;
+  const [clusterAvailability, setClusterAvailability] = useState<ClusterChildrenAvailability | null>(null);
+  useEffect(() => {
+    setClusterAvailability(null);
+    if (!isParentOfCluster || !datesUnavailable || !listingId || !crossSellCheckIn || !crossSellCheckOut) return;
+    const ac = new AbortController();
+    void fetchClusterChildrenAvailability(
+      Number(listingId), crossSellCheckIn, crossSellCheckOut, verifiedTenantSlug, ac.signal,
+    ).then((result) => {
+      if (!ac.signal.aborted) setClusterAvailability(result);
+    });
+    return () => ac.abort();
+  }, [isParentOfCluster, datesUnavailable, listingId, crossSellCheckIn, crossSellCheckOut, verifiedTenantSlug]);
+
   // TASK-102023: gate range pricing pending, fallback estimate, and Reserve on the failure state
   // covering the selected range. If the selected range falls within the shown month, use that
   // fetch's failure state; otherwise use the selected-range fetch's failure state.
@@ -2594,10 +2616,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {datesUnavailable && (
         <div className="mt-3">
           <ParentChildCrossSellBanner
-            isParentCluster={Boolean(isParentCluster || isParentListing({ name: listingName, clusterRole, accommodationType }))}
+            isParentCluster={isParentOfCluster}
             isUnavailable={Boolean(datesUnavailable)}
             parentName={listingName}
-            onBrowseRooms={() => navigate('/search')}
+            availability={clusterAvailability}
+            checkIn={crossSellCheckIn}
+            checkOut={crossSellCheckOut}
+            propertySlug={propertySlug}
+            onSelectChildRoom={(room: ChildRoomPreview) => room.href && navigate(room.href)}
           />
         </div>
       )}
