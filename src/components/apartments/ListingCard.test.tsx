@@ -78,6 +78,39 @@ describe('TASK-101158: ListingCard Razorpay chip is gated by hasOnlinePaymentRai
 });
 
 
+describe('HSL-011: ListingCard dorm badge reads the gender rule from the API only', () => {
+  afterEach(cleanup);
+  const renderDorm = (name: string, extra: { accommodationType?: string; dormGenderPolicy?: string | null }) => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    return render(
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingCard
+            id="9" name={name} location="Goa" image="" price={799} rating={0} reviews={0}
+            propertyType="Homestay" guests={6} petFriendly={false} {...extra}
+          />
+        </BookingProvider>
+      </CurrencyProvider>,
+    );
+  };
+
+  it('shows the API policy chip', () => {
+    renderDorm('6-Bed Dorm', { accommodationType: 'HostelDorm', dormGenderPolicy: 'MaleOnly' });
+    expect(screen.getByTestId('hostel-gender-badge-male')).toBeInTheDocument();
+  });
+
+  it('a name that says Female-Only does not make a chip when the API states no policy', () => {
+    renderDorm('6-Bed Female-Only Dorm', { accommodationType: 'HostelDorm', dormGenderPolicy: null });
+    expect(screen.getByTestId('hostel-dorm-base-badge')).toBeInTheDocument();
+    expect(screen.queryByTestId('hostel-gender-badge-female')).toBeNull();
+  });
+
+  it('a dorm-named listing that is not a HostelDorm shows no dorm badge at all', () => {
+    renderDorm('Bed in Dormitory Villa', {});
+    expect(screen.queryByTestId('hostel-dorm-container')).toBeNull();
+  });
+});
+
 describe('ListingCard independent controls', () => {
   afterEach(cleanup);
   it('keeps review keyboard events independent of opening the room', () => {

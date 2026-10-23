@@ -34,6 +34,8 @@ type ListingCardProps = {
   reviewCount?: number | null;
   propertyType: string;
   accommodationType?: string;
+  /** HSL-011: `Listing.DormGenderPolicy` from the API (FemaleOnly / MaleOnly / Mixed); never guessed from the name. */
+  dormGenderPolicy?: string | null;
   guests: number;
   bedrooms?: number | null;
   hasWifi?: boolean;
@@ -89,6 +91,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   reviewCount,
   propertyType,
   accommodationType,
+  dormGenderPolicy,
   guests,
   bedrooms,
   hasWifi,
@@ -307,7 +310,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
         <HostIdentityLabel marketplace={marketplace} verified={hostIdentityVerified} />
 
-        <HostelDormBadge accommodationType={accommodationType || propertyType} propertyType={propertyType} name={name} />
+        <HostelDormBadge accommodationType={accommodationType || propertyType} propertyType={propertyType} genderPolicy={dormGenderPolicy} />
 
         {/* TASK-1360: Last-booked social-proof badge */}
         {lastBookedLabel && (
