@@ -3,6 +3,17 @@ import { parseDormGenderPolicy, type DormGenderPolicy } from '@/utils/dormListin
 
 export type GenderPolicy = DormGenderPolicy;
 
+export function formatBedType(type?: string | null): string {
+  if (!type) return '';
+  const normalized = type.toLowerCase().replace(/[-_]/g, ' ').trim();
+  if (normalized.includes('lower')) return 'Lower Bunk';
+  if (normalized.includes('upper')) return 'Upper Bunk';
+  if (normalized.includes('single')) return 'Single Bed';
+  if (normalized.includes('double')) return 'Double Bed';
+  if (normalized.includes('bunk')) return 'Bunk Bed';
+  return type.charAt(0).toUpperCase() + type.slice(1);
+}
+
 export interface HostelDormBadgeProps {
   accommodationType?: string | null;
   propertyType?: string | null;
@@ -11,6 +22,11 @@ export interface HostelDormBadgeProps {
    * stated a rule, so NO gender chip is shown (the listing name is never read to guess one).
    */
   genderPolicy?: GenderPolicy | string | null;
+  /**
+   * TASK-1039778: Bed type label (e.g. "Lower Bunk", "Upper Bunk", "Single Bed")
+   */
+  bedType?: string | null;
+  bedTypes?: string[] | null;
   className?: string;
 }
 
@@ -40,6 +56,8 @@ export const HostelDormBadge: React.FC<HostelDormBadgeProps> = ({
   accommodationType,
   propertyType,
   genderPolicy,
+  bedType,
+  bedTypes,
   className = '',
 }) => {
   const isDorm = isHostelDorm({ accommodationType, propertyType });
@@ -49,6 +67,11 @@ export const HostelDormBadge: React.FC<HostelDormBadgeProps> = ({
   }
 
   const gender = resolveGenderPolicy(genderPolicy);
+  const resolvedBedTypes = bedTypes?.length
+    ? bedTypes.map(formatBedType).filter(Boolean)
+    : bedType
+      ? [formatBedType(bedType)].filter(Boolean)
+      : [];
 
   return (
     <div className={`space-y-2 ${className}`} data-testid="hostel-dorm-container">
@@ -90,6 +113,17 @@ export const HostelDormBadge: React.FC<HostelDormBadgeProps> = ({
             <span>Mixed Dorm</span>
           </span>
         )}
+
+        {resolvedBedTypes.map((label, idx) => (
+          <span
+            key={`bed-type-${idx}-${label}`}
+            className="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-xs font-semibold text-indigo-800 shadow-sm"
+            data-testid="hostel-bed-type-badge"
+          >
+            <span aria-hidden="true">🛌</span>
+            <span>{label}</span>
+          </span>
+        ))}
       </div>
     </div>
   );

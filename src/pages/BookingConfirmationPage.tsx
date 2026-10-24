@@ -150,12 +150,50 @@ function buildBookingIcsContent(args: {
   ].join("\r\n");
 }
 
+/**
+ * TASK-103121: Clean phone formatting with dial code / international format (+91 for India).
+ */
+export function formatCleanInternationalPhone(raw?: string | null): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return trimmed;
+  // If bare 10-digit Indian national number, format with +91
+  if (digits.length === 10) {
+    return `+91${digits}`;
+  }
+  // If 12 digits starting with 91
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return `+${digits}`;
+  }
+  if (trimmed.startsWith("+")) {
+    return trimmed;
+  }
+  return `+${digits}`;
+}
+
+/**
+ * TASK-103121: Standard clean phone digits for wa.me links:
+ * - Digits only (no spaces, hyphens, plus signs or special characters)
+ * - Standard international format without +
+ * - Prepends 91 for 10-digit Indian numbers
+ */
+export function cleanWaPhoneDigits(raw?: string | null): string {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
+}
+
 interface BookingSummary {
   bookingId: number;
   /** Omitted on very old API responses; pre-arrival link hidden if missing. */
   listingId?: number;
   guestId?: number;
   guestName: string;
+  guestPhone?: string;
   propertyName: string;
   listingName: string;
   checkinDate: string;
@@ -719,25 +757,29 @@ export default function BookingConfirmationPage() {
   // getContactPhone() now returns "" for white-label tenants with no configured number —
   // never build a tel: or wa.me link with an empty number (cross-tenant leak guard).
   const resolvedFallbackPhone = getContactPhone();
-  const hostPhone = hasRealHostPhone
+  const rawHostPhone = hasRealHostPhone
     ? booking.propertyPhone!.trim()
     : resolvedFallbackPhone
       ? `+91${resolvedFallbackPhone}`
       : "";
+  const hostPhone = formatCleanInternationalPhone(rawHostPhone);
   const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
-  const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
+  const whatsappDigits = cleanWaPhoneDigits(hostPhone);
   // True when there is a real number to contact (either the property's own phone or the
   // tenant's configured fallback). False for white-label tenants with no number set.
   const hasWhatsAppContact = (hasRealHostPhone || hasHostContact()) && whatsappDigits.length > 0;
   const supportEmail = getContactEmail();
-  const confirmationNotifyPhone = "";
+  const rawGuestPhone =
+    booking.guestPhone ||
+    (typeof window !== "undefined" ? window.localStorage.getItem("atlas_guest_phone") || "" : "");
+  const confirmationNotifyPhone = formatCleanInternationalPhone(rawGuestPhone);
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
-  const whatsappUrl = hasWhatsAppContact ? `https://wa.me/${whatsappDigits}?text=${whatsappText}` : "";
+  const whatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${whatsappText}` : "";
   // GUEST-026: Direct pre-filled WhatsApp link with booking reference and guest name
   const messageHostWhatsappText = encodeURIComponent(
     `Hi, I have a confirmed booking (#${booking.bookingId})${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Looking forward to my stay!`
   );
-  const messageHostWhatsappUrl = hasWhatsAppContact ? `https://wa.me/${whatsappDigits}?text=${messageHostWhatsappText}` : "";
+  const messageHostWhatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${messageHostWhatsappText}` : "";
   // GUEST-031/GUEST-030: canonical check-in deep-link, carries the booking token.
   const hubCheckinPath = booking.bookingRef && (token || booking.status === "Confirmed" || booking.status === "CheckedIn")
     ? `/check-in/${encodeURIComponent(booking.bookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ""}`
@@ -1468,7 +1510,7 @@ export default function BookingConfirmationPage() {
                 <InfoRow label="Check-in instructions" value={booking.checkinInstructions} />
               )}
               {booking.propertyPhone && (
-                <InfoRow label="Property contact" value={booking.propertyPhone} />
+                <InfoRow label="Property contact" value={formatCleanInternationalPhone(booking.propertyPhone)} />
               )}
               {!booking.checkinInstructions && !booking.propertyPhone && !booking.propertyAddress && (
                 <p className="text-sm text-text-secondary">Check-in instructions will be sent to you 24 hours before arrival.</p>
@@ -1680,7 +1722,7 @@ export default function BookingConfirmationPage() {
                   <p>
                     📧 Email confirmation should arrive shortly
                     {confirmationNotifyPhone ? (
-                      <> at <span className="font-medium text-text-primary">{confirmationNotifyPhone}</span></>
+                      <> at <span className="font-medium text-text-primary" data-testid="guest-confirmation-phone">{confirmationNotifyPhone}</span></>
                     ) : (
                       <> on the email you entered at checkout</>
                     )}
@@ -1773,7 +1815,8 @@ export default function BookingConfirmationPage() {
                 const addOnText = encodeURIComponent(
                   `Hi, I just booked #${booking!.bookingId} and I'd like to add: ${addOn.name} (${booking!.currency} ${addOn.price}${priceLabel}). Please confirm.`
                 );
-                const addOnWhatsapp = `https://wa.me/${whatsappDigits}?text=${addOnText}`;
+                const cleanPhone = cleanWaPhoneDigits(whatsappDigits);
+                const addOnWhatsapp = cleanPhone ? `https://wa.me/${cleanPhone}?text=${addOnText}` : "";
                 return (
                   <div key={addOn.addOnServiceId} className="flex items-center justify-between gap-3 bg-bg-surface rounded-xl border border-border-subtle px-4 py-3">
                     <div className="min-w-0">
@@ -1803,7 +1846,7 @@ export default function BookingConfirmationPage() {
               {hasWhatsAppContact && (
                 <>
                   Call or WhatsApp us at{" "}
-                  <a href={`tel:${hostPhoneDigits}`} className="text-brand-primary font-medium">{hostPhone}</a>
+                  <a href={`tel:${hostPhoneDigits.startsWith('+') ? hostPhoneDigits : `+${hostPhoneDigits}`}`} className="text-brand-primary font-medium" data-testid="host-phone-link">{hostPhone}</a>
                   {supportEmail && <>{" "}or email{" "}<a href={`mailto:${supportEmail}`} className="text-brand-primary font-medium">{supportEmail}</a></>}.
                 </>
               )}
