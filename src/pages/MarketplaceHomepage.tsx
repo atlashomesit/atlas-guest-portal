@@ -22,6 +22,8 @@ import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
 import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
+import { resolveAmenityLabel } from '@/utils/amenityCodes';
+import { isHostelDormType } from '@/utils/dormListing';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
 import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
@@ -76,7 +78,37 @@ type MarketplaceItem = {
   amenityCodes?: string[];
   amenities?: (string | { code?: string; name?: string; title?: string })[];
   description?: string;
+  propertyType?: string | null;
+  accommodationType?: string | null;
+  category?: string | null;
 };
+
+/**
+ * TASK-1039954: Resolves property type badge ("Homestay", "Villa", "B&B", "Hostel", "Hotel")
+ * for marketplace property cards with clean tag alignment.
+ */
+export function resolvePropertyTypeBadge(item: {
+  propertyType?: string | null;
+  accommodationType?: string | null;
+  category?: string | null;
+  title?: string | null;
+  name?: string | null;
+}): string {
+  const raw = `${item.propertyType || ''} ${item.category || ''} ${item.accommodationType || ''}`.toLowerCase();
+  if (raw.includes('hostel') || raw.includes('dorm') || isHostelDormType(item.accommodationType)) return 'Hostel';
+  if (raw.includes('villa')) return 'Villa';
+  if (raw.includes('b&b') || raw.includes('bnb') || raw.includes('bed & breakfast') || raw.includes('bed and breakfast') || raw.includes('guesthouse') || raw.includes('guest house')) return 'B&B';
+  if (raw.includes('hotel') || raw.includes('resort')) return 'Hotel';
+  if (raw.includes('homestay') || raw.includes('apartment') || raw.includes('home') || raw.includes('cottage') || raw.includes('studio')) return 'Homestay';
+
+  const text = `${item.title || ''} ${item.name || ''}`.toLowerCase();
+  if (text.includes('hostel') || text.includes('dorm')) return 'Hostel';
+  if (text.includes('villa')) return 'Villa';
+  if (text.includes('b&b') || text.includes('bnb')) return 'B&B';
+  if (text.includes('hotel')) return 'Hotel';
+
+  return 'Homestay';
+}
 
 /**
  * TASK-10299086: Resolves guest-facing display name for marketplace listing cards.
@@ -854,12 +886,59 @@ export default function MarketplaceHomepage() {
                     </div>
                   )}
 
-                  {/* TASK-1873: neighborhood/city chip */}
-                  {item.city && (
-                    <span className="w-fit rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-text-secondary">
-                      {item.city}
-                    </span>
-                  )}
+                  {/* TASK-1039954: Aligned property type badge and amenity chips */}
+                  {(() => {
+                    const propertyTypeBadge = resolvePropertyTypeBadge(item);
+                    const isHostel = propertyTypeBadge === 'Hostel' || isHostelDormType(item.accommodationType);
+                    const rawAmenities: string[] = [
+                      ...(Array.isArray(item.amenityCodes) ? item.amenityCodes : []),
+                      ...(Array.isArray(item.amenities)
+                        ? item.amenities.map((a) => (typeof a === 'string' ? a : a.title || a.name || a.code || ''))
+                        : []),
+                    ].filter(Boolean);
+                    const amenityChips = Array.from(
+                      new Set(
+                        rawAmenities
+                          .map((c) => resolveAmenityLabel(c))
+                          .filter((l): l is string => Boolean(l)),
+                      ),
+                    ).slice(0, 3);
+
+                    return (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5" data-testid="marketplace-card-tags">
+                          <span
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200"
+                            data-testid="property-type-badge"
+                          >
+                            {propertyTypeBadge}
+                          </span>
+                          {item.city && (
+                            <span className="w-fit rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-text-secondary" data-testid="marketplace-city-badge">
+                              {item.city}
+                            </span>
+                          )}
+                          {amenityChips.map((chip) => (
+                            <span
+                              key={chip}
+                              className="inline-flex items-center gap-1 rounded-md bg-neutral-50 border border-neutral-200/80 px-2 py-0.5 text-xs text-neutral-600"
+                              data-testid="marketplace-amenity-chip"
+                            >
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
+                        {isHostel && (
+                          <span
+                            className="inline-flex items-center self-start rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-semibold text-indigo-700"
+                            data-testid="hostel-per-bed-indicator"
+                          >
+                            Starting from per bed
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
 

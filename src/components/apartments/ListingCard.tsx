@@ -1,5 +1,5 @@
 import HostIdentityLabel from '@/components/property/HostIdentityLabel';
-import HostelDormBadge from '../hostel/HostelDormBadge';
+import HostelDormBadge, { isHostelDorm } from '../hostel/HostelDormBadge';
 import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 import React, { useMemo, useState } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
@@ -222,6 +222,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
     },
   ].filter((item) => item.visible);
 
+  const isHostel = isHostelDorm({ accommodationType: accommodationType || propertyType, propertyType });
+
   return (
     <article
       className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1"
@@ -380,6 +382,14 @@ const ListingCard: React.FC<ListingCardProps> = ({
                       {formatCurrency(originalPrice)}
                     </span>
                   )}
+                  {isHostel && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-semibold text-indigo-700"
+                      data-testid="hostel-per-bed-indicator"
+                    >
+                      Starting from per bed
+                    </span>
+                  )}
                   <div className="text-2xl font-bold leading-tight text-cta-primary">
                     {showTotal && processingFeePercent !== null ? (
                       <>
@@ -392,7 +402,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     ) : (
                       <>
                         {formatCurrency(finalPrice)}
-                        <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
+                        <span className="ml-1 text-sm font-semibold text-text-muted" data-testid="price-unit-label">
+                          {isHostel ? 'per bed / night' : '/ night'}
+                        </span>
                       </>
                     )}
                   </div>

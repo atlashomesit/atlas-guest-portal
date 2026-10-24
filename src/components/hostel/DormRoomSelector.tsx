@@ -2,6 +2,9 @@ import React from 'react';
 import HostelDormBadge, { formatBedType } from './HostelDormBadge';
 import { type DormGenderPolicy } from '@/utils/dormListing';
 
+export const DORM_GENDER_FILTERS = ['All', 'Mixed Dorm', 'Female Only', 'Male Only'] as const;
+export type DormGenderFilter = (typeof DORM_GENDER_FILTERS)[number];
+
 export interface DormBedOption {
   id: string | number;
   bedType: string; // e.g. "Lower Bunk", "Upper Bunk", "Single Bed"
@@ -10,6 +13,7 @@ export interface DormBedOption {
   currency?: string;
   availableBeds?: number;
   amenities?: string[];
+  genderPolicy?: DormGenderPolicy | string | null;
 }
 
 export interface DormRoomSelectorProps {
@@ -20,6 +24,8 @@ export interface DormRoomSelectorProps {
   selectedBedId?: string | number | null;
   selectedBedsCount?: number;
   maxBedsSelectable?: number;
+  selectedGenderFilter?: DormGenderFilter | string | null;
+  onGenderFilterChange?: (filter: DormGenderFilter | string) => void;
   onSelectBed?: (bedId: string | number) => void;
   onCountChange?: (count: number) => void;
   className?: string;
@@ -45,11 +51,34 @@ export const DormRoomSelector: React.FC<DormRoomSelectorProps> = ({
   selectedBedId,
   selectedBedsCount = 1,
   maxBedsSelectable = 8,
+  selectedGenderFilter,
+  onGenderFilterChange,
   onSelectBed,
   onCountChange,
   className = '',
 }) => {
-  const currentBedId = selectedBedId ?? (bedOptions[0]?.id || null);
+  const [internalGenderFilter, setInternalGenderFilter] = React.useState<string>('All');
+  const activeFilter = selectedGenderFilter ?? internalGenderFilter;
+
+  const handleFilterClick = (filter: string) => {
+    setInternalGenderFilter(filter);
+    onGenderFilterChange?.(filter);
+  };
+
+  const displayedBedOptions = React.useMemo(() => {
+    if (!activeFilter || activeFilter === 'All') return bedOptions;
+    const normalizedFilter = activeFilter.toLowerCase().replace(/[^a-z]/g, '');
+    const filtered = bedOptions.filter((opt) => {
+      const optPolicy = (opt.genderPolicy || dormGenderPolicy || '').toLowerCase().replace(/[^a-z]/g, '');
+      if (normalizedFilter.includes('female')) return optPolicy.includes('female');
+      if (normalizedFilter.includes('male')) return optPolicy.includes('male') && !optPolicy.includes('female');
+      if (normalizedFilter.includes('mixed')) return optPolicy.includes('mixed') || !optPolicy;
+      return true;
+    });
+    return filtered.length > 0 ? filtered : bedOptions;
+  }, [bedOptions, activeFilter, dormGenderPolicy]);
+
+  const currentBedId = selectedBedId ?? (displayedBedOptions[0]?.id || null);
 
   const handleDecrease = () => {
     if (onCountChange && selectedBedsCount > 1) {
@@ -83,13 +112,42 @@ export const DormRoomSelector: React.FC<DormRoomSelectorProps> = ({
         />
       </div>
 
+      {/* Gender filter selector (TASK-10299109 & TASK-1039779) */}
+      <div className="space-y-2 pt-1" data-testid="dorm-gender-filter-selector">
+        <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
+          Filter Dorm Beds by Gender
+        </span>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Gender filter">
+          {DORM_GENDER_FILTERS.map((filter) => {
+            const isActive = activeFilter === filter;
+            const filterKey = filter.toLowerCase().replace(/\s+/g, '-');
+            return (
+              <button
+                key={filter}
+                type="button"
+                data-testid={`gender-filter-${filterKey}`}
+                aria-pressed={isActive}
+                onClick={() => handleFilterClick(filter)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                  isActive
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                    : 'bg-neutral-50 text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                }`}
+              >
+                {filter}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Bed Type Selection Options */}
       <div className="space-y-3" role="radiogroup" aria-label="Bed type selection">
         <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
           Choose Bed Type
         </span>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {bedOptions.map((option) => {
+          {displayedBedOptions.map((option) => {
             const isSelected = currentBedId === option.id;
             const formattedType = formatBedType(option.bedType);
             const isAvailable = option.availableBeds == null || option.availableBeds > 0;
@@ -140,9 +198,14 @@ export const DormRoomSelector: React.FC<DormRoomSelectorProps> = ({
                     </span>
                   )}
                   {option.pricePerBed != null && (
-                    <span className="font-semibold text-neutral-900 ml-auto">
-                      {option.currency || '₹'}{option.pricePerBed}
-                      <span className="text-[10px] font-normal text-neutral-500">/night</span>
+                    <span className="font-semibold text-neutral-900 ml-auto flex items-center gap-1" data-testid="dorm-bed-price">
+                      <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5" data-testid="per-bed-indicator">
+                        per bed
+                      </span>
+                      <span>
+                        {option.currency || '₹'}{option.pricePerBed}
+                        <span className="text-[10px] font-normal text-neutral-500">/night</span>
+                      </span>
                     </span>
                   )}
                 </div>
