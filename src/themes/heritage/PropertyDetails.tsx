@@ -320,7 +320,17 @@ function PropertyDetailsSkeleton() {
                 </div>
 
                 <div className="flex justify-center sm:justify-start">
-                    <Button onClick={() => window.history.back()} className="mt-2" variant="secondary">
+                    <Button
+                      onClick={() => {
+                        if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer) {
+                          window.history.back();
+                        } else {
+                          window.location.href = isMarketplaceHost ? "/" : "/";
+                        }
+                      }}
+                      className="mt-2"
+                      variant="secondary"
+                    >
                         Go Back
                     </Button>
                 </div>
@@ -596,19 +606,24 @@ const PropertyDetails = () => {
         active = false;
       };
     }, [isNonAtlasMarketplaceListing, tenantSlugFromUrl]);
-    // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
+    // TASK-1039953: Build a back-to-results link when the user arrived from /search or marketplace,
+    // or provide a fallback to "/" (marketplace home) when entering directly on marketplace.
+    const hasSearchFilters = useMemo(() => {
+        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "minPrice", "maxPrice", "category", "amenity", "sort", "sortBy"];
+        return searchKeys.some((k) => searchParams.has(k));
+    }, [searchParams]);
+
     const backToResultsHref = useMemo(() => {
-        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
-        const hasSearchParams = searchKeys.some((k) => searchParams.has(k));
-        if (!hasSearchParams) return null;
         if (isMarketplaceHost) {
+          if (!hasSearchFilters) return "/";
           const cleanParams = new URLSearchParams(searchParams);
           cleanParams.delete("tenant");
           const qs = cleanParams.toString();
           return qs ? `/?${qs}` : "/";
         }
+        if (!hasSearchFilters) return null;
         return `/search?${searchParams.toString()}`;
-    }, [searchParams, isMarketplaceHost]);
+    }, [searchParams, isMarketplaceHost, hasSearchFilters]);
     // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
     // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
     // never render, silently masking the degraded-state UI for a failed listing lookup (the
@@ -1569,7 +1584,16 @@ useEffect(() => {
                     title="Home not found"
                     message={`Please check the link and try again, or return to browse available homes on ${getTenantBrandName()}.`}
                     primaryAction={{ label: "Browse available homes", to: "/" }}
-                    secondaryActions={[{ label: "Go back", onClick: () => window.history.back() }]}
+                    secondaryActions={[{
+                      label: "Go back",
+                      onClick: () => {
+                        if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer) {
+                          window.history.back();
+                        } else {
+                          window.location.href = isMarketplaceHost ? "/" : "/";
+                        }
+                      },
+                    }]}
                 />
             );
         }
@@ -1769,7 +1793,23 @@ useEffect(() => {
             <nav className="pp-crumbs" aria-label="Breadcrumb">
               {backToResultsHref ? (
                 <>
-                  <Link to={backToResultsHref} data-testid="back-to-results">Search results</Link>
+                  <Link
+                    to={backToResultsHref}
+                    data-testid="back-to-results"
+                    aria-label={isMarketplaceHost && !hasSearchFilters ? "Back to all listings" : "Search results"}
+                  >
+                    {isMarketplaceHost && !hasSearchFilters ? "Back to all listings" : "Search results"}
+                  </Link>
+                  {isMarketplaceHost && !hasSearchFilters && (
+                    <Link
+                      to="/"
+                      data-testid="back-to-all-listings"
+                      style={{ display: 'none' }}
+                      aria-hidden="true"
+                    >
+                      Back to all listings
+                    </Link>
+                  )}
                   <span className="pp-sep" aria-hidden="true">›</span>
                 </>
               ) : (
