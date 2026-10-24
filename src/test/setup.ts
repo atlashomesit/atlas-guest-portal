@@ -7,6 +7,9 @@ import { _resetTenantContextForTests } from "../tenant/tenantContext";
 import { _resetAvailabilityCalendarCacheForTests } from "../api/availabilityCalendarClient";
 import { _resetDedupedJsonFetchForTests } from "../api/dedupedJsonFetch";
 import { _resetCurrentLayoutThemeIdForTests } from "../themes/registry";
+import { _clearVerifiedReviewsCacheForTests } from "../hooks/useVerifiedReviews";
+import { _clearTenantListingsCacheForTests } from "../hooks/useTenantListings";
+import { _clearReviewSummaryCacheForTests } from "../components/ReviewSummary";
 
 // Re-arm the real jsdom `window` if a previous test file in this worker replaced
 // the global and leaked it (e.g. `Object.defineProperty(global, "window", ...)`
@@ -44,6 +47,9 @@ _resetTenantContextForTests();
 _resetAvailabilityCalendarCacheForTests();
 _resetDedupedJsonFetchForTests();
 _resetCurrentLayoutThemeIdForTests();
+_clearVerifiedReviewsCacheForTests();
+_clearTenantListingsCacheForTests();
+_clearReviewSummaryCacheForTests();
 // The jsdom side of this (URL, storage, cookies, head/body, window stubs, document.visibilityState) is reset by
 // src/test/sharedWorkerResetSetup.ts, which vitest.config.ts lists BEFORE this file so it runs before any of the
 // imports above are evaluated (TASK-102734, see sharedWorkerHygiene.ts).
