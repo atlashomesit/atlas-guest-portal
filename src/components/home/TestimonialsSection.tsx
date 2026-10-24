@@ -84,15 +84,20 @@ const KindWordsHeader = ({ ratingLine, headline }: { ratingLine?: string; headli
 );
 
 const TestimonialsSection = () => {
-  // TASK-2872: drive testimonials from real verified-stay reviews. Hooks run
-  // unconditionally (rules of hooks) before any early return below.
-  const { properties } = useTenantListings();
+  // TASK-2872 / TASK-1039970: drive testimonials from real verified-stay reviews.
+  // Prioritize listings that have verified reviews according to the public listing DTO,
+  // preventing N+1 queries against units with zero reviews.
+  const { properties, state } = useTenantListings();
   const listingIds = useMemo(
     () =>
-      properties
-        .map((p) => p.listingId)
-        .filter((id): id is number => typeof id === "number" && id > 0),
-    [properties],
+      state === "loading"
+        ? []
+        : properties
+            .slice()
+            .sort((a, b) => (b.property_reviews ?? 0) - (a.property_reviews ?? 0))
+            .map((p) => p.listingId)
+            .filter((id): id is number => typeof id === "number" && id > 0),
+    [properties, state],
   );
   const { reviews } = useVerifiedReviews(listingIds);
   if (enableTestimonialsStatic3) {

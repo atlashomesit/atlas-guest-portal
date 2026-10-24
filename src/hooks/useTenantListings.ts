@@ -241,18 +241,37 @@ const mapDtosToData = (
   return { listings, properties };
 };
 
+let sharedListingsCache: {
+  key: string;
+  data: { listings: Listing[]; properties: TenantPropertyRecord[] };
+  expiresAt: number;
+} | null = null;
+
+export function _clearTenantListingsCacheForTests(): void {
+  sharedListingsCache = null;
+}
+
 export function useTenantListings(): UseTenantListings {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
   const onlyApi = overrides.onlyApiListings === true;
   const filteredFallback = onlyApi ? [] : FALLBACK_PROPERTIES;
   const filteredListings = onlyApi ? [] : FALLBACK_LISTINGS;
+  const tenantKey = tenant?.slug ?? "";
+  const isCacheFresh = Boolean(
+    sharedListingsCache && sharedListingsCache.key === tenantKey && sharedListingsCache.expiresAt > Date.now(),
+  );
 
-  const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>({
-    listings: filteredListings,
-    properties: filteredFallback,
+  const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>(() => {
+    if (isCacheFresh && sharedListingsCache) {
+      return sharedListingsCache.data;
+    }
+    return {
+      listings: filteredListings,
+      properties: filteredFallback,
+    };
   });
-  const [state, setState] = useState<TenantListingsState>("idle");
+  const [state, setState] = useState<TenantListingsState>(() => (isCacheFresh ? "success" : "idle"));
   const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hasFetchedRef = useRef(false);
@@ -271,6 +290,11 @@ export function useTenantListings(): UseTenantListings {
       // TASK-4444: Trust DTO photos — the public DTO already carries photoUrls/coverPhotoUrl
       // Removed per-property photo fetches that were blocking first paint with N HTTP calls
       const mapped = mapDtosToData(dtos);
+      sharedListingsCache = {
+        key: tenantKey,
+        data: mapped,
+        expiresAt: Date.now() + 60_000,
+      };
       setData(mapped);
       setState("success");
     } catch (error) {
@@ -283,16 +307,19 @@ export function useTenantListings(): UseTenantListings {
       );
       setState("error");
     }
-  }, []);
+  }, [tenantKey]);
 
   useEffect(() => {
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
+    if (sharedListingsCache && sharedListingsCache.key === tenantKey && sharedListingsCache.expiresAt > Date.now()) {
+      return;
+    }
     void refetch();
     return () => {
       abortRef.current?.abort();
     };
-  }, [refetch]);
+  }, [refetch, tenantKey]);
 
   return { listings: data.listings, properties: data.properties, state, fetchErrorMessage, refetch };
 }

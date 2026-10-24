@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { settle } from '../test/settle';
-import { useVerifiedReviews } from './useVerifiedReviews';
+import { useVerifiedReviews, _clearVerifiedReviewsCacheForTests } from './useVerifiedReviews';
 
 vi.mock('../api/client', () => ({
   buildApiUrl: (path: string) => `http://localhost${path}`,
@@ -10,6 +10,7 @@ vi.mock('../api/client', () => ({
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  _clearVerifiedReviewsCacheForTests();
 });
 
 describe('useVerifiedReviews (REV-019)', () => {

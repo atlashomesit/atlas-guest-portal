@@ -50,7 +50,41 @@ const firstNameOnly = (full?: string | null): string => {
   return trimmed.split(/\s+/)[0];
 };
 
-const MAX_LISTINGS_QUERIED = 6;
+const MAX_LISTINGS_QUERIED = 2;
+
+type ListingReviewBatch = {
+  nativeReviews: ReviewDto[];
+  externalReviews: ExternalReviewDto[];
+};
+
+const verifiedReviewsCache = new Map<number, { promise: Promise<ListingReviewBatch>; expiresAt: number }>();
+
+export function _clearVerifiedReviewsCacheForTests(): void {
+  verifiedReviewsCache.clear();
+}
+
+function fetchListingReviewBatch(id: number): Promise<ListingReviewBatch> {
+  const now = Date.now();
+  const cached = verifiedReviewsCache.get(id);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+
+  const promise = Promise.all([
+    fetch(buildApiUrl(`/api/listings/${id}/reviews`), { headers: getApiHeaders() })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null),
+    fetch(buildApiUrl(`/api/public/listings/${id}`), { headers: getApiHeaders() })
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null),
+  ]).then(([nativeRes, publicRes]) => ({
+    nativeReviews: (nativeRes?.reviews ?? []) as ReviewDto[],
+    externalReviews: (publicRes?.externalReviews ?? []) as ExternalReviewDto[],
+  }));
+
+  verifiedReviewsCache.set(id, { promise, expiresAt: now + 5 * 60 * 1000 });
+  return promise;
+}
 
 export function useVerifiedReviews(
   listingIds: number[],
@@ -78,26 +112,14 @@ export function useVerifiedReviews(
     setLoading(true);
 
     const targetIds = ids.slice(0, MAX_LISTINGS_QUERIED);
-    Promise.all(
-      targetIds.map(async (id) => {
-        const [nativeRes, publicRes] = await Promise.all([
-          fetch(buildApiUrl(`/api/listings/${id}/reviews`), { headers: getApiHeaders() })
-            .then((res) => (res.ok ? res.json() : null))
-            .catch(() => null),
-          fetch(buildApiUrl(`/api/public/listings/${id}`), { headers: getApiHeaders() })
-            .then((res) => (res.ok ? res.json() : null))
-            .catch(() => null),
-        ]);
-        return {
-          nativeReviews: (nativeRes?.reviews ?? []) as ReviewDto[],
-          externalReviews: (publicRes?.externalReviews ?? []) as ExternalReviewDto[],
-        };
-      }),
-    ).then((results) => {
-      if (!active) return;
 
+    (async () => {
       const collected: VerifiedReview[] = [];
-      for (const res of results) {
+
+      for (const id of targetIds) {
+        if (!active) return;
+        const res = await fetchListingReviewBatch(id);
+
         // Native completed stays
         for (const r of res.nativeReviews) {
           const text = (r.body ?? r.title ?? "").trim();
@@ -111,6 +133,7 @@ export function useVerifiedReviews(
             });
           }
         }
+
         // External verified reviews (Airbnb, Booking.com, Google)
         for (const ext of res.externalReviews) {
           const rating = Number(ext.rating);
@@ -127,12 +150,18 @@ export function useVerifiedReviews(
             });
           }
         }
+
+        // TASK-1039970: Stop as soon as we have enough verified reviews (SLA <= 15 calls)
+        if (collected.length >= max) {
+          break;
+        }
       }
 
+      if (!active) return;
       collected.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
       setReviews(collected.slice(0, max));
       setLoading(false);
-    });
+    })();
 
     return () => {
       active = false;
