@@ -215,4 +215,25 @@ describe('MKT-011: Marketplace detail page listing tenant context resolution', (
       }),
     );
   });
+  it('MKT-031: back-to-results keeps brand=atlastays and utm_* tags', async () => {
+    _setListingTenantContextForTests('atlas', {
+      slug: 'atlas',
+      name: 'Atlas Homes',
+      brandName: 'Atlas Homes',
+      bookingMode: 'ONLINE',
+      paymentProvider: 'RAZORPAY',
+      whatsappBookingPhone: '9502244053',
+    });
+
+    render(renderPage('/homes/comfort-cove/450?tenant=atlas&city=Goa&brand=atlastays&utm_source=ig&utm_campaign=diwali'));
+    await settle();
+
+    const href = screen.getByTestId('back-to-results').getAttribute('href') ?? '';
+    expect(href.startsWith('/?')).toBe(true);
+    const params = new URLSearchParams(href.split('?')[1]);
+    expect(params.get('brand')).toBe('atlastays');
+    expect(params.get('utm_source')).toBe('ig');
+    expect(params.get('utm_campaign')).toBe('diwali');
+    expect(params.get('tenant')).toBeNull();
+  });
 });

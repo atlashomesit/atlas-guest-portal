@@ -180,6 +180,13 @@ export default function MarketplaceHomepage() {
       'children',
       'infants',
       'pets',
+      // MKT-031: marketplace brand switch (QA/preview) + campaign attribution survive the click-through
+      'brand',
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_term',
+      'utm_content',
     ]) {
       const v = searchParams.get(k);
       if (v != null && v !== '') p.set(k, v);
