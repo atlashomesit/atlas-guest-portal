@@ -23,14 +23,15 @@ interface ReviewFunnelConfig {
   googleReviewUrl?: string | null;
 }
 
-function StarButton({ value, selected, hovered, onHover, onClick }: {
-  value: number; selected: boolean; hovered: boolean;
+function StarButton({ value, selected, hovered, category, pressed, onHover, onClick }: {
+  value: number; selected: boolean; hovered: boolean; category: string; pressed: boolean;
   onHover: (v: number) => void; onClick: (v: number) => void;
 }) {
   return (
     <button
       type="button"
-      aria-label={`${value} star${value !== 1 ? "s" : ""}`}
+      aria-label={`${category}: ${value} of 5 stars`}
+      aria-pressed={pressed}
       onClick={() => onClick(value)}
       onMouseEnter={() => onHover(value)}
       onMouseLeave={() => onHover(0)}
@@ -76,12 +77,14 @@ function SubcategoryStars({
   const active = hover || value;
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-text-primary">{label}</p>
-      <div className="flex gap-1" data-testid={rowKey ? `subrating-${rowKey}` : undefined}>
+      <p className="text-sm font-medium text-text-primary">{label} *</p>
+      <div className="flex gap-1" role="group" aria-label={`${label} (required)`} data-testid={rowKey ? `subrating-${rowKey}` : undefined}>
         {[1, 2, 3, 4, 5].map((v) => (
           <StarButton
             key={v}
             value={v}
+            category={label}
+            pressed={v === value}
             selected={v <= value}
             hovered={v <= hover}
             onHover={onHover}
@@ -89,6 +92,7 @@ function SubcategoryStars({
           />
         ))}
       </div>
+      <p className="text-xs mt-1.5" aria-live="polite">{value ? `Selected: ${value} of 5` : "No rating selected"}</p>
       {active > 0 && <p className="text-xs font-semibold text-amber-600">{ratingLabels[active]}</p>}
     </div>
   );
@@ -399,11 +403,13 @@ export default function ReviewSubmitPage() {
 
           {/* Star rating */}
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <p className="text-sm font-medium text-text-primary">Overall rating</p>
-            <div className="flex gap-1" data-testid="overall-rating-stars">
+            <p className="text-sm font-medium text-text-primary">Overall rating *</p>
+            <div className="flex gap-1" role="group" aria-label="Overall rating (required)" data-testid="overall-rating-stars">
               {[1, 2, 3, 4, 5].map((v) => (
                 <StarButton
                   key={v} value={v}
+                  category="Overall rating"
+                  pressed={v === rating}
                   selected={v <= rating}
                   hovered={v <= hoveredRating}
                   onHover={setHoveredRating}
@@ -411,6 +417,7 @@ export default function ReviewSubmitPage() {
                 />
               ))}
             </div>
+            <p className="text-xs mt-1.5" aria-live="polite">{rating ? `Selected: ${rating} of 5` : "No rating selected"}</p>
             {activeRating > 0 && (
               <p className="text-sm font-semibold text-amber-600">{ratingLabels[activeRating]}</p>
             )}
