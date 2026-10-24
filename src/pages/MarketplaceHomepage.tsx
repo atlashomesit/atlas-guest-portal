@@ -46,6 +46,7 @@ type MarketplaceItem = {
   tenantCategory?: string;
   title: string;
   displayName?: string | null;
+  publicTitle?: string | null;
   nameFormatted?: string | null;
   name?: string | null;
   city?: string;
@@ -87,11 +88,15 @@ export function resolveMarketplaceListingDisplayName(item: {
   id?: number | string | null;
   title?: string | null;
   displayName?: string | null;
+  publicTitle?: string | null;
   nameFormatted?: string | null;
   name?: string | null;
   slug?: string | null;
 }): string {
-  const explicitGuestName = item.displayName?.trim() || item.nameFormatted?.trim();
+  const explicitGuestName =
+    item.displayName?.trim() ||
+    item.publicTitle?.trim() ||
+    item.nameFormatted?.trim();
   const rawFallback = item.title?.trim() || item.name?.trim() || item.slug?.trim() || '';
   const candidate = explicitGuestName || rawFallback;
   const resolved = getListingDisplayName(item.id, candidate, explicitGuestName || undefined);
@@ -101,6 +106,7 @@ export function resolveMarketplaceListingDisplayName(item: {
 function marketplaceListingPath(
   item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'> & {
     displayName?: string | null;
+    publicTitle?: string | null;
     nameFormatted?: string | null;
     name?: string | null;
     slug?: string | null;
@@ -452,6 +458,8 @@ export default function MarketplaceHomepage() {
     let result = items;
     if (minPrice != null || maxPrice != null) {
       result = result.filter((item) => {
+        // TASK-1039951: Price range filtering only considers active listings with valid positive rates (price > 0)
+        if (typeof item.pricePerNight !== 'number' || item.pricePerNight <= 0) return false;
         if (minPrice != null && item.pricePerNight < minPrice) return false;
         if (maxPrice != null && item.pricePerNight > maxPrice) return false;
         return true;

@@ -105,13 +105,13 @@ export function mergeListingAndExternalReviews(
     const cleanSource = normalizeReviewSource(r.source);
     const isGoogle = (cleanSource ?? '').toLowerCase() === 'google' || (!cleanSource && !r.sourceUrl);
     const rawBody = r.body || (r as { comment?: string | null }).comment;
-    const cleanedBody = stripReviewScraperBoilerplate(rawBody);
+    const cleanedBody = stripReviewScraperBoilerplate(rawBody).trim();
     return {
       id: -(idx + 1),
       displayKey: `ext-${idx}-${r.reviewDate ?? ''}`,
       guestName: r.guestName ?? (isGoogle ? 'Google user' : cleanSource ? `${cleanSource} guest` : 'Guest'),
       rating: Number(r.rating) || 5,
-      body: cleanedBody || null,
+      body: cleanedBody,
       createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
       isGoogle,
       source: cleanSource,
@@ -124,7 +124,9 @@ export function mergeListingAndExternalReviews(
   const validNative = (native || []).filter((r) => {
     const rating = Number(r.rating);
     if (isNaN(rating) || rating < 4) return false;
-    const body = stripHtmlPreservingEmoticons(r.body || (r as { comment?: string | null }).comment).trim();
+    const rawBody = (r.body || (r as { comment?: string | null }).comment || '').trim();
+    if (!rawBody) return false;
+    const body = stripHtmlPreservingEmoticons(rawBody).trim();
     return body.length > 0;
   });
 
@@ -132,7 +134,7 @@ export function mergeListingAndExternalReviews(
     const sanitizedBody = stripHtmlPreservingEmoticons(r.body || (r as { comment?: string | null }).comment).trim();
     return {
       ...r,
-      body: sanitizedBody || null,
+      body: sanitizedBody,
       displayKey: `native-${r.id}`,
     };
   });

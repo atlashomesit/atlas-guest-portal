@@ -58,6 +58,15 @@ describe('TASK-10299086 — Marketplace cards display guest-facing display name'
         nameFormatted: 'Mountain Chalet',
       }),
     ).toBe('Mountain Chalet');
+
+    // PublicTitle support (TASK-10299086)
+    expect(
+      resolveMarketplaceListingDisplayName({
+        id: 888,
+        title: 'Atlas888_RAW',
+        publicTitle: 'Lakefront Villa',
+      }),
+    ).toBe('Lakefront Villa');
   });
 
   it('renders guest-facing display names on marketplace cards', async () => {

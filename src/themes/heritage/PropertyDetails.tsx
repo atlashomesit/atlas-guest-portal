@@ -1435,9 +1435,11 @@ useEffect(() => {
 
     const ppApiReviews = listingReviewsFromApi;
     const ppMergedReviews = useMemo(() => {
-        return ppApiReviews && !ppApiReviews.loading
+        const raw = ppApiReviews && !ppApiReviews.loading
             ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
             : [];
+        // TASK-10299093: Ensure empty-body reviews are suppressed
+        return raw.filter((r) => r.body != null && r.body.trim() !== "");
     }, [ppApiReviews, externalReviewsFromApi]);
     const ppCombinedReviewCount = ppMergedReviews.length;
     const ppCombinedAverageRating = useMemo(() => {
@@ -2546,8 +2548,7 @@ useEffect(() => {
                                     {'★'.repeat(Math.min(5, r.rating))}{'☆'.repeat(Math.max(0, 5 - r.rating))}
                                   </div>
                                 )}
-                                {r.body && <p className="pp-v2-review-body">{r.body}</p>}
-                                {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
+                                {r.body && r.body.trim() !== "" && <p className="pp-v2-review-body">{r.body}</p>}
                                 {r.photoUrls && r.photoUrls.length > 0 && (
                                   <div className="pp-review-photos" style={{ display: 'flex', gap: 8, margin: '8px 0', flexWrap: 'wrap' }} data-testid="review-photos">
                                     {r.photoUrls.map((url, pIdx) => (

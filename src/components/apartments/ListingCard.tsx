@@ -25,6 +25,7 @@ type ListingCardProps = {
   id: string;
   name: string;
   displayName?: string | null;
+  publicTitle?: string | null;
   nameFormatted?: string | null;
   title?: string | null;
   location: string;
@@ -86,6 +87,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   marketplace = false,
   name,
   displayName,
+  publicTitle,
   nameFormatted,
   title,
   location,
@@ -125,11 +127,12 @@ const ListingCard: React.FC<ListingCardProps> = ({
   const { format: formatCurrency } = useCurrency();
   const { booking } = useBooking();
 
-  /** TASK-10299086: guest-facing display name, preferring displayName/title/nameFormatted over internal code */
+  /** TASK-10299086: guest-facing display name, preferring displayName/publicTitle/title/nameFormatted over internal code */
   const resolvedDisplayName = useMemo(() => {
-    const candidate = displayName?.trim() || title?.trim() || nameFormatted?.trim() || name;
-    return getListingDisplayName(id, candidate, displayName) || candidate;
-  }, [id, name, displayName, title, nameFormatted]);
+    const explicitName = displayName?.trim() || publicTitle?.trim() || nameFormatted?.trim();
+    const candidate = explicitName || title?.trim() || name;
+    return getListingDisplayName(id, candidate, explicitName || displayName) || candidate;
+  }, [id, name, displayName, publicTitle, title, nameFormatted]);
   const estimateNights = useMemo(() => {
     if (estimateNightsProp != null) return estimateNightsProp;
     const ci = booking.checkIn ? new Date(booking.checkIn) : null;
