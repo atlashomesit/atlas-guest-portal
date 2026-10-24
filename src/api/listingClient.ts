@@ -188,6 +188,8 @@ export type PublicListing = {
   accommodationType?: string | null;
   /** HSL-011: `Listing.DormGenderPolicy` - FemaleOnly / MaleOnly / Mixed. Null when the API states none. */
   dormGenderPolicy?: 'FemaleOnly' | 'MaleOnly' | 'Mixed' | null;
+  /** TASK-1039977 / PAY-006: refundable security deposit configured on listing (null/0 = none). */
+  securityDepositAmount?: number | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -315,6 +317,12 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     ...(() => {
       const dorm = readDormListingFields(payload);
       return { accommodationType: dorm.accommodationType, dormGenderPolicy: dorm.dormGenderPolicy };
+    })(),
+    securityDepositAmount: (() => {
+      const raw = payload.securityDepositAmount ?? payload.SecurityDepositAmount;
+      if (raw == null || raw === '') return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
     })(),
   };
 }

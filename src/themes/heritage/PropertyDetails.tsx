@@ -2830,6 +2830,7 @@ useEffect(() => {
                         dormBedCount={data.dormBedCount ?? null}
                         clusterRole={data.clusterRole ?? null}
                         clusterId={data.clusterId ?? null}
+                        securityDepositAmount={data.securityDepositAmount ?? null}
                         onStickySummaryChange={setStickyBookingSummary}
                         tenantContext={effectiveTenantCtx}
                       />

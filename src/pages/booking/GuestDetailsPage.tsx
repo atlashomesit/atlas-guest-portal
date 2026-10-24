@@ -70,6 +70,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
+import { fetchListingById } from '@/api/listingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
@@ -215,6 +216,8 @@ type CheckoutHoldCache = {
   holdGraceHours?: number | null;
   /** HSL-011: the dorm's gender rule, so a reload keeps asking the tick. */
   holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
+  holdSecurityDepositAmount?: number | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
@@ -363,6 +366,7 @@ const GuestDetailsPage: React.FC = () => {
           holdCancellationWindowHours: cached.holdCancellationWindowHours ?? null,
           holdGraceHours: cached.holdGraceHours ?? null,
           holdDormGenderPolicy: cached.holdDormGenderPolicy ?? null,
+          holdSecurityDepositAmount: cached.holdSecurityDepositAmount ?? null,
           checkIn: cached.checkIn ?? null,
           checkOut: cached.checkOut ?? null,
           guests: cached.guests ?? booking.guests,
@@ -596,6 +600,43 @@ const GuestDetailsPage: React.FC = () => {
     });
     return () => controller.abort();
   }, [holdListingId, effectiveTenantSlug]);
+
+  // TASK-1039977 / PAY-006: Refundable security deposit resolution & consent
+  const [listingSecurityDeposit, setListingSecurityDeposit] = useState<number | null>(null);
+
+  useEffect(() => {
+    const id = holdListingId != null ? Number(holdListingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return;
+    if (booking.holdSecurityDepositAmount != null) return;
+    const ac = new AbortController();
+    void fetchListingById(id, ac.signal)
+      .then((l) => {
+        if (!ac.signal.aborted) {
+          const raw = l?.securityDepositAmount ?? (l as Record<string, unknown>)?.SecurityDepositAmount;
+          const val = Number(raw);
+          if (Number.isFinite(val) && val > 0) {
+            setListingSecurityDeposit(val);
+          }
+        }
+      })
+      .catch(() => { /* non-critical */ });
+    return () => ac.abort();
+  }, [holdListingId, booking.holdSecurityDepositAmount]);
+
+  const effectiveSecurityDepositAmount =
+    booking.holdSecurityDepositAmount ??
+    checkoutInfo?.securityDepositAmount ??
+    listingSecurityDeposit ??
+    null;
+
+  const depositRequired =
+    typeof effectiveSecurityDepositAmount === 'number' &&
+    Number.isFinite(effectiveSecurityDepositAmount) &&
+    effectiveSecurityDepositAmount > 0;
+
+  const [depositAccepted, setDepositAccepted] = useState(false);
+  const [depositError, setDepositError] = useState('');
+  const depositRowRef = useRef<HTMLDivElement>(null);
   // TASK-10050 (DPDP guarded consent): transactional WhatsApp must NOT be pre-checked.
   // The previous `true` default meant consent was assumed unless the guest actively
   // opted out — a dark pattern that fails DPDP §6 "free, specific, informed" and
@@ -636,6 +677,7 @@ const GuestDetailsPage: React.FC = () => {
       holdCancellationWindowHours: booking.holdCancellationWindowHours ?? null,
       holdGraceHours: booking.holdGraceHours ?? null,
       holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
+      holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
@@ -649,7 +691,7 @@ const GuestDetailsPage: React.FC = () => {
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
     booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
-    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
+    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
@@ -908,6 +950,10 @@ const GuestDetailsPage: React.FC = () => {
     if (dormAckRequired && !dormAckAccepted) { setDormAckError('Please confirm the dorm rule to continue.'); valid = false; }
     else { setDormAckError(''); }
 
+    // TASK-1039977 / PAY-006: refundable security deposit consent
+    if (depositRequired && !depositAccepted) { setDepositError('Please accept the refundable security deposit terms to continue.'); valid = false; }
+    else { setDepositError(''); }
+
     setFormErrors(errors);
     if (!valid) {
       requestAnimationFrame(() => {
@@ -935,6 +981,11 @@ const GuestDetailsPage: React.FC = () => {
           dormAckRowRef.current?.querySelector('input')?.focus();
           return;
         }
+        if (depositRequired && !depositAccepted) {
+          depositRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          depositRowRef.current?.querySelector('input')?.focus();
+          return;
+        }
         if (houseRulesRequired && !houseRulesAccepted) {
           houseRulesRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           houseRulesRowRef.current?.querySelector('input')?.focus();
@@ -947,7 +998,7 @@ const GuestDetailsPage: React.FC = () => {
       });
     }
     return valid;
-  }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted]);
+  }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted, depositRequired, depositAccepted]);
 
   // ── Promo blur handler ────────────────────────────────────────────────────
   const handlePromoBlur = useCallback(async () => {
@@ -1088,6 +1139,7 @@ const GuestDetailsPage: React.FC = () => {
         holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
         holdListingName: null, holdCancellationTier: null,
         holdCancellationWindowHours: null, holdGraceHours: null,
+        holdSecurityDepositAmount: null,
         paymentHoldBookingId: null, paymentHoldToken: null,
       });
       const token = upiCheckout.bookingToken;
@@ -1164,7 +1216,7 @@ const GuestDetailsPage: React.FC = () => {
           transactional_whatsapp: whatsappOptIn,
           marketing: marketingOptIn,
         },
-        securityDepositAccepted: false,
+        securityDepositAccepted: depositRequired ? depositAccepted : false,
         guestInfo: {
           name: formData.name.trim(),
           email: formData.email.trim(),
@@ -1464,6 +1516,7 @@ const GuestDetailsPage: React.FC = () => {
                         holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
                         holdListingName: null, holdCancellationTier: null,
                         holdCancellationWindowHours: null, holdGraceHours: null,
+                        holdSecurityDepositAmount: null,
                         paymentHoldBookingId: null, paymentHoldToken: null,
                       });
                       const token = pendingBookingTokenRef.current;
@@ -1731,7 +1784,7 @@ const GuestDetailsPage: React.FC = () => {
     [
       isSubmitting, validateForm, holdId, holdToken, holdExpiresAt, phoneDialCode, formData,
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
-      houseRulesAccepted, checkoutInfo, hasDraft, startHoldAtPay,
+      houseRulesAccepted, dormAckAccepted, depositRequired, depositAccepted, checkoutInfo, hasDraft, startHoldAtPay,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
     ],
@@ -1785,6 +1838,12 @@ const GuestDetailsPage: React.FC = () => {
       dormAckRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+    // TASK-1039977 / PAY-006: refundable security deposit consent
+    if (depositRequired && !depositAccepted) {
+      setDepositError('Please accept the refundable security deposit terms to continue.');
+      depositRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     // The house-rules tick (when the host wrote rules) comes first on the page, so point at it first.
     if (houseRulesRequired && !houseRulesAccepted) {
       setHouseRulesError('Please accept the house rules to continue.');
@@ -1795,7 +1854,7 @@ const GuestDetailsPage: React.FC = () => {
     consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setConsentFlash(true);
     window.setTimeout(() => setConsentFlash(false), 1200);
-  }, [houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted]);
+  }, [houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted, depositRequired, depositAccepted]);
 
   // TASK-4537: Determine if the error message indicates a charged-but-unconfirmed state
   // that warrants showing clickable support affordance.
@@ -1812,6 +1871,7 @@ const GuestDetailsPage: React.FC = () => {
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
       holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
       holdCancellationTier: null, holdCancellationWindowHours: null, holdGraceHours: null,
+      holdSecurityDepositAmount: null,
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
   }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken, effectiveTenantSlug]);
@@ -1978,8 +2038,12 @@ const GuestDetailsPage: React.FC = () => {
   const paymentFailureEmail = getContactEmail();
   const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment received — booking not confirmed')}`;
 
-  /** Pay needs the consent tick, and the house-rules tick when the host wrote rules. */
-  const readyToPay = consentAccepted && (!houseRulesRequired || houseRulesAccepted) && (!dormAckRequired || dormAckAccepted);
+  /** Pay needs consent, house rules when present, dorm rule when present, and deposit consent when configured. */
+  const readyToPay =
+    consentAccepted &&
+    (!houseRulesRequired || houseRulesAccepted) &&
+    (!dormAckRequired || dormAckAccepted) &&
+    (!depositRequired || depositAccepted);
   const payDisabled = isSubmitting || !readyToPay || notTakingBookings;
 
   return (
@@ -2558,6 +2622,66 @@ const GuestDetailsPage: React.FC = () => {
               />
             </div>
 
+            {/* PAY-006 / TASK-1039977: Refundable security deposit disclosure banner & consent */}
+            {depositRequired && (
+              <div
+                ref={depositRowRef}
+                className="gd-deposit-section"
+                data-testid="security-deposit-banner"
+                style={{
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--gd-line-strong, #e2e8f0)',
+                  background: 'var(--gd-surface-muted, #f8fafc)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                  <ShieldCheck size={20} style={{ color: 'var(--gd-accent, #0f766e)', marginTop: '2px', flexShrink: 0 }} />
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--gd-ink, #0f172a)' }}>
+                      Refundable Security Deposit: {displayPrice(effectiveSecurityDepositAmount ?? 0)}
+                    </h4>
+                    <p style={{ margin: '0.25rem 0 0.75rem 0', fontSize: '0.85rem', color: 'var(--gd-ink-soft, #475569)', lineHeight: 1.4 }}>
+                      A refundable security deposit of <b>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</b> is required for this stay.
+                      This deposit covers incidental damages and is refunded after checkout inspection according to host policy.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={`gd-consent-row required${depositAccepted ? ' checked' : ''}`}
+                  data-testid="guest-booking-deposit-consent-row"
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  <input
+                    id="gd-deposit-consent"
+                    type="checkbox"
+                    checked={depositAccepted}
+                    onChange={(e) => {
+                      setDepositAccepted(e.target.checked);
+                      if (e.target.checked) setDepositError('');
+                    }}
+                    aria-invalid={Boolean(depositError)}
+                    aria-describedby={depositError ? 'gd-deposit-error' : undefined}
+                    data-testid="guest-booking-deposit-consent"
+                  />
+                  <div className="gd-consent-body">
+                    <label htmlFor="gd-deposit-consent">
+                      I understand and accept the refundable security deposit of{' '}
+                      <b>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</b> for this stay.
+                    </label>
+                    <span className="gd-consent-tag">Required · Refundable Deposit Policy</span>
+                  </div>
+                </div>
+                {depositError && (
+                  <div id="gd-deposit-error" className="gd-input-help error" role="alert" style={{ marginTop: '0.25rem' }}>
+                    {depositError}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Native consent controls keep one focus stop per choice and independent policy links. */}
             <div className="gd-consent">
               <div ref={consentRowRef} className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`} data-testid="guest-booking-consent-row">
@@ -2855,6 +2979,35 @@ const GuestDetailsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* PAY-006 / TASK-1039977: Refundable security deposit breakdown line in aside */}
+          {depositRequired && (
+            <div
+              className="gd-deposit-recap"
+              data-testid="security-deposit-breakdown"
+              style={{
+                marginTop: '0.75rem',
+                marginBottom: '0.75rem',
+                padding: '0.625rem 0.75rem',
+                borderRadius: '0.5rem',
+                background: 'var(--gd-surface-muted, #f8fafc)',
+                border: '1px solid var(--gd-line, #e2e8f0)',
+                fontSize: '0.85rem',
+                color: 'var(--gd-ink-soft, #475569)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--gd-ink, #0f172a)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Refundable security deposit
+                  <FeeInfoTip fee="securityDeposit" label="Refundable security deposit" testId="fee-info-security-deposit" />
+                </span>
+                <span>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</span>
+              </div>
+              <div style={{ marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--gd-ink-faint, #64748b)' }}>
+                Held separately per host policy · Refundable upon checkout inspection
+              </div>
+            </div>
+          )}
+
           {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 — Razorpay on-behalf-of
               disclosure for white-label / custom-domain tenants only. */}
           {tenantCtx?.legalContactPack?.isCustomDomain && (
@@ -2888,11 +3041,13 @@ const GuestDetailsPage: React.FC = () => {
                 <div className="gd-pay-microcopy">
                   {dormAckRequired && !dormAckAccepted
                     ? 'Confirm the dorm rule and tick the consent box to enable payment.'
-                    : houseRulesRequired && !houseRulesAccepted && !consentAccepted
-                      ? 'Tick the house rules and the consent box to enable payment.'
-                      : houseRulesRequired && !houseRulesAccepted
-                        ? 'Tick the house rules to enable payment.'
-                        : 'Tick the consent box to enable payment.'}
+                    : depositRequired && !depositAccepted
+                      ? 'Tick the refundable security deposit agreement to enable payment.'
+                      : houseRulesRequired && !houseRulesAccepted && !consentAccepted
+                        ? 'Tick the house rules and the consent box to enable payment.'
+                        : houseRulesRequired && !houseRulesAccepted
+                          ? 'Tick the house rules to enable payment.'
+                          : 'Tick the consent box to enable payment.'}
                 </div>
               )}
               {readyToPay && (

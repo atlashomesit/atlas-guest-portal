@@ -119,6 +119,8 @@ interface UnitBookingWidgetProps {
   dormGenderPolicy?: DormGenderPolicy | null;
   /** HSL-011: total beds in the dorm (`Listing.Quantity`) - the "Y" of "X of Y beds left". */
   dormBedCount?: number | null;
+  /** TASK-1039977 / PAY-006: listing security deposit (INR); forwarded to checkout */
+  securityDepositAmount?: number | null;
 }
 
 export type BookingStickySummary = {
@@ -213,6 +215,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   accommodationType,
   dormGenderPolicy = null,
   dormBedCount = null,
+  securityDepositAmount = null,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -1883,6 +1886,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdCancellationTier: effectiveRatePlanCancellationTier,
         holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
         holdGraceHours: isSelectedRatePlanNonRefundable ? null : resolvedGraceHours,
+        // TASK-1039977 / PAY-006: refundable security deposit forwarded to checkout
+        holdSecurityDepositAmount:
+          securityDepositAmount != null && Number(securityDepositAmount) > 0
+            ? Number(securityDepositAmount)
+            : null,
         // HSL-011: the checkout page asks the gender-rule tick from this (API value; null for every non-dorm listing).
         holdDormGenderPolicy: isDorm ? dormGenderPolicy : null,
         // Forward dates/guests into context for the details page. BookingContext's wire format

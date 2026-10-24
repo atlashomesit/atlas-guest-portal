@@ -22,6 +22,8 @@ export const FEE_INFO_COPY = {
     'Razorpay payment gateway fee — passed through, not a platform markup.',
   addOns:
     'Optional extras you selected for this stay, charged in addition to the room fare.',
+  securityDeposit:
+    'Refundable deposit collected by the host to cover potential incidental damages. Refunded after checkout inspection according to host policy.',
 } as const;
 
 export type FeeInfoKey = keyof typeof FEE_INFO_COPY;

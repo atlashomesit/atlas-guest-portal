@@ -24,6 +24,8 @@ export interface ListingCheckoutInfo {
   bookingMode: string | null;
   /** False means hand the guest to the host instead of calling POST /api/Razorpay/order. */
   onlinePaymentsAvailable: boolean;
+  /** TASK-1039977 / PAY-006: Refundable security deposit configured on the listing (null/0 = none). */
+  securityDepositAmount?: number | null;
 }
 
 const asString = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v : null);
@@ -54,6 +56,12 @@ export async function fetchListingCheckoutInfo(
       bookingMode: asString(data.bookingMode),
       // Unknown or missing is treated as "available": the order endpoint stays the final judge.
       onlinePaymentsAvailable: data.onlinePaymentsAvailable !== false,
+      securityDepositAmount: (() => {
+        const raw = data.securityDepositAmount ?? data.SecurityDepositAmount;
+        if (raw == null || raw === '') return null;
+        const n = Number(raw);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      })(),
     };
   } catch {
     return null;

@@ -62,6 +62,8 @@ type BookingState = {
   holdGraceHours: number | null;
   /** HSL-011: the dorm's gender rule (from the listing API) forwarded from UnitBookingWidget; null for a non-dorm or a mixed-unstated listing (session-only). */
   holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** TASK-1039977 / PAY-006: Refundable security deposit configured on the listing (session-only). */
+  holdSecurityDepositAmount?: number | null;
   /** MRP-002: Selected rate plan ID and display name forwarded from UnitBookingWidget (session-only). */
   listingRatePlanId?: number | null;
   ratePlanName?: string | null;
@@ -101,6 +103,7 @@ const defaultState: BookingState = {
   holdCancellationTier: null,
   holdCancellationWindowHours: null,
   holdGraceHours: null,
+  holdSecurityDepositAmount: null,
   listingRatePlanId: null,
   ratePlanName: null,
 };
@@ -142,6 +145,7 @@ const loadState = (): BookingState => {
       holdCancellationTier: null,
       holdCancellationWindowHours: null,
       holdGraceHours: null,
+      holdSecurityDepositAmount: null,
       listingRatePlanId: null,
       ratePlanName: null,
     };
