@@ -110,6 +110,10 @@ type NormalizedListing = {
   accessibilityFeatures: string[];
   /** TASK-10086: true when no v1 accessibility feature is declared — "Not specified — ask host". */
   accessibilityUnknown: boolean;
+  /** TASK-10299183: online payment / checkout gateway available for listing. */
+  onlinePaymentsAvailable?: boolean;
+  /** TASK-10299183: whether small-party pricing is configured. */
+  hasSmallPartyPricing?: boolean;
 };
 
 function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
@@ -152,6 +156,8 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         longitude: pin?.lng ?? null,
         accessibilityFeatures: staticAccessibility,
         accessibilityUnknown: staticAccessibility.length === 0,
+        onlinePaymentsAvailable: true,
+        hasSmallPartyPricing: false,
       };
     })
     .filter((l): l is NonNullable<typeof l> => l !== null);
@@ -213,6 +219,8 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         hasCoworkingDesk: l.hasCoworkingDesk ?? false,
         accessibilityFeatures: apiAccessibility,
         accessibilityUnknown: apiAccessibility.length === 0,
+        onlinePaymentsAvailable: l.onlinePaymentsAvailable !== false,
+        hasSmallPartyPricing: Boolean(l.hasSmallPartyPricing),
       };
     })
     .filter((l) => l.numericId > 0);
@@ -263,6 +271,8 @@ function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing
     // TASK-10086: marketplace feed carries no accessibility declarations — unknown, never accessible.
     accessibilityFeatures: [],
     accessibilityUnknown: true,
+    onlinePaymentsAvailable: (item as unknown as { onlinePaymentsAvailable?: boolean }).onlinePaymentsAvailable !== false,
+    hasSmallPartyPricing: false,
   };
   });
 }
@@ -715,6 +725,18 @@ const SearchPage = () => {
     tonightProbeLoading,
   ]);
 
+  /** TASK-1451 / TASK-2572 / TASK-4092: cheapest 3 available listings — excludes date-unavailable homes. */
+  const emptyStateSuggestions = useMemo(() => {
+    if (listings.length === 0) return [];
+    const dateFiltered = dateAvailableIds !== null
+      ? listings.filter((l) => dateAvailableIds.has(l.numericId))
+      : listings;
+    const pool = dateFiltered.length > 0 ? dateFiltered : listings;
+    return [...pool]
+      .sort((a, b) => a.pricePerNight - b.pricePerNight)
+      .slice(0, 3);
+  }, [listings, dateAvailableIds]);
+
   // GUEST-034 (founder ruling 2026-10-21 point 1): with dates in the search box every card shows the
   // checkout quote for THOSE dates and guests (GET /api/pricing/guest-breakdown), not tonight's rate times
   // the nights. Without dates the card keeps tonight's daily-summary price.
@@ -726,15 +748,18 @@ const SearchPage = () => {
   const quoteItems = useMemo<MarketplaceCardPriceItem[]>(() => {
     if (!quoteStay) return [];
     // Price filter/sort needs every candidate's number; otherwise one quote per VISIBLE card.
-    const scope = priceDrivenView ? unitsBeforePriceFilter : unitsBeforePriceFilter.slice(0, visibleCount);
+    const baseScope = priceDrivenView ? unitsBeforePriceFilter : unitsBeforePriceFilter.slice(0, visibleCount);
+    // TASK-10299183: also quote emptyStateSuggestions so suggestion cards calculate rate for searched dates
+    const seenIds = new Set(baseScope.map((u) => u.numericId));
+    const suggestionsToQuote = emptyStateSuggestions.filter((u) => !seenIds.has(u.numericId));
+    const scope = [...baseScope, ...suggestionsToQuote];
     const feeCharged = isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext());
     return scope.map((unit) => ({
       id: unit.numericId,
       tenantSlug: new URLSearchParams(unit.canonicalPath.split("?")[1] ?? "").get("tenant") ?? tenant?.slug ?? "",
       chargesOnlinePaymentFee: feeCharged,
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quoteStay, priceDrivenView, unitsBeforePriceFilter, visibleCount, isMarketplaceSearch, tenant?.slug]);
+  }, [quoteStay, priceDrivenView, unitsBeforePriceFilter, visibleCount, emptyStateSuggestions, isMarketplaceSearch, tenant?.slug]);
   const stayPrices = useMarketplaceCardPrices(quoteItems, quoteStay ?? { checkIn: null, checkOut: null, guests: null });
   /** The quote for the searched stay, when we have one for this home. */
   const stayDisplayFor = (id: number): DirectPriceDisplay | null => {
@@ -1022,17 +1047,6 @@ const SearchPage = () => {
       }),
     [sortedUnits],
   );
-  /** TASK-1451 / TASK-2572 / TASK-4092: cheapest 3 available listings — excludes date-unavailable homes. */
-  const emptyStateSuggestions = useMemo(() => {
-    if (listings.length === 0) return [];
-    const dateFiltered = dateAvailableIds !== null
-      ? listings.filter((l) => dateAvailableIds.has(l.numericId))
-      : listings;
-    const pool = dateFiltered.length > 0 ? dateFiltered : listings;
-    return [...pool]
-      .sort((a, b) => a.pricePerNight - b.pricePerNight)
-      .slice(0, 3);
-  }, [listings, dateAvailableIds]);
 
   return (
     <div className="search-page min-h-screen bg-bg-muted">
@@ -1552,32 +1566,56 @@ const SearchPage = () => {
                         <h4 className="line-clamp-2 text-base font-semibold text-text-primary">{unit.title}</h4>
                         <p className="text-sm text-text-muted">{unit.location}</p>
                         {(() => {
+                          const stayQuote = stayDisplayFor(unit.numericId);
                           const suggestBreakdown = getDailyListingPricing(unit.numericId);
-                          const suggestDisplayedPrice =
-                            (suggestBreakdown?.actualPrice ?? 0) > 0 ? suggestBreakdown!.actualPrice : unit.pricePerNight;
+                          const suggestDisplayedPrice = stayQuote
+                            ? stayQuote.realNightly
+                            : (suggestBreakdown?.actualPrice ?? 0) > 0 ? suggestBreakdown!.actualPrice : unit.pricePerNight;
                           // TASK-7543: GST slab is selected off the CHARGED (discounted) per-night
                           // rate, matching the server — see accommodationGstSlabPercentForChargedRate's
                           // doc comment. `suggestDisplayedPrice` is already that charged value, so the
                           // default (no override) banding basis is correct here.
                           return (
                             <>
-                              <p className="text-lg font-bold text-text-primary">
-                                {formatDisplayCurrency(suggestDisplayedPrice)}
-                                <span className="text-sm font-normal text-text-muted"> / night</span>
-                              </p>
-                              {/* TASK-5199: match main card — show est. total incl. GST when nights known */}
-                              <p className="text-xs text-text-muted">
-                                {formatEstTotalInclGst(
-                                  suggestDisplayedPrice,
-                                  estimateNights,
-                                  formatDisplayCurrency,
-                                  processingFeePercent,
-                                  unit.isGstRegistered,
+                              <div className="flex items-baseline gap-2">
+                                {stayQuote?.standardNightly != null && stayQuote.savingsPercent > 0 && (
+                                  <span className="text-sm text-text-muted line-through">
+                                    {formatDisplayCurrency(stayQuote.standardNightly)}
+                                  </span>
                                 )}
-                              </p>
+                                <p className="text-lg font-bold text-text-primary">
+                                  {formatDisplayCurrency(suggestDisplayedPrice)}
+                                  <span className="text-sm font-normal text-text-muted"> / night</span>
+                                </p>
+                              </div>
+                              {/* TASK-10299183: when searched dates exist, show the calculated all-in total */}
+                              {stayQuote ? (
+                                <p className="text-xs text-text-muted" data-testid="search-suggestion-total">
+                                  {allInTotalLabel(formatDisplayCurrency(stayQuote.total), stayQuote.nights)}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-text-muted">
+                                  {formatEstTotalInclGst(
+                                    suggestDisplayedPrice,
+                                    estimateNights,
+                                    formatDisplayCurrency,
+                                    processingFeePercent,
+                                    unit.isGstRegistered,
+                                  )}
+                                </p>
+                              )}
                             </>
                           );
                         })()}
+                        {/* TASK-10299183: Online checkout availability chip on suggestion card */}
+                        {((unit.onlinePaymentsAvailable !== false) && (isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext()))) && (
+                          <span
+                            className="w-fit inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200"
+                            data-testid="search-suggestion-online-payment-chip"
+                          >
+                            Online checkout
+                          </span>
+                        )}
                         <Link
                           to={appendQuerySuffix(unit.canonicalPath, querySuffix)}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
@@ -1835,12 +1873,25 @@ const SearchPage = () => {
                         GST
                       </span>
                     )}
+                    {/* TASK-10299183: Payment gateway / online checkout availability flag */}
+                    {((unit.onlinePaymentsAvailable !== false) && (isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext()))) && (
+                      <span
+                        className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200"
+                        data-testid="search-listing-online-payment-chip"
+                      >
+                        Online checkout
+                      </span>
+                    )}
                   </div>
 
-                  {isSmallParty(guests) && isGroupHome(unit) && (
+                  {isSmallParty(guests) && (isGroupHome(unit) || unit.hasSmallPartyPricing) && (
                     <div className="text-xs text-text-muted" data-testid="guest-listing-group-hint">
-                      <p style={{ margin: 0 }}>Best for groups of 4–{unit.maxGuests}</p>
-                      {smallHomesFrom != null && (
+                      <p style={{ margin: 0 }}>
+                        {unit.hasSmallPartyPricing
+                          ? "Special rate available for 1-2 guests"
+                          : `Best for groups of 4–${unit.maxGuests}`}
+                      </p>
+                      {smallHomesFrom != null && !unit.hasSmallPartyPricing && (
                         <button
                           type="button"
                           className="underline font-semibold"

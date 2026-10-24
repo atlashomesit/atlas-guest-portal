@@ -190,6 +190,10 @@ export type PublicListing = {
   dormGenderPolicy?: 'FemaleOnly' | 'MaleOnly' | 'Mixed' | null;
   /** TASK-1039977 / PAY-006: refundable security deposit configured on listing (null/0 = none). */
   securityDepositAmount?: number | null;
+  /** TASK-10299183: online payment / checkout gateway available for listing. */
+  onlinePaymentsAvailable?: boolean;
+  /** TASK-10299183: whether small-party discount pricing is configured. */
+  hasSmallPartyPricing?: boolean;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -324,6 +328,8 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
       const n = Number(raw);
       return Number.isFinite(n) && n > 0 ? n : null;
     })(),
+    onlinePaymentsAvailable: payload.onlinePaymentsAvailable !== false && payload.OnlinePaymentsAvailable !== false,
+    hasSmallPartyPricing: Boolean(payload.hasSmallPartyPricing || payload.HasSmallPartyPricing || payload.occupancyPricingEnabled || payload.OccupancyPricingEnabled),
   };
 }
 
