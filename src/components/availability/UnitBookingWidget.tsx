@@ -36,6 +36,7 @@ import { isSmallParty, SMALL_PARTY_HINT_DEFAULT } from '@/utils/smallParty';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import DirectSavingRow from '@/components/pricing/DirectSavingRow';
+import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
 import { directPriceDisplay, plainMealLabel } from '@/utils/directBookingPrice';
 import {
   fetchCalendarPricing,
@@ -1923,6 +1924,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         guests,
         listingRatePlanId: selectedRatePlanId,
         ratePlanName: selectedRatePlan?.name ?? null,
+        ratePlanMealPlan: selectedRatePlan?.mealPlanLabel || selectedRatePlan?.mealPlanCode || null,
+        ratePlanCancellationPolicy:
+          cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy || null,
       });
 
       // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
@@ -2419,6 +2423,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         )}
         {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (
         <div className="lv-price-rows">
+          {/* TASK-1039948: Direct booking pricing tier public display */}
+          {(selectedRatePlan || cancellationTrustText) && (
+            <div className="lv-price-row" style={{ display: 'block', paddingBottom: 6 }}>
+              <PricingTierDisplay
+                ratePlanName={selectedRatePlan?.name}
+                cancellationPolicy={cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy}
+                mealPlanLabel={selectedRatePlan?.mealPlanLabel}
+                mealPlanCode={selectedRatePlan?.mealPlanCode}
+              />
+            </div>
+          )}
           {/* TASK-4282: Show per-night breakdown when rates vary, or averaged format when uniform */}
           {(() => {
             // Collect daily prices for the selected range

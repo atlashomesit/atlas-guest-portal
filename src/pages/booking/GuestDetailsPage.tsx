@@ -70,6 +70,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
+import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
 import { fetchListingById } from '@/api/listingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
@@ -2967,6 +2968,17 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Price block */}
           <div className="gd-price-rows">
+            {/* TASK-1039948: Direct booking pricing tier public display */}
+            {(booking.ratePlanName || booking.ratePlanMealPlan || booking.ratePlanCancellationPolicy || freeCancellationCopy) && (
+              <div style={{ marginBottom: 6 }}>
+                <PricingTierDisplay
+                  ratePlanName={booking.ratePlanName}
+                  mealPlanLabel={booking.ratePlanMealPlan}
+                  cancellationPolicy={booking.ratePlanCancellationPolicy || freeCancellationCopy?.deadlineFormatted}
+                  isCompact
+                />
+              </div>
+            )}
             <div className="gd-price-row" data-testid="price-line-base">
               <div className="desc">
                 <span>

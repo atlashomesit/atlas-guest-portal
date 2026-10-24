@@ -46,6 +46,8 @@ import {
   getAccessibilityDeclarations,
 } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
+import { isHostelDorm } from "../components/hostel/HostelDormBadge";
+import { isHostelDormType } from "../utils/dormListing";
 import { CONTACT } from "../config/contact";
 import { getPropertyDesignImage } from "../config/branding";
 import "./search-page.css";
@@ -114,6 +116,10 @@ type NormalizedListing = {
   onlinePaymentsAvailable?: boolean;
   /** TASK-10299183: whether small-party pricing is configured. */
   hasSmallPartyPricing?: boolean;
+  /** TASK-10299109: dorm and hostel accommodation and gender fields */
+  accommodationType?: string | null;
+  dormGenderPolicy?: 'FemaleOnly' | 'MaleOnly' | 'Mixed' | null;
+  propertyType?: string | null;
 };
 
 function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
@@ -158,6 +164,9 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         accessibilityUnknown: staticAccessibility.length === 0,
         onlinePaymentsAvailable: true,
         hasSmallPartyPricing: false,
+        accommodationType: (property as Record<string, unknown>).accommodationType as string ?? null,
+        dormGenderPolicy: (property as Record<string, unknown>).dormGenderPolicy as any ?? null,
+        propertyType: property.property_type ?? (property as Record<string, unknown>).propertyType as string ?? null,
       };
     })
     .filter((l): l is NonNullable<typeof l> => l !== null);
@@ -221,6 +230,9 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         accessibilityUnknown: apiAccessibility.length === 0,
         onlinePaymentsAvailable: l.onlinePaymentsAvailable !== false,
         hasSmallPartyPricing: Boolean(l.hasSmallPartyPricing),
+        accommodationType: l.accommodationType ?? null,
+        dormGenderPolicy: l.dormGenderPolicy ?? null,
+        propertyType: (l as Record<string, unknown>).propertyType as string ?? null,
       };
     })
     .filter((l) => l.numericId > 0);
@@ -273,6 +285,9 @@ function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing
     accessibilityUnknown: true,
     onlinePaymentsAvailable: (item as unknown as { onlinePaymentsAvailable?: boolean }).onlinePaymentsAvailable !== false,
     hasSmallPartyPricing: false,
+    accommodationType: (item as Record<string, unknown>).accommodationType as string ?? null,
+    dormGenderPolicy: (item as Record<string, unknown>).dormGenderPolicy as any ?? null,
+    propertyType: (item as Record<string, unknown>).propertyType as string ?? null,
   };
   });
 }
@@ -1779,6 +1794,7 @@ const SearchPage = () => {
               const dailyBreakdown = getDailyListingPricing(unit.numericId);
               // GUEST-034: with dates searched the card shows the quote for those dates and guests.
               const stayQuote = stayDisplayFor(unit.numericId);
+              const isHostel = isHostelDorm({ accommodationType: unit.accommodationType, propertyType: unit.propertyType }) || isHostelDormType(unit.accommodationType);
               const stayPriceLoading = Boolean(quoteStay) && stayPrices.get(unit.numericId)?.status !== "ready"
                 && stayPrices.get(unit.numericId)?.status !== "unavailable";
               const displayedPrice = stayQuote
@@ -1918,6 +1934,14 @@ const SearchPage = () => {
 
                   <div className="search-card__foot">
                     <div className="search-card__price">
+                      {isHostel && (
+                        <span
+                          className="inline-flex items-center rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-semibold text-indigo-700 mb-1"
+                          data-testid="hostel-per-bed-indicator"
+                        >
+                          Starting from per bed
+                        </span>
+                      )}
                       {quoteStay ? (
                         stayPriceLoading ? (
                           <span className="inline-block h-12 w-28 rounded bg-bg-muted" data-testid="guest-listing-price-loading" aria-hidden />
@@ -1940,7 +1964,9 @@ const SearchPage = () => {
                             {isConverted && (
                               <p className="mt-0.5 text-xs text-text-muted">{formatINR(stayQuote.realNightly)} on payment</p>
                             )}
-                            <p className="mt-0.5 text-sm text-text-muted">per night</p>
+                            <p className="mt-0.5 text-sm text-text-muted" data-testid="guest-listing-unit-label">
+                              {isHostel ? 'per bed / night' : 'per night'}
+                            </p>
                             <p className="text-xs text-text-muted" data-testid="guest-listing-stay-total">
                               {allInTotalLabel(formatDisplayCurrency(stayQuote.total), stayQuote.nights)}
                             </p>
@@ -1971,7 +1997,9 @@ const SearchPage = () => {
                       {isConverted && (
                         <p className="mt-0.5 text-xs text-text-muted">{formatINR(displayedPrice)} on payment</p>
                       )}
-                      <p className="mt-0.5 text-sm text-text-muted">per night</p>
+                      <p className="mt-0.5 text-sm text-text-muted" data-testid="guest-listing-unit-label">
+                        {isHostel ? 'per bed / night' : 'per night'}
+                      </p>
                       <p className="text-xs text-text-muted">
                         {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, processingFeePercent, unit.isGstRegistered)}
                       </p>

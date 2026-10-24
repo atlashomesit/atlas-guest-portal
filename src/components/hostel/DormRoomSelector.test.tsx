@@ -64,4 +64,40 @@ describe('DormRoomSelector (TASK-1039778: bed type labels, gender restrictions, 
     fireEvent.click(screen.getByTestId('dorm-beds-decrease'));
     expect(onCountChange).toHaveBeenCalledWith(1);
   });
+
+  it('TASK-10299109 & TASK-1039779: renders gender filter selector and per bed price indicator', () => {
+    const onGenderFilterChange = vi.fn();
+    render(
+      <DormRoomSelector
+        onGenderFilterChange={onGenderFilterChange}
+        bedOptions={[
+          { id: 'b1', bedType: 'Lower Bunk', pricePerBed: 599, genderPolicy: 'Mixed' },
+          { id: 'b2', bedType: 'Upper Bunk', pricePerBed: 549, genderPolicy: 'FemaleOnly' },
+          { id: 'b3', bedType: 'Single Bed', pricePerBed: 699, genderPolicy: 'MaleOnly' },
+        ]}
+      />
+    );
+
+    const filterSelector = screen.getByTestId('dorm-gender-filter-selector');
+    expect(filterSelector).toBeInTheDocument();
+
+    const allBtn = screen.getByTestId('gender-filter-all');
+    const mixedBtn = screen.getByTestId('gender-filter-mixed-dorm');
+    const femaleBtn = screen.getByTestId('gender-filter-female-only');
+    const maleBtn = screen.getByTestId('gender-filter-male-only');
+
+    expect(allBtn).toHaveTextContent('All');
+    expect(mixedBtn).toHaveTextContent('Mixed Dorm');
+    expect(femaleBtn).toHaveTextContent('Female Only');
+    expect(maleBtn).toHaveTextContent('Male Only');
+
+    // Test per bed price indicator
+    const perBedBadges = screen.getAllByTestId('per-bed-indicator');
+    expect(perBedBadges.length).toBeGreaterThan(0);
+    expect(perBedBadges[0]).toHaveTextContent('per bed');
+
+    // Test clicking female only filter
+    fireEvent.click(femaleBtn);
+    expect(onGenderFilterChange).toHaveBeenCalledWith('Female Only');
+  });
 });

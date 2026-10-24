@@ -322,8 +322,8 @@ export default function SelfCheckIn() {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File must be under 10 MB.");
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File must be under 5 MB.");
       return;
     }
 
@@ -1454,12 +1454,12 @@ export default function SelfCheckIn() {
                               : `ID photo (${guestLabel})`}
                           </label>
                           <p id={idPhotoHelpId} className="text-xs text-text-muted mb-3">
-                            JPG, PNG, or PDF — max 10 MB
+                            JPG, PNG, or PDF — max 5 MB
                           </p>
 
                           {g.idFilePreview ? (
                             <div className="rounded-lg border border-border-subtle p-4 bg-white text-center">
-                              <img src={g.idFilePreview} alt="ID preview" className="max-h-48 mx-auto rounded-lg object-contain mb-3" />
+                              <img src={g.idFilePreview} alt="ID preview" data-testid="id-preview-thumbnail" className="max-h-48 mx-auto rounded-lg object-contain mb-3" />
                               <p className="text-xs text-text-primary font-medium mb-3">{g.idFile?.name}</p>
                               <div className="flex flex-wrap justify-center gap-2">
                                 <label className="cursor-pointer rounded-lg bg-bg-muted px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-surface border border-border-subtle transition">

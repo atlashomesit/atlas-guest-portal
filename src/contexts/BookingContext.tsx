@@ -67,6 +67,9 @@ type BookingState = {
   /** MRP-002: Selected rate plan ID and display name forwarded from UnitBookingWidget (session-only). */
   listingRatePlanId?: number | null;
   ratePlanName?: string | null;
+  /** TASK-1039948: Selected rate plan meal plan and cancellation policy for direct booking pricing tier display. */
+  ratePlanMealPlan?: string | null;
+  ratePlanCancellationPolicy?: string | null;
 };
 
 type BookingContextValue = {
@@ -106,6 +109,8 @@ const defaultState: BookingState = {
   holdSecurityDepositAmount: null,
   listingRatePlanId: null,
   ratePlanName: null,
+  ratePlanMealPlan: null,
+  ratePlanCancellationPolicy: null,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
@@ -148,6 +153,8 @@ const loadState = (): BookingState => {
       holdSecurityDepositAmount: null,
       listingRatePlanId: null,
       ratePlanName: null,
+      ratePlanMealPlan: null,
+      ratePlanCancellationPolicy: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);
