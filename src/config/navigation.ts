@@ -9,6 +9,8 @@ export const helpNav: NavItem[] = [
     { label: 'Policies', to: '/policies' },
     { label: 'FAQs', to: '/faq' },
     { label: 'Terms', to: '/terms' },
+    { label: 'Privacy', to: '/privacy' },
+    { label: 'Contact', to: '/contact' },
 ];
 
 export const primaryNav: NavItem[] = [
