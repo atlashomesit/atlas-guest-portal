@@ -1482,10 +1482,13 @@ export default function BookingConfirmationPage() {
           <GuestMessageThread bookingId={Number(bookingId)} token={token} issueCategory={searchParams.get('issue')} issueRequestKey={location.key} hostPhone={hostPhone} />
         )}
 
-        {/* TASK-4415: guest self-serve FAQ — same as listing detail page */}
+        {/* TASK-4415 / TASK-10298986: guest self-serve FAQ — same as listing detail page */}
         {booking.listingId && (
           <Suspense fallback={null}>
-            <GuestAssistant listingId={booking.listingId} />
+            <GuestAssistant
+              listingId={booking.listingId}
+              tenantSlug={searchParams.get('tenant')?.trim() || getTenantContext()?.slug || null}
+            />
           </Suspense>
         )}
 

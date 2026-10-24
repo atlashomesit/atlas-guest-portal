@@ -3152,9 +3152,13 @@ useEffect(() => {
           </div>
         )}
 
-        {/* TASK-1728: Guest Assistant FAQ widget */}
+        {/* TASK-1728 / TASK-10298986: Guest Assistant FAQ widget with target tenant scoping */}
         <Suspense fallback={null}>
-          <GuestAssistant listingId={resolvedListingId ?? data.listingId ?? null} />
+          <GuestAssistant
+            listingId={resolvedListingId ?? data.listingId ?? null}
+            tenantSlug={effectiveTenantCtx?.slug ?? tenantSlugFromUrl ?? null}
+            tenantId={effectiveTenantCtx?.id ?? (data as { tenantId?: number | null })?.tenantId ?? null}
+          />
         </Suspense>
 
         {/* TASK-102116: floating "Chat with Host on WhatsApp" bubble with pre-filled

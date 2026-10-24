@@ -23,7 +23,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Lock, ShieldCheck } from 'lucide-react';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
@@ -80,7 +80,8 @@ import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
 import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
 import { reportUpiPaid } from '@/api/payment';
 import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
-import { getIstCalendarDate, toCalendarISO } from '@/utils/date';
+import { getIstCalendarDate, toCalendarISO, istInstantFromCalendarDate } from '@/utils/date';
+import { resolveListing } from '@/utils/listingResolver';
 import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
 
@@ -338,18 +339,85 @@ function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => voi
 
 // ── GuestDetailsPage ─────────────────────────────────────────────────────────
 
+const normalizeDateParam = (val: string | null): string | null => {
+  if (!val) return null;
+  const trimmed = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [y, m, d] = trimmed.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return istInstantFromCalendarDate(dateObj).toISOString();
+  }
+  const parsed = new Date(trimmed);
+  return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+};
+
 const GuestDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { propertySlug, unitSlug } = useParams<{ propertySlug: string; unitSlug: string }>();
   const { booking, updateBooking } = useBooking();
   const brandName = getTenantBrandName();
   const { currency, formatINR } = useCurrency();
   const [holdHydrationDone, setHoldHydrationDone] = useState(false);
 
-  // TASK-2882: rehydrate the stay draft (and a still-live hold, if the guest already tapped Pay) from sessionStorage
-  // after a hard reload before showing the "pick dates" modal.
+  // TASK-10298987: Parse direct deep-link URL search params from router location.search (or window.location.search fallback)
+  const urlParams = useMemo(() => {
+    const search = location.search || (typeof window !== 'undefined' ? window.location.search : '');
+    const sp = new URLSearchParams(search);
+    const rawCheckIn = sp.get('checkIn') || sp.get('checkin');
+    const rawCheckOut = sp.get('checkOut') || sp.get('checkout');
+    const rawGuests = sp.get('guests');
+    const rawListingId = sp.get('listingId') || sp.get('listing_id');
+    const rawRatePlanId = sp.get('ratePlanId') || sp.get('listingRatePlanId');
+    return {
+      checkIn: normalizeDateParam(rawCheckIn),
+      checkOut: normalizeDateParam(rawCheckOut),
+      guests: rawGuests ? Math.max(1, parseInt(rawGuests, 10) || 1) : null,
+      tenant: sp.get('tenant')?.trim() || null,
+      listingId: rawListingId && !isNaN(Number(rawListingId)) ? Number(rawListingId) : null,
+      ratePlanId: rawRatePlanId && !isNaN(Number(rawRatePlanId)) ? Number(rawRatePlanId) : null,
+    };
+  }, [location.search]);
+
+  // TASK-2882 & TASK-10298987: hydrate the stay draft from URL query params (deep link) or sessionStorage
+  // after a reload or direct deep-link before showing the "pick dates" modal.
   useEffect(() => {
-    if (!(booking.holdListingId || booking.holdId) || !booking.checkIn || !booking.checkOut) {
+    if (urlParams.checkIn && urlParams.checkOut) {
+      const cached = loadCheckoutHold();
+      const listingIdFromUnit = unitSlug && !isNaN(Number(unitSlug)) ? Number(unitSlug) : null;
+      const effectiveListingId = urlParams.listingId ?? listingIdFromUnit ?? (cached?.holdListingId ?? null);
+
+      updateBooking({
+        checkIn: urlParams.checkIn,
+        checkOut: urlParams.checkOut,
+        guests: urlParams.guests ?? cached?.guests ?? booking.guests ?? 2,
+        holdListingId: effectiveListingId,
+        holdPropertySlug: propertySlug ?? cached?.holdPropertySlug ?? null,
+        holdUnitSlug: unitSlug ?? cached?.holdUnitSlug ?? null,
+        holdTenantSlug: urlParams.tenant ?? cached?.holdTenantSlug ?? booking.holdTenantSlug ?? null,
+        listingRatePlanId: urlParams.ratePlanId ?? cached?.listingRatePlanId ?? null,
+        ratePlanName: cached?.ratePlanName ?? null,
+        holdPriceBreakdown: cached?.holdPriceBreakdown ?? null,
+        holdCancellationTier: cached?.holdCancellationTier ?? null,
+        holdCancellationWindowHours: cached?.holdCancellationWindowHours ?? null,
+        holdGraceHours: cached?.holdGraceHours ?? null,
+        holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? null,
+        holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? null,
+      });
+
+      if (!effectiveListingId && unitSlug) {
+        resolveListing(unitSlug, undefined, urlParams.tenant ?? booking.holdTenantSlug ?? null)
+          .then((l) => {
+            if (l?.id && !isNaN(Number(l.id))) {
+              updateBooking({
+                holdListingId: Number(l.id),
+                holdListingName: l.name ?? null,
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    } else if (!(booking.holdListingId || booking.holdId) || !booking.checkIn || !booking.checkOut) {
       const cached = loadCheckoutHold();
       if (cached) {
         updateBooking({
@@ -440,7 +508,11 @@ const GuestDetailsPage: React.FC = () => {
   // guest's typed details, which are persisted to sessionStorage below.
   // FOUNDER RULED 2026-10-19: there is NO hold on arrival — the draft is the listing, dates and quote handed over by
   // Reserve. The hold (and its clock) exists only after the guest taps Pay.
-  const hasDraft = Boolean((holdListingId || holdId) && booking.checkIn && booking.checkOut);
+  // TASK-10298987: if checkIn/checkOut are present in URL search params or in booking state,
+  // hasDraft is true so direct deep links with search params never block the guest.
+  const hasDraft = Boolean(
+    ((holdListingId || holdId || (propertySlug && unitSlug)) && (booking.checkIn || urlParams.checkIn) && (booking.checkOut || urlParams.checkOut))
+  );
 
   // ── Hold countdown (shown ONLY while a hold is live, i.e. during payment) ──────────────────────
   const [countdown, setCountdown] = useState(() =>
