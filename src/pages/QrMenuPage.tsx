@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
   Utensils,
-  Coffee,
   Sparkles,
   Car,
   ShoppingBag,
@@ -14,7 +13,6 @@ import {
   Minus,
   MessageSquare,
   ArrowRight,
-  ChevronRight,
   Receipt,
   Smartphone,
 } from "lucide-react";
@@ -81,7 +79,7 @@ export interface OrderStatus {
 }
 
 const FALLBACK_MENU: MenuResponse = {
-  tenantName: "Atlas Homestays & Resorts",
+  tenantName: "Homestay & Resorts",
   tenantSlug: "demo-resort",
   currency: "INR",
   brandColor: "#9e402a",
@@ -205,9 +203,9 @@ export default function QrMenuPage() {
   const tableCode = searchParams.get("table") || undefined;
   const orderParam = searchParams.get("order");
 
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [menu, setMenu] = useState<MenuResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
 
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");

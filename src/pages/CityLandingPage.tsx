@@ -6,6 +6,7 @@ import SEO from "@/components/SEO";
 import { fetchPublicListings, type PublicListing } from "@/api/listingClient";
 import { buildApiUrl } from "@/api/client";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "@/utils/guestImageUrl";
+import { getListingDisplayName } from "@/lib/listingDisplayName";
 import { buildHomeUnitPath, getPropertySlug } from "@/utils/navigation";
 import { listingMatchesCityKeywords, marketplaceListingMatchesCityKeywords } from "@/utils/cityListingFilter";
 import { withTenantBrandInCopy } from "@/tenant/displayBrand";
@@ -109,6 +110,9 @@ type MarketplaceCityListingRow = {
   id: number;
   tenantSlug: string;
   title: string;
+  displayName?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
   city?: string | null;
   pricePerNight: number;
   maxGuests: number;
@@ -149,7 +153,12 @@ async function fetchAllMarketplaceListings(signal: AbortSignal): Promise<Marketp
 }
 
 function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCard {
-  const propertySlug = getPropertySlug({ name: item.title });
+  const displayTitle = getListingDisplayName(
+    item.id,
+    item.displayName?.trim() || item.title?.trim() || item.nameFormatted?.trim() || item.name?.trim() || "Homestay",
+    item.displayName,
+  );
+  const propertySlug = getPropertySlug({ name: displayTitle || item.title });
   const image = sanitizeGuestImageUrl(item.coverImageUrl) ?? "";
   const rating = item.rating ?? 0;
   const reviews = item.reviewCount ?? 0;
@@ -158,8 +167,11 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     propertySlug,
     listingId: item.id,
     id: String(item.id),
-    name: item.title || "Homestay",
-    location: item.city || item.title || "",
+    name: displayTitle,
+    displayName: item.displayName,
+    title: item.title,
+    nameFormatted: item.nameFormatted,
+    location: item.city || displayTitle || item.title || "",
     neighborhoods: [],
     image,
     price: item.pricePerNight ?? 0,

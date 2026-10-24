@@ -1,11 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import QrMenuPage from "../QrMenuPage";
+import { settle } from "@/test/settle";
 
 const MOCK_MENU = {
   tenantName: "Coorg Plantation Resort",
@@ -170,9 +171,8 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
   test("renders menu grouped by categories and hides items marked IsSoldOut86 (Done When #1)", async () => {
     renderQrMenu("/qr-menu/coorg-resort?room=101");
 
-    await waitFor(() => {
-      expect(screen.getByTestId("pos-qr-menu-page")).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId("pos-qr-menu-page")).toBeTruthy();
 
     expect(screen.getByText("Coorg Plantation Resort")).toBeTruthy();
     expect(screen.getByText("Villa 101")).toBeTruthy();
@@ -195,9 +195,8 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
   test("enforces anti-abuse room-charge guardrail: fails with 403 ROOM_VERIFICATION_FAILED when phone/PIN mismatch (Done When #2)", async () => {
     renderQrMenu("/qr-menu/coorg-resort?room=101");
 
-    await waitFor(() => {
-      expect(screen.getByTestId("add-to-cart-1")).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId("add-to-cart-1")).toBeTruthy();
 
     // Add Pandi Curry (480) & Akki Roti (160) = 640
     fireEvent.click(screen.getByTestId("add-to-cart-1"));
@@ -217,18 +216,16 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
     fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
 
     // Verify 403 ROOM_VERIFICATION_FAILED error message is displayed
-    await waitFor(() => {
-      expect(screen.getByTestId("pos-qr-room-verification-error")).toBeTruthy();
-      expect(screen.getByText(/Room verification failed: Room does not have an active CheckedIn booking today or phone last-4 \/ PIN did not match/i)).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId("pos-qr-room-verification-error")).toBeTruthy();
+    expect(screen.getByText(/Room verification failed: Room does not have an active CheckedIn booking today or phone last-4 \/ PIN did not match/i)).toBeTruthy();
   });
 
   test("succeeds with valid phone last-4 and renders live status tracker with WhatsApp update badge (Done When #2 & #4)", async () => {
     renderQrMenu("/qr-menu/coorg-resort?room=101");
 
-    await waitFor(() => {
-      expect(screen.getByTestId("add-to-cart-1")).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId("add-to-cart-1")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("add-to-cart-1"));
 
@@ -240,20 +237,18 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
     fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
 
     // Live status tracker appears (Done When #4)
-    await waitFor(() => {
-      expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
-      expect(screen.getByText("POS-20261021-001")).toBeTruthy();
-      expect(screen.getByText("Order Received")).toBeTruthy();
-      expect(screen.getByText(/Live status updates are active on your WhatsApp/i)).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
+    expect(screen.getByText("POS-20261021-001")).toBeTruthy();
+    expect(screen.getByText("Order Received")).toBeTruthy();
+    expect(screen.getByText(/Live status updates are active on your WhatsApp/i)).toBeTruthy();
   });
 
   test("allows Table QR walk-in checkout via Pay Now (UPI) or Pay on Delivery (Done When #3)", async () => {
     renderQrMenu("/qr-menu/coorg-resort?table=T4");
 
-    await waitFor(() => {
-      expect(screen.getByTestId("add-to-cart-1")).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId("add-to-cart-1")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("add-to-cart-1"));
 
@@ -271,14 +266,14 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
     // Submit order
     fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
-      expect(screen.getByText("POS-20261021-001")).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
+    expect(screen.getByText("POS-20261021-001")).toBeTruthy();
   });
   test("POS-003: Schedule for Later sends scheduledFor and shows the scheduled note; ASAP sends none", async () => {
     renderQrMenu("/qr-menu/coorg-resort?table=T4");
-    await waitFor(() => expect(screen.getByTestId("add-to-cart-1")).toBeTruthy());
+    await settle();
+    expect(screen.getByTestId("add-to-cart-1")).toBeTruthy();
     fireEvent.click(screen.getByTestId("add-to-cart-1"));
     fireEvent.click(screen.getByTestId("settle-pay-on-delivery"));
 
@@ -300,7 +295,8 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
     });
     fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
 
-    await waitFor(() => expect(screen.getByTestId("pos-qr-scheduled-note")).toBeTruthy());
+    await settle();
+    expect(screen.getByTestId("pos-qr-scheduled-note")).toBeTruthy();
     const call = (global.fetch as any).mock.calls.find((c: any[]) => c[1]?.method === "POST");
     const body = JSON.parse(call[1].body);
     expect(Number.isNaN(Date.parse(body.scheduledFor))).toBe(false);
@@ -309,11 +305,13 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
 
   test("POS-003: as soon as possible sends no scheduledFor", async () => {
     renderQrMenu("/qr-menu/coorg-resort?table=T4");
-    await waitFor(() => expect(screen.getByTestId("add-to-cart-1")).toBeTruthy());
+    await settle();
+    expect(screen.getByTestId("add-to-cart-1")).toBeTruthy();
     fireEvent.click(screen.getByTestId("add-to-cart-1"));
     fireEvent.click(screen.getByTestId("settle-pay-on-delivery"));
     fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
-    await waitFor(() => expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy());
+    await settle();
+    expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
     const call = (global.fetch as any).mock.calls.find((c: any[]) => c[1]?.method === "POST");
     expect(JSON.parse(call[1].body).scheduledFor).toBeUndefined();
   });

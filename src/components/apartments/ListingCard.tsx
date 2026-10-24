@@ -17,12 +17,16 @@ import {
   type CancellationTier,
 } from "../../utils/cancellationPolicy";
 import { hasOnlinePaymentRail } from "../../tenant/paymentRail";
+import { getListingDisplayName } from "../../lib/listingDisplayName";
 
 type ListingCardProps = {
   hostIdentityVerified?: unknown;
   marketplace?: boolean;
   id: string;
   name: string;
+  displayName?: string | null;
+  nameFormatted?: string | null;
+  title?: string | null;
   location: string;
   neighborhoods?: string[];
   image: string;
@@ -81,6 +85,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
   hostIdentityVerified,
   marketplace = false,
   name,
+  displayName,
+  nameFormatted,
+  title,
   location,
   neighborhoods = [],
   image,
@@ -117,6 +124,12 @@ const ListingCard: React.FC<ListingCardProps> = ({
   const showRazorpayChip = hasOnlinePaymentRail();
   const { format: formatCurrency } = useCurrency();
   const { booking } = useBooking();
+
+  /** TASK-10299086: guest-facing display name, preferring displayName/title/nameFormatted over internal code */
+  const resolvedDisplayName = useMemo(() => {
+    const candidate = displayName?.trim() || title?.trim() || nameFormatted?.trim() || name;
+    return getListingDisplayName(id, candidate, displayName) || candidate;
+  }, [id, name, displayName, title, nameFormatted]);
   const estimateNights = useMemo(() => {
     if (estimateNightsProp != null) return estimateNightsProp;
     const ci = booking.checkIn ? new Date(booking.checkIn) : null;
@@ -216,12 +229,12 @@ const ListingCard: React.FC<ListingCardProps> = ({
         // the focusable element; clicks on the image area follow it naturally.
         <a
           href={href}
-          aria-label={`View photos and room ${name}`}
+          aria-label={`View photos and room ${resolvedDisplayName}`}
           className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]"
         >
           <OptimizedImage
             src={image?.trim() ? image : getPropertyDesignImage(id)}
-            alt={name}
+            alt={resolvedDisplayName}
             className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
             wrapperClassName="h-full"
             sizes="(max-width: 768px) 100vw, 33vw"
@@ -231,10 +244,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
           </span>
         </a>
       ) : (
-        <button type="button" onClick={onClick} aria-label={`View photos and room ${name}`} className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]">
+        <button type="button" onClick={onClick} aria-label={`View photos and room ${resolvedDisplayName}`} className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]">
           <OptimizedImage
             src={image?.trim() ? image : getPropertyDesignImage(id)}
-            alt={name}
+            alt={resolvedDisplayName}
             className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
             wrapperClassName="h-full"
             sizes="(max-width: 768px) 100vw, 33vw"
@@ -251,11 +264,11 @@ const ListingCard: React.FC<ListingCardProps> = ({
             <h3 className="text-lg font-semibold text-text-primary">
               {href ? (
                 <a href={href} className="block min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">
-                  {name}
+                  {resolvedDisplayName}
                 </a>
               ) : (
                 <button type="button" onClick={onClick} className="min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">
-                  {name}
+                  {resolvedDisplayName}
                 </button>
               )}
             </h3>

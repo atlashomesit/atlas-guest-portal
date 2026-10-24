@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 
 import { normalizeReviewSource } from "@/components/property/reviewMerge";
+import { stripHtmlPreservingEmoticons } from "@/utils/sanitizeReviewText";
 
 /**
  * TASK-2872 / REV-019: real verified reviews for the homepage testimonials section.
@@ -120,9 +121,9 @@ export function useVerifiedReviews(
         if (!active) return;
         const res = await fetchListingReviewBatch(id);
 
-        // Native completed stays
+        // Native completed stays — TASK-10299093 / TASK-10299094: suppress empty body and preserve emoticons
         for (const r of res.nativeReviews) {
-          const text = (r.body ?? r.title ?? "").trim();
+          const text = stripHtmlPreservingEmoticons(r.body ?? "").trim();
           if (r.isVerifiedStay && r.rating >= 4 && text.length > 0) {
             collected.push({
               id: r.id,
@@ -137,7 +138,7 @@ export function useVerifiedReviews(
         // External verified reviews (Airbnb, Booking.com, Google)
         for (const ext of res.externalReviews) {
           const rating = Number(ext.rating);
-          const text = (ext.body ?? "").trim();
+          const text = stripHtmlPreservingEmoticons(ext.body ?? "").trim();
           if (!isNaN(rating) && rating >= 4 && text.length > 0) {
             const cleanSource = normalizeReviewSource(ext.source) ?? (ext.sourceUrl?.includes("google") ? "Google" : undefined);
             collected.push({

@@ -4,7 +4,10 @@ import path from "path";
 // Minimal config for legal content validation tests (no jest-dom/DOM setup)
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      vitest: path.resolve(__dirname, "./node_modules/vitest"),
+    },
   },
   test: {
     environment: "node",
