@@ -223,6 +223,7 @@ type MarketplaceApiItem = {
   tenantSlug: string;
   title: string;
   displayName?: string | null;
+  publicTitle?: string | null;
   nameFormatted?: string | null;
   name?: string | null;
   city?: string;
@@ -235,11 +236,13 @@ type MarketplaceApiItem = {
 
 function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing[] {
   return items.map((item) => {
+    const explicitName = item.displayName?.trim() || item.publicTitle?.trim() || item.nameFormatted?.trim();
+    const candidate = explicitName || item.title?.trim() || item.name?.trim() || item.title;
     const displayTitle =
       getListingDisplayName(
         item.id,
-        item.displayName?.trim() || item.title?.trim() || item.nameFormatted?.trim() || item.name?.trim() || item.title,
-        item.displayName,
+        candidate,
+        explicitName || item.displayName,
       ) || item.title;
     const propertySlug = getPropertySlug({ property_name: displayTitle });
     const canonicalPath = `${buildHomeUnitPath(propertySlug, item.id)}?tenant=${encodeURIComponent(item.tenantSlug)}`;
@@ -752,7 +755,9 @@ const SearchPage = () => {
       // A home whose stay quote is still loading is kept, never filtered on a stale tonight number.
       if (quoteStay && !stayDisplayFor(unit.numericId) && stayPrices.get(unit.numericId)?.status !== "unavailable") return true;
       const displayedPrice = nightlyPriceFor(unit);
-      if (minPrice && displayedPrice > 0 && displayedPrice < minPrice) return false;
+      // TASK-1039951: Price range filtering only considers active listings with valid positive rates (price > 0)
+      if ((minPrice != null || maxPrice != null) && (!displayedPrice || displayedPrice <= 0)) return false;
+      if (minPrice && displayedPrice < minPrice) return false;
       if (maxPrice && displayedPrice > maxPrice) return false;
       return true;
     });

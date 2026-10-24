@@ -211,3 +211,65 @@ describe('TASK-1039952 — Sort dropdown on Marketplace Homepage', () => {
     expect(headings).toEqual(['Comfort Villa', 'Luxury Suite', 'Budget Studio']);
   });
 });
+
+describe('TASK-1039951 — Price range filtering qualifies positive rates only', () => {
+  it('excludes listings with price 0 or unconfigured rates when price filter is applied', async () => {
+    const listingsWithZeroPrice = [
+      ...mockListings,
+      {
+        id: 404,
+        tenantSlug: 'atlas',
+        tenantName: 'Atlas Homestays',
+        title: 'Unconfigured Listing',
+        displayName: 'Unconfigured Listing',
+        city: 'Goa',
+        pricePerNight: 0,
+        maxGuests: 2,
+        slug: '404',
+        rating: 4.5,
+        reviewCount: 3,
+        amenityCodes: ['wifi'],
+      },
+    ];
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const u = String(url);
+        if (u.includes('/marketplace/properties')) {
+          return { ok: true, json: async () => [] } as unknown as Response;
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            items: listingsWithZeroPrice,
+            total: listingsWithZeroPrice.length,
+            page: 1,
+            pageSize: 20,
+          }),
+        } as unknown as Response;
+      }),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    // Before price filter, Unconfigured Listing is loaded
+    expect(screen.getByText('Unconfigured Listing')).toBeInTheDocument();
+
+    // Apply max price 6000: only positive price listings <= 6000 should remain (Budget Studio and Comfort Villa).
+    // The listing with price 0 must be excluded.
+    const maxPriceInput = screen.getByLabelText('Max price');
+    fireEvent.change(maxPriceInput, { target: { value: '6000' } });
+    await settle();
+
+    expect(screen.queryByText('Unconfigured Listing')).not.toBeInTheDocument();
+    expect(screen.getByText('Budget Studio')).toBeInTheDocument();
+    expect(screen.getByText('Comfort Villa')).toBeInTheDocument();
+    expect(screen.queryByText('Luxury Suite')).not.toBeInTheDocument();
+  });
+});
