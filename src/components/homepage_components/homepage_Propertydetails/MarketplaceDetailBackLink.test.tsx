@@ -122,6 +122,10 @@ describe('TASK-1039953 — Safe fallback back navigation on Marketplace Detail P
 
     const backAll = screen.getByTestId('back-to-all-listings');
     expect(backAll.getAttribute('href')).toBe('/');
+
+    const backBtn = screen.getByTestId('back-to-results-btn');
+    expect(backBtn).toBeInTheDocument();
+    expect(backBtn.getAttribute('href')).toBe('/');
   });
 
   it('links back to search results URL when search params are present', async () => {
@@ -142,5 +146,10 @@ describe('TASK-1039953 — Safe fallback back navigation on Marketplace Detail P
     expect(backLink.textContent).toBe('Search results');
     expect(backLink.getAttribute('href')).toContain('city=Goa');
     expect(backLink.getAttribute('href')).toContain('category=homes');
+
+    const backBtn = screen.getByTestId('back-to-results-btn');
+    expect(backBtn).toBeInTheDocument();
+    expect(backBtn.getAttribute('href')).toContain('city=Goa');
+    expect(backBtn.getAttribute('href')).toContain('category=homes');
   });
 });

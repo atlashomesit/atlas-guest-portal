@@ -236,14 +236,14 @@ export default function MarketplaceHomepage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // TASK-1039950: sync category and amenity filter pills with URL query parameters
-  const categoryParam = searchParams.get('category');
-  const [category, setCategory] = useState<'all' | 'homes' | 'rooms'>(
-    categoryParam === 'homes' || categoryParam === 'rooms' ? categoryParam : 'all',
+  const categoryParam = searchParams.get('category')?.toLowerCase();
+  const [category, setCategory] = useState<'all' | 'homes' | 'rooms' | 'villas'>(
+    categoryParam === 'homes' || categoryParam === 'rooms' || categoryParam === 'villas' ? categoryParam : 'all',
   );
 
-  // MKT-023 / TASK-1039950: Quick amenity filter selection synced with ?amenity=
+  // MKT-023 / TASK-1039950: Quick amenity filter selection synced with ?amenity= and ?amenities=
   const [selectedAmenity, setSelectedAmenity] = useState<string | null>(
-    searchParams.get('amenity')?.trim() || null,
+    searchParams.get('amenity')?.trim() || searchParams.get('amenities')?.trim() || null,
   );
 
   // TASK-1039952: sort dropdown options ("Recommended" | "Price: Low to High" | "Price: High to Low" | "Rating: High to Low")
@@ -255,13 +255,13 @@ export default function MarketplaceHomepage() {
   );
 
   useEffect(() => {
-    const cat = searchParams.get('category');
-    if (cat === 'homes' || cat === 'rooms') {
+    const cat = searchParams.get('category')?.toLowerCase();
+    if (cat === 'homes' || cat === 'rooms' || cat === 'villas') {
       setCategory(cat);
     } else {
       setCategory('all');
     }
-    const amen = searchParams.get('amenity')?.trim() || null;
+    const amen = searchParams.get('amenity')?.trim() || searchParams.get('amenities')?.trim() || null;
     setSelectedAmenity(amen);
 
     const s = searchParams.get('sort') || searchParams.get('sortBy');
@@ -272,7 +272,7 @@ export default function MarketplaceHomepage() {
     }
   }, [searchParams]);
 
-  const handleCategoryChange = useCallback((c: 'all' | 'homes' | 'rooms') => {
+  const handleCategoryChange = useCallback((c: 'all' | 'homes' | 'rooms' | 'villas') => {
     setCategory(c);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -291,8 +291,10 @@ export default function MarketplaceHomepage() {
       const next = new URLSearchParams(prev);
       if (amenity) {
         next.set('amenity', amenity);
+        next.set('amenities', amenity);
       } else {
         next.delete('amenity');
+        next.delete('amenities');
       }
       return next;
     }, { replace: true });
@@ -308,6 +310,7 @@ export default function MarketplaceHomepage() {
       const next = new URLSearchParams(prev);
       if (valid !== 'recommended') {
         next.set('sort', valid);
+        next.set('sortBy', valid);
       } else {
         next.delete('sort');
         next.delete('sortBy');
@@ -332,6 +335,7 @@ export default function MarketplaceHomepage() {
       'pets',
       'category',
       'amenity',
+      'amenities',
       'sort',
       'sortBy',
       // MKT-031: marketplace brand switch (QA/preview) + campaign attribution survive the click-through
@@ -488,15 +492,37 @@ export default function MarketplaceHomepage() {
 
   const visibleItems = useMemo(() => {
     let result = items;
-    if (minPrice != null || maxPrice != null) {
+
+    // TASK-1039952 / TASK-1039951: get calculated display/quoted price for listing
+    const getItemPrice = (item: MarketplaceItem): number => {
+      const cardPrice = cardPrices.get(item.id);
+      if (cardPrice && cardPrice.status === 'ready' && cardPrice.display.realNightly != null) {
+        return cardPrice.display.realNightly;
+      }
+      return item.pricePerNight;
+    };
+
+    if (category !== 'all') {
       result = result.filter((item) => {
-        // TASK-1039951: Price range filtering only considers active listings with valid positive rates (price > 0)
-        if (typeof item.pricePerNight !== 'number' || item.pricePerNight <= 0) return false;
-        if (minPrice != null && item.pricePerNight < minPrice) return false;
-        if (maxPrice != null && item.pricePerNight > maxPrice) return false;
+        const cat = resolvePropertyTypeBadge(item).toLowerCase();
+        if (category === 'homes') return cat === 'homestay' || cat === 'home' || cat === 'villa';
+        if (category === 'rooms') return cat === 'room' || cat === 'hotel' || cat === 'b&b' || cat === 'hostel';
+        if (category === 'villas') return cat === 'villa' || (item.title && item.title.toLowerCase().includes('villa'));
         return true;
       });
     }
+
+    if (minPrice != null || maxPrice != null) {
+      result = result.filter((item) => {
+        // TASK-1039951: Price range filtering qualifies positive rates only and uses calculated display/quoted price
+        const price = getItemPrice(item);
+        if (typeof price !== 'number' || price <= 0) return false;
+        if (minPrice != null && price < minPrice) return false;
+        if (maxPrice != null && price > maxPrice) return false;
+        return true;
+      });
+    }
+
     if (selectedAmenity) {
       // MKT-026: when this pill maps to master codes AND the item carries amenityCodes (a current
       // API), match those exact codes - the same set the server filtered on, so nothing the server
@@ -508,15 +534,6 @@ export default function MarketplaceHomepage() {
           : matchesAmenityFilter(item, selectedAmenity),
       );
     }
-
-    // TASK-1039952: sort listing results according to chosen option
-    const getItemPrice = (item: MarketplaceItem): number => {
-      const cardPrice = cardPrices.get(item.id);
-      if (cardPrice && cardPrice.status === 'ready' && cardPrice.display.realNightly != null) {
-        return cardPrice.display.realNightly;
-      }
-      return item.pricePerNight;
-    };
 
     if (sortBy === 'price_asc') {
       return [...result].sort((a, b) => getItemPrice(a) - getItemPrice(b));
@@ -535,7 +552,7 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -709,14 +726,14 @@ export default function MarketplaceHomepage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {(['all', 'homes', 'rooms'] as const).map((c) => (
+        {(['all', 'homes', 'rooms', 'villas'] as const).map((c) => (
           <button
             key={c}
             data-testid={`marketplace-filter-${c}`}
             className={`min-h-[44px] rounded-xl px-4 py-2 ${category === c ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
             onClick={() => handleCategoryChange(c)}
           >
-            {c[0].toUpperCase() + c.slice(1)}
+            {c === 'all' ? 'All' : c[0].toUpperCase() + c.slice(1)}
           </button>
         ))}
         {/* TL-PROP: map view toggle. Hidden if no properties have lat/lng configured. */}
