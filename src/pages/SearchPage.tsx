@@ -316,6 +316,36 @@ function availabilityChip(
   return null;
 }
 
+/** TASK-1039950: Helper to match property category ('homes', 'rooms', 'villas') */
+function matchesCategory(unit: NormalizedListing, cat: string): boolean {
+  if (!cat || cat === "all") return true;
+  const raw = `${unit.propertyType || ""} ${unit.accommodationType || ""} ${unit.title || ""}`.toLowerCase();
+  if (cat === "villas") {
+    return raw.includes("villa");
+  }
+  if (cat === "rooms") {
+    return (
+      raw.includes("room") ||
+      raw.includes("hotel") ||
+      raw.includes("b&b") ||
+      raw.includes("bnb") ||
+      raw.includes("hostel") ||
+      raw.includes("dorm")
+    );
+  }
+  if (cat === "homes") {
+    return (
+      raw.includes("home") ||
+      raw.includes("apartment") ||
+      raw.includes("cottage") ||
+      raw.includes("homestay") ||
+      raw.includes("villa") ||
+      raw.includes("studio")
+    );
+  }
+  return true;
+}
+
 const SearchPage = () => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const processingFeePercent = useTenantProcessingFee();
@@ -415,13 +445,15 @@ const SearchPage = () => {
     };
   }, [isMarketplaceSearch, loadFromApi, loadFromMarketplace, retryCount]);
 
+  // TASK-1039950: sync category and amenity filter chips with URL query parameters
+  const categoryParam = searchParams.get("category")?.toLowerCase() || "";
   const minPriceParam = searchParams.get("minPrice");
   const maxPriceParam = searchParams.get("maxPrice");
   const remoteWorkParam = searchParams.get("remoteWork");
   const longStayParam = searchParams.get("longStay");
   const availableNowParam = searchParams.get("availableNow");
-  const amenitiesParamRaw = searchParams.get("amenities");
-  const sortByParam = searchParams.get("sortBy");
+  const amenitiesParamRaw = searchParams.get("amenities") || searchParams.get("amenity");
+  const sortByParam = searchParams.get("sortBy") || searchParams.get("sort");
   const nomadWifiParam = searchParams.get("nomadWifi");
   const nomadWorkspaceParam = searchParams.get("nomadWorkspace");
   const monthlyStayParam = searchParams.get("monthlyStay");
@@ -457,6 +489,7 @@ const SearchPage = () => {
   const explicitDateSearch = useMemo(() => Boolean(checkIn && checkOut), [checkIn, checkOut]);
   /** TASK-1451: include guests so "Clear filters" resets guest count too. */
   const hasActiveFilters = Boolean(
+    (categoryParam && categoryParam !== "all") ||
     minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0
     || nomadWifi || nomadWorkspace || monthlyStay || guests != null
     || sortBy !== "recommended" || mapView,
@@ -712,6 +745,10 @@ const SearchPage = () => {
         const hasAllSelectedAmenities = selectedAmenities.every(amenity => hasAmenity(unit, amenity));
         if (!hasAllSelectedAmenities) return false;
       }
+      // TASK-1039950: Category filter ('homes', 'rooms', 'villas')
+      if (categoryParam && categoryParam !== "all") {
+        if (!matchesCategory(unit, categoryParam)) return false;
+      }
       if (availableNow) {
         if (tonightProbeLoading) return true;
         if (tonightAvailableIds === null) return true;
@@ -721,6 +758,7 @@ const SearchPage = () => {
     });
   }, [
     availableNow,
+    categoryParam,
     checkIn,
     checkOut,
     dateAvailableIds,
@@ -875,8 +913,13 @@ const SearchPage = () => {
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (value) next.set(key, value);
-      else next.delete(key);
+      if (value) {
+        next.set(key, value);
+        if (key === "sortBy") next.set("sort", value);
+      } else {
+        next.delete(key);
+        if (key === "sortBy") next.delete("sort");
+      }
       if (key === "guests") deleteGuestBreakdown(next);
       return next;
     }, { replace: true });
@@ -892,9 +935,11 @@ const SearchPage = () => {
   const clearFilters = () => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
+      next.delete("category");
       next.delete("minPrice");
       next.delete("maxPrice");
       next.delete("amenities");
+      next.delete("amenity");
       next.delete("remoteWork");
       next.delete("longStay");
       next.delete("availableNow");
@@ -905,6 +950,7 @@ const SearchPage = () => {
       next.delete("nomadWorkspace");
       next.delete("monthlyStay");
       next.delete("sortBy");
+      next.delete("sort");
       next.delete("view");
       return next;
     }, { replace: true });
@@ -995,9 +1041,14 @@ const SearchPage = () => {
     if (monthlyStay) {
       chips.push({ key: "monthlyStay", label: "30+ nights min stay", onRemove: () => del("monthlyStay") });
     }
+    if (categoryParam && categoryParam !== "all") {
+      const catLabel = categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1);
+      chips.push({ key: "category", label: `Category: ${catLabel}`, onRemove: () => del("category") });
+    }
     return chips;
   }, [
     availableNow,
+    categoryParam,
     guests,
     longStay,
     maxPrice,
@@ -1282,6 +1333,37 @@ const SearchPage = () => {
             </label>
           </div>
 
+          {/* TASK-1039950: Category filter pills */}
+          <div className="search-filters__chips" data-testid="search-category-filters">
+            <span className="search-filters__chip-label">Category</span>
+            {(
+              [
+                { key: "", label: "All" },
+                { key: "homes", label: "Homes" },
+                { key: "rooms", label: "Rooms" },
+                { key: "villas", label: "Villas" },
+              ] as const
+            ).map(({ key, label }) => {
+              const active = (categoryParam || "") === key || (!categoryParam && key === "");
+              return (
+                <button
+                  key={key || "all"}
+                  type="button"
+                  data-testid={`marketplace-filter-${key || "all"}`}
+                  onClick={() => updateParam("category", key)}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium min-h-9 transition-colors ${
+                    active
+                      ? "bg-cta-primary text-[var(--text-on-cta)] border border-cta-primary"
+                      : "bg-bg-muted border border-border-subtle text-text-primary hover:border-cta-primary"
+                  }`}
+                  aria-pressed={active}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="search-filters__chips">
             <div className="flex items-center gap-2 min-w-[150px]">
               <span className="search-filters__chip-label !min-w-0">Amenities</span>
@@ -1402,14 +1484,16 @@ const SearchPage = () => {
             <label className="text-sm text-text-muted" htmlFor="sort-by">Sort:</label>
             <select
               id="sort-by"
+              data-testid="marketplace-sort-select"
+              aria-label="Sort listings"
               value={sortBy}
               onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
-              className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary cursor-pointer"
             >
               <option value="recommended" title={`Sorted by ${getTenantBrandName()} suggested order — building, floor, and availability`}>Recommended</option>
-              <option value="price_asc">Price: low to high</option>
-              <option value="price_desc">Price: high to low</option>
-              <option value="rating_desc">Highest rated</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="rating_desc">Top Rated</option>
               <option value="newest">Newest</option>
             </select>
           </div>

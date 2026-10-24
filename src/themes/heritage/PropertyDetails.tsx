@@ -609,7 +609,7 @@ const PropertyDetails = () => {
     // TASK-1039953: Build a back-to-results link when the user arrived from /search or marketplace,
     // or provide a fallback to "/" (marketplace home) when entering directly on marketplace.
     const hasSearchFilters = useMemo(() => {
-        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "minPrice", "maxPrice", "category", "amenity", "sort", "sortBy"];
+        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "adults", "children", "minPrice", "maxPrice", "category", "amenity", "amenities", "sort", "sortBy"];
         return searchKeys.some((k) => searchParams.has(k));
     }, [searchParams]);
 
@@ -621,7 +621,7 @@ const PropertyDetails = () => {
           const qs = cleanParams.toString();
           return qs ? `/?${qs}` : "/";
         }
-        if (!hasSearchFilters) return null;
+        if (!hasSearchFilters) return "/search";
         return `/search?${searchParams.toString()}`;
     }, [searchParams, isMarketplaceHost, hasSearchFilters]);
     // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
@@ -1791,39 +1791,51 @@ useEffect(() => {
         <div className="pp-root" data-testid="heritage-property-details">
           <div className="pp-shell">
 
-            {/* ---- Breadcrumbs ---- */}
-            <nav className="pp-crumbs" aria-label="Breadcrumb">
-              {backToResultsHref ? (
-                <>
-                  <Link
-                    to={backToResultsHref}
-                    data-testid="back-to-results"
-                    aria-label={isMarketplaceHost && !hasSearchFilters ? "Back to all listings" : "Search results"}
-                  >
-                    {isMarketplaceHost && !hasSearchFilters ? "Back to all listings" : "Search results"}
-                  </Link>
-                  {isMarketplaceHost && !hasSearchFilters && (
+            {/* ---- Breadcrumbs & Back to Results ---- */}
+            <div className="flex items-center justify-between gap-4 mb-2 flex-wrap" data-testid="detail-nav-header">
+              <nav className="pp-crumbs" aria-label="Breadcrumb">
+                {backToResultsHref && (hasSearchFilters || isMarketplaceHost) ? (
+                  <>
                     <Link
-                      to="/"
-                      data-testid="back-to-all-listings"
-                      style={{ display: 'none' }}
-                      aria-hidden="true"
+                      to={backToResultsHref}
+                      data-testid="back-to-results"
+                      aria-label={isMarketplaceHost && !hasSearchFilters ? "Back to all listings" : "Search results"}
                     >
-                      Back to all listings
+                      {isMarketplaceHost && !hasSearchFilters ? "Back to all listings" : "Search results"}
                     </Link>
-                  )}
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                </>
-              ) : (
-                <>
-                  <Link to="/">Home</Link>
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                  <Link to={isMarketplaceHost ? "/" : "/#our-homes"}>{isMarketplaceHost ? "All Homes" : "Stays"}</Link>
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                </>
-              )}
-              <span aria-current="page">{getListingDisplayName(data.id, data.property_name)}</span>
-            </nav>
+                    {isMarketplaceHost && !hasSearchFilters && (
+                      <Link
+                        to="/"
+                        data-testid="back-to-all-listings"
+                        style={{ display: 'none' }}
+                        aria-hidden="true"
+                      >
+                        Back to all listings
+                      </Link>
+                    )}
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/">Home</Link>
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                    <Link to={isMarketplaceHost ? "/" : "/#our-homes"}>{isMarketplaceHost ? "All Homes" : "Stays"}</Link>
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                  </>
+                )}
+                <span aria-current="page">{getListingDisplayName(data.id, data.property_name)}</span>
+              </nav>
+
+              {/* TASK-1039953: Clear "Back to Results" button returning to /search or previous search state */}
+              <Link
+                to={backToResultsHref || (isMarketplaceHost ? "/" : "/search")}
+                data-testid="back-to-results-btn"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-primary hover:text-black bg-bg-muted hover:bg-neutral-200/80 px-3 py-1.5 rounded-lg border border-border-subtle transition-colors"
+                aria-label="Back to Results"
+              >
+                ← Back to Results
+              </Link>
+            </div>
 
             {/* ---- Title row ---- */}
             <div className="pp-title-row">
