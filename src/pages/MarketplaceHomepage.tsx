@@ -168,9 +168,10 @@ type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; page
 // moves the cliff and pulls every listing + cover image on first paint.
 const PAGE_SIZE = 20;
 
+export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc';
+
 export default function MarketplaceHomepage() {
   const navigate = useNavigate();
-  const [category, setCategory] = useState<'all' | 'homes' | 'rooms'>('all');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,8 +196,88 @@ export default function MarketplaceHomepage() {
   const [marketplaceProperties, setMarketplaceProperties] = useState<MarketplacePropertyApi[]>([]);
   // TASK-4413: read dates and guest count from URL params (from AirbnbSearchBar)
   const [searchParams, setSearchParams] = useSearchParams();
-  // MKT-023: Quick amenity filter selection
-  const [selectedAmenity, setSelectedAmenity] = useState<string | null>(null);
+
+  // TASK-1039950: sync category and amenity filter pills with URL query parameters
+  const categoryParam = searchParams.get('category');
+  const [category, setCategory] = useState<'all' | 'homes' | 'rooms'>(
+    categoryParam === 'homes' || categoryParam === 'rooms' ? categoryParam : 'all',
+  );
+
+  // MKT-023 / TASK-1039950: Quick amenity filter selection synced with ?amenity=
+  const [selectedAmenity, setSelectedAmenity] = useState<string | null>(
+    searchParams.get('amenity')?.trim() || null,
+  );
+
+  // TASK-1039952: sort dropdown options ("Recommended" | "Price: Low to High" | "Price: High to Low" | "Rating: High to Low")
+  const sortParam = searchParams.get('sort') || searchParams.get('sortBy');
+  const [sortBy, setSortBy] = useState<MarketplaceSortOption>(
+    sortParam === 'price_asc' || sortParam === 'price_desc' || sortParam === 'rating_desc'
+      ? sortParam
+      : 'recommended',
+  );
+
+  useEffect(() => {
+    const cat = searchParams.get('category');
+    if (cat === 'homes' || cat === 'rooms') {
+      setCategory(cat);
+    } else {
+      setCategory('all');
+    }
+    const amen = searchParams.get('amenity')?.trim() || null;
+    setSelectedAmenity(amen);
+
+    const s = searchParams.get('sort') || searchParams.get('sortBy');
+    if (s === 'price_asc' || s === 'price_desc' || s === 'rating_desc') {
+      setSortBy(s);
+    } else {
+      setSortBy('recommended');
+    }
+  }, [searchParams]);
+
+  const handleCategoryChange = useCallback((c: 'all' | 'homes' | 'rooms') => {
+    setCategory(c);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (c !== 'all') {
+        next.set('category', c);
+      } else {
+        next.delete('category');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleAmenityChange = useCallback((amenity: string | null) => {
+    setSelectedAmenity(amenity);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (amenity) {
+        next.set('amenity', amenity);
+      } else {
+        next.delete('amenity');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleSortChange = useCallback((newSort: string) => {
+    const valid: MarketplaceSortOption =
+      newSort === 'price_asc' || newSort === 'price_desc' || newSort === 'rating_desc'
+        ? newSort
+        : 'recommended';
+    setSortBy(valid);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (valid !== 'recommended') {
+        next.set('sort', valid);
+      } else {
+        next.delete('sort');
+        next.delete('sortBy');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   // TASK-102058: the criteria the grid was filtered by, forwarded into every property
   // link (cards + map pins) so details hydrates and Back-navigation restores the bar.
   const searchSuffix = useMemo(() => {
@@ -211,6 +292,10 @@ export default function MarketplaceHomepage() {
       'children',
       'infants',
       'pets',
+      'category',
+      'amenity',
+      'sort',
+      'sortBy',
       // MKT-031: marketplace brand switch (QA/preview) + campaign attribution survive the click-through
       'brand',
       'utm_source',
@@ -383,9 +468,34 @@ export default function MarketplaceHomepage() {
           : matchesAmenityFilter(item, selectedAmenity),
       );
     }
+
+    // TASK-1039952: sort listing results according to chosen option
+    const getItemPrice = (item: MarketplaceItem): number => {
+      const cardPrice = cardPrices.get(item.id);
+      if (cardPrice && cardPrice.status === 'ready' && cardPrice.display.realNightly != null) {
+        return cardPrice.display.realNightly;
+      }
+      return item.pricePerNight;
+    };
+
+    if (sortBy === 'price_asc') {
+      return [...result].sort((a, b) => getItemPrice(a) - getItemPrice(b));
+    }
+    if (sortBy === 'price_desc') {
+      return [...result].sort((a, b) => getItemPrice(b) - getItemPrice(a));
+    }
+    if (sortBy === 'rating_desc') {
+      return [...result].sort((a, b) => {
+        const ratingA = a.rating ?? 0;
+        const ratingB = b.rating ?? 0;
+        if (ratingB !== ratingA) return ratingB - ratingA;
+        return (b.reviewCount ?? 0) - (a.reviewCount ?? 0);
+      });
+    }
+
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests]);
+  }, [items, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -564,7 +674,7 @@ export default function MarketplaceHomepage() {
             key={c}
             data-testid={`marketplace-filter-${c}`}
             className={`min-h-[44px] rounded-xl px-4 py-2 ${category === c ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
-            onClick={() => setCategory(c)}
+            onClick={() => handleCategoryChange(c)}
           >
             {c[0].toUpperCase() + c.slice(1)}
           </button>
@@ -582,51 +692,73 @@ export default function MarketplaceHomepage() {
         )}
       </div>
 
-      {/* MKT-023 / TASK-10298932: Top amenities quick filter pills */}
+      {/* MKT-023 / TASK-10298932 / TASK-1039950: Top amenities quick filter pills */}
       <AmenityFilterPills
         selectedAmenity={selectedAmenity}
-        onSelectAmenity={setSelectedAmenity}
+        onSelectAmenity={handleAmenityChange}
       />
 
-      {/* TASK-4413: price-range control — client-side filter over the fetched grid. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <label htmlFor="marketplace-min-price" className="text-sm font-medium text-text-muted">
-          Price / night
-        </label>
-        <input
-          id="marketplace-min-price"
-          type="number"
-          min={0}
-          inputMode="numeric"
-          placeholder="Min"
-          value={minPriceInput}
-          onChange={(e) => setMinPriceInput(e.target.value)}
-          className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
-        />
-        <span aria-hidden className="text-text-muted">–</span>
-        <input
-          id="marketplace-max-price"
-          type="number"
-          min={0}
-          inputMode="numeric"
-          placeholder="Max"
-          aria-label="Max price"
-          value={maxPriceInput}
-          onChange={(e) => setMaxPriceInput(e.target.value)}
-          className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
-        />
-        {(minPriceInput !== '' || maxPriceInput !== '') && (
-          <button
-            type="button"
-            onClick={() => {
-              setMinPriceInput('');
-              setMaxPriceInput('');
-            }}
-            className="min-h-[40px] rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-muted"
+      {/* TASK-4413: price-range control & TASK-1039952: sort dropdown */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="marketplace-min-price" className="text-sm font-medium text-text-muted">
+            Price / night
+          </label>
+          <input
+            id="marketplace-min-price"
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="Min"
+            value={minPriceInput}
+            onChange={(e) => setMinPriceInput(e.target.value)}
+            className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
+          />
+          <span aria-hidden className="text-text-muted">–</span>
+          <input
+            id="marketplace-max-price"
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="Max"
+            aria-label="Max price"
+            value={maxPriceInput}
+            onChange={(e) => setMaxPriceInput(e.target.value)}
+            className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
+          />
+          {(minPriceInput !== '' || maxPriceInput !== '') && (
+            <button
+              type="button"
+              onClick={() => {
+                setMinPriceInput('');
+                setMaxPriceInput('');
+              }}
+              className="min-h-[40px] rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-muted"
+            >
+              Clear price
+            </button>
+          )}
+        </div>
+
+        {/* TASK-1039952: Missing sort dropdown on Marketplace Homepage */}
+        <div className="flex items-center gap-2" data-testid="marketplace-sort-wrapper">
+          <label htmlFor="marketplace-sort" className="text-sm font-medium text-text-muted whitespace-nowrap">
+            Sort by:
+          </label>
+          <select
+            id="marketplace-sort"
+            data-testid="marketplace-sort-select"
+            aria-label="Sort listings"
+            value={sortBy}
+            onChange={(e) => handleSortChange(e.target.value)}
+            className="min-h-[40px] rounded-lg border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-black cursor-pointer"
           >
-            Clear price
-          </button>
-        )}
+            <option value="recommended">Recommended</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="rating_desc">Rating: High to Low</option>
+          </select>
+        </div>
       </div>
 
       {showMap && mapPins.length > 0 && (
@@ -860,6 +992,7 @@ export default function MarketplaceHomepage() {
               setMinPriceInput('');
               setMaxPriceInput('');
               setSelectedAmenity(null);
+              setSortBy('recommended');
               setSearchParams({});
             }}
             className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-black px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-gray-800 transition-colors"
