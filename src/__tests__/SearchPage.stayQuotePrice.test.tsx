@@ -12,11 +12,15 @@ import { clearMarketplaceCardPriceCache } from '../hooks/useMarketplaceCardPrice
 import SearchPage from '../pages/SearchPage';
 import { settle } from '../test/settle';
 
-vi.mock('../api/listingClient', () => ({
-  fetchPublicListings: vi.fn(() =>
-    Promise.resolve([{ id: 7, name: 'Penthouse', title: 'Penthouse', maxGuests: 4, baseNightlyRate: 5998 }]),
-  ),
-}));
+vi.mock('../api/listingClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/listingClient')>();
+  return {
+    ...actual,
+    fetchPublicListings: vi.fn(() =>
+      Promise.resolve([{ id: 7, name: 'Penthouse', title: 'Penthouse', maxGuests: 6, baseNightlyRate: 5998 }]),
+    ),
+  };
+});
 
 vi.mock('../runtime-config', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../runtime-config')>();
@@ -44,6 +48,15 @@ beforeEach(() => {
   mockFetch.mockImplementation((input: unknown) => {
     const url = String(input);
     if (url.includes('/api/pricing/guest-breakdown')) {
+      if (url.includes('guests=5')) {
+        // 5-guest quote for 2 nights (TASK-10299186): 8,253 all-in total
+        return json({
+          baseAmount: 10400,
+          discountAmount: 2388,
+          convenienceFeeAmount: 241,
+          finalAmount: 8253,
+        });
+      }
       // Weekend (Fri+Sat) 2-night quote: standard 13,128, 25% direct discount, all-in 10,141.
       return json({
         baseAmount: 13128,
@@ -99,5 +112,21 @@ describe('SearchPage card price for the searched stay (GUEST-034)', () => {
     expect(mockFetch.mock.calls.map(urlOf).some((u) => u.includes('/api/pricing/guest-breakdown'))).toBe(false);
     expect(screen.getByTestId('guest-listing-nightly-price')).toHaveTextContent(/4,499/);
     expect(screen.queryByTestId('guest-listing-stay-total')).not.toBeInTheDocument();
+  });
+
+  it('queries quote for 5 guests and renders true 5-guest rate (₹8,253) even if adults=2 is in params (TASK-10299186)', async () => {
+    renderAt('/search?checkIn=2026-10-30&checkOut=2026-11-01&guests=5&adults=2');
+    await settle();
+
+    const quoteCalls = mockFetch.mock.calls.map(urlOf).filter((u) => u.includes('/api/pricing/guest-breakdown'));
+    expect(quoteCalls).toHaveLength(1);
+    expect(quoteCalls[0]).toContain('listingId=7');
+    expect(quoteCalls[0]).toContain('checkIn=2026-10-30');
+    expect(quoteCalls[0]).toContain('checkOut=2026-11-01');
+    expect(quoteCalls[0]).toContain('guests=5');
+
+    const card = screen.getByTestId('guest-listing-card');
+    // Total is the 5-guest quote's ₹8,253, not 1-2 guest rate
+    expect(screen.getByTestId('guest-listing-stay-total')).toHaveTextContent(/8,253 total · 2 nights · all fees included/);
   });
 });

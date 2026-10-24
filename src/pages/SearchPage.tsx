@@ -4,7 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Briefcase, CalendarDays, CalendarRange, Wifi } from "lucide-react";
 
 import { propertyData } from "../data";
-import { fetchPublicListings, type PublicListing } from "../api/listingClient";
+import { fetchPublicListings, resolveStaticMaxGuests, type PublicListing } from "../api/listingClient";
 import { getListingDisplayName } from "../lib/listingDisplayName";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { allInTotalLabel, directSavingsLabel, type DirectPriceDisplay } from "../utils/directBookingPrice";
@@ -140,7 +140,7 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         title: getListingDisplayName(id, property.property_name),
         location: property.property_location ?? "",
         pricePerNight: property.property_price ?? 0,
-        maxGuests: property.maxCapacity ?? 4,
+        maxGuests: resolveStaticMaxGuests(property as Record<string, unknown>) ?? property.maxCapacity ?? 4,
         imageUrl:
           sanitizeGuestImageUrl(property.property_img?.[0]) ?? getPropertyDesignImage(id),
         amenities: property.property_amenities?.slice(0, 3) ?? [],
@@ -302,8 +302,8 @@ const SearchPage = () => {
   // way to retry, indistinguishable from a real zero-result search.
   const [retryCount, setRetryCount] = useState(0);
 
-  const checkInParam = searchParams.get("checkIn");
-  const checkOutParam = searchParams.get("checkOut");
+  const checkInParam = searchParams.get("checkIn") ?? searchParams.get("checkin");
+  const checkOutParam = searchParams.get("checkOut") ?? searchParams.get("checkout");
   const guestsParam = searchParams.get("guests");
   const adultsParam = searchParams.get("adults");
   const childrenParam = searchParams.get("children");
@@ -317,7 +317,7 @@ const SearchPage = () => {
       if (checkInParam) p.set("checkIn", checkInParam);
       if (checkOutParam) p.set("checkOut", checkOutParam);
       const guestTotal =
-        (Number(adultsParam) || 0) + (Number(childrenParam) || 0) || Number(guestsParam) || 0;
+        Math.max((Number(adultsParam) || 0) + (Number(childrenParam) || 0), Number(guestsParam) || 0);
       if (guestTotal > 0) p.set("guests", String(guestTotal));
       p.set("page", "1");
       p.set("pageSize", "100");
@@ -393,9 +393,9 @@ const SearchPage = () => {
   const checkIn = useMemo(() => parseDate(checkInParam), [checkInParam]);
   const checkOut = useMemo(() => parseDate(checkOutParam), [checkOutParam]);
   const guests = useMemo(() => {
-    const total = adultsParam || childrenParam
-      ? (Number(adultsParam) || 0) + (Number(childrenParam) || 0)
-      : Number(guestsParam) || 0;
+    const fromBreakdown = (Number(adultsParam) || 0) + (Number(childrenParam) || 0);
+    const fromTotal = Number(guestsParam) || 0;
+    const total = Math.max(fromBreakdown, fromTotal);
     // A hand-edited URL (?guests=-2) must not become a nonsense filter.
     return total > 0 ? Math.min(Math.floor(total), MAX_GUESTS_FILTER) : null;
   }, [adultsParam, childrenParam, guestsParam]);
@@ -722,7 +722,7 @@ const SearchPage = () => {
       chargesOnlinePaymentFee: feeCharged,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quoteStay, priceDrivenView, unitsBeforePriceFilter, visibleCount, isMarketplaceSearch]);
+  }, [quoteStay, priceDrivenView, unitsBeforePriceFilter, visibleCount, isMarketplaceSearch, tenant?.slug]);
   const stayPrices = useMarketplaceCardPrices(quoteItems, quoteStay ?? { checkIn: null, checkOut: null, guests: null });
   /** The quote for the searched stay, when we have one for this home. */
   const stayDisplayFor = (id: number): DirectPriceDisplay | null => {

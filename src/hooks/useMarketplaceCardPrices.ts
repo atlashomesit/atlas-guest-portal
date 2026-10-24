@@ -39,10 +39,25 @@ export type MarketplaceCardPrice =
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Normalizes a date-like string (e.g. '2026-10-30' or '2026-10-30T00:00:00.000Z') to 'YYYY-MM-DD'.
+ * Returns null if the value is missing or invalid.
+ */
+export function toMarketplaceDateOnly(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (!match) return null;
+  const dateStr = match[1];
+  const parsed = Date.parse(`${dateStr}T00:00:00Z`);
+  return Number.isNaN(parsed) ? null : dateStr;
+}
+
 /** Whole nights between two yyyy-MM-dd dates, or null when the pair is not a valid stay. */
 export function marketplaceStayNights(checkIn: string | null, checkOut: string | null): number | null {
-  if (!checkIn || !checkOut || !ISO_DATE.test(checkIn) || !ISO_DATE.test(checkOut)) return null;
-  const nights = Math.round((Date.parse(`${checkOut}T00:00:00Z`) - Date.parse(`${checkIn}T00:00:00Z`)) / 86_400_000);
+  const dIn = toMarketplaceDateOnly(checkIn);
+  const dOut = toMarketplaceDateOnly(checkOut);
+  if (!dIn || !dOut) return null;
+  const nights = Math.round((Date.parse(`${dOut}T00:00:00Z`) - Date.parse(`${dIn}T00:00:00Z`)) / 86_400_000);
   return Number.isFinite(nights) && nights > 0 ? nights : null;
 }
 
@@ -53,13 +68,15 @@ export async function fetchMarketplaceCardPrice(
   signal?: AbortSignal,
 ): Promise<DirectPriceDisplay | null> {
   const paymentFeeCharged = item.chargesOnlinePaymentFee !== false;
-  const nights = marketplaceStayNights(stay.checkIn, stay.checkOut);
+  const checkIn = toMarketplaceDateOnly(stay.checkIn);
+  const checkOut = toMarketplaceDateOnly(stay.checkOut);
+  const nights = marketplaceStayNights(checkIn, checkOut);
 
-  if (nights != null && stay.checkIn && stay.checkOut) {
+  if (nights != null && checkIn && checkOut) {
     const quote = await fetchGuestPriceBreakdown(
       item.id,
-      stay.checkIn,
-      stay.checkOut,
+      checkIn,
+      checkOut,
       signal,
       null,
       stay.guests,
@@ -94,7 +111,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, { display: DirectPriceDisplay | null; storedAt: number }>();
 
 function cacheKey(item: MarketplaceCardPriceItem, stay: MarketplaceStay): string {
-  return [item.tenantSlug, item.id, stay.checkIn ?? '', stay.checkOut ?? '', stay.guests ?? ''].join('|');
+  const checkIn = toMarketplaceDateOnly(stay.checkIn);
+  const checkOut = toMarketplaceDateOnly(stay.checkOut);
+  return [item.tenantSlug, item.id, checkIn ?? '', checkOut ?? '', stay.guests ?? ''].join('|');
 }
 
 /** Test seam: forget every cached card price. */
@@ -111,13 +130,16 @@ export function useMarketplaceCardPrices(
 ): Map<number, MarketplaceCardPrice> {
   const [prices, setPrices] = useState<Map<number, MarketplaceCardPrice>>(() => new Map());
 
+  const checkIn = toMarketplaceDateOnly(stay.checkIn);
+  const checkOut = toMarketplaceDateOnly(stay.checkOut);
+
   // Re-run only when the set of homes or the stay changes, not on every new array identity.
   const itemsKey = items.map((i) => `${i.tenantSlug}:${i.id}:${i.chargesOnlinePaymentFee}`).join(',');
-  const stayKey = `${stay.checkIn ?? ''}|${stay.checkOut ?? ''}|${stay.guests ?? ''}`;
+  const stayKey = `${checkIn ?? ''}|${checkOut ?? ''}|${stay.guests ?? ''}`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const stableItems = useMemo(() => items, [itemsKey]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const stableStay = useMemo(() => stay, [stayKey]);
+  const stableStay = useMemo<MarketplaceStay>(() => ({ checkIn, checkOut, guests: stay.guests }), [stayKey]);
 
   useEffect(() => {
     const controller = new AbortController();
