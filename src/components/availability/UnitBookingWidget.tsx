@@ -32,6 +32,7 @@ import {
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
+import { isSmallParty, SMALL_PARTY_HINT_DEFAULT } from '@/utils/smallParty';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import DirectSavingRow from '@/components/pricing/DirectSavingRow';
@@ -121,6 +122,10 @@ interface UnitBookingWidgetProps {
   dormBedCount?: number | null;
   /** TASK-1039977 / PAY-006: listing security deposit (INR); forwarded to checkout */
   securityDepositAmount?: number | null;
+  /** TASK-10299183: small-party pricing configured on listing. */
+  hasSmallPartyPricing?: boolean;
+  /** Custom small-party hint text. Defaults to "Special rate available for 1-2 guests". */
+  smallPartyHint?: string | null;
 }
 
 export type BookingStickySummary = {
@@ -216,6 +221,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   dormGenderPolicy = null,
   dormBedCount = null,
   securityDepositAmount = null,
+  hasSmallPartyPricing = false,
+  smallPartyHint,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -287,6 +294,20 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
+
+  // TASK-10299183: small-party pricing hint in booking box
+  const smallPartyPricingConfigured = Boolean(
+    hasSmallPartyPricing ||
+    publicRatePlans.some(
+      (p) =>
+        p.guests > 0 &&
+        p.guests <= 2 &&
+        (!p.isDefault ||
+          p.effectiveNightlyRate <
+            (publicRatePlans.find((d) => d.isDefault)?.effectiveNightlyRate ?? Infinity)),
+    ),
+  );
+  const showSmallPartyHint = smallPartyPricingConfigured && isSmallParty(guests);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
@@ -2221,6 +2242,30 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
+        {/* TASK-10299183: small-party discount hint when small-party pricing is configured and guest count qualifies (1-2 guests) */}
+        {showSmallPartyHint && (
+          <div
+            className="bw-small-party-hint"
+            data-testid="booking-small-party-hint"
+            role="status"
+            style={{
+              marginTop: 8,
+              padding: '6px 10px',
+              borderRadius: 8,
+              backgroundColor: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              color: '#065f46',
+              fontSize: '12px',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: '13px' }}>✨</span>
+            <span>{smallPartyHint || SMALL_PARTY_HINT_DEFAULT}</span>
+          </div>
+        )}
         {/* HSL-011: live beds-left for the chosen nights (smallest free count across them). Only printed when the
             availability data gave a count for every night; never a guess. */}
         {isDorm && dormBedsLeft != null && (

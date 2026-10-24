@@ -2906,6 +2906,7 @@ useEffect(() => {
                         clusterRole={data.clusterRole ?? null}
                         clusterId={data.clusterId ?? null}
                         securityDepositAmount={data.securityDepositAmount ?? null}
+                        hasSmallPartyPricing={Boolean(data.hasSmallPartyPricing || (data as unknown as { occupancyPricingEnabled?: boolean }).occupancyPricingEnabled)}
                         onStickySummaryChange={setStickyBookingSummary}
                         tenantContext={effectiveTenantCtx}
                       />
