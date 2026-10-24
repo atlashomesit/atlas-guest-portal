@@ -15,6 +15,7 @@ import { sizedForPartyFirst } from '@/utils/smallParty'; // GUEST-033
 import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
+import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
@@ -44,6 +45,9 @@ type MarketplaceItem = {
   tenantName: string;
   tenantCategory?: string;
   title: string;
+  displayName?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
   city?: string;
   pricePerNight: number;
   maxGuests: number;
@@ -73,11 +77,38 @@ type MarketplaceItem = {
   description?: string;
 };
 
+/**
+ * TASK-10299086: Resolves guest-facing display name for marketplace listing cards.
+ * Prefers listing.displayName / listing.title / listing.nameFormatted over internal slug/code,
+ * and maps internal Atlas SKU codes (e.g. Atlas101 -> Studio 101, Atlas501_PH -> Penthouse 501)
+ * using getListingDisplayName.
+ */
+export function resolveMarketplaceListingDisplayName(item: {
+  id?: number | string | null;
+  title?: string | null;
+  displayName?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
+  slug?: string | null;
+}): string {
+  const explicitGuestName = item.displayName?.trim() || item.nameFormatted?.trim();
+  const rawFallback = item.title?.trim() || item.name?.trim() || item.slug?.trim() || '';
+  const candidate = explicitGuestName || rawFallback;
+  const resolved = getListingDisplayName(item.id, candidate, explicitGuestName || undefined);
+  return resolved || candidate || 'Listing';
+}
+
 function marketplaceListingPath(
-  item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>,
+  item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'> & {
+    displayName?: string | null;
+    nameFormatted?: string | null;
+    name?: string | null;
+    slug?: string | null;
+  },
   searchSuffix = '',
 ): string {
-  const propertySlug = getPropertySlug({ property_name: item.title });
+  const displayTitle = resolveMarketplaceListingDisplayName(item);
+  const propertySlug = getPropertySlug({ property_name: displayTitle || item.title });
   const base = buildHomeUnitPath(propertySlug, item.id);
   // TASK-102058: carry the active search criteria forward into the details URL
   // (mirrors SearchPage's querySuffix). Without this the details page hydrates
@@ -611,6 +642,7 @@ export default function MarketplaceHomepage() {
         {!loading &&
           visibleItems.map((item) => {
             const isFav = favIds.has(item.id);
+            const cardTitle = resolveMarketplaceListingDisplayName(item);
             const canonicalUrl = marketplaceListingPath(item, searchSuffix);
 
             return (
@@ -630,7 +662,7 @@ export default function MarketplaceHomepage() {
                 <div className="h-40 w-full bg-bg-muted">
                   <OptimizedImage
                     src={sanitizeGuestImageUrl(item.coverImageUrl) ?? ''}
-                    alt={item.title || 'Listing photo'}
+                    alt={cardTitle || 'Listing photo'}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -661,7 +693,7 @@ export default function MarketplaceHomepage() {
                       onClick={(e) => e.stopPropagation()}
                       className="hover:underline focus:outline-none"
                     >
-                      {item.title}
+                      {cardTitle}
                     </Link>
                   </h2>
                   <HostIdentityLabel marketplace verified={item.hostIdentityVerified} />

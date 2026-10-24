@@ -222,6 +222,9 @@ type MarketplaceApiItem = {
   id: number;
   tenantSlug: string;
   title: string;
+  displayName?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
   city?: string;
   pricePerNight: number;
   maxGuests: number;
@@ -232,12 +235,18 @@ type MarketplaceApiItem = {
 
 function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing[] {
   return items.map((item) => {
-    const propertySlug = getPropertySlug({ property_name: item.title });
+    const displayTitle =
+      getListingDisplayName(
+        item.id,
+        item.displayName?.trim() || item.title?.trim() || item.nameFormatted?.trim() || item.name?.trim() || item.title,
+        item.displayName,
+      ) || item.title;
+    const propertySlug = getPropertySlug({ property_name: displayTitle });
     const canonicalPath = `${buildHomeUnitPath(propertySlug, item.id)}?tenant=${encodeURIComponent(item.tenantSlug)}`;
     return {
     id: `mp-${item.id}`,
     numericId: item.id,
-    title: item.title,
+    title: displayTitle,
     location: item.city ?? "",
     pricePerNight: item.pricePerNight,
     maxGuests: item.maxGuests,

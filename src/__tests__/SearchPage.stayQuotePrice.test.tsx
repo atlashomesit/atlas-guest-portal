@@ -126,6 +126,7 @@ describe('SearchPage card price for the searched stay (GUEST-034)', () => {
     expect(quoteCalls[0]).toContain('guests=5');
 
     const card = screen.getByTestId('guest-listing-card');
+    expect(card).toBeInTheDocument();
     // Total is the 5-guest quote's ₹8,253, not 1-2 guest rate
     expect(screen.getByTestId('guest-listing-stay-total')).toHaveTextContent(/8,253 total · 2 nights · all fees included/);
   });
