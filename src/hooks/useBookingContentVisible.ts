@@ -3,11 +3,15 @@ import { useEffect, useState } from 'react';
 /** Always-guarded content: host checkout instructions + message composer (all widths). */
 export const ALWAYS_SELECTOR = '[data-testid="guest-message-composer"], [data-testid="checkout-briefing"]';
 /** GUEST-035: the booking box (Total row, savings/cancellation lines) — guarded on phones only. */
-export const PHONE_ONLY_SELECTOR = '[data-testid="guest-booking-form"]';
+export const PHONE_ONLY_SELECTOR = '[data-testid="guest-booking-form"], [data-booking-widget="true"], .lv-booking';
 export const PHONE_MEDIA_QUERY = '(max-width: 767px)';
 
 function isPhone(): boolean {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(PHONE_MEDIA_QUERY).matches;
+  if (typeof window === 'undefined') return false;
+  if (typeof window.matchMedia === 'function') {
+    return window.matchMedia(PHONE_MEDIA_QUERY).matches;
+  }
+  return window.innerWidth <= 767;
 }
 
 /**
@@ -21,7 +25,7 @@ export function useBookingContentVisible(): boolean {
     let byElement = new Map<Element, boolean>();
     const io = new IntersectionObserver((entries) => {
       for (const entry of entries) {
-        if (byElement.has(entry.target)) byElement.set(entry.target, entry.isIntersecting);
+        byElement.set(entry.target, entry.isIntersecting);
       }
       setVisible([...byElement.values()].some(Boolean));
     }, { rootMargin: '0px 0px 96px 0px' });

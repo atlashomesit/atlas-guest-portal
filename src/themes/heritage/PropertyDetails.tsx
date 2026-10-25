@@ -2862,7 +2862,7 @@ useEffect(() => {
                         timezoneId={data.timezoneId}
                         coverPhotoUrl={primaryImage}
                         maxGuests={data.maxGuests}
-                        propertySlug={propertySlugParam}
+                        propertySlug={propertySlug}
                         unitSlug={unitSlugParam}
                         // TASK-102485: tell the widget the listing lookup FAILED (vs still
                         // resolving) so that with listingId undefined it fail-closes with the
@@ -2881,6 +2881,7 @@ useEffect(() => {
                         accommodationType={data.accommodationType ?? null}
                         dormGenderPolicy={data.dormGenderPolicy ?? null}
                         dormBedCount={data.dormBedCount ?? null}
+                        isParentCluster={data.isParentCluster ?? (data.clusterRole ? data.clusterRole.toUpperCase() === 'PARENT' : undefined)}
                         clusterRole={data.clusterRole ?? null}
                         clusterId={data.clusterId ?? null}
                         securityDepositAmount={data.securityDepositAmount ?? null}
