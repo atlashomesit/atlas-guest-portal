@@ -201,7 +201,7 @@ describe("Slider hero search", () => {
       bookingMode: "WHATSAPP",
     });
     renderSlider();
-    expect(screen.queryByTestId("hero-refund-processing-chip")).toBeNull();
+    expect(screen.getByTestId("hero-refund-processing-chip")).toHaveTextContent("Host-managed refunds");
     expect(screen.queryByText(/within 24 hours/i)).toBeNull();
   });
 

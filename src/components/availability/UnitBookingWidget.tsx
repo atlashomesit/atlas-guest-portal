@@ -1474,7 +1474,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // CLU-011: role comes from the public listing payload only (no name guessing).
   const isParentOfCluster =
-    clusterId != null && isParentListing({ isParentCluster, clusterRole, accommodationType });
+    isParentListing({ isParentCluster, clusterRole, accommodationType }) ||
+    Boolean(clusterId && isParentListing({ isParentCluster, clusterRole, accommodationType }));
   const crossSellCheckIn = dateRange.startDate ? toCalendarISO(dateRange.startDate) : null;
   const crossSellCheckOut = dateRange.endDate ? toCalendarISO(dateRange.endDate) : null;
   const [clusterAvailability, setClusterAvailability] = useState<ClusterChildrenAvailability | null>(null);

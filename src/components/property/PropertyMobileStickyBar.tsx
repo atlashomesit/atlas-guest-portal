@@ -7,6 +7,7 @@
 import React from "react";
 import { formatCurrency } from "@/utils/formatting";
 import type { BookingStickySummary } from "@/components/availability/UnitBookingWidget";
+import { useBookingContentVisible } from "@/hooks/useBookingContentVisible";
 
 type Props = {
   bookable: boolean;
@@ -97,6 +98,8 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
   onReserveClick,
 }) => {
   const pastHero = useStickyBarVisibility();
+  const bookingContentVisible = useBookingContentVisible();
+  const isVisible = pastHero && !bookingContentVisible;
   const canReviewBooking = Boolean(summary?.canReviewBooking && summary.hasCompleteDates && !summary.datesUnavailable && !summary.pricingPending && summary.totalAmount != null && summary.totalAmount > 0);
 
   const handleReserve = React.useCallback(() => {
@@ -163,13 +166,13 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
     <div
       className="pp-m-sticky"
       aria-label="Book this property"
-      aria-hidden={!pastHero}
+      aria-hidden={!isVisible}
       data-testid="mobile-reserve-bar"
-      data-visible={pastHero ? "true" : "false"}
+      data-visible={isVisible ? "true" : "false"}
       style={{
-        transform: pastHero ? "translateY(0)" : "translateY(110%)",
-        opacity: pastHero ? 1 : 0,
-        pointerEvents: pastHero ? "auto" : "none",
+        transform: isVisible ? "translateY(0)" : "translateY(110%)",
+        opacity: isVisible ? 1 : 0,
+        pointerEvents: isVisible ? "auto" : "none",
         transition: "transform 0.3s ease, opacity 0.3s ease",
       }}
     >
