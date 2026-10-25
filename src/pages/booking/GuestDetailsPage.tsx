@@ -458,7 +458,7 @@ const GuestDetailsPage: React.FC = () => {
       () => {},
       () => {},
     );
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only preload
+  }, []);
 
   // ── Hold state from context ──────────────────────────────────────────────
   const holdId = booking.holdId;
