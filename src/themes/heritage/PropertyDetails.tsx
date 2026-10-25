@@ -325,7 +325,7 @@ function PropertyDetailsSkeleton() {
                         if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer) {
                           window.history.back();
                         } else {
-                          window.location.href = isMarketplaceHost ? "/" : "/";
+                          window.location.href = "/";
                         }
                       }}
                       className="mt-2"
@@ -398,6 +398,9 @@ interface Property {
     /** CLU-011: `PublicListingDto.ClusterRole` / `.ClusterId` (API only). */
     clusterRole?: string | null;
     clusterId?: number | null;
+    isParentCluster?: boolean | null;
+    securityDepositAmount?: number | null;
+    hasSmallPartyPricing?: boolean | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -1592,7 +1595,7 @@ useEffect(() => {
                         if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer) {
                           window.history.back();
                         } else {
-                          window.location.href = isMarketplaceHost ? "/" : "/";
+                          window.location.href = "/";
                         }
                       },
                     }]}

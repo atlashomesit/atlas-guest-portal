@@ -213,7 +213,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const quoteItems = React.useMemo<MarketplaceCardPriceItem[]>(() => {
     if (!hasStayDates) return [];
     return sortedListings
-      .map((listing) => {
+      .map((listing): MarketplaceCardPriceItem | null => {
         const property = propertyLookup[listing.id];
         const listingDbId = property?.listingId != null ? Number(property.listingId) : Number(listing.id);
         const id = Number.isFinite(listingDbId) && listingDbId > 0 ? listingDbId : Number(listing.id);

@@ -73,7 +73,7 @@ declare global {
   }
 }
 
-interface UnitBookingWidgetProps {
+export interface UnitBookingWidgetProps {
   listingId?: string | number;
   propertyId?: string | number;
   listingName?: string;

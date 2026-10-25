@@ -166,7 +166,7 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         hasSmallPartyPricing: false,
         accommodationType: (property as Record<string, unknown>).accommodationType as string ?? null,
         dormGenderPolicy: (property as Record<string, unknown>).dormGenderPolicy as any ?? null,
-        propertyType: property.property_type ?? (property as Record<string, unknown>).propertyType as string ?? null,
+        propertyType: ((property as Record<string, unknown>).property_type as string) ?? ((property as Record<string, unknown>).propertyType as string) ?? null,
       };
     })
     .filter((l): l is NonNullable<typeof l> => l !== null);

@@ -1,4 +1,3 @@
-import React from 'react';
 import { plainMealLabel } from '@/utils/directBookingPrice';
 
 export interface PricingTierDisplayProps {

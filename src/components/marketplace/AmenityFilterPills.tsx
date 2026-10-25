@@ -1,4 +1,3 @@
-import React from 'react';
 import { DEFAULT_MARKETPLACE_AMENITY_PILLS, type AmenityFilterPillItem } from '@/utils/amenityFilters';
 
 export type AmenityFilterPillsProps = {

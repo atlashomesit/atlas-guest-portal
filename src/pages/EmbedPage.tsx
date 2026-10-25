@@ -445,6 +445,7 @@ export function DateGuestPicker({
 function GuestDetailsForm({
   listing,
   tenantName,
+  tenantSlug,
   checkIn,
   checkOut,
   guests,
@@ -454,6 +455,7 @@ function GuestDetailsForm({
 }: {
   listing: EmbedListingSummary;
   tenantName: string;
+  tenantSlug: string;
   checkIn: Date;
   checkOut: Date;
   guests: number;
@@ -508,7 +510,7 @@ function GuestDetailsForm({
     setUpiReportBusy(true);
     setUpiReportError(null);
     try {
-      await reportUpiPaid(upiCheckout.bookingId, upiCheckout.bookingToken, config.tenantSlug);
+      await reportUpiPaid(upiCheckout.bookingId, upiCheckout.bookingToken, tenantSlug);
       setUpiReported(true);
     } catch (err) {
       setUpiReportError(err instanceof Error ? err.message : 'Could not tell the host. Please try again.');
@@ -619,7 +621,7 @@ function GuestDetailsForm({
         // Step 1: init-hold (only when no live hold exists or it has expired)
         const holdRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
           method: 'POST',
-          headers: getOrderRequestHeaders(idempotencyKey, config.tenantSlug),
+          headers: getOrderRequestHeaders(idempotencyKey, tenantSlug),
           body: JSON.stringify({
             bookingDraft: {
               listingId: listing.id,
@@ -644,7 +646,7 @@ function GuestDetailsForm({
       // Step 2: final-charge (Razorpay order)
       const orderRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
         method: 'POST',
-        headers: getOrderRequestHeaders(idempotencyKey, config.tenantSlug),
+        headers: getOrderRequestHeaders(idempotencyKey, tenantSlug),
         body: JSON.stringify({
           holdId: hold.holdId,
           holdToken: hold.prepToken,
@@ -699,7 +701,7 @@ function GuestDetailsForm({
           try {
             const verifyRes = await fetch(buildApiUrl('/api/Razorpay/verify'), {
               method: 'POST',
-              headers: getOrderRequestHeaders(crypto.randomUUID(), config.tenantSlug),
+              headers: getOrderRequestHeaders(crypto.randomUUID(), tenantSlug),
               body: JSON.stringify({
                 bookingId: order.bookingId,
                 razorpayOrderId: response.razorpay_order_id,
@@ -1177,6 +1179,7 @@ export default function EmbedPage() {
         <GuestDetailsForm
           listing={selectedListing}
           tenantName={config.tenantName}
+          tenantSlug={config.tenantSlug}
           checkIn={checkIn}
           checkOut={checkOut}
           guests={guests}

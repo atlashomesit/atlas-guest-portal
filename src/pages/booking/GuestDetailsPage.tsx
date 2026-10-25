@@ -1323,8 +1323,8 @@ const GuestDetailsPage: React.FC = () => {
         // ("Try again" keeps the same hold — no fresh clock per try). Otherwise the nights are re-checked and the
         // hold started right now; if the nights are gone the 409 below says so BEFORE any money moves.
         let activeHoldId: number | null = (holdId != null ? Number(holdId) : null) ?? latestHoldRef.current.holdId;
-        let activeHoldToken: string | null = (holdToken ?? null) ?? latestHoldRef.current.holdToken;
-        let activeHoldExpiresAt: string | null = (holdExpiresAt ?? null) ?? latestHoldRef.current.holdExpiresAt;
+        let activeHoldToken: string | null = holdToken ?? latestHoldRef.current.holdToken;
+        let activeHoldExpiresAt: string | null = holdExpiresAt ?? latestHoldRef.current.holdExpiresAt;
         const holdIsLive =
           activeHoldId != null &&
           activeHoldExpiresAt != null &&

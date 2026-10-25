@@ -17,3 +17,5 @@ export function DormGenderAckLine({
     </p>
   );
 }
+
+export default DormGenderAckLine;
