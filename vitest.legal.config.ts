@@ -6,7 +6,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      vitest: path.resolve(__dirname, "./node_modules/vitest"),
     },
   },
   test: {
@@ -15,6 +14,6 @@ export default defineConfig({
     // Use threads pool instead of forks (default) to avoid subprocess
     // fork-timeout failures when running under heavy parallel build load
     // (release gate runs API, admin, and guest builds simultaneously).
-    pool: "threads",
+    pool: "forks",
   },
 });
