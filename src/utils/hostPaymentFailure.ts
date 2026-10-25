@@ -43,7 +43,15 @@ export function buildHostPaymentFailureMessage(ctx: HostFailureContext): string 
   if (hasLabels) {
     line += ` for ${ctx.checkInLabel} to ${ctx.checkOutLabel}`;
   }
-  const n = ctx.nights && ctx.nights > 0 ? ctx.nights : null;
+  let n = ctx.nights && ctx.nights > 0 ? ctx.nights : null;
+  if (!n && hasLabels) {
+    const d1 = new Date(ctx.checkInLabel!);
+    const d2 = new Date(ctx.checkOutLabel!);
+    if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+      const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff > 0) n = diff;
+    }
+  }
   const g = ctx.guests && ctx.guests > 0 ? ctx.guests : null;
   const bits: string[] = [];
   if (n) bits.push(`${n} ${n === 1 ? 'night' : 'nights'}`);

@@ -820,7 +820,12 @@ const GuestDetailsPage: React.FC = () => {
   // The widget's legacy estimate fallback may retain a positive fee for an absorbed hold.
   // Raw hold metadata drives only visible rows; total/payment calculation stays unchanged.
   const displayedFeeAmount = feeAmount(priceBreakdown?.paymentFeeDisplay?.amount) ?? convenienceFeeAmount;
-  const nights = priceBreakdown?.nights ?? 0;
+  const nights =
+    priceBreakdown?.nights && priceBreakdown.nights > 0
+      ? priceBreakdown.nights
+      : (booking.checkIn && booking.checkOut
+          ? Math.max(1, Math.round((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000))
+          : 0);
 
   const addOnsTotal = useMemo(
     () =>
