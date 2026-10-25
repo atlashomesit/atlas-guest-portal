@@ -2591,9 +2591,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <span className="lv-num">{displayPrice(isNaN(finalTotal) ? 0 : Math.max(1, finalTotal))}</span>
           </div>
           {/* HSL-011: the all-in Total above divided by the beds, so a group sees what ONE bed costs them. */}
-          {isDorm && guests > 1 && !isNaN(finalTotal) && finalTotal > 0 && (
+          {isDorm && guests >= 1 && !isNaN(finalTotal) && finalTotal > 0 && (
             <p className="text-xs" data-testid="dorm-per-bed-total" style={{ margin: '4px 0 0', color: 'var(--text-muted, #6b5a55)' }}>
-              About {displayPrice(Math.round(finalTotal / guests))} per bed, all in
+              {guests > 1 ? `About ${displayPrice(Math.round(finalTotal / guests))} per bed, all in` : `${displayPrice(Math.round(finalTotal))} per bed, all in`}
             </p>
           )}
         </div>
