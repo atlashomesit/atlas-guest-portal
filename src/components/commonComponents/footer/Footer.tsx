@@ -239,7 +239,7 @@ const Footer = () => {
             {/* TASK-10298995: Legal disclaimer with valid route links */}
             <div
                 data-testid="footer-legal-disclaimer"
-                className="mt-3 text-xs text-center text-[var(--footer-link)] max-w-2xl mx-auto opacity-80"
+                className="mt-3 text-xs text-center text-[var(--footer-link)] max-w-2xl mx-auto"
             >
                 By using this website, you agree to the{' '}
                 <Link to="/terms" className="underline hover:text-[var(--footer-link-hover)] transition-colors">
