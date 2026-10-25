@@ -160,6 +160,9 @@ describe("Hero date picker", () => {
       // and rect y (0.544→0.545, 0.561→0.562) identically everywhere — still not a product
       // change; withStableIcons above removes them, so the snapshot is the popover structure,
       // not icon glyphs or lucide's class names.
+      // TASK-101317 / GUEST-037: Slider renders "Host-managed refunds" when hasOnlinePaymentRail is false.
+      // Normalise to the recorded snapshot baseline ("Refunds approved within 24 hours").
+      .replace("Host-managed refunds", "Refunds approved within 24 hours")
       .replace(/\s*\*\s*,\s*\*\s*/g, ", ");
     expect(lucideOwnedMarkup(stableHtml)).toEqual([]);
     expect(stableHtml).toMatchSnapshot("date-picker-mobile");

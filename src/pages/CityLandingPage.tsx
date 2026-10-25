@@ -72,6 +72,7 @@ function toListingCardModel(listing: PublicListing) {
     listingId: listing.id,
     id: String(listing.id),
     name: listing.name || listing.propertyName || "Homestay",
+    displayName: listing.displayName ?? listing.name,
     location: listing.propertyAddress || listing.propertyName || "",
     neighborhoods: [] as string[],
     image,
@@ -168,6 +169,7 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     listingId: item.id,
     id: String(item.id),
     name: displayTitle,
+    displayName: item.displayName ?? displayTitle,
     location: item.city || displayTitle || item.title || "",
     neighborhoods: [],
     image,
@@ -366,6 +368,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
                   hostIdentityVerified={c.hostIdentityVerified}
                   id={c.id}
                   name={c.name}
+                  displayName={c.displayName}
                   location={c.location}
                   neighborhoods={c.neighborhoods}
                   image={c.image}
