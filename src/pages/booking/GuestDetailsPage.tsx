@@ -1182,6 +1182,12 @@ const GuestDetailsPage: React.FC = () => {
     checkoutSettledRef.current = false; // a new hold starts a new abandon/settle cycle
     const expiresIso = typeof newExpiry === 'string' ? newExpiry : new Date(newExpiry).toISOString();
     const token = typeof prepToken === 'string' ? prepToken : null;
+    latestHoldRef.current = {
+      holdId: Number(newHoldId),
+      holdToken: token,
+      holdTenantSlug: effectiveTenantSlug ?? null,
+      holdExpiresAt: expiresIso,
+    };
     updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
     return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
   }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, effectiveTenantSlug, updateBooking]);
@@ -1311,9 +1317,9 @@ const GuestDetailsPage: React.FC = () => {
         // Details and house rules carried no clock and closed no OTA night. A live hold is reused as is
         // ("Try again" keeps the same hold — no fresh clock per try). Otherwise the nights are re-checked and the
         // hold started right now; if the nights are gone the 409 below says so BEFORE any money moves.
-        let activeHoldId: number | null = holdId != null ? Number(holdId) : null;
-        let activeHoldToken: string | null = holdToken ?? null;
-        let activeHoldExpiresAt: string | null = holdExpiresAt ?? null;
+        let activeHoldId: number | null = (holdId != null ? Number(holdId) : null) ?? latestHoldRef.current.holdId;
+        let activeHoldToken: string | null = (holdToken ?? null) ?? latestHoldRef.current.holdToken;
+        let activeHoldExpiresAt: string | null = (holdExpiresAt ?? null) ?? latestHoldRef.current.holdExpiresAt;
         const holdIsLive =
           activeHoldId != null &&
           activeHoldExpiresAt != null &&
@@ -1615,9 +1621,11 @@ const GuestDetailsPage: React.FC = () => {
                     // TASK-10087: terminal outcome — anonymous identifiers only, no PII
                     // (payment/order IDs stay in the visible recovery message, never in the event).
                     track(TerminalCheckoutOutcomeEvents.ChargedUnconfirmed, holdListingId ? Number(holdListingId) : 0);
+                    const waBase = getWhatsAppLink();
+                    const waSection = waBase ? ` or contact us on WhatsApp (${waBase}?text=${waText})` : '';
                     setOrderError(
                       `Payment received but we could not confirm your booking yet. Payment ID: ${paymentId} · Booking #${bookingId}. ` +
-                        `We will retry automatically for about 5 minutes — if your stay is not confirmed by then, tap "Check again" below or contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
+                        `We will retry automatically for about 5 minutes — if your stay is not confirmed by then, tap "Check again" below${waSection} ` +
                         `or email ${getContactEmail()}. No need to pay again.`,
                     );
                     const pollToken = pendingBookingTokenRef.current;
@@ -2085,10 +2093,10 @@ const GuestDetailsPage: React.FC = () => {
   const trialPayAtProperty = isTenantTrialPayAtPropertyOnly(tenantCtx);
   const whatsappHandoffUrl = (() => {
     const digits = (whatsappNumber || '').replace(/\D/g, '');
+    if (!digits) return null;
+    const fullDigits = digits.length === 10 ? `91${digits}` : digits;
     const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
-    if (digits) return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-    // No host number known: on the host's own site the site contact is the host's; on the marketplace there is no safe number.
-    return isMarketplaceMode() ? '' : `${getWhatsAppLink()}?text=${encodeURIComponent(text)}`;
+    return `https://wa.me/${fullDigits}?text=${encodeURIComponent(text)}`;
   })();
   // FOUNDER RULED 2026-10-19: the failed-payment contact is the HOST's WhatsApp (pre-written with the room, dates, guests,
   // amount and the guest's name; the guest only taps Send), else a call link to the host's phone, else nothing.
@@ -2100,13 +2108,16 @@ const GuestDetailsPage: React.FC = () => {
     checkOutLabel: checkOutDisplay,
     nights,
     guests: booking.guests ?? 1,
-    amountInr: chargeInr,
+    amountInr: razorpayAmountPaise != null && razorpayAmountPaise > 0 ? razorpayAmountPaise / 100 : chargeInr,
     guestName: formData.name,
   });
   // Charged-but-unconfirmed (the money WAS taken) keeps the site-level support links below; only the failed-payment panel is host-first.
-  const paymentFailureWhatsAppUrl = `${getWhatsAppLink()}?text=${encodeURIComponent(
-    'Hi, my payment went through but my booking is not confirmed yet. Can you help?',
-  )}`;
+  const waBase = getWhatsAppLink();
+  const paymentFailureWhatsAppUrl = waBase
+    ? `${waBase}?text=${encodeURIComponent(
+        'Hi, my payment went through but my booking is not confirmed yet. Can you help?',
+      )}`
+    : '';
   const paymentFailureTelLink = getTelLink();
   const paymentFailureEmail = getContactEmail();
   const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment received — booking not confirmed')}`;
@@ -2860,9 +2871,11 @@ const GuestDetailsPage: React.FC = () => {
                         >
                           {chargedUnconfirmedChecking ? 'Checking…' : 'Check again'}
                         </button>
-                        <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
-                          <IconWhatsApp size={14} /> WhatsApp us
-                        </a>
+                        {paymentFailureWhatsAppUrl ? (
+                          <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
+                            <IconWhatsApp size={14} /> WhatsApp us
+                          </a>
+                        ) : null}
                         <a href={paymentFailureTelLink}>Call {formatDisplayNumber()}</a>
                         <a href={paymentFailureMailto}>Email {paymentFailureEmail}</a>
                       </div>
@@ -3195,7 +3208,11 @@ const GuestDetailsPage: React.FC = () => {
                 <IconWhatsApp size={16}/>
                 <div>
                   <b>Online payment is not available for this property.</b><br/>
-                  <span>Contact the host on WhatsApp to confirm your dates.</span>
+                  <span>
+                    {whatsappHandoffUrl
+                      ? 'Contact the host on WhatsApp to confirm your dates.'
+                      : 'Please contact the host directly to make a reservation.'}
+                  </span>
                   {trialPayAtProperty && (
                     <div data-testid="guest-trial-pay-at-property-notice" style={{ marginTop: 4 }}>
                       {TRIAL_PAY_AT_PROPERTY_COPY}
@@ -3348,24 +3365,27 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
           : <>Direct booking with the host · <b>no OTA fee</b></>}
       </span>
     </div>
-    {whatsappNumber && (
-      <div className="gd-trust-row">
-        <span style={{ color: '#25D366' }}><IconWhatsApp size={14}/></span>
-        <span>
-          Stuck?{' '}
-          <a
-            // TASK-4294/TASK-4300: use the canonical contact helpers — getWhatsAppLink() carries
-            // the 91 country code and formatDisplayNumber() shows "+91-…", instead of the raw
-            // tenant whatsappBookingPhone (no +, no country code, wrong number on the marketplace).
-            href={getWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            WhatsApp {brandName} on {formatDisplayNumber()}
-          </a>
-        </span>
-      </div>
-    )}
+    {(() => {
+      const digits = (whatsappNumber || '').replace(/\D/g, '');
+      if (!digits) return null;
+      const fullDigits = digits.length === 10 ? `91${digits}` : digits;
+      const prefill = encodeURIComponent(`Hi ${brandName}, I need help with my booking.`);
+      return (
+        <div className="gd-trust-row">
+          <span style={{ color: '#25D366' }}><IconWhatsApp size={14}/></span>
+          <span>
+            Stuck?{' '}
+            <a
+              href={`https://wa.me/${fullDigits}?text=${prefill}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              WhatsApp {brandName} on {formatDisplayNumber()}
+            </a>
+          </span>
+        </div>
+      );
+    })()}
   </div>
 );
 
