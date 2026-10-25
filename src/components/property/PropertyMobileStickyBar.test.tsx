@@ -32,7 +32,9 @@ class MockIntersectionObserver {
 }
 
 function lastObserver(): MockIntersectionObserver {
-  const io = MockIntersectionObserver.instances[MockIntersectionObserver.instances.length - 1];
+  const io =
+    MockIntersectionObserver.instances.find((i) => i.observed.length > 0) ??
+    MockIntersectionObserver.instances[0];
   if (!io) throw new Error("expected an IntersectionObserver to be created");
   return io;
 }
