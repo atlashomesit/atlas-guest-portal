@@ -24,6 +24,22 @@ describe('mergeListingAndExternalReviews (TASK-103146)', () => {
     expect(result.every((r) => r.rating >= 4)).toBe(true);
   });
 
+  it('suppresses hidden reviews (isHidden: true) from both native and external reviews', () => {
+    const native: ListingReviewRow[] = [
+      { id: 301, guestName: 'Visible Native', rating: 5, body: 'Great stay', isHidden: false, createdAt: '2026-08-01T12:00:00Z' },
+      { id: 302, guestName: 'Hidden Native', rating: 5, body: 'Disputed stay', isHidden: true, createdAt: '2026-08-02T12:00:00Z' },
+    ];
+    const external: ExternalReviewRow[] = [
+      { guestName: 'Visible External', rating: 5, body: 'Great external stay', isHidden: false, reviewDate: '2026-08-01', source: 'Google' },
+      { guestName: 'Hidden External', rating: 5, body: 'Hidden external stay', isHidden: true, reviewDate: '2026-08-02', source: 'Airbnb' },
+    ];
+
+    const result = mergeListingAndExternalReviews(native, external);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.guestName)).toEqual(['Visible Native', 'Visible External']);
+  });
+
   it('suppresses external reviews with empty or whitespace-only bodies even if rating is 5', () => {
     const external: ExternalReviewRow[] = [
       { guestName: 'Real Reviewer', rating: 5, body: 'Loved the sunrise view from the balcony!', reviewDate: '2026-08-01', source: 'Airbnb' },

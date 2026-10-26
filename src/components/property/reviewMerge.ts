@@ -20,6 +20,7 @@ export type ListingReviewRow = {
   createdAt: string;
   photoUrls?: string[] | null;
   isVerifiedStay?: boolean;
+  isHidden?: boolean;
   ratingCleanliness?: number | null;
   ratingValue?: number | null;
   ratingCheckin?: number | null;
@@ -38,6 +39,7 @@ export type ExternalReviewRow = {
   hostResponse?: string | null;
   hostResponseAt?: string | null;
   respondedAt?: string | null;
+  isHidden?: boolean;
 };
 
 export type DisplayReviewRow = ListingReviewRow & {
@@ -93,6 +95,7 @@ export function mergeListingAndExternalReviews(
   external: ExternalReviewRow[],
 ): DisplayReviewRow[] {
   const validExternal = (external || []).filter((r) => {
+    if (r.isHidden) return false;
     const rating = Number(r.rating);
     if (isNaN(rating) || rating < 4) return false;
     const rawBody = (r.body || (r as { comment?: string | null }).comment || '').trim();
@@ -122,6 +125,7 @@ export function mergeListingAndExternalReviews(
   });
 
   const validNative = (native || []).filter((r) => {
+    if (r.isHidden) return false;
     const rating = Number(r.rating);
     if (isNaN(rating) || rating < 4) return false;
     const rawBody = (r.body || (r as { comment?: string | null }).comment || '').trim();

@@ -1452,7 +1452,7 @@ useEffect(() => {
             : 0;
     }, [ppMergedReviews, ppCombinedReviewCount]);
     const ppHasApiReviews = Boolean(
-        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
+        ppApiReviews && !ppApiReviews.loading && ppCombinedReviewCount > 0,
     );
 
     /** TASK-1357 / REV-013: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
