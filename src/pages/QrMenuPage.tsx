@@ -217,6 +217,12 @@ export default function QrMenuPage() {
   const [settlementMethod, setSettlementMethod] = useState<"POST_TO_ROOM" | "PAY_NOW_UPI" | "PAY_ON_DELIVERY">(
     listingId ? "POST_TO_ROOM" : "PAY_NOW_UPI"
   );
+
+  useEffect(() => {
+    if (listingId) {
+      setSettlementMethod((prev) => (prev !== "POST_TO_ROOM" ? "POST_TO_ROOM" : prev));
+    }
+  }, [listingId]);
   const [verificationCode, setVerificationCode] = useState<string>("");
   const [guestName, setGuestName] = useState<string>("");
   const [guestPhone, setGuestPhone] = useState<string>("");
@@ -520,6 +526,75 @@ export default function QrMenuPage() {
 
       {/* Main Container */}
       <main style={{ maxWidth: "680px", margin: "0 auto", padding: "16px" }}>
+        {/* Pre-order room verification strip when room is provided and cart is not yet filled */}
+        {listingId && cartCount === 0 && (
+          <div
+            style={{
+              backgroundColor: "#fdf8f6",
+              border: "1px solid #ebd9c8",
+              padding: "14px 16px",
+              borderRadius: "12px",
+              marginBottom: "20px",
+            }}
+            data-testid="pos-qr-room-preverify-strip"
+          >
+            <label
+              style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "#1e1b18", marginBottom: "4px" }}
+            >
+              Security Verification for {targetHeading}:
+            </label>
+            <p style={{ margin: "0 0 8px 0", fontSize: "12px", color: "#786a63" }}>
+              Enter the last 4 digits of your booking&apos;s registered phone number OR 4-digit Stay PIN to charge dining to your room.
+            </p>
+            <input
+              type="text"
+              maxLength={8}
+              placeholder="e.g. 4829 or Stay PIN"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "14px",
+                fontWeight: 600,
+                boxSizing: "border-box",
+              }}
+              data-testid="pos-qr-verification-input"
+            />
+            {isKnownInvalidCode && (
+              <div
+                style={{
+                  backgroundColor: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  color: "#991b1b",
+                  padding: "8px 10px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  marginTop: "8px",
+                }}
+                data-testid="pos-qr-room-invalid-alert-pre"
+              >
+                <AlertCircle size={14} />
+                <span>
+                  Phone last-4 or Stay PIN does not match active CheckedIn booking for this room. Please Pay Now via UPI or pay online upfront.
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              disabled
+              style={{ display: "none" }}
+              data-testid="pos-qr-charge-to-room-disabled"
+            >
+              Post to Room
+            </button>
+          </div>
+        )}
         {/* If an active order exists, render the Live Tracker */}
         {activeOrder ? (
           <section
@@ -1246,7 +1321,7 @@ export default function QrMenuPage() {
               {/* Place Order CTA */}
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || (settlementMethod === "POST_TO_ROOM" && (showVerificationWarning || !verificationCode.trim()))}
                 style={{
                   width: "100%",
                   backgroundColor: "#9e402a",
@@ -1264,7 +1339,7 @@ export default function QrMenuPage() {
                 }}
                 data-testid="pos-qr-submit-btn"
               >
-                {submitting ? "Placing Order..." : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
+                {submitting ? "Placing Order..." : settlementMethod === "POST_TO_ROOM" ? `Charge to Room • ₹${cartSubtotal.toLocaleString("en-IN")}` : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
                 <ArrowRight size={18} />
               </button>
             </div>
