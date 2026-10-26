@@ -2476,14 +2476,14 @@ useEffect(() => {
                         <div className="pp-v2-reviews-detail">
                         {/* TASK-101380 / REV-030: per-star distribution from blended ratingStarCounts if available. */}
                         <RatingDistribution
-                          ratings={ppMergedReviews.map((r) => Number(r.rating))}
-                          totalCount={ppCombinedReviewCount}
+                          ratings={api.reviews.map((r) => Number(r.rating))}
+                          totalCount={api.totalCount}
                           starCounts={publicRatingStarCounts}
                           otherSourcesCount={publicRatingStarCounts ? 0 : externalReviewsFromApi.length}
                         />
                         {/* Sub-rating bars derived from API reviews if available */}
-                        {ppMergedReviews.length > 0 && (() => {
-                          const rs = ppMergedReviews.filter((r) => r.rating > 0);
+                        {api.reviews.length > 0 && (() => {
+                          const rs = api.reviews.filter((r) => r.rating > 0);
                           const avg = (vals: (number | null | undefined)[]) => {
                             const valid = vals.filter((v): v is number => v != null && v >= 1);
                             return valid.length > 0 ? (valid.reduce((a, b) => a + b, 0) / valid.length) : null;
@@ -2500,7 +2500,7 @@ useEffect(() => {
                           ].filter(b => b.v != null);
                           if (bars.length === 0) {
                             // The distribution already states the count and source; do not repeat it.
-                            if (publicRatingStarCounts || starDistribution(ppMergedReviews.map((r) => Number(r.rating)), ppCombinedReviewCount)) return null;
+                            if (publicRatingStarCounts || starDistribution(api.reviews.map((r) => Number(r.rating)), api.totalCount)) return null;
                             return (
                               <div style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', lineHeight: 1.6 }}>
                                 <p style={{ margin: '0 0 4px', fontWeight: 600, color: 'var(--text-primary, #4a3535)' }}>Overall rating</p>
