@@ -62,6 +62,10 @@ export type TenantPropertyRecord = {
   /** HSL-011: dorm facts from the public listing DTO (API only; null for every non-dorm listing). */
   accommodationType?: string | null;
   dormGenderPolicy?: DormGenderPolicy | null;
+  /** CLU-011: cluster role and id from public listing DTO (API only). */
+  clusterRole?: string | null;
+  clusterId?: number | null;
+  isParentCluster?: boolean | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -168,6 +172,9 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     checkOutTime: dto.checkOutTime?.trim() || null,
     accommodationType: dto.accommodationType ?? null,
     dormGenderPolicy: dto.dormGenderPolicy ?? null,
+    clusterRole: dto.clusterRole ?? null,
+    clusterId: dto.clusterId ?? null,
+    isParentCluster: dto.isParentCluster ?? (dto.clusterRole ? dto.clusterRole.toUpperCase() === 'PARENT' : null),
   };
 };
 

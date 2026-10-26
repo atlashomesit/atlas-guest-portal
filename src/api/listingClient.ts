@@ -194,6 +194,10 @@ export type PublicListing = {
   onlinePaymentsAvailable?: boolean;
   /** TASK-10299183: whether small-party discount pricing is configured. */
   hasSmallPartyPricing?: boolean;
+  /** CLU-011: cluster role and id from public listing DTO (API only) */
+  clusterRole?: string | null;
+  clusterId?: number | null;
+  isParentCluster?: boolean | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -330,6 +334,20 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     })(),
     onlinePaymentsAvailable: payload.onlinePaymentsAvailable !== false && payload.OnlinePaymentsAvailable !== false,
     hasSmallPartyPricing: Boolean(payload.hasSmallPartyPricing || payload.HasSmallPartyPricing || payload.occupancyPricingEnabled || payload.OccupancyPricingEnabled),
+    clusterRole: (() => {
+      const raw = payload.clusterRole ?? payload.ClusterRole;
+      return typeof raw === 'string' && raw.trim() ? raw.trim().toUpperCase() : null;
+    })(),
+    clusterId: (() => {
+      const raw = payload.clusterId ?? payload.ClusterId;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
+    isParentCluster: (() => {
+      if (typeof payload.isParentCluster === 'boolean') return payload.isParentCluster;
+      const role = payload.clusterRole ?? payload.ClusterRole;
+      return typeof role === 'string' && role.trim().toUpperCase() === 'PARENT';
+    })(),
   };
 }
 
