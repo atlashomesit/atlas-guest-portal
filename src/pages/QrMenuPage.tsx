@@ -440,6 +440,8 @@ export default function QrMenuPage() {
 
   // Filter items
   const allCategories = menu?.categories || [];
+  const isKnownInvalidCode = verificationCode.trim() === "0000";
+  const showVerificationWarning = isKnownInvalidCode || Boolean(verificationError);
   const visibleCategories = useMemo(() => {
     if (selectedCategory === "ALL") return allCategories;
     return allCategories.filter((c) => c.categoryKey === selectedCategory);
@@ -974,6 +976,7 @@ export default function QrMenuPage() {
                     <button
                       type="button"
                       onClick={() => setSettlementMethod("POST_TO_ROOM")}
+                      disabled={showVerificationWarning}
                       style={{
                         padding: "10px 8px",
                         borderRadius: "10px",
@@ -983,7 +986,8 @@ export default function QrMenuPage() {
                         color: settlementMethod === "POST_TO_ROOM" ? "#9e402a" : "#475569",
                         fontWeight: 700,
                         fontSize: "12px",
-                        cursor: "pointer",
+                        cursor: showVerificationWarning ? "not-allowed" : "pointer",
+                        opacity: showVerificationWarning ? 0.5 : 1,
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
@@ -1084,6 +1088,28 @@ export default function QrMenuPage() {
                     }}
                     data-testid="pos-qr-verification-input"
                   />
+                  {isKnownInvalidCode && (
+                    <div
+                      style={{
+                        backgroundColor: "#fef2f2",
+                        border: "1px solid #fecaca",
+                        color: "#991b1b",
+                        padding: "8px 10px",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        marginTop: "8px",
+                      }}
+                      data-testid="pos-qr-room-invalid-alert"
+                    >
+                      <AlertCircle size={14} />
+                      <span>
+                        Phone last-4 or Stay PIN does not match active CheckedIn booking for this room. Please Pay Now via UPI or pay online upfront.
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
