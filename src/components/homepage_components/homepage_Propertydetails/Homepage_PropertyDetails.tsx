@@ -437,6 +437,7 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         dormBedCount: item.dormBedCount ?? null,
         clusterRole: item.clusterRole ?? null,
         clusterId: item.clusterId ?? null,
+        isParentCluster: item.isParentCluster ?? (item.clusterRole ? item.clusterRole.toUpperCase() === 'PARENT' : null),
     };
 }
 
