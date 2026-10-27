@@ -1270,9 +1270,13 @@ export default function BookingConfirmationPage() {
                 <span className="shrink-0 text-lg" aria-hidden>→</span>
               </Link>
             )}
+            {hasWhatsAppContact && isPendingBooking && (
+              <p className="text-xs leading-relaxed my-2 text-text-secondary" data-testid="stay-hub-whatsapp-status">
+                Your message includes booking #{booking.bookingId} and its Pending status. Check the status with your host before treating this booking as confirmed.
+              </p>
+            )}
             <div className="flex flex-wrap gap-2.5">
               {hasWhatsAppContact && (
-                <>
                 <a
                   href={messageHostWhatsappUrl || whatsappUrl}
                   target="_blank"
@@ -1283,12 +1287,6 @@ export default function BookingConfirmationPage() {
                 >
                   💬 Message Host on WhatsApp
                 </a>
-                {isPendingBooking && (
-                  <p className="text-xs leading-relaxed my-2 text-text-secondary" data-testid="stay-hub-whatsapp-status">
-                    Your message includes booking #{booking.bookingId} and its Pending status. Check the status with your host before treating this booking as confirmed.
-                  </p>
-                )}
-                </>
               )}
               <a
                 href={googleCalendarUrl}
