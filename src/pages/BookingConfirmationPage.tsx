@@ -776,8 +776,11 @@ export default function BookingConfirmationPage() {
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
   const whatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${whatsappText}` : "";
   // GUEST-026: Direct pre-filled WhatsApp link with booking reference and guest name
+  const isPendingBooking = booking.status === "Pending";
   const messageHostWhatsappText = encodeURIComponent(
-    `Hi, I have a confirmed booking (#${booking.bookingId})${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Looking forward to my stay!`
+    isPendingBooking
+      ? `Hi, I have a question about booking #${booking.bookingId}${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Its current status is Pending. Please help me check the booking status.`
+      : `Hi, I have a confirmed booking (#${booking.bookingId})${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Looking forward to my stay!`
   );
   const messageHostWhatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${messageHostWhatsappText}` : "";
   // GUEST-031/GUEST-030: canonical check-in deep-link, carries the booking token.
@@ -1269,6 +1272,7 @@ export default function BookingConfirmationPage() {
             )}
             <div className="flex flex-wrap gap-2.5">
               {hasWhatsAppContact && (
+                <>
                 <a
                   href={messageHostWhatsappUrl || whatsappUrl}
                   target="_blank"
@@ -1279,6 +1283,12 @@ export default function BookingConfirmationPage() {
                 >
                   💬 Message Host on WhatsApp
                 </a>
+                {isPendingBooking && (
+                  <p className="text-xs leading-relaxed my-2 text-text-secondary" data-testid="stay-hub-whatsapp-status">
+                    Your message includes booking #{booking.bookingId} and its Pending status. Check the status with your host before treating this booking as confirmed.
+                  </p>
+                )}
+                </>
               )}
               <a
                 href={googleCalendarUrl}

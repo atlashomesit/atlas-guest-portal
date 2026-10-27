@@ -25,7 +25,13 @@ export default function CommunicationPreferences() {
   const [params] = useSearchParams();
   const unsubscribed = params.get("unsubscribed");
   const channel = params.get("channel");
-  const [loading, setLoading] = React.useState(false);
+  const [loading, setLoading] = React.useState(true);
+  const [loadedToken, setLoadedToken] = React.useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = React.useState(0);
+  const headingRef = React.useRef<HTMLHeadingElement>(null);
+  const retryRef = React.useRef<HTMLButtonElement>(null);
+  const recoveryFocus = React.useRef(false);
+  const preferencesLoaded = loadedToken === guestToken;
   const [saved, setSaved] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [consentLoading, setConsentLoading] = React.useState(false);
@@ -43,6 +49,7 @@ export default function CommunicationPreferences() {
     if (!guestToken) return;
     let cancelled = false;
     setLoading(true);
+    setLoadedToken(null);
     setError(null);
     fetch(buildApiUrl(`/api/public/communication-preferences/preferences/${encodeURIComponent(guestToken)}`), {
       headers: { Accept: "application/json", ...getApiHeaders() },
@@ -59,17 +66,27 @@ export default function CommunicationPreferences() {
           postStayReviewRequest: !!data.postStayReviewRequest,
           promotionalOffers: !!data.promotionalOffers,
         });
+        setLoadedToken(guestToken);
       })
       .catch((e: unknown) => {
         if (cancelled) return;
         console.error("Communication preferences load failed:", e);
-        setError("We couldn't load your preferences. Please use the link from your booking email or SMS.");
+        setError(loadAttempt > 0
+          ? "Your saved preferences are still unavailable. Please try loading again."
+          : "Your saved preferences are temporarily unavailable. Retry loading before changing them.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [guestToken]);
+  }, [guestToken, loadAttempt]);
+
+  React.useEffect(() => {
+    if (loading || !recoveryFocus.current) return;
+    recoveryFocus.current = false;
+    const target = preferencesLoaded ? headingRef.current : retryRef.current;
+    target?.focus();
+  }, [loading, preferencesLoaded]);
 
   React.useEffect(() => {
     if (!guestToken) return;
@@ -100,7 +117,7 @@ export default function CommunicationPreferences() {
   }, [guestToken]);
 
   const onSave = async () => {
-    if (!guestToken) return;
+    if (!guestToken || !preferencesLoaded || loading) return;
     setLoading(true);
     setError(null);
     setSaved(false);
@@ -177,8 +194,8 @@ export default function CommunicationPreferences() {
       <SEO title={`Communication preferences | ${brandName}`} description={`Manage email and WhatsApp preferences for ${brandName}.`} />
       <div className="max-w-xl mx-auto px-4 py-12 space-y-6">
         <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5">
-          <h1 className="text-xl font-bold text-text-primary mb-4">Communication preferences</h1>
-          {error && <p className="text-support-error text-sm mb-3">{error}</p>}
+          <h1 ref={headingRef} tabIndex={-1} className="text-xl font-bold text-text-primary mb-4">Communication preferences</h1>
+          {error && <p role="alert" className="text-support-error text-sm mb-3">{error}</p>}
           {saved && <p className="text-support-success text-sm mb-3">Preferences updated.</p>}
           {loading ? (
             <LoadingState kind="skeleton-form" message="Loading preferences…" />
@@ -189,22 +206,22 @@ export default function CommunicationPreferences() {
                 <span>Transactional messages (required)</span>
               </label>
               <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
-                <input
+                {preferencesLoaded ? <input
                   type="checkbox"
                   checked={form.checkInCheckoutReminders}
                   onChange={(e) => setForm((f) => ({ ...f, checkInCheckoutReminders: e.target.checked }))}
                   className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)]"
-                />
+                /> : <span className="text-[11px] min-w-[68px] font-semibold text-text-muted">Unavailable</span>}
                 <span>Check-in/check-out reminders</span>
               </label>
               <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
-                <input
+                {preferencesLoaded ? <input
                   type="checkbox"
                   checked={form.postStayReviewRequest}
                   onChange={(e) => setForm((f) => ({ ...f, postStayReviewRequest: e.target.checked }))}
                   className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)] mt-0.5"
                   data-testid="whatsapp-messages-toggle"
-                />
+                /> : <span className="text-[11px] min-w-[68px] font-semibold text-text-muted">Unavailable</span>}
                 <span>
                   WhatsApp messages
                   <span className="block text-text-muted text-xs mt-0.5 leading-snug">
@@ -213,12 +230,12 @@ export default function CommunicationPreferences() {
                 </span>
               </label>
               <label className="flex items-start gap-3 min-h-11 cursor-pointer text-sm text-text-secondary py-1 -my-1">
-                <input
+                {preferencesLoaded ? <input
                   type="checkbox"
                   checked={form.promotionalOffers}
                   onChange={(e) => setForm((f) => ({ ...f, promotionalOffers: e.target.checked }))}
                   className="h-5 w-5 min-h-[24px] min-w-[24px] shrink-0 accent-[color:var(--cta-primary)] mt-0.5"
-                />
+                /> : <span className="text-[11px] min-w-[68px] font-semibold text-text-muted">Unavailable</span>}
                 <span>
                   Promotional offers (email &amp; SMS)
                   <span className="block text-text-muted text-xs mt-0.5 leading-snug">
@@ -226,13 +243,27 @@ export default function CommunicationPreferences() {
                   </span>
                 </span>
               </label>
-              <button
+              {preferencesLoaded ? <button
                 onClick={onSave}
                 disabled={loading}
                 className="mt-2 rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level1 transition hover:opacity-90 disabled:opacity-60 w-fit"
               >
                 Save preferences
-              </button>
+              </button> : (
+                <button
+                  type="button"
+                  ref={retryRef}
+                  onClick={() => {
+                    recoveryFocus.current = true;
+                    setLoading(true);
+                    setLoadAttempt((attempt) => attempt + 1);
+                  }}
+                  disabled={loading}
+                  className="mt-2 rounded-full bg-[color:var(--cta-primary)] px-5 py-3 text-sm font-semibold text-white shadow-level1 transition hover:opacity-90 disabled:opacity-60 w-fit"
+                >
+                  Retry loading preferences
+                </button>
+              )}
             </div>
           )}
         </div>
