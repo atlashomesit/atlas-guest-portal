@@ -35,17 +35,17 @@ const renderPage = (path = "/review/101?t=valid-token") =>
   );
 
 async function fillAndSubmitReview(ratingValue: number) {
-  // Select overall rating
+  // Select overall rating (UXD-2026-10-23-08-A names each star "<group>: N of 5 stars")
   const overallContainer = screen.getByTestId("overall-rating-stars");
   const starButton = within(overallContainer).getByRole("button", {
-    name: `${ratingValue} star${ratingValue !== 1 ? "s" : ""}`,
+    name: `Overall rating: ${ratingValue} of 5 stars`,
   });
   fireEvent.click(starButton);
 
   // Fill required subratings (cleanliness, value, checkin, communication)
   for (const key of ["cleanliness", "value", "checkin", "communication"]) {
     const subContainer = screen.getByTestId(`subrating-${key}`);
-    const subStar = within(subContainer).getByRole("button", { name: "5 stars" });
+    const subStar = within(subContainer).getByRole("button", { name: /: 5 of 5 stars$/ });
     fireEvent.click(subStar);
   }
 
