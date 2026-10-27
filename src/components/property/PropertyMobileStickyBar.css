@@ -21,3 +21,28 @@
 @media (min-width: 1024px) {
   body[data-pp-sticky-chat] [data-testid="support-widget-trigger"] { right: auto !important; left: 20px; }
 }
+
+/* TOP10-2026-10-27-01-C: one compact bar on phone: total, dates, Chat, Review booking.
+   Secondary lines (fees note, free-cancel deadline, plan label) stay in the booking card. */
+@media (max-width: 767px) {
+  .pp-m-sticky { padding: 10px 14px; gap: 10px; }
+  .pp-m-sticky .pp-m-sticky-price { flex: 1 1 auto; min-width: 0; }
+  .pp-m-sticky .pp-m-sticky-price > b,
+  .pp-m-sticky .pp-m-sticky-price > span:not([class]) { display: inline; }
+  .pp-m-sticky .pp-m-sticky-price > b { font-size: 17px; }
+  .pp-m-sticky .pp-m-sticky-price > span[data-testid="mobile-sticky-stay"] {
+    display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pp-m-sticky .pp-m-sticky-price > [data-testid="mobile-sticky-cancel-deadline"],
+  .pp-m-sticky .pp-m-sticky-price > [data-testid="mobile-sticky-fees-included"] { display: none; }
+  .pp-m-sticky .pp-m-sticky-price > [data-testid="mobile-sticky-rate-plan"] { display: none; }
+  .pp-m-sticky .pp-m-sticky-cta { padding: 0 16px; white-space: nowrap; flex: 0 0 auto; }
+}
+
+/* At 1024px+ the three floaters stack in the left gutter, none over another or over the
+   booking card: Chat with us lowest, FAQ above it, host WhatsApp above that. */
+@media (min-width: 1024px) {
+  body[data-pp-sticky-chat] [data-testid="support-widget-trigger"] { bottom: 84px !important; }
+  body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { bottom: 156px !important; }
+  body[data-pp-sticky-chat] [data-testid="listing-whatsapp-float"] { bottom: 212px !important; }
+}

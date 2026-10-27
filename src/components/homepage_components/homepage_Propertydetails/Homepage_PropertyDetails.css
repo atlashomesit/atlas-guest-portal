@@ -1146,3 +1146,7 @@
   .pp-root .lv-booking[tabindex="-1"] { scroll-margin-top: 96px; }
   .pp-root .lv-booking[tabindex="-1"]:focus { outline: 2px solid var(--cta-primary, #c04528); outline-offset: 3px; }
 }
+
+/* TOP10-2026-10-27-01-B: with the card beside the gallery every tile shows its whole image so
+   captions baked into photos are never clipped (was only true for 1 or 2 photos). */
+.pp-book-beside .pp-gallery-img { object-fit: contain !important; background: var(--bg-muted, #f5ebe0); }

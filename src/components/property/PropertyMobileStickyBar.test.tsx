@@ -128,12 +128,12 @@ describe("PropertyMobileStickyBar", () => {
           totalAmount: 9332,
           pricingPending: false,
           freeCancelUntil: null,
-          stayLabel: "Sat 14 – Mon 16 Nov · 2 guests",
+          stayLabel: "14–16 Nov · 2 guests",
         }}
         onReserveClick={() => {}}
       />,
     );
-    expect(screen.getByTestId("mobile-sticky-stay")).toHaveTextContent("Sat 14 – Mon 16 Nov · 2 guests");
+    expect(screen.getByTestId("mobile-sticky-stay")).toHaveTextContent("14–16 Nov · 2 guests");
   });
 
   it("merges chat into one button that opens the support drawer and hides floaters (TOP10-2026-10-27-01-D)", () => {

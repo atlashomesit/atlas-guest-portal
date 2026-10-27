@@ -143,7 +143,7 @@ export type BookingStickySummary = {
   mealPlanCode?: string | null;
   mealPlanLabel?: string | null;
   hasMultipleRatePlans?: boolean;
-  /** TOP10-2026-10-27-01-C: "Sat 14 – Mon 16 Nov · 2 guests" for the phone sticky bar (display only). */
+  /** TOP10-2026-10-27-01-C: "14–16 Nov · 2 guests" for the phone sticky bar (display only). */
   stayLabel?: string | null;
 };
 
@@ -1697,7 +1697,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   const stickyStayLabel =
     hasSelectedRange && dateRange.startDate && dateRange.endDate
-      ? `${format(dateRange.startDate, 'EEE d')} – ${format(dateRange.endDate, 'EEE d MMM')} · ${guests} guest${guests === 1 ? '' : 's'}`
+      ? `${format(dateRange.startDate, format(dateRange.startDate, 'MMM') === format(dateRange.endDate, 'MMM') ? 'd' : 'd MMM')}–${format(dateRange.endDate, 'd MMM')} · ${guests} guest${guests === 1 ? '' : 's'}`
       : null;
 
   useEffect(() => {
