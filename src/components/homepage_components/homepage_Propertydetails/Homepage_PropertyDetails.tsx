@@ -1812,7 +1812,7 @@ useEffect(() => {
             HI-FI PROPERTY PAGE — pp-* design system
             All logic preserved; only layout/styling changed.
            ===================================================================== */}
-        <div className={`pp-root${galleryUrls.length === 1 ? " pp-single-photo" : ""}`}>
+        <div className={`pp-root${galleryUrls.length === 1 ? " pp-single-photo" : ""}${galleryUrls.length === 2 ? " pp-two-photo" : ""}${galleryUrls.length > 0 ? " pp-book-beside" : ""}`}>
           <div className="pp-shell">
 
             {/* ---- Breadcrumbs & Back to Results ---- */}

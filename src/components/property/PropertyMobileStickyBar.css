@@ -1,0 +1,16 @@
+/* TOP10-2026-10-27-01-D: one Chat button inside the phone sticky bar; no floating chat controls
+   over the listing content. The Theme preview selector is a separate control and is untouched. */
+.pp-m-sticky-chat { display: none; }
+@media (max-width: 767px) {
+  .pp-m-sticky-chat {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
+    border: 1px solid var(--border-subtle, #f0ddd0);
+    background: var(--bg-surface, #fff); color: var(--cta-primary, #c04528);
+    cursor: pointer;
+  }
+  .pp-m-sticky-chat:focus-visible { outline: 2px solid var(--cta-primary, #c04528); outline-offset: 2px; }
+  body[data-pp-sticky-chat] [data-testid="listing-whatsapp-float"],
+  body[data-pp-sticky-chat] [data-testid="support-widget-trigger"],
+  body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { display: none !important; }
+}

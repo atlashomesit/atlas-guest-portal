@@ -10,6 +10,16 @@ import type { BookingStickySummary } from "@/components/availability/UnitBooking
 import { useBookingContentVisible } from "@/hooks/useBookingContentVisible";
 import { isInternalOrDefaultRatePlanName } from "@/components/pricing/PricingTierDisplay";
 import { plainMealLabel } from "@/utils/directBookingPrice";
+import "./PropertyMobileStickyBar.css";
+
+/**
+ * TOP10-2026-10-27-01-D: on phones the one Chat button in this bar replaces the floating host
+ * WhatsApp bubble, FAQ help button and "Chat with us" pill. It opens the existing support drawer
+ * (WhatsApp, call, FAQs) through this window event; SupportWidget listens for it.
+ */
+export const OPEN_SUPPORT_EVENT = "atlas:open-support";
+/** Body attribute that lets CSS hide the floaters (phones only) while this bar is mounted. */
+export const STICKY_CHAT_BODY_ATTR = "data-pp-sticky-chat";
 
 type Props = {
   bookable: boolean;
@@ -50,48 +60,6 @@ export function tryOpenPropertyDateSheet(doc: Document = document): boolean {
   return false;
 }
 
-/**
- * Mobile-only visibility: hidden near the top of the page, shown (smoothly, via
- * transform/opacity transition) once the hero card has scrolled out of view.
- * Defaults to visible when there is nothing to observe (no IntersectionObserver,
- * e.g. jsdom, or no sentinel in the DOM) so the bar never disappears on
- * unsupported setups. Desktop layout is untouched — `.pp-m-sticky` stays
- * `display: none` outside the mobile media query.
- */
-function useStickyBarVisibility(): boolean {
-  const [visible, setVisible] = React.useState(false);
-
-  React.useEffect(() => {
-    if (typeof document === "undefined" || typeof IntersectionObserver === "undefined") {
-      setVisible(true);
-      return;
-    }
-    const sentinel =
-      document.querySelector(STICKY_BAR_HERO_SELECTOR) ??
-      document.querySelector(STICKY_BAR_BOOKING_FORM_SELECTOR);
-    if (!sentinel) {
-      setVisible(true);
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          // Show only once the sentinel has scrolled *above* the viewport
-          // (boundingClientRect.top < 0) — a booking form sitting below the fold
-          // on first paint must NOT reveal the bar.
-          const top = entry.boundingClientRect?.top ?? -1;
-          setVisible(!entry.isIntersecting && top < 0);
-        }
-      },
-      { threshold: 0 },
-    );
-    io.observe(sentinel);
-    return () => io.disconnect();
-  }, []);
-
-  return visible;
-}
-
 export const PropertyMobileStickyBar: React.FC<Props> = ({
   bookable,
   nightlyFallback,
@@ -99,9 +67,20 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
   summary,
   onReserveClick,
 }) => {
-  const pastHero = useStickyBarVisibility();
   const bookingContentVisible = useBookingContentVisible();
-  const isVisible = pastHero && !bookingContentVisible;
+  // TOP10-2026-10-27-01-C: the bar is visible from the first view (price + next step on phone);
+  // it still steps aside while the booking card itself is on screen.
+  const isVisible = !bookingContentVisible;
+  React.useEffect(() => {
+    if (!bookable || typeof document === "undefined") return undefined;
+    document.body.setAttribute(STICKY_CHAT_BODY_ATTR, "true");
+    return () => document.body.removeAttribute(STICKY_CHAT_BODY_ATTR);
+  }, [bookable]);
+
+  const handleChat = React.useCallback(() => {
+    window.dispatchEvent(new CustomEvent(OPEN_SUPPORT_EVENT));
+  }, []);
+
   const canReviewBooking = Boolean(summary?.canReviewBooking && summary.hasCompleteDates && !summary.datesUnavailable && !summary.pricingPending && summary.totalAmount != null && summary.totalAmount > 0);
 
   const handleReserve = React.useCallback(() => {
@@ -206,6 +185,11 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
                 {ratePlanBadgeText}
               </span>
             )}
+            {summary?.stayLabel && (
+              <span className="pp-m-sticky-taxes" data-testid="mobile-sticky-stay">
+                {summary.stayLabel}
+              </span>
+            )}
             {summary?.freeCancelUntil ? (
               <span className="pp-m-sticky-taxes" data-testid="mobile-sticky-cancel-deadline">
                 Free cancel until {summary.freeCancelUntil}
@@ -250,10 +234,22 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
       </div>
       <button
         type="button"
+        className="pp-m-sticky-chat"
+        data-testid="mobile-sticky-chat"
+        onClick={handleChat}
+        tabIndex={isVisible ? 0 : -1}
+        aria-label="Chat with us: WhatsApp, call, FAQs"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.6A8.4 8.4 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5Z" />
+        </svg>
+      </button>
+      <button
+        type="button"
         className="pp-btn pp-btn-primary pp-m-sticky-cta"
         data-testid="mobile-sticky-book-now"
         onClick={handleReserve}
-        tabIndex={pastHero ? 0 : -1}
+        tabIndex={isVisible ? 0 : -1}
         aria-label={canReviewBooking ? "Review selected dates and price" : datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
       >
         {canReviewBooking ? "Review booking" : datesUnavailable ? "Change dates" : "Reserve"}

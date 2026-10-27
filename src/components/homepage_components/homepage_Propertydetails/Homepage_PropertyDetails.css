@@ -1111,15 +1111,33 @@
 .pp-single-photo .pp-gallery { grid-template-columns: 1fr; grid-template-rows: 1fr; height: 320px; }
 .pp-single-photo .pp-cell-hero { grid-column: 1; grid-row: 1; }
 .pp-single-photo .pp-gallery-img { object-fit: contain; }
+/* TOP10-2026-10-27-01-A: with any photos, the existing booking card sits beside the gallery
+   from 1024px so price, dates and Reserve are in the first view. Same markup, no new data. */
 @media (min-width: 1024px) {
-  .pp-single-photo .pp-shell { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px 28px; align-items: start; }
-  .pp-single-photo .pp-shell > * { grid-column: 1 / -1; }
-  .pp-single-photo .pp-gallery { grid-column: 1; grid-row: 3; }
-  .pp-single-photo .pp-main { display: contents; }
-  .pp-single-photo .pp-main > div { grid-column: 1; }
-  .pp-single-photo .pp-booking-col { grid-column: 2; grid-row: 3 / span 4; margin-top: 0; }
-  .pp-single-photo .pp-v2-location { grid-column: 1; margin-top: 0; }
-  .pp-single-photo .pp-title-row { margin-bottom: 0; }
+  .pp-book-beside .pp-shell { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px 28px; align-items: start; }
+  .pp-book-beside .pp-shell > * { grid-column: 1 / -1; }
+  .pp-book-beside .pp-gallery { grid-column: 1; grid-row: 3; }
+  .pp-book-beside .pp-main { display: contents; }
+  .pp-book-beside .pp-main > div { grid-column: 1; }
+  .pp-book-beside .pp-booking-col { grid-column: 2; grid-row: 3 / span 4; margin-top: 0; }
+  .pp-book-beside .pp-v2-location { grid-column: 1; margin-top: 0; }
+  .pp-book-beside .pp-title-row { margin-bottom: 0; }
+  .pp-book-beside:not(.pp-single-photo):not(.pp-two-photo) .pp-gallery { height: 400px; }
+}
+/* TOP10-2026-10-27-01-B: the two captured photos side by side, whole image visible so the
+   captions baked into the photos are never clipped; "View gallery" sits on the main photo. */
+.pp-two-photo .pp-gallery { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; height: 300px; }
+.pp-two-photo .pp-cell-hero { grid-column: 1; grid-row: 1; }
+.pp-two-photo .pp-cell-2 { grid-column: 2; grid-row: 1; }
+.pp-two-photo .pp-gallery-img { object-fit: contain !important; background: var(--bg-muted, #f5ebe0); }
+.pp-two-photo .pp-gallery-more {
+  position: relative; right: auto; bottom: auto; top: auto;
+  grid-column: 1; grid-row: 1; align-self: end; justify-self: end; margin: 12px;
+}
+@media (max-width: 767px) {
+  .pp-two-photo .pp-gallery { grid-template-columns: 1fr; height: 240px; }
+  .pp-two-photo .pp-cell-2 { display: none; }
+  .pp-two-photo .pp-gallery-more { top: auto; }
 }
 @media (max-width: 640px) { .pp-single-photo .pp-gallery { height: 240px; } }
 
