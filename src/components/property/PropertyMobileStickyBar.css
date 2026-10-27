@@ -14,3 +14,10 @@
   body[data-pp-sticky-chat] [data-testid="support-widget-trigger"],
   body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { display: none !important; }
 }
+
+/* TOP10-2026-10-27-01-A: from 1024px the booking card sits in the right column, so the
+   Chat with us launcher moves to the bottom-left (as in the approved mockup) instead of
+   covering the CHECK-OUT field. The host WhatsApp bubble keeps its own spot above it. */
+@media (min-width: 1024px) {
+  body[data-pp-sticky-chat] [data-testid="support-widget-trigger"] { right: auto !important; left: 20px; }
+}
