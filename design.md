@@ -89,6 +89,15 @@ The founder's approval of the proposals presented during 18–22 October include
 This is implementation authorization only. The actual comparison bundle and independent per-ID verdicts remain required; hold the draft PR with auto-merge disabled until Sreekar explicitly approves the exact final head.
 
 
+## Daily ten — 23 October r5 implementation approval, 24 October 2026
+
+Sreekar said **“I approve all”** while viewing the immutable [r5 gallery](https://github.com/atlashomesit/atlas-ux-evidence/blob/77e5808e5a9c258b973b73d59d08478b8805c2c1/docs/ux/daily-five/2026-10-23/r5/index.html). Binding approval is private `2026-10-23/implemented-r1/APPROVAL.json`; gallery SHA-256 is `2107458bc5f0cdf0d56e9cc54cbfebd65ebdab232d08bec9ed7d98e3093ddf01`.
+
+UXD-2026-10-23-08-A names each required rating group and star choice, exposes exactly the selected value with aria-pressed and persistent selected-value text, and retains existing hover/rating colors and submission validation. UXD-2026-10-23-09-A adds arrival/contact/count correction within the ID step with separate drafts, validation, Cancel/focus return and explicit confirmation before removing trailing guests. Keep retained guest objects, ID files, verification state, nationality, house rules and downstream payload semantics; adding a guest creates only a blank new record. No verification or payment service contract changes. This supersedes only those disclosed scopes. Preserve current colors, useful features, imagery, status/financial meanings, permissions and service contracts. Actual baseline / approved / implemented comparisons and independent per-ID review belong in `2026-10-23/implemented-r1/`. Keep draft PRs held with auto-merge off until Sreekar separately approves the actual result and exact final heads. No merge, direct dev push, release or deployment is authorized.
+
+**27 October 2026:** Sreekar approved merging this batch to dev ("Yes, merge all three batches into dev"). No deployment, release cut or held-test activation was approved with it.
+
+
 ## Daily ten - 27 October 2026 implementation approval
 
 Sreekar approved immutable private `docs/ux/daily-five/2026-10-27/r1` (archive commit `04fcfb9cbc600d41716a011fda249a4e1d8380d5`): "I approve all 10 proposals for 27 October. Implement them and show me the actual before and after on mobile and wide screens for final approval before merging." Receipt: `2026-10-27/implemented-r1/APPROVAL.json`.

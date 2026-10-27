@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
+import ArrivalDetailsEditor, { type ArrivalDetailsDraft } from "../components/ArrivalDetailsEditor";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
@@ -387,6 +388,23 @@ export default function SelfCheckIn() {
       return updated;
     });
     setStep("id-upload");
+  };
+
+  const applyArrivalCorrection = (next: ArrivalDetailsDraft) => {
+    // A guest-count correction must not inherit a pending auto-advance from earlier ID verification.
+    if (advanceTimerRef.current !== null) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+    setArrivalTime(next.arrivalTime);
+    setGuestCount(next.guestCount);
+    setContactPhone(next.contactPhone);
+    setContactEmail(next.contactEmail);
+    setContactPhoneError("");
+    setContactEmailError("");
+    setGuests((previous) => Array.from({ length: Number(next.guestCount) }, (_, index) => previous[index] ?? {
+      name: "", govtIdType: "", govtIdNumber: "", phoneNumber: "", isVerified: false, activeVerifyTab: "digilocker",
+    }));
   };
 
   const handleContinueFromIdUpload = () => {
@@ -987,6 +1005,14 @@ export default function SelfCheckIn() {
         {/* ── Step: ID ───────────────────────────────────────────── */}
         {step === "id-upload" && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1">
+            <ArrivalDetailsEditor
+              value={{ arrivalTime, guestCount, contactPhone, contactEmail }}
+              currentGuestCount={guests.length}
+              phoneRequired={details?.guestHasDeliverablePhone === false}
+              validatePhone={isPlausibleGuestPhone}
+              validateEmail={isPlausibleGuestEmail}
+              onApply={applyArrivalCorrection}
+            />
             <h2 className="text-xl font-bold text-text-primary mb-1">Government ID Verification</h2>
             <p className="text-text-secondary text-sm mb-5">
               Please provide and verify government-issued ID for all {guests.length} {guests.length === 1 ? "guest" : "guests"}.
