@@ -149,6 +149,17 @@ const SupportWidgetContent = () => {
     trackEvent("chat_opened", { surface: "support_widget", entryPoint: "floating_pill" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
   };
 
+  // TOP10-2026-10-27-01-D: the property page's sticky-bar Chat button opens this same drawer.
+  useEffect(() => {
+    const openFromStickyBar = () => {
+      setIsDismissed(false);
+      setIsOpen(true);
+      trackEvent("chat_opened", { surface: "support_widget", entryPoint: "sticky_bar" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
+    };
+    window.addEventListener("atlas:open-support", openFromStickyBar);
+    return () => window.removeEventListener("atlas:open-support", openFromStickyBar);
+  }, [analyticsMetadata.route, analyticsMetadata.listingId]);
+
   const handleClose = () => {
     setIsOpen(false);
     rememberDismissal();

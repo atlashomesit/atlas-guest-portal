@@ -143,6 +143,8 @@ export type BookingStickySummary = {
   mealPlanCode?: string | null;
   mealPlanLabel?: string | null;
   hasMultipleRatePlans?: boolean;
+  /** TOP10-2026-10-27-01-C: "14–16 Nov · 2 guests" for the phone sticky bar (display only). */
+  stayLabel?: string | null;
 };
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
@@ -1693,6 +1695,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     (hasSelectedRange && !rangePricingPending && isNaN(finalTotal));
   const canReviewBooking = hasSelectedRange && !reserveDisabled && !calendarOpenPricingPending && displayFinalTotal > 0;
 
+  const stickyStayLabel =
+    hasSelectedRange && dateRange.startDate && dateRange.endDate
+      ? `${format(dateRange.startDate, format(dateRange.startDate, 'MMM') === format(dateRange.endDate, 'MMM') ? 'd' : 'd MMM')}–${format(dateRange.endDate, 'd MMM')} · ${guests} guest${guests === 1 ? '' : 's'}`
+      : null;
+
   useEffect(() => {
     onStickySummaryChange?.({
       hasCompleteDates: hasSelectedRange,
@@ -1711,8 +1718,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       mealPlanCode: null,
       mealPlanLabel: null,
       hasMultipleRatePlans: publicRatePlans.length > 1,
+      stayLabel: stickyStayLabel,
     });
   }, [
+    stickyStayLabel,
     onStickySummaryChange,
     canReviewBooking,
     hasSelectedRange,
@@ -2084,9 +2093,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         </div>
       )}
 
-      {listingId != null && Number(listingId) > 0 && (
-        <FomoBar listingId={Number(listingId)} />
-      )}
       {isBookingDisabled && (
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
       )}
@@ -2379,25 +2385,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             Select your check-out date (minimum one night after check-in).
           </p>
         )}
-        {/* Legend for calendar cell colours — same swatches as the calendar popover's legend. */}
-        <ul className="bw-legend" aria-label="Calendar legend" data-testid="bw-availability-legend">
-          <li className="bw-legend-item">
-            <span className="bw-legend-label">
-              <span className="bc-sw bc-sw-available" aria-hidden="true" />
-              Available
-            </span>
-            <span className="bw-legend-desc">Open for booking</span>
-          </li>
-          {/* Founder ruling 2026-10-21: no "Turnover" in front of guests — a turnover night is simply a night
-              they can book, so it is drawn and described as available. */}
-          <li className="bw-legend-item">
-            <span className="bw-legend-label">
-              <span className="bc-sw bc-sw-unavail" aria-hidden="true" />
-              Not available
-            </span>
-            <span className="bw-legend-desc">Already booked or closed</span>
-          </li>
-        </ul>
         {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
             AND the range is valid (checkout > checkin) (TASK-4284).
             Showing a breakdown for a reversed or same-day range would display either a
@@ -2709,6 +2696,33 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         You won&apos;t be charged yet
       </p>
       )}
+
+      {/* TOP10-2026-10-27-01-E: social proof and the calendar legend follow the money and the
+          action: total, photo, dates/guests, lines, Reserve, then reassurance. */}
+      {listingId != null && Number(listingId) > 0 && (
+        <FomoBar listingId={Number(listingId)} />
+      )}
+      <div className="lv-booking-legend">
+        {/* Legend for calendar cell colours — same swatches as the calendar popover's legend. */}
+        <ul className="bw-legend" aria-label="Calendar legend" data-testid="bw-availability-legend">
+          <li className="bw-legend-item">
+            <span className="bw-legend-label">
+              <span className="bc-sw bc-sw-available" aria-hidden="true" />
+              Available
+            </span>
+            <span className="bw-legend-desc">Open for booking</span>
+          </li>
+          {/* Founder ruling 2026-10-21: no "Turnover" in front of guests — a turnover night is simply a night
+              they can book, so it is drawn and described as available. */}
+          <li className="bw-legend-item">
+            <span className="bw-legend-label">
+              <span className="bc-sw bc-sw-unavail" aria-hidden="true" />
+              Not available
+            </span>
+            <span className="bw-legend-desc">Already booked or closed</span>
+          </li>
+        </ul>
+      </div>
 
       {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline
           when a check-in date is selected; generic fallback copy otherwise. TASK-7012: rendered only

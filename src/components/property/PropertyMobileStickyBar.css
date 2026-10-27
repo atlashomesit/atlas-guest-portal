@@ -1,0 +1,48 @@
+/* TOP10-2026-10-27-01-D: one Chat button inside the phone sticky bar; no floating chat controls
+   over the listing content. The Theme preview selector is a separate control and is untouched. */
+.pp-m-sticky-chat { display: none; }
+@media (max-width: 767px) {
+  .pp-m-sticky-chat {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
+    border: 1px solid var(--border-subtle, #f0ddd0);
+    background: var(--bg-surface, #fff); color: var(--cta-primary, #c04528);
+    cursor: pointer;
+  }
+  .pp-m-sticky-chat:focus-visible { outline: 2px solid var(--cta-primary, #c04528); outline-offset: 2px; }
+  body[data-pp-sticky-chat] [data-testid="listing-whatsapp-float"],
+  body[data-pp-sticky-chat] [data-testid="support-widget-trigger"],
+  body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { display: none !important; }
+}
+
+/* TOP10-2026-10-27-01-A: from 1024px the booking card sits in the right column, so the
+   Chat with us launcher moves to the bottom-left (as in the approved mockup) instead of
+   covering the CHECK-OUT field. The host WhatsApp bubble keeps its own spot above it. */
+@media (min-width: 1024px) {
+  body[data-pp-sticky-chat] [data-testid="support-widget-trigger"] { right: auto !important; left: 20px; }
+}
+
+/* TOP10-2026-10-27-01-C: one compact bar on phone: total, dates, Chat, Review booking.
+   Secondary lines (fees note, free-cancel deadline, plan label) stay in the booking card. */
+@media (max-width: 767px) {
+  .pp-m-sticky { padding: 10px 14px; gap: 10px; }
+  .pp-m-sticky .pp-m-sticky-price { flex: 1 1 auto; min-width: 0; }
+  .pp-m-sticky .pp-m-sticky-price > b,
+  .pp-m-sticky .pp-m-sticky-price > span:not([class]) { display: inline; }
+  .pp-m-sticky .pp-m-sticky-price > b { font-size: 17px; }
+  .pp-m-sticky .pp-m-sticky-price > span[data-testid="mobile-sticky-stay"] {
+    display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pp-m-sticky .pp-m-sticky-price > [data-testid="mobile-sticky-cancel-deadline"],
+  .pp-m-sticky .pp-m-sticky-price > [data-testid="mobile-sticky-fees-included"] { display: none; }
+  .pp-m-sticky .pp-m-sticky-price > [data-testid="mobile-sticky-rate-plan"] { display: none; }
+  .pp-m-sticky .pp-m-sticky-cta { padding: 0 16px; white-space: nowrap; flex: 0 0 auto; }
+}
+
+/* At 1024px+ the three floaters stack in the left gutter, none over another or over the
+   booking card: Chat with us lowest, FAQ above it, host WhatsApp above that. */
+@media (min-width: 1024px) {
+  body[data-pp-sticky-chat] [data-testid="support-widget-trigger"] { bottom: 84px !important; }
+  body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { bottom: 156px !important; }
+  body[data-pp-sticky-chat] [data-testid="listing-whatsapp-float"] { bottom: 212px !important; }
+}

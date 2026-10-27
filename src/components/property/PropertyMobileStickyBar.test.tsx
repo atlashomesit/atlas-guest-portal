@@ -100,7 +100,7 @@ describe("PropertyMobileStickyBar", () => {
     expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 
-  it("stays hidden near the top, appears after scrolling past the hero, hides again on top (TASK-102075)", () => {
+  it("is visible from the first view with price and next step (TOP10-2026-10-27-01-C)", () => {
     render(
       <>
         <div data-testid="property-photo-gallery">hero</div>
@@ -113,46 +113,39 @@ describe("PropertyMobileStickyBar", () => {
         />
       </>,
     );
-
-    const bar = screen.getByTestId("mobile-reserve-bar");
-    // Hero visible at first paint -> bar hidden.
-    expect(bar).toHaveAttribute("data-visible", "false");
-    // The hero gallery card is what gets observed.
-    expect(lastObserver().observed[0].getAttribute("data-testid")).toBe("property-photo-gallery");
-
-    // Scrolled past the hero -> bar appears smoothly.
-    act(() => {
-      lastObserver().trigger([{ isIntersecting: false, boundingClientRect: { top: -320 } }]);
-    });
-    expect(bar).toHaveAttribute("data-visible", "true");
-
-    // Back near the top -> bar hides again.
-    act(() => {
-      lastObserver().trigger([{ isIntersecting: true, boundingClientRect: { top: 0 } }]);
-    });
-    expect(bar).toHaveAttribute("data-visible", "false");
+    expect(screen.getByTestId("mobile-reserve-bar")).toHaveAttribute("data-visible", "true");
+    expect(screen.getByTestId("mobile-sticky-book-now")).toHaveAttribute("tabindex", "0");
   });
 
-  it("does not reveal the bar for a booking form sitting below the fold (TASK-102075)", () => {
+  it("shows the stay dates under the total (TOP10-2026-10-27-01-C)", () => {
     render(
-      <>
-        <div data-testid="guest-booking-form">booking card</div>
-        <PropertyMobileStickyBar
-          bookable
-          nightlyFallback={5000}
-          nightlyIsSynthetic={false}
-          summary={null}
-          onReserveClick={() => {}}
-        />
-      </>,
+      <PropertyMobileStickyBar
+        bookable
+        nightlyFallback={5000}
+        nightlyIsSynthetic={false}
+        summary={{
+          hasCompleteDates: true,
+          totalAmount: 9332,
+          pricingPending: false,
+          freeCancelUntil: null,
+          stayLabel: "14–16 Nov · 2 guests",
+        }}
+        onReserveClick={() => {}}
+      />,
     );
+    expect(screen.getByTestId("mobile-sticky-stay")).toHaveTextContent("14–16 Nov · 2 guests");
+  });
 
-    const bar = screen.getByTestId("mobile-reserve-bar");
-    // Form below the viewport on first paint (top > 0, not intersecting) -> still hidden.
-    act(() => {
-      lastObserver().trigger([{ isIntersecting: false, boundingClientRect: { top: 900 } }]);
-    });
-    expect(bar).toHaveAttribute("data-visible", "false");
+  it("merges chat into one button that opens the support drawer and hides floaters (TOP10-2026-10-27-01-D)", () => {
+    const opened = vi.fn();
+    window.addEventListener("atlas:open-support", opened);
+    const { unmount } = renderBar();
+    expect(document.body).toHaveAttribute("data-pp-sticky-chat", "true");
+    fireEvent.click(screen.getByTestId("mobile-sticky-chat"));
+    expect(opened).toHaveBeenCalledTimes(1);
+    window.removeEventListener("atlas:open-support", opened);
+    unmount();
+    expect(document.body).not.toHaveAttribute("data-pp-sticky-chat");
   });
 
   it("opens the existing date-picker sheet on Reserve instead of scrolling (TASK-102075)", () => {
