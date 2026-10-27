@@ -2,11 +2,12 @@ import type { DestinationOption } from './types';
 
 export const POPULAR_DESTINATIONS: DestinationOption[] = [
   { label: 'Goa', region: 'India', kind: 'popular' },
+  { label: 'Coorg', region: 'India', kind: 'popular' },
+  { label: 'Manali', region: 'India', kind: 'popular' },
   { label: 'Hyderabad', region: 'India', kind: 'popular' },
-  { label: 'Bangalore', region: 'India', kind: 'popular' },
-  { label: 'Bali', region: 'Indonesia', kind: 'popular' },
-  { label: 'Dubai', region: 'UAE', kind: 'popular' },
-  { label: 'Paris', region: 'France', kind: 'popular' },
+  { label: 'Bengaluru', region: 'India', kind: 'popular' },
+  { label: 'Gurugram', region: 'India', kind: 'popular' },
+  { label: 'Nashik', region: 'India', kind: 'popular' },
 ];
 
 export function filterDestinations(
