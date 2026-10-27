@@ -119,6 +119,96 @@ export function describeCancellationPolicy(
   };
 }
 
+export interface CancellationRefundTier {
+  cutoffLabel: string;
+  refundPercent: number;
+  refundLabel: string;
+  description: string;
+  isFreeCancellation?: boolean;
+  isNonRefundable?: boolean;
+}
+
+/**
+ * TASK-10298996: Structured, unambiguous refund tiers matching backend policy definitions:
+ * - Flexible: Free cancellation up to 48 hours before check-in; Non-refundable within 48h
+ * - Moderate: Free cancellation up to 5 days (120h); 50% refund after 5-day window; Non-refundable after check-in
+ * - Strict: Free cancellation up to 7 days (168h); Non-refundable within 7 days of check-in
+ */
+export function getCancellationRefundTiers(
+  tier: CancellationTier | string | null | undefined,
+  windowHoursOverride?: number | null,
+): CancellationRefundTier[] {
+  const effectiveTier = resolveEffectiveCancellationTier(tier);
+  const hours =
+    typeof windowHoursOverride === 'number' && windowHoursOverride > 0
+      ? windowHoursOverride
+      : FREE_CANCELLATION_WINDOW_HOURS[effectiveTier];
+
+  if (effectiveTier === 'Flexible') {
+    return [
+      {
+        cutoffLabel: `Up to ${hours} hours before check-in`,
+        refundPercent: 100,
+        refundLabel: '100% refund',
+        description: `Free cancellation up to ${hours} hours before check-in.`,
+        isFreeCancellation: true,
+      },
+      {
+        cutoffLabel: `Within ${hours} hours of check-in`,
+        refundPercent: 0,
+        refundLabel: 'Non-refundable',
+        description: `Non-refundable within ${hours}h of check-in.`,
+        isNonRefundable: true,
+      },
+    ];
+  }
+
+  if (effectiveTier === 'Moderate') {
+    const days = Math.round(hours / 24);
+    return [
+      {
+        cutoffLabel: `Up to ${days} days before check-in`,
+        refundPercent: 100,
+        refundLabel: '100% refund',
+        description: `Free cancellation up to ${days} days before check-in.`,
+        isFreeCancellation: true,
+      },
+      {
+        cutoffLabel: `Between ${days} days and check-in`,
+        refundPercent: 50,
+        refundLabel: '50% partial refund',
+        description: `Partial refund (50%) for cancellations after the ${days}-day window.`,
+      },
+      {
+        cutoffLabel: 'After check-in',
+        refundPercent: 0,
+        refundLabel: 'Non-refundable',
+        description: 'Non-refundable after check-in.',
+        isNonRefundable: true,
+      },
+    ];
+  }
+
+  // Strict
+  const days = Math.round(hours / 24);
+  return [
+    {
+      cutoffLabel: `Up to ${days} days before check-in`,
+      refundPercent: 100,
+      refundLabel: '100% refund',
+      description: `Free cancellation up to ${days} days before check-in.`,
+      isFreeCancellation: true,
+    },
+    {
+      cutoffLabel: `Within ${days} days of check-in`,
+      refundPercent: 0,
+      refundLabel: 'Non-refundable',
+      description: `Non-refundable within ${days} days of check-in.`,
+      isNonRefundable: true,
+    },
+  ];
+}
+
 /**
  * Computes the absolute free-cancellation deadline (as a JS Date) for a given check-in date.
  * `checkInDate` should be the IST calendar date the guest selected (time-of-day is ignored —
@@ -310,8 +400,13 @@ export function resolveFreeCancellationTrustCopy(input: {
     return { trustMessage: null, deadlineFormatted: null, applicableGraceHours };
   }
 
+  // GUEST-037: name the listing's actual policy instead of a vague "standard policy" line, so this
+  // strip can never disagree with the policy card on the same page.
+  const policy = describeCancellationPolicy(input.tier);
+  const effectiveTier = resolveEffectiveCancellationTier(input.tier);
+  const afterWindow = policy.afterWindowCopy ? ` ${policy.afterWindowCopy}` : '';
   return {
-    trustMessage: 'Standard cancellation policy applies for this stay.',
+    trustMessage: `${effectiveTier} policy: ${policy.headline}.${afterWindow}`,
     deadlineFormatted: null,
     applicableGraceHours: null,
   };

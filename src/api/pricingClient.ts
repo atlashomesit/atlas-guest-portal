@@ -51,6 +51,11 @@ export type TodayBreakdown = {
    * daily-summary row from the checkout quote, so cards can show what the guest is actually charged.
    */
   finalAmount: number;
+  /**
+   * TASK-10298998: the payment-fee percent inside `finalAmount` (0 when none), so a no-gateway host's card can
+   * take it back out — nothing on that site charges it.
+   */
+  convenienceFeePercent?: number;
 };
 
 /** Per-day row from GET /pricing/breakdown (calendar view). */
@@ -109,6 +114,8 @@ export type GuestPriceBreakdown = {
   gstPercent: number | null;
   gstAmount: number | null;
   finalAmount: number | null;
+  /** HSL-010: HostelDorm stay price line from the server, e.g. "3 beds x Rs 799 x 2 nights". Absent for every other listing type. */
+  priceLine?: string;
 };
 
 /**
@@ -275,6 +282,9 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
   const gstAmount = raw.gstAmount ?? raw.GstAmount;
   const finalAmount = raw.finalAmount ?? raw.FinalAmount;
 
+  const priceLineRaw = raw.priceLine ?? raw.PriceLine;
+  const priceLine = typeof priceLineRaw === 'string' && priceLineRaw.trim() !== '' ? priceLineRaw.trim() : undefined;
+
   return {
     baseAmount: num('baseAmount', 'BaseAmount'),
     discountAmount: num('discountAmount', 'DiscountAmount'),
@@ -289,6 +299,7 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
     gstPercent: gstPercent !== undefined && gstPercent !== null ? Number(gstPercent) : null,
     gstAmount: gstAmount !== undefined && gstAmount !== null ? Number(gstAmount) : null,
     finalAmount: finalAmount !== undefined && finalAmount !== null ? Number(finalAmount) : null,
+    ...(priceLine ? { priceLine } : {}),
   };
 }
 
@@ -444,12 +455,17 @@ export async function fetchCalendarPricing(
 
 /** GET /pricing/daily-summary. Uses server's current date.
  * TASK-7823: pass listingId so a property page does not price the whole catalog. */
-export async function fetchDailySummary(signal?: AbortSignal, listingId?: string | number): Promise<DailyPricingSummaryDto> {
+export async function fetchDailySummary(
+  signal?: AbortSignal,
+  listingId?: string | number,
+  /** TASK-10298999: the listing owner's tenant — marketplace cards price homes of many hosts on one page. */
+  tenantSlug?: string | null,
+): Promise<DailyPricingSummaryDto> {
   const url = new URL(buildApiUrl(DAILY_SUMMARY_ENDPOINT));
   if (listingId != null && String(listingId).trim() !== '') {
     url.searchParams.set('listingId', String(listingId));
   }
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
 
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
@@ -492,5 +508,6 @@ export function getTodayBreakdownFromListing(listing: DailyListingPricingDto): T
     actualPrice,
     globalDiscountPercent: Number(listing.globalDiscountPercent ?? 0),
     finalAmount: finalAmount > 0 ? finalAmount : actualPrice,
+    convenienceFeePercent: Math.max(0, Number(listing.convenienceFeePercent ?? 0) || 0),
   };
 }

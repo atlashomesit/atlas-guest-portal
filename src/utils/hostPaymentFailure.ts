@@ -39,15 +39,24 @@ export function buildHostPaymentFailureMessage(ctx: HostFailureContext): string 
   const parts: string[] = [];
   parts.push(who ? `Hi, this is ${who}.` : 'Hi,');
   let line = `I tried to book ${room}`;
-  if (ctx.checkInLabel && ctx.checkOutLabel) {
+  const hasLabels = ctx.checkInLabel && ctx.checkOutLabel && ctx.checkInLabel !== '—' && ctx.checkOutLabel !== '—';
+  if (hasLabels) {
     line += ` for ${ctx.checkInLabel} to ${ctx.checkOutLabel}`;
-    const n = ctx.nights && ctx.nights > 0 ? ctx.nights : null;
-    const g = ctx.guests && ctx.guests > 0 ? ctx.guests : null;
-    const bits: string[] = [];
-    if (n) bits.push(`${n} ${n === 1 ? 'night' : 'nights'}`);
-    if (g) bits.push(`${g} ${g === 1 ? 'guest' : 'guests'}`);
-    if (bits.length) line += ` (${bits.join(', ')})`;
   }
+  let n = ctx.nights && ctx.nights > 0 ? ctx.nights : null;
+  if (!n && hasLabels) {
+    const d1 = new Date(ctx.checkInLabel!);
+    const d2 = new Date(ctx.checkOutLabel!);
+    if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+      const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+      if (diff > 0) n = diff;
+    }
+  }
+  const g = ctx.guests && ctx.guests > 0 ? ctx.guests : null;
+  const bits: string[] = [];
+  if (n) bits.push(`${n} ${n === 1 ? 'night' : 'nights'}`);
+  if (g) bits.push(`${g} ${g === 1 ? 'guest' : 'guests'}`);
+  if (bits.length) line += ` (${bits.join(', ')})`;
   if (ctx.amountInr && ctx.amountInr > 0) line += `, total ${rupees(ctx.amountInr)}`;
   line += ", but my payment didn't go through. Can you help me complete the booking?";
   parts.push(line);
@@ -61,11 +70,14 @@ export function buildHostPaymentFailureMessage(ctx: HostFailureContext): string 
 export function buildHostFailureContact(ctx: HostFailureContext): HostFailureContactAction | null {
   const wa = digitsOnly(ctx.hostWhatsAppDigits);
   if (wa) {
-    return {
-      kind: 'whatsapp',
-      href: buildWaLink({ phoneE164: wa, text: buildHostPaymentFailureMessage(ctx) }),
-      label: 'Message the host on WhatsApp',
-    };
+    const link = buildWaLink({ phoneE164: wa, text: buildHostPaymentFailureMessage(ctx) });
+    if (link) {
+      return {
+        kind: 'whatsapp',
+        href: link,
+        label: 'Message the host on WhatsApp',
+      };
+    }
   }
   const phone = digitsOnly(ctx.hostPhoneDigits);
   if (phone) {

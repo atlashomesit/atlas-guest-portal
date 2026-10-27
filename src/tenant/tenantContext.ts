@@ -161,6 +161,20 @@ export interface TenantLegalContactPack {
 
 let tenantInfo: TenantInfo | null = null;
 
+type TenantResolutionCacheEntry = {
+  value?: TenantInfo | null;
+  promise: Promise<TenantInfo | null>;
+  timestamp: number;
+};
+const domainResolveCache = new Map<string, TenantResolutionCacheEntry>();
+
+type TenantValidationCacheEntry = {
+  value?: TenantInfo;
+  promise: Promise<TenantInfo>;
+  timestamp: number;
+};
+const tenantValidateCache = new Map<string, TenantValidationCacheEntry>();
+
 /** TASK-8356: exported parser for legalContactPack — replaces tautological local copy in morDisclosure.test.ts */
 export function parseLegalContactPack(data: Record<string, unknown>): TenantLegalContactPack | undefined {
   const pack = data.legalContactPack as Record<string, unknown> | null | undefined;
@@ -184,6 +198,8 @@ export function parseLegalContactPack(data: Record<string, unknown>): TenantLega
 /** Test-only: clear resolved tenant info (module state outlives test files under isolate:false). */
 export function _resetTenantContextForTests(): void {
   tenantInfo = null;
+  domainResolveCache.clear();
+  tenantValidateCache.clear();
 }
 
 /** Test-only: set resolved tenant info. */
@@ -233,164 +249,189 @@ export class SubdomainNotActivatedError extends Error {
 }
 
 export async function resolveFromDomain(apiBaseUrl: string, domain: string): Promise<TenantInfo | null> {
-  try {
-    const lookupDomain = normalizeHostForDomainLookup(domain);
-    // Dev + browser: same-origin /tenants is proxied by Vite — avoids CORS failures on
-    // *.localhost whitelabel hosts (e2e-wa-only.localhost) that would fall back to tenantKey.
-    const url =
-      import.meta.env.DEV && typeof window !== 'undefined'
-        ? `/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`
-        : `${apiBaseUrl.replace(/\/$/, '')}/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`;
-    const res = await fetch(url); // No auth headers — this is the bootstrap endpoint
-
-    if (!res.ok) {
-      // TASK-2642: a 404 SUBDOMAIN_NOT_ACTIVATED means the slug is a real tenant that hasn't bought
-      // the WEBSITE add-on. Surface it distinctly so boot does NOT fall back to validateTenant()
-      // (which would render Atlas branding on a stranger's branded subdomain).
-      if (res.status === 404) {
-        try {
-          const body = await res.json();
-          if (body?.error === 'SUBDOMAIN_NOT_ACTIVATED') {
-            throw new SubdomainNotActivatedError();
-          }
-        } catch (bodyErr) {
-          if (bodyErr instanceof SubdomainNotActivatedError) throw bodyErr;
-          // Non-JSON body / parse failure → fall through to the null return below.
-        }
+  const lookupDomain = normalizeHostForDomainLookup(domain);
+  const cacheKey = `${apiBaseUrl.replace(/\/$/, '')}::${lookupDomain}`;
+  const now = Date.now();
+  const cached = domainResolveCache.get(cacheKey);
+  if (cached && now - cached.timestamp < 5 * 60 * 1000) {
+    if (cached.value !== undefined) {
+      if (cached.value) {
+        tenantInfo = cached.value;
       }
-      if (import.meta.env.DEV) {
-        console.warn('[tenantContext] resolveFromDomain non-OK response', {
-          domain,
-          status: res.status,
-          url,
-        });
-      }
-      return null;
+      return cached.value;
     }
-
-    const data = await res.json();
-    const isMarketplaceRoot = Boolean(data.isMarketplaceRoot);
-    const slug = data.tenantSlug as string | null;
-    if (!slug && !isMarketplaceRoot) {
-      if (import.meta.env.DEV) {
-        console.warn('[tenantContext] resolveFromDomain invalid payload shape', {
-          domain,
-          data,
-        });
-      }
-      return null;
-    }
-
-    if (slug) setDomainResolvedSlug(slug);
-    if (isMarketplaceRoot && isAtlastaysMarketplaceSurface(domain)) setMarketplaceMode(true);
-
-    const brandShort = String(data.brandName ?? "").trim();
-    const brandLong =
-      typeof data.legalContactPack?.legalName === "string" ? data.legalContactPack.legalName.trim() : "";
-
-    tenantInfo = {
-      name: brandShort,
-      brandName: brandShort || undefined,
-      brandNameLong: brandLong || undefined,
-      slug: slug ?? '',
-      logoUrl: data.logoUrl ?? undefined,
-      primaryColor: data.primaryColor ?? undefined,
-      tagline: data.tagline ?? undefined,
-      faviconUrl: data.faviconUrl ?? undefined,
-      category: data.category ?? undefined,
-      isMarketplaceRoot,
-      brandColor: data.primaryColor ?? undefined, // backward compat
-      isGstVerified: Boolean(data.isGstVerified), // TASK-1727
-      // TASK-102427: defensive read — undefined until the host configures it server-side.
-      gaMeasurementId: typeof data.gaMeasurementId === 'string' && data.gaMeasurementId.trim().length > 0
-        ? data.gaMeasurementId.trim()
-        : undefined,
-      // RA-006: TenantBrandPack payment fields
-      paymentProvider: data.paymentProvider ?? undefined,
-      displayMerchantName: data.displayMerchantName ?? undefined,
-      upiVpa: data.upiVpa ?? undefined,
-      upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
-      upiInstructions: data.upiInstructions ?? undefined,
-      bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP' || data.bookingMode === 'BLOCKED_LIFECYCLE')
-        ? data.bookingMode
-        : undefined,
-      lifecycleStage: typeof data.lifecycleStage === 'string' ? data.lifecycleStage : (typeof data.stage === 'string' ? data.stage : undefined),
-      websiteStatus: typeof data.websiteStatus === 'string' ? data.websiteStatus : undefined,
-      onlinePaymentsEnabled: typeof data.onlinePaymentsEnabled === 'boolean'
-        ? data.onlinePaymentsEnabled
-        : (data.lifecycleStage === 'Trial' || data.lifecycleStage === 'TrialEndedNudge' || data.stage === 'Trial')
-          ? false
-          : undefined,
-      notTakingBookings: Boolean(
-        data.notTakingBookings === true ||
-        data.websiteStatus === 'not_taking_bookings' ||
-        data.lifecycleStage === 'Blocked' ||
-        data.stage === 'Blocked' ||
-        data.bookingMode === 'BLOCKED_LIFECYCLE'
-      ),
-      whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
-        ? data.whatsappBookingPhone
-        : undefined,
-      mapLocation: (data.mapLocation && typeof data.mapLocation.lat === 'number' && typeof data.mapLocation.lng === 'number')
-        ? {
-            lat: data.mapLocation.lat,
-            lng: data.mapLocation.lng,
-            zoom: typeof data.mapLocation.zoom === 'number' ? data.mapLocation.zoom : undefined,
-            markerLabel: typeof data.mapLocation.markerLabel === 'string' && data.mapLocation.markerLabel.length > 0
-              ? data.mapLocation.markerLabel
-              : undefined,
-          }
-        : undefined,
-      locationContent: data.locationContent
-        ? {
-            subtitle: typeof data.locationContent.subtitle === 'string' ? data.locationContent.subtitle : undefined,
-            transport: Array.isArray(data.locationContent.transport) ? data.locationContent.transport : undefined,
-            nearbyAmenities: Array.isArray(data.locationContent.nearbyAmenities) ? data.locationContent.nearbyAmenities : undefined,
-            landmarks: Array.isArray(data.locationContent.landmarks) ? data.locationContent.landmarks : undefined,
-          }
-        : undefined,
-      legalContactPack: parseLegalContactPack(data as Record<string, unknown>),
-      // TASK-4381/4386 / ADR-0068
-      isInternal: Boolean(data.isInternal),
-      // TASK-4903/4904 (ADR-0081): read defensively — undefined until TASK-4904 ships the
-      // DTO fields server-side; the guest portal's theme-resolution wiring (src/main.tsx)
-      // already treats `undefined` as "fall back to classic/default", so no further wiring
-      // change is needed once these are populated.
-      effectiveThemeId: typeof data.effectiveThemeId === 'string' ? data.effectiveThemeId : undefined,
-      effectiveColorPresetId:
-        typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
-          ? data.effectiveColorPresetId
-          : undefined,
-      // TASK-4899: defensive read — absent/unrecognized value stays undefined (never assumed
-      // Neutral) until atlas-api ships TenantFromDomainDto.GuestCommsBrandingMode.
-      guestCommsBrandingMode:
-        data.guestCommsBrandingMode === 'Platform' || data.guestCommsBrandingMode === 'Neutral'
-          ? data.guestCommsBrandingMode
-          : undefined,
-      searchByImageEnabled: Boolean(data.searchByImageEnabled),
-      faq: Array.isArray(data.faq) ? data.faq : undefined,
-      cookieBanner: data.cookieBanner && typeof data.cookieBanner.text === 'string'
-        ? {
-            title: typeof data.cookieBanner.title === 'string' ? data.cookieBanner.title : undefined,
-            text: data.cookieBanner.text,
-            privacyUrl: typeof data.cookieBanner.privacyUrl === 'string' ? data.cookieBanner.privacyUrl : '/privacy',
-            privacyLinkLabel: typeof data.cookieBanner.privacyLinkLabel === 'string' ? data.cookieBanner.privacyLinkLabel : undefined,
-          }
-        : undefined,
-    };
-    return tenantInfo;
-  } catch (error) {
-    // TASK-2642: propagate the not-activated signal; never swallow it into the null fallback.
-    if (error instanceof SubdomainNotActivatedError) throw error;
-    if (import.meta.env.DEV) {
-      console.warn('[tenantContext] resolveFromDomain failed', {
-        domain,
-        apiBaseUrl,
-        error,
-      });
-    }
-    return null; // Network error — caller falls back to validateTenant()
+    return cached.promise;
   }
+
+  const promise = (async (): Promise<TenantInfo | null> => {
+    try {
+      // Dev + browser: same-origin /tenants is proxied by Vite — avoids CORS failures on
+      // *.localhost whitelabel hosts (e2e-wa-only.localhost) that would fall back to tenantKey.
+      const url =
+        import.meta.env.DEV && typeof window !== 'undefined'
+          ? `/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`
+          : `${apiBaseUrl.replace(/\/$/, '')}/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`;
+      const res = await fetch(url); // No auth headers — this is the bootstrap endpoint
+
+      if (!res.ok) {
+        // TASK-2642: a 404 SUBDOMAIN_NOT_ACTIVATED means the slug is a real tenant that hasn't bought
+        // the WEBSITE add-on. Surface it distinctly so boot does NOT fall back to validateTenant()
+        // (which would render Atlas branding on a stranger's branded subdomain).
+        if (res.status === 404) {
+          try {
+            const body = await res.json();
+            if (body?.error === 'SUBDOMAIN_NOT_ACTIVATED') {
+              throw new SubdomainNotActivatedError();
+            }
+          } catch (bodyErr) {
+            if (bodyErr instanceof SubdomainNotActivatedError) throw bodyErr;
+            // Non-JSON body / parse failure → fall through to the null return below.
+          }
+        }
+        if (import.meta.env.DEV) {
+          console.warn('[tenantContext] resolveFromDomain non-OK response', {
+            domain,
+            status: res.status,
+            url,
+          });
+        }
+        const entry = domainResolveCache.get(cacheKey);
+        if (entry) entry.value = null;
+        return null;
+      }
+
+      const data = await res.json();
+      const isMarketplaceRoot = Boolean(data.isMarketplaceRoot);
+      const slug = data.tenantSlug as string | null;
+      if (!slug && !isMarketplaceRoot) {
+        if (import.meta.env.DEV) {
+          console.warn('[tenantContext] resolveFromDomain invalid payload shape', {
+            domain,
+            data,
+          });
+        }
+        const entry = domainResolveCache.get(cacheKey);
+        if (entry) entry.value = null;
+        return null;
+      }
+
+      if (slug) setDomainResolvedSlug(slug);
+      if (isMarketplaceRoot && isAtlastaysMarketplaceSurface(domain)) setMarketplaceMode(true);
+
+      const brandShort = String(data.brandName ?? "").trim();
+      const brandLong =
+        typeof data.legalContactPack?.legalName === "string" ? data.legalContactPack.legalName.trim() : "";
+
+      tenantInfo = {
+        name: brandShort,
+        brandName: brandShort || undefined,
+        brandNameLong: brandLong || undefined,
+        slug: slug ?? '',
+        logoUrl: data.logoUrl ?? undefined,
+        primaryColor: data.primaryColor ?? undefined,
+        tagline: data.tagline ?? undefined,
+        faviconUrl: data.faviconUrl ?? undefined,
+        category: data.category ?? undefined,
+        isMarketplaceRoot,
+        brandColor: data.primaryColor ?? undefined, // backward compat
+        isGstVerified: Boolean(data.isGstVerified), // TASK-1727
+        // TASK-102427: defensive read — undefined until the host configures it server-side.
+        gaMeasurementId: typeof data.gaMeasurementId === 'string' && data.gaMeasurementId.trim().length > 0
+          ? data.gaMeasurementId.trim()
+          : undefined,
+        // RA-006: TenantBrandPack payment fields
+        paymentProvider: data.paymentProvider ?? undefined,
+        displayMerchantName: data.displayMerchantName ?? undefined,
+        upiVpa: data.upiVpa ?? undefined,
+        upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
+        upiInstructions: data.upiInstructions ?? undefined,
+        bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP' || data.bookingMode === 'BLOCKED_LIFECYCLE')
+          ? data.bookingMode
+          : undefined,
+        lifecycleStage: typeof data.lifecycleStage === 'string' ? data.lifecycleStage : (typeof data.stage === 'string' ? data.stage : undefined),
+        websiteStatus: typeof data.websiteStatus === 'string' ? data.websiteStatus : undefined,
+        onlinePaymentsEnabled: typeof data.onlinePaymentsEnabled === 'boolean'
+          ? data.onlinePaymentsEnabled
+          : (data.lifecycleStage === 'Trial' || data.lifecycleStage === 'TrialEndedNudge' || data.stage === 'Trial')
+            ? false
+            : undefined,
+        notTakingBookings: Boolean(
+          data.notTakingBookings === true ||
+          data.websiteStatus === 'not_taking_bookings' ||
+          data.lifecycleStage === 'Blocked' ||
+          data.stage === 'Blocked' ||
+          data.bookingMode === 'BLOCKED_LIFECYCLE'
+        ),
+        whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
+          ? data.whatsappBookingPhone
+          : undefined,
+        mapLocation: (data.mapLocation && typeof data.mapLocation.lat === 'number' && typeof data.mapLocation.lng === 'number')
+          ? {
+              lat: data.mapLocation.lat,
+              lng: data.mapLocation.lng,
+              zoom: typeof data.mapLocation.zoom === 'number' ? data.mapLocation.zoom : undefined,
+              markerLabel: typeof data.mapLocation.markerLabel === 'string' && data.mapLocation.markerLabel.length > 0
+                ? data.mapLocation.markerLabel
+                : undefined,
+            }
+          : undefined,
+        locationContent: data.locationContent
+          ? {
+              subtitle: typeof data.locationContent.subtitle === 'string' ? data.locationContent.subtitle : undefined,
+              transport: Array.isArray(data.locationContent.transport) ? data.locationContent.transport : undefined,
+              nearbyAmenities: Array.isArray(data.locationContent.nearbyAmenities) ? data.locationContent.nearbyAmenities : undefined,
+              landmarks: Array.isArray(data.locationContent.landmarks) ? data.locationContent.landmarks : undefined,
+            }
+          : undefined,
+        legalContactPack: parseLegalContactPack(data as Record<string, unknown>),
+        // TASK-4381/4386 / ADR-0068
+        isInternal: Boolean(data.isInternal),
+        // TASK-4903/4904 (ADR-0081): read defensively — undefined until TASK-4904 ships the
+        // DTO fields server-side; the guest portal's theme-resolution wiring (src/main.tsx)
+        // already treats `undefined` as "fall back to classic/default", so no further wiring
+        // change is needed once these are populated.
+        effectiveThemeId: typeof data.effectiveThemeId === 'string' ? data.effectiveThemeId : undefined,
+        effectiveColorPresetId:
+          typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
+            ? data.effectiveColorPresetId
+            : undefined,
+        // TASK-4899: defensive read — absent/unrecognized value stays undefined (never assumed
+        // Neutral) until atlas-api ships TenantFromDomainDto.GuestCommsBrandingMode.
+        guestCommsBrandingMode:
+          data.guestCommsBrandingMode === 'Platform' || data.guestCommsBrandingMode === 'Neutral'
+            ? data.guestCommsBrandingMode
+            : undefined,
+        searchByImageEnabled: Boolean(data.searchByImageEnabled),
+        faq: Array.isArray(data.faq) ? data.faq : undefined,
+        cookieBanner: data.cookieBanner && typeof data.cookieBanner.text === 'string'
+          ? {
+              title: typeof data.cookieBanner.title === 'string' ? data.cookieBanner.title : undefined,
+              text: data.cookieBanner.text,
+              privacyUrl: typeof data.cookieBanner.privacyUrl === 'string' ? data.cookieBanner.privacyUrl : '/privacy',
+              privacyLinkLabel: typeof data.cookieBanner.privacyLinkLabel === 'string' ? data.cookieBanner.privacyLinkLabel : undefined,
+            }
+          : undefined,
+      };
+      const entry = domainResolveCache.get(cacheKey);
+      if (entry) entry.value = tenantInfo;
+      return tenantInfo;
+    } catch (error) {
+      domainResolveCache.delete(cacheKey);
+      // TASK-2642: propagate the not-activated signal; never swallow it into the null fallback.
+      if (error instanceof SubdomainNotActivatedError) throw error;
+      if (import.meta.env.DEV) {
+        console.warn('[tenantContext] resolveFromDomain failed', {
+          domain,
+          apiBaseUrl,
+          error,
+        });
+      }
+      return null; // Network error — caller falls back to validateTenant()
+    }
+  })();
+
+  domainResolveCache.set(cacheKey, { promise, timestamp: now });
+  return promise;
 }
 
 /**
@@ -399,63 +440,87 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
  * Use resolveFromDomain() on boot instead when possible.
  */
 export async function validateTenant(slug: string): Promise<TenantInfo> {
-  const url = buildApiUrl(`/tenants/${encodeURIComponent(slug)}/public`);
-  const res = await fetch(url, { headers: getApiHeaders() });
-
-  if (!res.ok) {
-    if (res.status === 404) {
-      throw new Error(`Tenant "${slug}" not found. Check /.well-known/atlas-runtime-config.json and ensure tenantKey (or ATLAS_TENANT_KEY) is a valid tenant slug.`);
+  const trimmed = slug?.trim().toLowerCase();
+  const cacheKey = trimmed;
+  const now = Date.now();
+  const cached = tenantValidateCache.get(cacheKey);
+  if (cached && now - cached.timestamp < 5 * 60 * 1000) {
+    if (cached.value !== undefined) {
+      tenantInfo = cached.value;
+      return cached.value;
     }
-    throw new Error(`Failed to validate tenant "${slug}" (${res.status}).`);
+    return cached.promise;
   }
 
-  const data = await res.json();
-  const nm = String(data.name ?? "").trim();
-  tenantInfo = {
-    id: data.id,
-    name: nm,
-    brandName: nm || undefined,
-    brandNameLong: undefined,
-    slug: data.slug,
-    logoUrl: data.logoUrl ?? undefined,
-    primaryColor: data.brandColor ?? undefined,
-    brandColor: data.brandColor ?? undefined,
-    // TASK-102427: same defensive read as resolveFromDomain() above.
-    gaMeasurementId: typeof (data as Record<string, unknown>).gaMeasurementId === 'string' &&
-      ((data as Record<string, unknown>).gaMeasurementId as string).trim().length > 0
-      ? ((data as Record<string, unknown>).gaMeasurementId as string).trim()
-      : undefined,
-    mapLocation: (data.mapLocation && typeof data.mapLocation.lat === 'number' && typeof data.mapLocation.lng === 'number')
-      ? {
-          lat: data.mapLocation.lat,
-          lng: data.mapLocation.lng,
-          zoom: typeof data.mapLocation.zoom === 'number' ? data.mapLocation.zoom : undefined,
-          markerLabel: typeof data.mapLocation.markerLabel === 'string' ? data.mapLocation.markerLabel : undefined,
+  const promise = (async (): Promise<TenantInfo> => {
+    try {
+      const url = buildApiUrl(`/tenants/${encodeURIComponent(slug)}/public`);
+      const res = await fetch(url, { headers: getApiHeaders() });
+
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error(`Tenant "${slug}" not found. Check /.well-known/atlas-runtime-config.json and ensure tenantKey (or ATLAS_TENANT_KEY) is a valid tenant slug.`);
         }
-      : undefined,
-    locationContent: data.locationContent
-      ? {
-          subtitle: typeof data.locationContent.subtitle === 'string' ? data.locationContent.subtitle : undefined,
-          transport: Array.isArray(data.locationContent.transport) ? data.locationContent.transport : undefined,
-          nearbyAmenities: Array.isArray(data.locationContent.nearbyAmenities) ? data.locationContent.nearbyAmenities : undefined,
-          landmarks: Array.isArray(data.locationContent.landmarks) ? data.locationContent.landmarks : undefined,
-        }
-      : undefined,
-    // TASK-4381/4386 / ADR-0068
-    isInternal: Boolean(data.isInternal),
-    // TASK-4950: mirrors resolveFromDomain()'s parse (above) so the validateTenant() fallback
-    // path (used when resolveFromDomain returns null) also resolves the tenant's real layout
-    // theme + color preset instead of silently falling back to classic/default. main.tsx's
-    // existing resolution treats `undefined` as "fall back to classic/default" already, so no
-    // further wiring change is needed.
-    effectiveThemeId: typeof data.effectiveThemeId === 'string' ? data.effectiveThemeId : undefined,
-    effectiveColorPresetId:
-      typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
-        ? data.effectiveColorPresetId
-        : undefined,
-    searchByImageEnabled: Boolean(data.searchByImageEnabled),
-  };
-  return tenantInfo;
+        throw new Error(`Failed to validate tenant "${slug}" (${res.status}).`);
+      }
+
+      const data = await res.json();
+      const nm = String(data.name ?? "").trim();
+      tenantInfo = {
+        id: data.id,
+        name: nm,
+        brandName: nm || undefined,
+        brandNameLong: undefined,
+        slug: data.slug,
+        logoUrl: data.logoUrl ?? undefined,
+        primaryColor: data.brandColor ?? undefined,
+        brandColor: data.brandColor ?? undefined,
+        // TASK-102427: same defensive read as resolveFromDomain() above.
+        gaMeasurementId: typeof (data as Record<string, unknown>).gaMeasurementId === 'string' &&
+          ((data as Record<string, unknown>).gaMeasurementId as string).trim().length > 0
+          ? ((data as Record<string, unknown>).gaMeasurementId as string).trim()
+          : undefined,
+        mapLocation: (data.mapLocation && typeof data.mapLocation.lat === 'number' && typeof data.mapLocation.lng === 'number')
+          ? {
+              lat: data.mapLocation.lat,
+              lng: data.mapLocation.lng,
+              zoom: typeof data.mapLocation.zoom === 'number' ? data.mapLocation.zoom : undefined,
+              markerLabel: typeof data.mapLocation.markerLabel === 'string' ? data.mapLocation.markerLabel : undefined,
+            }
+          : undefined,
+        locationContent: data.locationContent
+          ? {
+              subtitle: typeof data.locationContent.subtitle === 'string' ? data.locationContent.subtitle : undefined,
+              transport: Array.isArray(data.locationContent.transport) ? data.locationContent.transport : undefined,
+              nearbyAmenities: Array.isArray(data.locationContent.nearbyAmenities) ? data.locationContent.nearbyAmenities : undefined,
+              landmarks: Array.isArray(data.locationContent.landmarks) ? data.locationContent.landmarks : undefined,
+            }
+          : undefined,
+        // TASK-4381/4386 / ADR-0068
+        isInternal: Boolean(data.isInternal),
+        // TASK-4950: mirrors resolveFromDomain()'s parse (above) so the validateTenant() fallback
+        // path (used when resolveFromDomain returns null) also resolves the tenant's real layout
+        // theme + color preset instead of silently falling back to classic/default. main.tsx's
+        // existing resolution treats `undefined` as "fall back to classic/default" already, so no
+        // further wiring change is needed.
+        effectiveThemeId: typeof data.effectiveThemeId === 'string' ? data.effectiveThemeId : undefined,
+        effectiveColorPresetId:
+          typeof data.effectiveColorPresetId === 'string' || data.effectiveColorPresetId === null
+            ? data.effectiveColorPresetId
+            : undefined,
+        searchByImageEnabled: Boolean(data.searchByImageEnabled),
+      };
+      const entry = tenantValidateCache.get(cacheKey);
+      if (entry) entry.value = tenantInfo;
+      return tenantInfo;
+    } catch (err) {
+      tenantValidateCache.delete(cacheKey);
+      throw err;
+    }
+  })();
+
+  tenantValidateCache.set(cacheKey, { promise, timestamp: now });
+  return promise;
 }
 
 type ListingTenantCacheEntry = {

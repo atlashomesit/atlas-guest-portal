@@ -7,6 +7,9 @@ import { _resetTenantContextForTests } from "../tenant/tenantContext";
 import { _resetAvailabilityCalendarCacheForTests } from "../api/availabilityCalendarClient";
 import { _resetDedupedJsonFetchForTests } from "../api/dedupedJsonFetch";
 import { _resetCurrentLayoutThemeIdForTests } from "../themes/registry";
+import { _clearVerifiedReviewsCacheForTests } from "../hooks/useVerifiedReviews";
+import { _clearTenantListingsCacheForTests } from "../hooks/useTenantListings";
+import { _clearReviewSummaryCacheForTests } from "../components/ReviewSummary";
 
 // Re-arm the real jsdom `window` if a previous test file in this worker replaced
 // the global and leaked it (e.g. `Object.defineProperty(global, "window", ...)`
@@ -44,6 +47,9 @@ _resetTenantContextForTests();
 _resetAvailabilityCalendarCacheForTests();
 _resetDedupedJsonFetchForTests();
 _resetCurrentLayoutThemeIdForTests();
+_clearVerifiedReviewsCacheForTests();
+_clearTenantListingsCacheForTests();
+_clearReviewSummaryCacheForTests();
 // The jsdom side of this (URL, storage, cookies, head/body, window stubs, document.visibilityState) is reset by
 // src/test/sharedWorkerResetSetup.ts, which vitest.config.ts lists BEFORE this file so it runs before any of the
 // imports above are evaluated (TASK-102734, see sharedWorkerHygiene.ts).
@@ -72,19 +78,21 @@ Object.defineProperty(global, "fetch", {
 });
 
 // Avoid "window.matchMedia is not a function" in components that use media queries
-Object.defineProperty(window, "matchMedia", {
-  writable: true,
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
 
 // jsdom does not implement ResizeObserver. Components that observe their own
 // size (e.g. the embed widget's height postMessage) would throw on mount. This

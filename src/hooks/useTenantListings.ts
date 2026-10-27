@@ -13,6 +13,7 @@ import {
   getTenantPublicListingIdAllowlist,
 } from "@/tenant/tenantOverrides";
 import { resolveEffectiveListingAddress } from "@/utils/listingAddress";
+import type { DormGenderPolicy } from "@/utils/dormListing";
 
 type LocalProperty = (typeof propertyData)[number];
 
@@ -58,6 +59,13 @@ export type TenantPropertyRecord = {
   /** TASK-102020: listing check-in/out times for property page display. */
   checkInTime?: string | null;
   checkOutTime?: string | null;
+  /** HSL-011: dorm facts from the public listing DTO (API only; null for every non-dorm listing). */
+  accommodationType?: string | null;
+  dormGenderPolicy?: DormGenderPolicy | null;
+  /** CLU-011: cluster role and id from public listing DTO (API only). */
+  clusterRole?: string | null;
+  clusterId?: number | null;
+  isParentCluster?: boolean | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -162,6 +170,11 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     cancellationTier: dto.cancellationTier ?? null,
     checkInTime: dto.checkInTime?.trim() || null,
     checkOutTime: dto.checkOutTime?.trim() || null,
+    accommodationType: dto.accommodationType ?? null,
+    dormGenderPolicy: dto.dormGenderPolicy ?? null,
+    clusterRole: dto.clusterRole ?? null,
+    clusterId: dto.clusterId ?? null,
+    isParentCluster: dto.isParentCluster ?? (dto.clusterRole ? dto.clusterRole.toUpperCase() === 'PARENT' : null),
   };
 };
 
@@ -235,18 +248,37 @@ const mapDtosToData = (
   return { listings, properties };
 };
 
+let sharedListingsCache: {
+  key: string;
+  data: { listings: Listing[]; properties: TenantPropertyRecord[] };
+  expiresAt: number;
+} | null = null;
+
+export function _clearTenantListingsCacheForTests(): void {
+  sharedListingsCache = null;
+}
+
 export function useTenantListings(): UseTenantListings {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
   const onlyApi = overrides.onlyApiListings === true;
   const filteredFallback = onlyApi ? [] : FALLBACK_PROPERTIES;
   const filteredListings = onlyApi ? [] : FALLBACK_LISTINGS;
+  const tenantKey = tenant?.slug ?? "";
+  const isCacheFresh = Boolean(
+    sharedListingsCache && sharedListingsCache.key === tenantKey && sharedListingsCache.expiresAt > Date.now(),
+  );
 
-  const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>({
-    listings: filteredListings,
-    properties: filteredFallback,
+  const [data, setData] = useState<{ listings: Listing[]; properties: TenantPropertyRecord[] }>(() => {
+    if (isCacheFresh && sharedListingsCache) {
+      return sharedListingsCache.data;
+    }
+    return {
+      listings: filteredListings,
+      properties: filteredFallback,
+    };
   });
-  const [state, setState] = useState<TenantListingsState>("idle");
+  const [state, setState] = useState<TenantListingsState>(() => (isCacheFresh ? "success" : "idle"));
   const [fetchErrorMessage, setFetchErrorMessage] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hasFetchedRef = useRef(false);
@@ -265,6 +297,11 @@ export function useTenantListings(): UseTenantListings {
       // TASK-4444: Trust DTO photos — the public DTO already carries photoUrls/coverPhotoUrl
       // Removed per-property photo fetches that were blocking first paint with N HTTP calls
       const mapped = mapDtosToData(dtos);
+      sharedListingsCache = {
+        key: tenantKey,
+        data: mapped,
+        expiresAt: Date.now() + 60_000,
+      };
       setData(mapped);
       setState("success");
     } catch (error) {
@@ -277,16 +314,19 @@ export function useTenantListings(): UseTenantListings {
       );
       setState("error");
     }
-  }, []);
+  }, [tenantKey]);
 
   useEffect(() => {
     if (hasFetchedRef.current) return;
     hasFetchedRef.current = true;
+    if (sharedListingsCache && sharedListingsCache.key === tenantKey && sharedListingsCache.expiresAt > Date.now()) {
+      return;
+    }
     void refetch();
     return () => {
       abortRef.current?.abort();
     };
-  }, [refetch]);
+  }, [refetch, tenantKey]);
 
   return { listings: data.listings, properties: data.properties, state, fetchErrorMessage, refetch };
 }

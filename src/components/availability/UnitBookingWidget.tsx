@@ -32,9 +32,11 @@ import {
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
+import { isSmallParty, SMALL_PARTY_HINT_DEFAULT } from '@/utils/smallParty';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import DirectSavingRow from '@/components/pricing/DirectSavingRow';
+import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
 import { directPriceDisplay, plainMealLabel } from '@/utils/directBookingPrice';
 import {
   fetchCalendarPricing,
@@ -50,13 +52,16 @@ import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
+import ParentChildCrossSellBanner, { isParentListing, type ChildRoomPreview } from '../cluster/ParentChildCrossSellBanner';
+import { fetchClusterChildrenAvailability, type ClusterChildrenAvailability } from '@/api/clusterChildrenClient';
+import HostelDormBadge from '../hostel/HostelDormBadge';
+import { bedsLeftForNights, isHostelDormType, type DormGenderPolicy } from '@/utils/dormListing';
 import { track } from '@/lib/events'; // TASK-1480
 import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantContext, type TenantInfo } from '@/tenant/tenantContext';
 import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
-  ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
 
 declare global {
@@ -68,7 +73,7 @@ declare global {
   }
 }
 
-interface UnitBookingWidgetProps {
+export interface UnitBookingWidgetProps {
   listingId?: string | number;
   propertyId?: string | number;
   listingName?: string;
@@ -106,6 +111,22 @@ interface UnitBookingWidgetProps {
   lookupFailed?: boolean;
   /** MKT-011: optional listing tenant context (used on marketplace to match listing host's bookingMode) */
   tenantContext?: TenantInfo | null;
+  /** CLU-004: parent cluster indicator for child room cross-sell */
+  isParentCluster?: boolean;
+  clusterRole?: string | null;
+  /** CLU-011: `PublicListingDto.ClusterId` - a Parent only has Children to offer when it belongs to a cluster. */
+  clusterId?: number | null;
+  accommodationType?: string | null;
+  /** HSL-011: `Listing.DormGenderPolicy` from the API (HostelDorm only). Never guessed from the listing name. */
+  dormGenderPolicy?: DormGenderPolicy | null;
+  /** HSL-011: total beds in the dorm (`Listing.Quantity`) - the "Y" of "X of Y beds left". */
+  dormBedCount?: number | null;
+  /** TASK-1039977 / PAY-006: listing security deposit (INR); forwarded to checkout */
+  securityDepositAmount?: number | null;
+  /** TASK-10299183: small-party pricing configured on listing. */
+  hasSmallPartyPricing?: boolean;
+  /** Custom small-party hint text. Defaults to "Special rate available for 1-2 guests". */
+  smallPartyHint?: string | null;
 }
 
 export type BookingStickySummary = {
@@ -194,6 +215,15 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   onStickySummaryChange,
   lookupFailed = false,
   tenantContext,
+  isParentCluster,
+  clusterRole,
+  clusterId,
+  accommodationType,
+  dormGenderPolicy = null,
+  dormBedCount = null,
+  securityDepositAmount = null,
+  hasSmallPartyPricing = false,
+  smallPartyHint,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -265,6 +295,20 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
+
+  // TASK-10299183: small-party pricing hint in booking box
+  const smallPartyPricingConfigured = Boolean(
+    hasSmallPartyPricing ||
+    publicRatePlans.some(
+      (p) =>
+        p.guests > 0 &&
+        p.guests <= 2 &&
+        (!p.isDefault ||
+          p.effectiveNightlyRate <
+            (publicRatePlans.find((d) => d.isDefault)?.effectiveNightlyRate ?? Infinity)),
+    ),
+  );
+  const showSmallPartyHint = smallPartyPricingConfigured && isSmallParty(guests);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
@@ -279,6 +323,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Set would be wrong here. Additive/empty for every tenant that never opts out (zero
   // behaviour change — nothing in this Map, every read below is a no-op `=== false` miss).
   const [dateBookabilityMap, setDateBookabilityMap] = useState<Map<string, boolean>>(new Map());
+  // HSL-011: per-date `roomsAvailable` from the same /api/pricing/availability-rates call. For a HostelDorm that is the
+  // number of beds still free that night; it feeds the "X of Y beds left" line and is never read for any other listing.
+  const [dateRoomsAvailableMap, setDateRoomsAvailableMap] = useState<Map<string, number>>(new Map());
   // Availability fetch must NOT gate Reserve (TASK-4277 / 2026-07-12 hosted-dev: a prior
   // `isLoading` flag left Reserve disabled during F1 availability latency after check-in-only).
   //
@@ -422,6 +469,25 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   );
   const effectiveMinStayNights = getEffectiveMinStayForDate(dateRange.startDate);
   const effectiveMaxGuests = maxGuests;
+  // HSL-011: a HostelDorm sells BEDS. The type comes from the listing API only (never the listing name).
+  const isDorm = isHostelDormType(accommodationType);
+  const dormBedsLeft = useMemo(() => {
+    if (!isDorm || !dateRange.startDate || !dateRange.endDate) return null;
+    const nights: string[] = [];
+    let d = startOfCalendarDay(dateRange.startDate);
+    const end = startOfCalendarDay(dateRange.endDate);
+    while (d.getTime() < end.getTime()) {
+      nights.push(toCalendarISO(d));
+      d = addDays(d, 1);
+    }
+    const left = bedsLeftForNights(nights, dateRoomsAvailableMap);
+    // Never print a count the data contradicts (more free than the dorm has): show nothing instead of a guess.
+    if (left == null || (dormBedCount != null && left > dormBedCount)) return null;
+    return left;
+  }, [isDorm, dateRange.startDate, dateRange.endDate, dateRoomsAvailableMap, dormBedCount]);
+  /** Beds the guest may ask for: the dorm's cap, and no more than are free when that is known. */
+  const dormMaxBeds = dormBedsLeft != null ? Math.max(1, Math.min(effectiveMaxGuests, dormBedsLeft)) : effectiveMaxGuests;
+  const dormOverBeds = isDorm && dormBedsLeft != null && guests > dormBedsLeft;
   /**
    * The Reserve init-hold answered 422 PAYMENT_PROVIDER_NOT_CONFIGURED_*: this tenant cannot take an online
    * payment (TASK-101182's fail-closed guard), so the guest is handed to the host on WhatsApp instead of
@@ -954,14 +1020,25 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // whatever's already known in place) rather than fail-closing Reserve the way TASK-4830's
   // availability-calendar failure does — that flag is reserved for the booking-CONFLICT source
   // of truth, not this rate-usability signal.
-  const mergeAvailabilityRates = useCallback((days: { date: string; bookable: boolean }[]) => {
+  const mergeAvailabilityRates = useCallback((days: { date: string; bookable: boolean; roomsAvailable?: number }[]) => {
     if (days.length === 0) return;
     setDateBookabilityMap((prev) => {
       const next = new Map(prev);
       for (const day of days) next.set(day.date, day.bookable);
       return next;
     });
-  }, []);
+    // HSL-011: remember the per-night free count - beds, for a dorm only. Same last-write-wins merge as above.
+    if (!isDorm) return;
+    setDateRoomsAvailableMap((prev) => {
+      const next = new Map(prev);
+      for (const day of days) {
+        if (typeof day.roomsAvailable === 'number' && Number.isFinite(day.roomsAvailable)) {
+          next.set(day.date, day.roomsAvailable);
+        }
+      }
+      return next;
+    });
+  }, [isDorm]);
 
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') return;
@@ -1395,6 +1472,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const datesUnavailable =
     availabilityConflict || checkinUnavailable || availabilityFailed || listingLookupFailed;
 
+  // CLU-011: role comes from the public listing payload only (no name guessing).
+  const isParentOfCluster =
+    isParentListing({ isParentCluster, clusterRole, accommodationType }) ||
+    Boolean(clusterId && isParentListing({ isParentCluster, clusterRole, accommodationType }));
+  const crossSellCheckIn = dateRange.startDate ? toCalendarISO(dateRange.startDate) : null;
+  const crossSellCheckOut = dateRange.endDate ? toCalendarISO(dateRange.endDate) : null;
+  const [clusterAvailability, setClusterAvailability] = useState<ClusterChildrenAvailability | null>(null);
+  useEffect(() => {
+    setClusterAvailability(null);
+    if (!isParentOfCluster || !datesUnavailable || !listingId || !crossSellCheckIn || !crossSellCheckOut) return;
+    const ac = new AbortController();
+    void fetchClusterChildrenAvailability(
+      Number(listingId), crossSellCheckIn, crossSellCheckOut, verifiedTenantSlug, ac.signal,
+    ).then((result) => {
+      if (!ac.signal.aborted) setClusterAvailability(result);
+    });
+    return () => ac.abort();
+  }, [isParentOfCluster, datesUnavailable, listingId, crossSellCheckIn, crossSellCheckOut, verifiedTenantSlug]);
+
   // TASK-102023: gate range pricing pending, fallback estimate, and Reserve on the failure state
   // covering the selected range. If the selected range falls within the shown month, use that
   // fetch's failure state; otherwise use the selected-range fetch's failure state.
@@ -1545,9 +1641,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             discountAmount: serverPriceBreakdown.discountAmount,
             finalAmount: serverPriceBreakdown.finalAmount,
             nights: priceDetails.nights,
+            // TASK-10298998: same rule as the Total below — no gateway, no payment fee.
+            paymentFeeCharged: showOnlinePaymentProcessing,
+            paymentFeeAmount: serverPriceBreakdown.convenienceFeeAmount,
           })
         : null,
-    [serverGstMatchesSelection, serverPriceBreakdown, priceDetails.nights],
+    [serverGstMatchesSelection, serverPriceBreakdown, priceDetails.nights, showOnlinePaymentProcessing],
   );
   // The direct-booking discount the server quote applies for the selected stay (0 when none / not loaded).
   const directDiscountAmount =
@@ -1567,9 +1666,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             discountAmount: effectiveDailyPricing.baseAmount - effectiveDailyPricing.actualPrice,
             finalAmount: effectiveDailyPricing.finalAmount,
             nights: 1,
+            paymentFeeCharged: showOnlinePaymentProcessing,
+            paymentFeeAmount:
+              (effectiveDailyPricing.actualPrice * (effectiveDailyPricing.convenienceFeePercent ?? 0)) / 100,
           })
         : null,
-    [effectiveDailyPricing],
+    [effectiveDailyPricing, showOnlinePaymentProcessing],
   );
 
   // Keep the navigation shortcut tied to the authoritative form eligibility.
@@ -1633,18 +1735,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const referralDiscountApplied = 0;
   const promoDiscountApplied = 0;
   const addOnsTotal = 0;
-
-  // v2: "Why book direct" block removed from widget JSX. Calculation kept (prefixed _) for future
-  // OTA comparison card on the listing page. TASK-2576 context: data was used to show OTA fee delta.
-  const illustrativeOtaGuestFeeComparison = useMemo(() => {
-    // DESIGN-030: no "Save ~₹…" confidence line for dates that cannot be booked.
-    if (!hasSelectedRange || datesUnavailable || breakdownPrice <= 0) return null;
-    const illustrativeGuestFee = Math.round((breakdownPrice * ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT) / 100);
-    return {
-      illustrativeGuestFee,
-      illustrativeRoomPlusFee: breakdownPrice + illustrativeGuestFee,
-    };
-  }, [hasSelectedRange, datesUnavailable, breakdownPrice]);
 
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
@@ -1740,6 +1830,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+    // HSL-011: never hand a dorm stay to checkout for more beds than the dates have free.
+    if (isDorm && dormBedsLeft != null && guests > dormBedsLeft) {
+      setFormError(`Only ${dormBedsLeft} ${dormBedsLeft === 1 ? 'bed' : 'beds'} left on these dates. Please choose fewer beds.`);
+      return;
+    }
+
     const numericListingId = listingId != null ? Number(listingId) : NaN;
     if (!Number.isFinite(numericListingId)) {
       setFormError('Property could not be loaded. Please refresh the page and try again.');
@@ -1813,6 +1909,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdCancellationTier: effectiveRatePlanCancellationTier,
         holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
         holdGraceHours: isSelectedRatePlanNonRefundable ? null : resolvedGraceHours,
+        // TASK-1039977 / PAY-006: refundable security deposit forwarded to checkout
+        holdSecurityDepositAmount:
+          securityDepositAmount != null && Number(securityDepositAmount) > 0
+            ? Number(securityDepositAmount)
+            : null,
+        // HSL-011: the checkout page asks the gender-rule tick from this (API value; null for every non-dorm listing).
+        holdDormGenderPolicy: isDorm ? dormGenderPolicy : null,
         // Forward dates/guests into context for the details page. BookingContext's wire format
         // is an ISO instant, and the hydration effect above reads it back as an IST civil date —
         // so emit the IST-midnight instant (unchanged format, correct day) rather than
@@ -1822,6 +1925,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         guests,
         listingRatePlanId: selectedRatePlanId,
         ratePlanName: selectedRatePlan?.name ?? null,
+        ratePlanMealPlan: selectedRatePlan?.mealPlanLabel || selectedRatePlan?.mealPlanCode || null,
+        ratePlanCancellationPolicy:
+          cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy || null,
       });
 
       // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
@@ -1847,6 +1953,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     convenienceFeePercent, touristTaxLineAmount,
     resolvedCancellationWindowHours, resolvedGraceHours,
     selectedRatePlanId, selectedRatePlan, effectiveRatePlanCancellationTier, isSelectedRatePlanNonRefundable,
+    isDorm, dormBedsLeft, dormGenderPolicy,
   ]);
 
   // Hand-off link for the Reserve 422 above. Derived at render, not captured in handleReserve, so it
@@ -1978,8 +2085,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
       )}
 
-      {/* v2: "Why book direct" info collapsed — illustrativeOtaGuestFeeComparison kept for outer page
-          comparison card usage. Reference kept alive by the calculation above (line ~870). */}
       {/* Price loading state — shown inline in breakdown when loading */}
       {dailyPricingLoading && (
         <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Loading price…</p>
@@ -1987,6 +2092,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (2) + (3): Date range card + Guests card */}
       <div className="lv-booking-form">
+        {/* HSL-011: a dorm says so before the guest picks anything, with the host's gender rule when the API states one. */}
+        {isDorm && (
+          <HostelDormBadge accommodationType={accommodationType} genderPolicy={dormGenderPolicy} className="mb-2" />
+        )}
         {effectiveMinStayNights > 1 && (
           <p
             className="inline-flex items-center rounded-full bg-[#ffe4d6] px-3 py-1.5 text-sm font-medium text-[#4a3535] border border-[#e5cfc0]"
@@ -2086,34 +2195,42 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             // dead. minHeight restores a 44px hit area (WCAG 2.2 SC 2.5.5 / Apple HIG) without
             // re-introducing double padding. Applies on desktop too — it was ~38px there as well.
             style={{ padding: 0, minHeight: 44, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-            aria-label={`Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
+            aria-label={isDorm
+              ? `Beds: ${guests} ${guests === 1 ? 'bed' : 'beds'}. Click to change.`
+              : `Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >
             <div>
-              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>Guests</small>
-              <span className="lv-guest-val">{guests} {guests === 1 ? 'adult' : 'adults'}</span>
+              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>{isDorm ? 'Beds' : 'Guests'}</small>
+              <span className="lv-guest-val">
+                {isDorm ? `${guests} ${guests === 1 ? 'bed' : 'beds'}` : `${guests} ${guests === 1 ? 'adult' : 'adults'}`}
+              </span>
               {guests >= effectiveMaxGuests && (
                 <small style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}>
-                  Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'} for this home
+                  {isDorm
+                    ? `Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'} per booking`
+                    : `Maximum ${effectiveMaxGuests} guest${effectiveMaxGuests === 1 ? '' : 's'} for this home`}
                 </small>
               )}
             </div>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--text-muted, #6b5a55)', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
           </button>
           {guestsOpen && (
-            <div className="bw-guests-pop" role="group" aria-label="Guest count">
+            <div className="bw-guests-pop" role="group" aria-label={isDorm ? 'Bed count' : 'Guest count'}>
               <div className="bw-guest-row">
                 <div>
-                  <div className="bw-guest-label">Guests</div>
+                  <div className="bw-guest-label">{isDorm ? 'Beds' : 'Guests'}</div>
                   <div className="bw-guest-sub">
-                    Ages 2+ · Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'}
+                    {isDorm
+                      ? `One bed per guest · Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'}`
+                      : `Ages 2+ · Maximum ${effectiveMaxGuests} guest${effectiveMaxGuests === 1 ? '' : 's'}`}
                   </div>
                 </div>
                 <div className="bw-counter">
                   <button
                     type="button"
                     className="bw-counter-btn"
-                    aria-label="Decrease guests"
+                    aria-label={isDorm ? 'Decrease beds' : 'Decrease guests'}
                     disabled={guests <= 1}
                     onClick={() => setGuests((current) => Math.max(1, current - 1))}
                   >−</button>
@@ -2121,15 +2238,57 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   <button
                     type="button"
                     className="bw-counter-btn"
-                    aria-label="Increase guests"
-                    disabled={guests >= effectiveMaxGuests}
-                    onClick={() => setGuests((current) => Math.min(effectiveMaxGuests, current + 1))}
+                    aria-label={isDorm ? 'Increase beds' : 'Increase guests'}
+                    disabled={guests >= (isDorm ? dormMaxBeds : effectiveMaxGuests)}
+                    onClick={() => setGuests((current) => Math.min(isDorm ? dormMaxBeds : effectiveMaxGuests, current + 1))}
                   >+</button>
                 </div>
               </div>
             </div>
           )}
         </div>
+        {/* TASK-10299183: small-party discount hint when small-party pricing is configured and guest count qualifies (1-2 guests) */}
+        {showSmallPartyHint && (
+          <div
+            className="bw-small-party-hint"
+            data-testid="booking-small-party-hint"
+            role="status"
+            style={{
+              marginTop: 8,
+              padding: '6px 10px',
+              borderRadius: 8,
+              backgroundColor: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              color: '#065f46',
+              fontSize: '12px',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: '13px' }}>✨</span>
+            <span>{smallPartyHint || SMALL_PARTY_HINT_DEFAULT}</span>
+          </div>
+        )}
+        {/* HSL-011: live beds-left for the chosen nights (smallest free count across them). Only printed when the
+            availability data gave a count for every night; never a guess. */}
+        {isDorm && dormBedsLeft != null && (
+          <p
+            className="text-xs"
+            data-testid="dorm-beds-left"
+            style={{ margin: '6px 0 0', fontWeight: 600, color: dormBedsLeft <= 2 ? '#b45309' : 'var(--text-muted, #6b5a55)' }}
+          >
+            {dormBedCount != null
+              ? `${dormBedsLeft} of ${dormBedCount} ${dormBedCount === 1 ? 'bed' : 'beds'} left`
+              : `${dormBedsLeft} ${dormBedsLeft === 1 ? 'bed' : 'beds'} left`}
+          </p>
+        )}
+        {dormOverBeds && (
+          <p className="text-xs text-support-error" role="alert" data-testid="dorm-over-beds" style={{ margin: '4px 0 0' }}>
+            Only {dormBedsLeft} {dormBedsLeft === 1 ? 'bed' : 'beds'} left on these dates. Please choose fewer beds.
+          </p>
+        )}
         {publicRatePlans.length > 1 && (
           <div
             className="bw-rate-plan-selector"
@@ -2265,6 +2424,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         )}
         {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (
         <div className="lv-price-rows">
+          {/* TASK-1039948: Direct booking pricing tier public display */}
+          {(selectedRatePlan || cancellationTrustText) && (
+            <div className="lv-price-row" style={{ display: 'block', paddingBottom: 6 }}>
+              <PricingTierDisplay
+                ratePlanName={selectedRatePlan?.name}
+                cancellationPolicy={cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy}
+                mealPlanLabel={selectedRatePlan?.mealPlanLabel}
+                mealPlanCode={selectedRatePlan?.mealPlanCode}
+              />
+            </div>
+          )}
           {/* TASK-4282: Show per-night breakdown when rates vary, or averaged format when uniform */}
           {(() => {
             // Collect daily prices for the selected range
@@ -2284,7 +2454,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             const uniquePrices = new Set(dailyPrices.map(dp => dp.price));
             const ratesVary = uniquePrices.size > 1;
 
-            if (ratesVary && dailyPrices.length > 0) {
+            // HSL-010: a dorm's per-night rows are PER BED (calendar rate) while the subtotal is beds x that — rows
+            // that cannot sum to the subtotal read as a hidden fee, so a dorm always uses the single priced line.
+            const isBedPricedStay = serverGstMatchesSelection && !!serverPriceBreakdown?.priceLine;
+
+            if (ratesVary && dailyPrices.length > 0 && !isBedPricedStay) {
               // Show per-night breakdown
               return (
                 <>
@@ -2330,9 +2504,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 <>
                   <div className="lv-price-row" data-testid="price-line-base">
                     <span>
-                      {priceDetails.nights > 0 && nightlyShown > 0
-                        ? `${displayPrice(nightlyShown)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
-                        : 'Accommodation'}
+                      {serverGstMatchesSelection && serverPriceBreakdown?.priceLine
+                        ? /* HSL-010: a dorm stay is priced per bed — the server's own line ("3 beds x Rs 799 x 2 nights")
+                             explains the total instead of a misleading per-night average. */
+                          serverPriceBreakdown.priceLine
+                        : priceDetails.nights > 0 && nightlyShown > 0
+                          ? `${displayPrice(nightlyShown)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+                          : 'Accommodation'}
                     </span>
                     <span className="lv-num">{displayPrice(standardStay ?? breakdownPrice)}</span>
                   </div>
@@ -2413,6 +2591,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <span>Total</span>
             <span className="lv-num">{displayPrice(isNaN(finalTotal) ? 0 : Math.max(1, finalTotal))}</span>
           </div>
+          {/* HSL-011: the all-in Total above divided by the beds, so a group sees what ONE bed costs them. */}
+          {isDorm && guests >= 1 && !isNaN(finalTotal) && finalTotal > 0 && (
+            <p className="text-xs" data-testid="dorm-per-bed-total" style={{ margin: '4px 0 0', color: 'var(--text-muted, #6b5a55)' }}>
+              {guests > 1 ? `About ${displayPrice(Math.round(finalTotal / guests))} per bed, all in` : `${displayPrice(Math.round(finalTotal))} per bed, all in`}
+            </p>
+          )}
         </div>
         )}
         </div>
@@ -2496,21 +2680,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
+
+      {/* CLU-004: Parent whole-villa blocked -> available child private rooms cross-sell alert */}
+      {datesUnavailable && (
+        <div className="mt-3">
+          <ParentChildCrossSellBanner
+            isParentCluster={isParentOfCluster}
+            isUnavailable={Boolean(datesUnavailable)}
+            parentName={listingName}
+            availability={clusterAvailability}
+            checkIn={crossSellCheckIn}
+            checkOut={crossSellCheckOut}
+            propertySlug={propertySlug}
+            onSelectChildRoom={(room: ChildRoomPreview) => room.href && navigate(room.href)}
+          />
+        </div>
+      )}
+
       {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
       {!datesUnavailable && (
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>
         You won&apos;t be charged yet
       </p>
-      )}
-
-      {!datesUnavailable && illustrativeOtaGuestFeeComparison && illustrativeOtaGuestFeeComparison.illustrativeGuestFee > 0 && (
-        <p
-          className="bw-direct-savings"
-          data-testid="bw-direct-savings-line"
-          style={{ textAlign: 'center', fontSize: 12, color: '#157046', marginTop: 6, lineHeight: 1.45 }}
-        >
-          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — direct booking, lower fees than OTAs.
-        </p>
       )}
 
       {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline

@@ -24,6 +24,22 @@ describe('mergeListingAndExternalReviews (TASK-103146)', () => {
     expect(result.every((r) => r.rating >= 4)).toBe(true);
   });
 
+  it('suppresses hidden reviews (isHidden: true) from both native and external reviews', () => {
+    const native: ListingReviewRow[] = [
+      { id: 301, guestName: 'Visible Native', rating: 5, body: 'Great stay', isHidden: false, createdAt: '2026-08-01T12:00:00Z' },
+      { id: 302, guestName: 'Hidden Native', rating: 5, body: 'Disputed stay', isHidden: true, createdAt: '2026-08-02T12:00:00Z' },
+    ];
+    const external: ExternalReviewRow[] = [
+      { guestName: 'Visible External', rating: 5, body: 'Great external stay', isHidden: false, reviewDate: '2026-08-01', source: 'Google' },
+      { guestName: 'Hidden External', rating: 5, body: 'Hidden external stay', isHidden: true, reviewDate: '2026-08-02', source: 'Airbnb' },
+    ];
+
+    const result = mergeListingAndExternalReviews(native, external);
+
+    expect(result).toHaveLength(2);
+    expect(result.map((r) => r.guestName)).toEqual(['Visible Native', 'Visible External']);
+  });
+
   it('suppresses external reviews with empty or whitespace-only bodies even if rating is 5', () => {
     const external: ExternalReviewRow[] = [
       { guestName: 'Real Reviewer', rating: 5, body: 'Loved the sunrise view from the balcony!', reviewDate: '2026-08-01', source: 'Airbnb' },
@@ -35,6 +51,51 @@ describe('mergeListingAndExternalReviews (TASK-103146)', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].guestName).toBe('Real Reviewer');
+  });
+
+  it('TASK-10299093: suppresses native reviews with empty or whitespace-only bodies even if title or 5-star rating is present', () => {
+    const native: ListingReviewRow[] = [
+      { id: 201, guestName: 'Has Body', rating: 5, body: 'Loved the room and amenities!', title: 'Great stay', createdAt: '2026-08-01T12:00:00Z' },
+      { id: 202, guestName: 'Empty Body Null', rating: 5, body: null, title: 'Five star title only', createdAt: '2026-08-02T12:00:00Z' },
+      { id: 203, guestName: 'Whitespace Body', rating: 5, body: '   \n  \t  ', title: 'Spaces only', createdAt: '2026-08-03T12:00:00Z' },
+      { id: 204, guestName: 'Empty String Body', rating: 5, body: '', title: null, createdAt: '2026-08-04T12:00:00Z' },
+    ];
+
+    const result = mergeListingAndExternalReviews(native, []);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(201);
+    expect(result[0].guestName).toBe('Has Body');
+  });
+
+  it('TASK-10299094: does not corrupt "<3" hearts or "< ... >" text in review bodies while stripping HTML tags', () => {
+    const external: ExternalReviewRow[] = [
+      {
+        guestName: 'Heart Lover',
+        rating: 5,
+        body: 'We loved it <3 great value, rooms < 20 sqm but fine > expected, price <5000 INR',
+        reviewDate: '2026-08-01',
+        source: 'Airbnb',
+      },
+      {
+        guestName: 'Tag User',
+        rating: 5,
+        body: '<b>bold</b> nice <script>alert(1)</script> ok <3',
+        reviewDate: '2026-08-02',
+        source: 'Google',
+      },
+    ];
+
+    const result = mergeListingAndExternalReviews([], external);
+
+    expect(result).toHaveLength(2);
+    const heartReview = result.find((r) => r.guestName === 'Heart Lover');
+    expect(heartReview?.body).toBe(
+      'We loved it <3 great value, rooms < 20 sqm but fine > expected, price <5000 INR',
+    );
+
+    const tagReview = result.find((r) => r.guestName === 'Tag User');
+    expect(tagReview?.body).toBe('bold nice alert(1) ok <3');
   });
 
   it('suppresses native reviews with rating less than 4 stars', () => {

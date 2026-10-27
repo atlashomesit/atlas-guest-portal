@@ -36,6 +36,11 @@ describe('buildWaLink — TASK-102397 pre-fill encoding', () => {
     );
   });
 
+  it('returns empty string when phone has no digits so it never produces a recipient-less link', () => {
+    expect(buildWaLink({ phoneE164: '', text: 'hi' })).toBe('');
+    expect(buildWaLink({ phoneE164: 'abc', text: 'hi' })).toBe('');
+  });
+
   it('defaultPrefill never returns a blank message', () => {
     expect(defaultPrefill({}).length).toBeGreaterThan(0);
   });

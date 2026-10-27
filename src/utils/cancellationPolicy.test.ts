@@ -153,7 +153,9 @@ describe('resolveFreeCancellationTrustCopy (TASK-7012)', () => {
       now,
     });
     expect(copy.deadlineFormatted).toBeNull();
-    expect(copy.trustMessage).toBe('Standard cancellation policy applies for this stay.');
+    expect(copy.trustMessage).toBe(
+      'Strict policy: Full refund if cancelled 7+ days before check-in. No refund within 7 days of check-in.',
+    );
   });
 
   /**
@@ -175,7 +177,9 @@ describe('resolveFreeCancellationTrustCopy (TASK-7012)', () => {
     });
     expect(copy.applicableGraceHours).toBeNull();
     expect(copy.deadlineFormatted).toBeNull();
-    expect(copy.trustMessage).toBe('Standard cancellation policy applies for this stay.');
+    expect(copy.trustMessage).toBe(
+      'Strict policy: Full refund if cancelled 7+ days before check-in. No refund within 7 days of check-in.',
+    );
     // Whatever we say, it must never read as a free-cancellation promise.
     expect(copy.trustMessage).not.toMatch(/free cancellation/i);
   });

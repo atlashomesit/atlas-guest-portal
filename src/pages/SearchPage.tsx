@@ -4,10 +4,13 @@ import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Briefcase, CalendarDays, CalendarRange, Wifi } from "lucide-react";
 
 import { propertyData } from "../data";
-import { fetchPublicListings, type PublicListing } from "../api/listingClient";
+import { fetchPublicListings, resolveStaticMaxGuests, type PublicListing } from "../api/listingClient";
 import { getListingDisplayName } from "../lib/listingDisplayName";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
-import { directSavingsLabel } from "../utils/directBookingPrice";
+import { allInTotalLabel, directSavingsLabel, type DirectPriceDisplay } from "../utils/directBookingPrice";
+import { isGroupHome, isSmallParty, sizedForPartyFirst } from "../utils/smallParty";
+import { useMarketplaceCardPrices, type MarketplaceCardPriceItem } from "../hooks/useMarketplaceCardPrices";
+import { hasOnlinePaymentRail } from "../tenant/paymentRail";
 import { parseDate } from "../utils/formatting";
 import { toCalendarISO } from "../utils/date";
 import { useCurrency } from "../contexts/CurrencyContext";
@@ -43,6 +46,8 @@ import {
   getAccessibilityDeclarations,
 } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
+import { isHostelDorm } from "../components/hostel/HostelDormBadge";
+import { isHostelDormType } from "../utils/dormListing";
 import { CONTACT } from "../config/contact";
 import { getPropertyDesignImage } from "../config/branding";
 import "./search-page.css";
@@ -63,17 +68,8 @@ function deleteGuestBreakdown(params: URLSearchParams) {
   params.delete("children");
 }
 
-/**
- * TASK-10298822: Prevents double question mark URLs when canonicalPath already includes
- * query parameters (e.g. ?tenant=...) and querySuffix is appended.
- */
-export function appendQuerySuffix(basePath: string, suffix: string): string {
-  if (!suffix) return basePath;
-  const cleanSuffix = suffix.startsWith('?') ? suffix.slice(1) : suffix;
-  if (!cleanSuffix) return basePath;
-  const separator = basePath.includes('?') ? '&' : '?';
-  return `${basePath}${separator}${cleanSuffix}`;
-}
+import { appendQuerySuffix } from "../utils/navigation";
+export { appendQuerySuffix };
 
 type NormalizedListing = {
   id: string;
@@ -116,6 +112,14 @@ type NormalizedListing = {
   accessibilityFeatures: string[];
   /** TASK-10086: true when no v1 accessibility feature is declared — "Not specified — ask host". */
   accessibilityUnknown: boolean;
+  /** TASK-10299183: online payment / checkout gateway available for listing. */
+  onlinePaymentsAvailable?: boolean;
+  /** TASK-10299183: whether small-party pricing is configured. */
+  hasSmallPartyPricing?: boolean;
+  /** TASK-10299109: dorm and hostel accommodation and gender fields */
+  accommodationType?: string | null;
+  dormGenderPolicy?: 'FemaleOnly' | 'MaleOnly' | 'Mixed' | null;
+  propertyType?: string | null;
 };
 
 function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
@@ -146,7 +150,7 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         title: getListingDisplayName(id, property.property_name),
         location: property.property_location ?? "",
         pricePerNight: property.property_price ?? 0,
-        maxGuests: property.maxCapacity ?? 4,
+        maxGuests: resolveStaticMaxGuests(property as Record<string, unknown>) ?? property.maxCapacity ?? 4,
         imageUrl:
           sanitizeGuestImageUrl(property.property_img?.[0]) ?? getPropertyDesignImage(id),
         amenities: property.property_amenities?.slice(0, 3) ?? [],
@@ -158,6 +162,11 @@ function buildStaticListings(allowedIds?: Set<number>): NormalizedListing[] {
         longitude: pin?.lng ?? null,
         accessibilityFeatures: staticAccessibility,
         accessibilityUnknown: staticAccessibility.length === 0,
+        onlinePaymentsAvailable: true,
+        hasSmallPartyPricing: false,
+        accommodationType: (property as Record<string, unknown>).accommodationType as string ?? null,
+        dormGenderPolicy: (property as Record<string, unknown>).dormGenderPolicy as any ?? null,
+        propertyType: ((property as Record<string, unknown>).property_type as string) ?? ((property as Record<string, unknown>).propertyType as string) ?? null,
       };
     })
     .filter((l): l is NonNullable<typeof l> => l !== null);
@@ -219,6 +228,11 @@ function apiToNormalized(listings: PublicListing[]): NormalizedListing[] {
         hasCoworkingDesk: l.hasCoworkingDesk ?? false,
         accessibilityFeatures: apiAccessibility,
         accessibilityUnknown: apiAccessibility.length === 0,
+        onlinePaymentsAvailable: l.onlinePaymentsAvailable !== false,
+        hasSmallPartyPricing: Boolean(l.hasSmallPartyPricing),
+        accommodationType: l.accommodationType ?? null,
+        dormGenderPolicy: l.dormGenderPolicy ?? null,
+        propertyType: (l as Record<string, unknown>).propertyType as string ?? null,
       };
     })
     .filter((l) => l.numericId > 0);
@@ -228,6 +242,10 @@ type MarketplaceApiItem = {
   id: number;
   tenantSlug: string;
   title: string;
+  displayName?: string | null;
+  publicTitle?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
   city?: string;
   pricePerNight: number;
   maxGuests: number;
@@ -238,12 +256,20 @@ type MarketplaceApiItem = {
 
 function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing[] {
   return items.map((item) => {
-    const propertySlug = getPropertySlug({ property_name: item.title });
+    const explicitName = item.displayName?.trim() || item.publicTitle?.trim() || item.nameFormatted?.trim();
+    const candidate = explicitName || item.title?.trim() || item.name?.trim() || item.title;
+    const displayTitle =
+      getListingDisplayName(
+        item.id,
+        candidate,
+        explicitName || item.displayName,
+      ) || item.title;
+    const propertySlug = getPropertySlug({ property_name: displayTitle });
     const canonicalPath = `${buildHomeUnitPath(propertySlug, item.id)}?tenant=${encodeURIComponent(item.tenantSlug)}`;
     return {
     id: `mp-${item.id}`,
     numericId: item.id,
-    title: item.title,
+    title: displayTitle,
     location: item.city ?? "",
     pricePerNight: item.pricePerNight,
     maxGuests: item.maxGuests,
@@ -257,6 +283,11 @@ function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing
     // TASK-10086: marketplace feed carries no accessibility declarations — unknown, never accessible.
     accessibilityFeatures: [],
     accessibilityUnknown: true,
+    onlinePaymentsAvailable: (item as unknown as { onlinePaymentsAvailable?: boolean }).onlinePaymentsAvailable !== false,
+    hasSmallPartyPricing: false,
+    accommodationType: (item as Record<string, unknown>).accommodationType as string ?? null,
+    dormGenderPolicy: (item as Record<string, unknown>).dormGenderPolicy as any ?? null,
+    propertyType: (item as Record<string, unknown>).propertyType as string ?? null,
   };
   });
 }
@@ -285,6 +316,36 @@ function availabilityChip(
   return null;
 }
 
+/** TASK-1039950: Helper to match property category ('homes', 'rooms', 'villas') */
+function matchesCategory(unit: NormalizedListing, cat: string): boolean {
+  if (!cat || cat === "all") return true;
+  const raw = `${unit.propertyType || ""} ${unit.accommodationType || ""} ${unit.title || ""}`.toLowerCase();
+  if (cat === "villas") {
+    return raw.includes("villa");
+  }
+  if (cat === "rooms") {
+    return (
+      raw.includes("room") ||
+      raw.includes("hotel") ||
+      raw.includes("b&b") ||
+      raw.includes("bnb") ||
+      raw.includes("hostel") ||
+      raw.includes("dorm")
+    );
+  }
+  if (cat === "homes") {
+    return (
+      raw.includes("home") ||
+      raw.includes("apartment") ||
+      raw.includes("cottage") ||
+      raw.includes("homestay") ||
+      raw.includes("villa") ||
+      raw.includes("studio")
+    );
+  }
+  return true;
+}
+
 const SearchPage = () => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const processingFeePercent = useTenantProcessingFee();
@@ -308,12 +369,12 @@ const SearchPage = () => {
   // way to retry, indistinguishable from a real zero-result search.
   const [retryCount, setRetryCount] = useState(0);
 
-  const checkInParam = searchParams.get("checkIn");
-  const checkOutParam = searchParams.get("checkOut");
+  const checkInParam = searchParams.get("checkIn") ?? searchParams.get("checkin");
+  const checkOutParam = searchParams.get("checkOut") ?? searchParams.get("checkout");
   const guestsParam = searchParams.get("guests");
   const adultsParam = searchParams.get("adults");
   const childrenParam = searchParams.get("children");
-  const destinationParam = searchParams.get("destination") ?? searchParams.get("city");
+  const destinationParam = searchParams.get("destination") ?? searchParams.get("city") ?? searchParams.get("location");
 
   const loadFromMarketplace = useCallback(async (signal: AbortSignal) => {
     setApiError(false);
@@ -323,7 +384,7 @@ const SearchPage = () => {
       if (checkInParam) p.set("checkIn", checkInParam);
       if (checkOutParam) p.set("checkOut", checkOutParam);
       const guestTotal =
-        (Number(adultsParam) || 0) + (Number(childrenParam) || 0) || Number(guestsParam) || 0;
+        Math.max((Number(adultsParam) || 0) + (Number(childrenParam) || 0), Number(guestsParam) || 0);
       if (guestTotal > 0) p.set("guests", String(guestTotal));
       p.set("page", "1");
       p.set("pageSize", "100");
@@ -384,13 +445,15 @@ const SearchPage = () => {
     };
   }, [isMarketplaceSearch, loadFromApi, loadFromMarketplace, retryCount]);
 
+  // TASK-1039950: sync category and amenity filter chips with URL query parameters
+  const categoryParam = searchParams.get("category")?.toLowerCase() || "";
   const minPriceParam = searchParams.get("minPrice");
   const maxPriceParam = searchParams.get("maxPrice");
   const remoteWorkParam = searchParams.get("remoteWork");
   const longStayParam = searchParams.get("longStay");
   const availableNowParam = searchParams.get("availableNow");
-  const amenitiesParamRaw = searchParams.get("amenities");
-  const sortByParam = searchParams.get("sortBy");
+  const amenitiesParamRaw = searchParams.get("amenities") || searchParams.get("amenity");
+  const sortByParam = searchParams.get("sortBy") || searchParams.get("sort");
   const nomadWifiParam = searchParams.get("nomadWifi");
   const nomadWorkspaceParam = searchParams.get("nomadWorkspace");
   const monthlyStayParam = searchParams.get("monthlyStay");
@@ -399,9 +462,9 @@ const SearchPage = () => {
   const checkIn = useMemo(() => parseDate(checkInParam), [checkInParam]);
   const checkOut = useMemo(() => parseDate(checkOutParam), [checkOutParam]);
   const guests = useMemo(() => {
-    const total = adultsParam || childrenParam
-      ? (Number(adultsParam) || 0) + (Number(childrenParam) || 0)
-      : Number(guestsParam) || 0;
+    const fromBreakdown = (Number(adultsParam) || 0) + (Number(childrenParam) || 0);
+    const fromTotal = Number(guestsParam) || 0;
+    const total = Math.max(fromBreakdown, fromTotal);
     // A hand-edited URL (?guests=-2) must not become a nonsense filter.
     return total > 0 ? Math.min(Math.floor(total), MAX_GUESTS_FILTER) : null;
   }, [adultsParam, childrenParam, guestsParam]);
@@ -426,6 +489,7 @@ const SearchPage = () => {
   const explicitDateSearch = useMemo(() => Boolean(checkIn && checkOut), [checkIn, checkOut]);
   /** TASK-1451: include guests so "Clear filters" resets guest count too. */
   const hasActiveFilters = Boolean(
+    (categoryParam && categoryParam !== "all") ||
     minPrice || maxPrice || remoteWork || longStay || availableNow || selectedAmenities.length > 0
     || nomadWifi || nomadWorkspace || monthlyStay || guests != null
     || sortBy !== "recommended" || mapView,
@@ -638,7 +702,8 @@ const SearchPage = () => {
     return codes.some((code) => amenityCodeMatchesCategory(code, amenity));
   };
 
-  const filteredUnits = useMemo(() => {
+  /** Every filter except price: the price filter needs the stay quote, which is fetched for these homes. */
+  const unitsBeforePriceFilter = useMemo(() => {
     if (hasInvalidDates) return [];
 
     return listings.filter((unit) => {
@@ -648,13 +713,6 @@ const SearchPage = () => {
         if (!haystack.includes(dest)) return false;
       }
       if (guests && guests > unit.maxGuests) return false;
-      // TASK-4555: Use displayed price (actualPrice with fallback to pricePerNight) for filter,
-      // not the base rate, so discounted listings sort/filter by the shown price.
-      const displayedPrice = (getDailyListingPricing(unit.numericId)?.actualPrice ?? 0) > 0
-        ? getDailyListingPricing(unit.numericId)!.actualPrice
-        : unit.pricePerNight;
-      if (minPrice && displayedPrice > 0 && displayedPrice < minPrice) return false;
-      if (maxPrice && displayedPrice > maxPrice) return false;
       // TASK-1865: exclude listings confirmed unavailable for selected dates; skip when still loading or fetch failed
       if (checkIn && checkOut && !dateAvailLoading && dateAvailableIds !== null) {
         if (!dateAvailableIds.has(unit.numericId)) return false;
@@ -687,6 +745,10 @@ const SearchPage = () => {
         const hasAllSelectedAmenities = selectedAmenities.every(amenity => hasAmenity(unit, amenity));
         if (!hasAllSelectedAmenities) return false;
       }
+      // TASK-1039950: Category filter ('homes', 'rooms', 'villas')
+      if (categoryParam && categoryParam !== "all") {
+        if (!matchesCategory(unit, categoryParam)) return false;
+      }
       if (availableNow) {
         if (tonightProbeLoading) return true;
         if (tonightAvailableIds === null) return true;
@@ -696,19 +758,17 @@ const SearchPage = () => {
     });
   }, [
     availableNow,
+    categoryParam,
     checkIn,
     checkOut,
     dateAvailableIds,
     dateAvailLoading,
     destinationParam,
-    getDailyListingPricing,
     guests,
     hasInvalidDates,
     isMarketplaceSearch,
     listings,
     longStay,
-    maxPrice,
-    minPrice,
     monthlyStay,
     nomadWifi,
     nomadWorkspace,
@@ -718,6 +778,70 @@ const SearchPage = () => {
     tonightProbeLoading,
   ]);
 
+  /** TASK-1451 / TASK-2572 / TASK-4092: cheapest 3 available listings — excludes date-unavailable homes. */
+  const emptyStateSuggestions = useMemo(() => {
+    if (listings.length === 0) return [];
+    const dateFiltered = dateAvailableIds !== null
+      ? listings.filter((l) => dateAvailableIds.has(l.numericId))
+      : listings;
+    const pool = dateFiltered.length > 0 ? dateFiltered : listings;
+    return [...pool]
+      .sort((a, b) => a.pricePerNight - b.pricePerNight)
+      .slice(0, 3);
+  }, [listings, dateAvailableIds]);
+
+  // GUEST-034 (founder ruling 2026-10-21 point 1): with dates in the search box every card shows the
+  // checkout quote for THOSE dates and guests (GET /api/pricing/guest-breakdown), not tonight's rate times
+  // the nights. Without dates the card keeps tonight's daily-summary price.
+  const quoteStay = useMemo(() => {
+    if (!checkIn || !checkOut || hasInvalidDates) return null;
+    return { checkIn: toCalendarISO(checkIn), checkOut: toCalendarISO(checkOut), guests };
+  }, [checkIn, checkOut, hasInvalidDates, guests]);
+  const priceDrivenView = Boolean(minPrice || maxPrice || sortBy === "price_asc" || sortBy === "price_desc");
+  const quoteItems = useMemo<MarketplaceCardPriceItem[]>(() => {
+    if (!quoteStay) return [];
+    // Price filter/sort needs every candidate's number; otherwise one quote per VISIBLE card.
+    const baseScope = priceDrivenView ? unitsBeforePriceFilter : unitsBeforePriceFilter.slice(0, visibleCount);
+    // TASK-10299183: also quote emptyStateSuggestions so suggestion cards calculate rate for searched dates
+    const seenIds = new Set(baseScope.map((u) => u.numericId));
+    const suggestionsToQuote = emptyStateSuggestions.filter((u) => !seenIds.has(u.numericId));
+    const scope = [...baseScope, ...suggestionsToQuote];
+    const feeCharged = isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext());
+    return scope.map((unit) => ({
+      id: unit.numericId,
+      tenantSlug: new URLSearchParams(unit.canonicalPath.split("?")[1] ?? "").get("tenant") ?? tenant?.slug ?? "",
+      chargesOnlinePaymentFee: feeCharged,
+    }));
+  }, [quoteStay, priceDrivenView, unitsBeforePriceFilter, visibleCount, emptyStateSuggestions, isMarketplaceSearch, tenant?.slug]);
+  const stayPrices = useMarketplaceCardPrices(quoteItems, quoteStay ?? { checkIn: null, checkOut: null, guests: null });
+  /** The quote for the searched stay, when we have one for this home. */
+  const stayDisplayFor = (id: number): DirectPriceDisplay | null => {
+    if (!quoteStay) return null;
+    const p = stayPrices.get(id);
+    return p?.status === "ready" ? p.display : null;
+  };
+  /** Per-night price used by filter and sort: the stay quote when dates are searched, else tonight's price. */
+  const nightlyPriceFor = (unit: NormalizedListing): number => {
+    const quoted = stayDisplayFor(unit.numericId);
+    if (quoted) return quoted.realNightly;
+    const tonight = getDailyListingPricing(unit.numericId)?.actualPrice ?? 0;
+    return tonight > 0 ? tonight : unit.pricePerNight;
+  };
+
+  const filteredUnits = useMemo(() => {
+    return unitsBeforePriceFilter.filter((unit) => {
+      // A home whose stay quote is still loading is kept, never filtered on a stale tonight number.
+      if (quoteStay && !stayDisplayFor(unit.numericId) && stayPrices.get(unit.numericId)?.status !== "unavailable") return true;
+      const displayedPrice = nightlyPriceFor(unit);
+      // TASK-1039951: Price range filtering only considers active listings with valid positive rates (price > 0)
+      if ((minPrice != null || maxPrice != null) && (!displayedPrice || displayedPrice <= 0)) return false;
+      if (minPrice && displayedPrice < minPrice) return false;
+      if (maxPrice && displayedPrice > maxPrice) return false;
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitsBeforePriceFilter, quoteStay, stayPrices, getDailyListingPricing, minPrice, maxPrice]);
+
   /** TASK-1714: Apply chosen sort order on top of filtered results. */
   const sortedUnits = useMemo(() => {
     const s = [...filteredUnits];
@@ -725,32 +849,35 @@ const SearchPage = () => {
       case "price_asc": {
         // TASK-4555: Sort by displayed price (actualPrice with fallback), not base rate.
         return s.sort((a, b) => {
-          const priceA = (getDailyListingPricing(a.numericId)?.actualPrice ?? 0) > 0
-            ? getDailyListingPricing(a.numericId)!.actualPrice
-            : a.pricePerNight;
-          const priceB = (getDailyListingPricing(b.numericId)?.actualPrice ?? 0) > 0
-            ? getDailyListingPricing(b.numericId)!.actualPrice
-            : b.pricePerNight;
+          const priceA = nightlyPriceFor(a);
+          const priceB = nightlyPriceFor(b);
           return priceA - priceB;
         });
       }
       case "price_desc": {
         // TASK-4555: Sort by displayed price (actualPrice with fallback), not base rate.
         return s.sort((a, b) => {
-          const priceA = (getDailyListingPricing(a.numericId)?.actualPrice ?? 0) > 0
-            ? getDailyListingPricing(a.numericId)!.actualPrice
-            : a.pricePerNight;
-          const priceB = (getDailyListingPricing(b.numericId)?.actualPrice ?? 0) > 0
-            ? getDailyListingPricing(b.numericId)!.actualPrice
-            : b.pricePerNight;
+          const priceA = nightlyPriceFor(a);
+          const priceB = nightlyPriceFor(b);
           return priceB - priceA;
         });
       }
       case "rating_desc": return s.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
       case "newest":      return s.sort((a, b) => b.numericId - a.numericId);
-      default:            return s; // "recommended" — preserve Atlas weighting
+      default:
+        // GUEST-033: for 1-2 guests, homes sized for them come first (stable); otherwise preserve Atlas weighting.
+        return sizedForPartyFirst(s, guests);
     }
-  }, [filteredUnits, sortBy, getDailyListingPricing]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredUnits, sortBy, getDailyListingPricing, stayPrices, quoteStay, guests]);
+
+  /** GUEST-033: cheapest per-night price among the homes a couple fits (from the quote when dates are searched). */
+  const smallHomesFrom = useMemo(() => {
+    if (!isSmallParty(guests)) return null;
+    const prices = filteredUnits.filter((u) => !isGroupHome(u)).map((u) => nightlyPriceFor(u)).filter((n) => n > 0);
+    return prices.length > 0 ? Math.min(...prices) : null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredUnits, guests, stayPrices, quoteStay, getDailyListingPricing]);
 
   useEffect(() => {
     setVisibleCount(ITEMS_PER_PAGE);
@@ -786,8 +913,13 @@ const SearchPage = () => {
   const updateParam = (key: string, value: string) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
-      if (value) next.set(key, value);
-      else next.delete(key);
+      if (value) {
+        next.set(key, value);
+        if (key === "sortBy") next.set("sort", value);
+      } else {
+        next.delete(key);
+        if (key === "sortBy") next.delete("sort");
+      }
       if (key === "guests") deleteGuestBreakdown(next);
       return next;
     }, { replace: true });
@@ -803,9 +935,11 @@ const SearchPage = () => {
   const clearFilters = () => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
+      next.delete("category");
       next.delete("minPrice");
       next.delete("maxPrice");
       next.delete("amenities");
+      next.delete("amenity");
       next.delete("remoteWork");
       next.delete("longStay");
       next.delete("availableNow");
@@ -816,6 +950,7 @@ const SearchPage = () => {
       next.delete("nomadWorkspace");
       next.delete("monthlyStay");
       next.delete("sortBy");
+      next.delete("sort");
       next.delete("view");
       return next;
     }, { replace: true });
@@ -906,9 +1041,14 @@ const SearchPage = () => {
     if (monthlyStay) {
       chips.push({ key: "monthlyStay", label: "30+ nights min stay", onRemove: () => del("monthlyStay") });
     }
+    if (categoryParam && categoryParam !== "all") {
+      const catLabel = categoryParam.charAt(0).toUpperCase() + categoryParam.slice(1);
+      chips.push({ key: "category", label: `Category: ${catLabel}`, onRemove: () => del("category") });
+    }
     return chips;
   }, [
     availableNow,
+    categoryParam,
     guests,
     longStay,
     maxPrice,
@@ -973,17 +1113,6 @@ const SearchPage = () => {
       }),
     [sortedUnits],
   );
-  /** TASK-1451 / TASK-2572 / TASK-4092: cheapest 3 available listings — excludes date-unavailable homes. */
-  const emptyStateSuggestions = useMemo(() => {
-    if (listings.length === 0) return [];
-    const dateFiltered = dateAvailableIds !== null
-      ? listings.filter((l) => dateAvailableIds.has(l.numericId))
-      : listings;
-    const pool = dateFiltered.length > 0 ? dateFiltered : listings;
-    return [...pool]
-      .sort((a, b) => a.pricePerNight - b.pricePerNight)
-      .slice(0, 3);
-  }, [listings, dateAvailableIds]);
 
   return (
     <div className="search-page min-h-screen bg-bg-muted">
@@ -1204,6 +1333,37 @@ const SearchPage = () => {
             </label>
           </div>
 
+          {/* TASK-1039950: Category filter pills */}
+          <div className="search-filters__chips" data-testid="search-category-filters">
+            <span className="search-filters__chip-label">Category</span>
+            {(
+              [
+                { key: "", label: "All" },
+                { key: "homes", label: "Homes" },
+                { key: "rooms", label: "Rooms" },
+                { key: "villas", label: "Villas" },
+              ] as const
+            ).map(({ key, label }) => {
+              const active = (categoryParam || "") === key || (!categoryParam && key === "");
+              return (
+                <button
+                  key={key || "all"}
+                  type="button"
+                  data-testid={`marketplace-filter-${key || "all"}`}
+                  onClick={() => updateParam("category", key)}
+                  className={`rounded-full px-3.5 py-1.5 text-sm font-medium min-h-9 transition-colors ${
+                    active
+                      ? "bg-cta-primary text-[var(--text-on-cta)] border border-cta-primary"
+                      : "bg-bg-muted border border-border-subtle text-text-primary hover:border-cta-primary"
+                  }`}
+                  aria-pressed={active}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="search-filters__chips">
             <div className="flex items-center gap-2 min-w-[150px]">
               <span className="search-filters__chip-label !min-w-0">Amenities</span>
@@ -1324,14 +1484,16 @@ const SearchPage = () => {
             <label className="text-sm text-text-muted" htmlFor="sort-by">Sort:</label>
             <select
               id="sort-by"
+              data-testid="marketplace-sort-select"
+              aria-label="Sort listings"
               value={sortBy}
               onChange={(e) => updateParam("sortBy", e.target.value === "recommended" ? "" : e.target.value)}
-              className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary"
+              className="rounded-lg border border-border-subtle bg-bg-surface px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-cta-primary cursor-pointer"
             >
               <option value="recommended" title={`Sorted by ${getTenantBrandName()} suggested order — building, floor, and availability`}>Recommended</option>
-              <option value="price_asc">Price: low to high</option>
-              <option value="price_desc">Price: high to low</option>
-              <option value="rating_desc">Highest rated</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="rating_desc">Top Rated</option>
               <option value="newest">Newest</option>
             </select>
           </div>
@@ -1503,32 +1665,56 @@ const SearchPage = () => {
                         <h4 className="line-clamp-2 text-base font-semibold text-text-primary">{unit.title}</h4>
                         <p className="text-sm text-text-muted">{unit.location}</p>
                         {(() => {
+                          const stayQuote = stayDisplayFor(unit.numericId);
                           const suggestBreakdown = getDailyListingPricing(unit.numericId);
-                          const suggestDisplayedPrice =
-                            (suggestBreakdown?.actualPrice ?? 0) > 0 ? suggestBreakdown!.actualPrice : unit.pricePerNight;
+                          const suggestDisplayedPrice = stayQuote
+                            ? stayQuote.realNightly
+                            : (suggestBreakdown?.actualPrice ?? 0) > 0 ? suggestBreakdown!.actualPrice : unit.pricePerNight;
                           // TASK-7543: GST slab is selected off the CHARGED (discounted) per-night
                           // rate, matching the server — see accommodationGstSlabPercentForChargedRate's
                           // doc comment. `suggestDisplayedPrice` is already that charged value, so the
                           // default (no override) banding basis is correct here.
                           return (
                             <>
-                              <p className="text-lg font-bold text-text-primary">
-                                {formatDisplayCurrency(suggestDisplayedPrice)}
-                                <span className="text-sm font-normal text-text-muted"> / night</span>
-                              </p>
-                              {/* TASK-5199: match main card — show est. total incl. GST when nights known */}
-                              <p className="text-xs text-text-muted">
-                                {formatEstTotalInclGst(
-                                  suggestDisplayedPrice,
-                                  estimateNights,
-                                  formatDisplayCurrency,
-                                  processingFeePercent,
-                                  unit.isGstRegistered,
+                              <div className="flex items-baseline gap-2">
+                                {stayQuote?.standardNightly != null && stayQuote.savingsPercent > 0 && (
+                                  <span className="text-sm text-text-muted line-through">
+                                    {formatDisplayCurrency(stayQuote.standardNightly)}
+                                  </span>
                                 )}
-                              </p>
+                                <p className="text-lg font-bold text-text-primary">
+                                  {formatDisplayCurrency(suggestDisplayedPrice)}
+                                  <span className="text-sm font-normal text-text-muted"> / night</span>
+                                </p>
+                              </div>
+                              {/* TASK-10299183: when searched dates exist, show the calculated all-in total */}
+                              {stayQuote ? (
+                                <p className="text-xs text-text-muted" data-testid="search-suggestion-total">
+                                  {allInTotalLabel(formatDisplayCurrency(stayQuote.total), stayQuote.nights)}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-text-muted">
+                                  {formatEstTotalInclGst(
+                                    suggestDisplayedPrice,
+                                    estimateNights,
+                                    formatDisplayCurrency,
+                                    processingFeePercent,
+                                    unit.isGstRegistered,
+                                  )}
+                                </p>
+                              )}
                             </>
                           );
                         })()}
+                        {/* TASK-10299183: Online checkout availability chip on suggestion card */}
+                        {((unit.onlinePaymentsAvailable !== false) && (isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext()))) && (
+                          <span
+                            className="w-fit inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200"
+                            data-testid="search-suggestion-online-payment-chip"
+                          >
+                            Online checkout
+                          </span>
+                        )}
                         <Link
                           to={appendQuerySuffix(unit.canonicalPath, querySuffix)}
                           className="mt-auto inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[var(--cta-primary-hover)] px-4 py-2 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-[var(--cta-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary"
@@ -1690,8 +1876,14 @@ const SearchPage = () => {
                 .filter((x): x is { key: string; label: string } => Boolean(x))
                 .slice(0, 4);
               const dailyBreakdown = getDailyListingPricing(unit.numericId);
-              const displayedPrice =
-                (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
+              // GUEST-034: with dates searched the card shows the quote for those dates and guests.
+              const stayQuote = stayDisplayFor(unit.numericId);
+              const isHostel = isHostelDorm({ accommodationType: unit.accommodationType, propertyType: unit.propertyType }) || isHostelDormType(unit.accommodationType);
+              const stayPriceLoading = Boolean(quoteStay) && stayPrices.get(unit.numericId)?.status !== "ready"
+                && stayPrices.get(unit.numericId)?.status !== "unavailable";
+              const displayedPrice = stayQuote
+                ? stayQuote.realNightly
+                : (dailyBreakdown?.actualPrice ?? 0) > 0 ? dailyBreakdown!.actualPrice : unit.pricePerNight;
               // TASK-7543: GST slab is selected off the CHARGED (discounted) rate, matching the
               // server — see accommodationGstSlabPercentForChargedRate's doc comment.
               // `displayedPrice` is already that charged value, so the default (no override)
@@ -1781,7 +1973,36 @@ const SearchPage = () => {
                         GST
                       </span>
                     )}
+                    {/* TASK-10299183: Payment gateway / online checkout availability flag */}
+                    {((unit.onlinePaymentsAvailable !== false) && (isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext()))) && (
+                      <span
+                        className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200"
+                        data-testid="search-listing-online-payment-chip"
+                      >
+                        Online checkout
+                      </span>
+                    )}
                   </div>
+
+                  {isSmallParty(guests) && (isGroupHome(unit) || unit.hasSmallPartyPricing) && (
+                    <div className="text-xs text-text-muted" data-testid="guest-listing-group-hint">
+                      <p style={{ margin: 0 }}>
+                        {unit.hasSmallPartyPricing
+                          ? "Special rate available for 1-2 guests"
+                          : `Best for groups of 4–${unit.maxGuests}`}
+                      </p>
+                      {smallHomesFrom != null && !unit.hasSmallPartyPricing && (
+                        <button
+                          type="button"
+                          className="underline font-semibold"
+                          data-testid="guest-listing-small-homes-link"
+                          onClick={() => updateParam("sortBy", "price_asc")}
+                        >
+                          See homes for two from {formatDisplayCurrency(smallHomesFrom)}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <OwnerShareBadge className="self-start" />
 
@@ -1797,6 +2018,50 @@ const SearchPage = () => {
 
                   <div className="search-card__foot">
                     <div className="search-card__price">
+                      {isHostel && (
+                        <span
+                          className="inline-flex items-center rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-semibold text-indigo-700 mb-1"
+                          data-testid="hostel-per-bed-indicator"
+                        >
+                          Starting from per bed
+                        </span>
+                      )}
+                      {quoteStay ? (
+                        stayPriceLoading ? (
+                          <span className="inline-block h-12 w-28 rounded bg-bg-muted" data-testid="guest-listing-price-loading" aria-hidden />
+                        ) : stayQuote ? (
+                          <>
+                            {stayQuote.standardNightly != null && stayQuote.savingsPercent > 0 && (
+                              <p className="text-xs" data-testid="guest-listing-direct-saving" style={{ margin: 0 }}>
+                                <span className="sr-only">Standard price </span>
+                                <span style={{ textDecoration: 'line-through', color: 'var(--text-muted, #6b5a55)' }}>
+                                  {formatDisplayCurrency(stayQuote.standardNightly)}
+                                </span>{' '}
+                                <span style={{ fontWeight: 600, color: '#b8472f' }}>
+                                  {directSavingsLabel(stayQuote.savingsPercent)}
+                                </span>
+                              </p>
+                            )}
+                            <p className="search-card__price-amt" data-testid="guest-listing-nightly-price">
+                              {formatDisplayCurrency(stayQuote.realNightly)}
+                            </p>
+                            {isConverted && (
+                              <p className="mt-0.5 text-xs text-text-muted">{formatINR(stayQuote.realNightly)} on payment</p>
+                            )}
+                            <p className="mt-0.5 text-sm text-text-muted" data-testid="guest-listing-unit-label">
+                              {isHostel ? 'per bed / night' : 'per night'}
+                            </p>
+                            <p className="text-xs text-text-muted" data-testid="guest-listing-stay-total">
+                              {allInTotalLabel(formatDisplayCurrency(stayQuote.total), stayQuote.nights)}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-sm text-text-muted" data-testid="guest-listing-price-unavailable">
+                            Open to see the price for your dates
+                          </p>
+                        )
+                      ) : (
+                      <>
                       {/* Founder ruling 2026-10-21: show the direct-booking saving next to the real price —
                           the daily-summary row is built from the checkout quote. */}
                       {dailyBreakdown && dailyBreakdown.baseAmount > dailyBreakdown.actualPrice && dailyBreakdown.actualPrice > 0 && (
@@ -1816,10 +2081,14 @@ const SearchPage = () => {
                       {isConverted && (
                         <p className="mt-0.5 text-xs text-text-muted">{formatINR(displayedPrice)} on payment</p>
                       )}
-                      <p className="mt-0.5 text-sm text-text-muted">per night</p>
+                      <p className="mt-0.5 text-sm text-text-muted" data-testid="guest-listing-unit-label">
+                        {isHostel ? 'per bed / night' : 'per night'}
+                      </p>
                       <p className="text-xs text-text-muted">
                         {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, processingFeePercent, unit.isGstRegistered)}
                       </p>
+                      </>
+                      )}
                       {longStay && (
                         <LongStayCalculator
                           pricePerNight={unit.pricePerNight}

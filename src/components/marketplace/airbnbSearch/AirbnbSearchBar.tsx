@@ -15,6 +15,7 @@ import { filterDestinations, POPULAR_DESTINATIONS } from './destinationData';
 import { fetchPublicCities } from '@/api/publicCities';
 import { clearRecentSearches, persistRecentSearch, readRecentSearches } from './recentSearches';
 import type { AirbnbSearchValues, DestinationOption } from './types';
+import { isMarketplaceMode } from '@/tenant/tenantResolver';
 
 const MAX_GUESTS = 20;
 const DEBOUNCE_MS = 300;
@@ -41,9 +42,17 @@ function formatGuestSummary(counts: GuestCounts): string {
   return parts.join(' • ');
 }
 
-function buildSearchParams(values: AirbnbSearchValues): URLSearchParams {
+function buildSearchParams(
+  values: AirbnbSearchValues,
+  currentParams?: URLSearchParams,
+): URLSearchParams {
   const p = new URLSearchParams();
+  const brand = currentParams?.get('brand');
+  if (brand?.trim().toLowerCase() === 'atlastays' || isMarketplaceMode()) {
+    p.set('brand', brand?.trim() || 'atlastays');
+  }
   p.set('destination', values.destination.trim());
+  p.set('location', values.destination.trim());
   if (values.checkIn) p.set('checkIn', values.checkIn);
   if (values.checkOut) p.set('checkOut', values.checkOut);
   p.set('adults', String(values.guests.adults));
@@ -68,6 +77,10 @@ export default function AirbnbSearchBar() {
     startDate: null,
     endDate: null,
   });
+  // GUEST-036: the month the calendar is paging through is view state, kept apart from the stay
+  // dates. It used to be written into dateRange.startDate, which planted a phantom check-in on
+  // every month change and snapped the grid forward again.
+  const [shownDate, setShownDate] = useState<Date>(today);
   const [guestCounts, setGuestCounts] = useState<GuestCounts>({
     adults: 2,
     children: 0,
@@ -256,18 +269,22 @@ export default function AirbnbSearchBar() {
     if (!values) return;
     persistRecentSearch(values);
     setRecentEpoch((n) => n + 1);
-    // TASK-4413 / MKT-022: On marketplace homepage with dates, filter grid in-place; otherwise redirect to /search
-    const hasDates = Boolean(values.checkIn && values.checkOut);
-    if (location.pathname === '/' && hasDates) {
+    // TASK-4413 / MKT-022 / TASK-10298931: On marketplace homepage (/), filter grid in-place
+    // whether dates are provided or omitted, preserving brand parameter if present.
+    if (location.pathname === '/') {
       const p = new URLSearchParams();
+      const currentBrand = searchParams.get('brand');
+      if (currentBrand?.trim().toLowerCase() === 'atlastays' || isMarketplaceMode()) {
+        p.set('brand', currentBrand?.trim() || 'atlastays');
+      }
       p.set('city', values.destination.trim());
-      p.set('checkIn', values.checkIn!);
-      p.set('checkOut', values.checkOut!);
+      if (values.checkIn) p.set('checkIn', values.checkIn);
+      if (values.checkOut) p.set('checkOut', values.checkOut);
       const guestTotal = values.guests.adults + values.guests.children;
       if (guestTotal > 0) p.set('guests', String(guestTotal));
       navigate({ pathname: '/', search: p.toString() });
     } else {
-      navigate({ pathname: '/search', search: buildSearchParams(values).toString() });
+      navigate({ pathname: '/search', search: buildSearchParams(values, searchParams).toString() });
     }
   };
 
@@ -432,8 +449,8 @@ export default function AirbnbSearchBar() {
             minDate={today}
             disabledDay={(date) => startOfCalendarDay(date) < today}
             months={typeof window !== 'undefined' && window.innerWidth < 768 ? 1 : 2}
-            shownDate={dateRange.startDate ?? today}
-            onShownDateChange={(d) => setDateRange((r) => ({ ...r, startDate: r.startDate ?? startOfMonth(d) }))}
+            shownDate={shownDate}
+            onShownDateChange={(d) => setShownDate(startOfMonth(d))}
             activeField={activeDateField}
             // TASK-102076: same keep-open contract as SearchAvailabilityWidget —
             // the picker's check-out auto-advance holds step 2, so stay open with

@@ -4,7 +4,9 @@ import path from "path";
 // Minimal config for legal content validation tests (no jest-dom/DOM setup)
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(__dirname, "./src") },
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
   },
   test: {
     environment: "node",
@@ -12,6 +14,6 @@ export default defineConfig({
     // Use threads pool instead of forks (default) to avoid subprocess
     // fork-timeout failures when running under heavy parallel build load
     // (release gate runs API, admin, and guest builds simultaneously).
-    pool: "threads",
+    pool: "forks",
   },
 });

@@ -16,6 +16,8 @@ import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolve
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantListingAddress, getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
+import { readClusterListingFields } from '@/utils/clusterListing';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { getGuestFacingPhone } from '@/config/contact';
 import {
@@ -310,7 +312,17 @@ function PropertyDetailsSkeleton() {
                 </div>
 
                 <div className="flex justify-center sm:justify-start">
-                    <Button onClick={() => window.history.back()} className="mt-2" variant="secondary">
+                    <Button
+                      onClick={() => {
+                        if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer) {
+                          window.history.back();
+                        } else {
+                          window.location.href = "/";
+                        }
+                      }}
+                      className="mt-2"
+                      variant="secondary"
+                    >
                         Go Back
                     </Button>
                 </div>
@@ -370,6 +382,17 @@ interface Property {
     city?: string | null;
     state?: string | null;
     country?: string | null;
+    /** HSL-011: dorm facts from GET /listings/{id} (API only; null for every non-dorm listing). */
+    accommodationType?: string | null;
+    dormGenderPolicy?: DormGenderPolicy | null;
+    /** HSL-011: total beds in the dorm (Listing.Quantity). */
+    dormBedCount?: number | null;
+    /** CLU-011: `PublicListingDto.ClusterRole` / `.ClusterId` (API only). */
+    clusterRole?: string | null;
+    clusterId?: number | null;
+    isParentCluster?: boolean | null;
+    securityDepositAmount?: number | null;
+    hasSmallPartyPricing?: boolean | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -409,6 +432,12 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         city: item.city ?? ((item as unknown as Record<string, unknown>).City as string | undefined),
         state: item.state ?? ((item as unknown as Record<string, unknown>).State as string | undefined),
         country: item.country ?? ((item as unknown as Record<string, unknown>).Country as string | undefined),
+        accommodationType: item.accommodationType ?? null,
+        dormGenderPolicy: item.dormGenderPolicy ?? null,
+        dormBedCount: item.dormBedCount ?? null,
+        clusterRole: item.clusterRole ?? null,
+        clusterId: item.clusterId ?? null,
+        isParentCluster: item.isParentCluster ?? (item.clusterRole ? item.clusterRole.toUpperCase() === 'PARENT' : null),
     };
 }
 
@@ -575,19 +604,24 @@ const PropertyDetails = () => {
         active = false;
       };
     }, [isNonAtlasMarketplaceListing, tenantSlugFromUrl]);
-    // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
+    // TASK-1039953: Build a back-to-results link when the user arrived from /search or marketplace,
+    // or provide a fallback to "/" (marketplace home) when entering directly on marketplace.
+    const hasSearchFilters = useMemo(() => {
+        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "adults", "children", "minPrice", "maxPrice", "category", "amenity", "amenities", "sort", "sortBy"];
+        return searchKeys.some((k) => searchParams.has(k));
+    }, [searchParams]);
+
     const backToResultsHref = useMemo(() => {
-        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
-        const hasSearchParams = searchKeys.some((k) => searchParams.has(k));
-        if (!hasSearchParams) return null;
         if (isMarketplaceDetail) {
+          if (!hasSearchFilters) return "/";
           const cleanParams = new URLSearchParams(searchParams);
           cleanParams.delete("tenant");
           const qs = cleanParams.toString();
           return qs ? `/?${qs}` : "/";
         }
+        if (!hasSearchFilters) return "/search";
         return `/search?${searchParams.toString()}`;
-    }, [searchParams, isMarketplaceDetail]);
+    }, [searchParams, isMarketplaceDetail, hasSearchFilters]);
     // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
     // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
     // never render, silently masking the degraded-state UI for a failed listing lookup (the
@@ -812,6 +846,7 @@ const PropertyDetails = () => {
                 // TASK-2739-v1: GET /listings/{id} also carries publishStatus; keep state in sync.
                 if (typeof d.publishStatus === 'string') setPublishStatus(d.publishStatus);
                 const mg = parseMaxGuestsFromPayload(d);
+                const dorm = readDormListingFields(d);
                 const rawPhone = d.hostPhone ?? d.contactPhone;
                 const phone = typeof rawPhone === 'string' && rawPhone.trim() ? rawPhone.trim() : null;
 
@@ -837,6 +872,14 @@ const PropertyDetails = () => {
                     if (phone !== null && !prev.hostPhone) {
                         updates.hostPhone = phone;
                     }
+                    // HSL-011: dorm facts (type, gender rule, bed count) come from the listing detail payload only.
+                    if (dorm.accommodationType !== (prev.accommodationType ?? null)) updates.accommodationType = dorm.accommodationType;
+                    if (dorm.dormGenderPolicy !== (prev.dormGenderPolicy ?? null)) updates.dormGenderPolicy = dorm.dormGenderPolicy;
+                    if (dorm.bedCount !== (prev.dormBedCount ?? null)) updates.dormBedCount = dorm.bedCount;
+                    // CLU-011: cluster role/id from the listing detail payload only.
+                    const cluster = readClusterListingFields(d);
+                    if (cluster.clusterRole !== (prev.clusterRole ?? null)) updates.clusterRole = cluster.clusterRole;
+                    if (cluster.clusterId !== (prev.clusterId ?? null)) updates.clusterId = cluster.clusterId;
                     const prevGallery = filterGuestImageUrls(prev.property_img ?? []);
                     if (hydratedImages.length > prevGallery.length) {
                         updates.property_img = hydratedImages;
@@ -1266,6 +1309,17 @@ const PropertyDetails = () => {
                             const raw = (apiListing as Record<string, unknown>).country ?? (apiListing as Record<string, unknown>).Country;
                             return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
                         })(),
+                        // HSL-011: dorm facts, API payload only.
+                        ...(() => {
+                            const dorm = readDormListingFields(apiListing as Record<string, unknown>);
+                            return {
+                                accommodationType: dorm.accommodationType,
+                                dormGenderPolicy: dorm.dormGenderPolicy,
+                                dormBedCount: dorm.bedCount,
+                            };
+                        })(),
+                        // CLU-011: cluster role/id, API payload only.
+                        ...readClusterListingFields(apiListing as Record<string, unknown>),
                     };
                     const images = filterGuestImageUrls(
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
@@ -1387,9 +1441,11 @@ useEffect(() => {
 
     const ppApiReviews = listingReviewsFromApi;
     const ppMergedReviews = useMemo(() => {
-        return ppApiReviews && !ppApiReviews.loading
+        const raw = ppApiReviews && !ppApiReviews.loading
             ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
             : [];
+        // TASK-10299093: Ensure empty-body reviews are suppressed
+        return raw.filter((r) => r.body != null && r.body.trim() !== "");
     }, [ppApiReviews, externalReviewsFromApi]);
     const ppCombinedReviewCount = ppMergedReviews.length;
     const ppCombinedAverageRating = useMemo(() => {
@@ -1399,7 +1455,7 @@ useEffect(() => {
             : 0;
     }, [ppMergedReviews, ppCombinedReviewCount]);
     const ppHasApiReviews = Boolean(
-        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
+        ppApiReviews && !ppApiReviews.loading && ppCombinedReviewCount > 0,
     );
 
     /** TASK-1357 / REV-013: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
@@ -1546,7 +1602,16 @@ useEffect(() => {
                         title="Home not found"
                         message={`Please check the link and try again, or return to browse available homes on ${getTenantBrandName()}.`}
                         primaryAction={{ label: "Browse available homes", to: "/" }}
-                        secondaryActions={[{ label: "Go back", onClick: () => window.history.back() }]}
+                        secondaryActions={[{
+                          label: "Go back",
+                          onClick: () => {
+                            if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer) {
+                              window.history.back();
+                            } else {
+                              window.location.href = "/";
+                            }
+                          },
+                        }]}
                     />
                 </>
             );
@@ -1750,23 +1815,51 @@ useEffect(() => {
         <div className={`pp-root${galleryUrls.length === 1 ? " pp-single-photo" : ""}`}>
           <div className="pp-shell">
 
-            {/* ---- Breadcrumbs ---- */}
-            <nav className="pp-crumbs" aria-label="Breadcrumb">
-              {backToResultsHref ? (
-                <>
-                  <Link to={backToResultsHref} data-testid="back-to-results">Search results</Link>
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                </>
-              ) : (
-                <>
-                  <Link to="/">Home</Link>
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                  <Link to={isMarketplaceDetail ? "/" : "/#our-homes"}>{isMarketplaceDetail ? "All Homes" : "Stays"}</Link>
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                </>
-              )}
-              <span aria-current="page">{getListingDisplayName(data.id, data.property_name)}</span>
-            </nav>
+            {/* ---- Breadcrumbs & Back to Results ---- */}
+            <div className="flex items-center justify-between gap-4 mb-2 flex-wrap" data-testid="detail-nav-header">
+              <nav className="pp-crumbs" aria-label="Breadcrumb">
+                {backToResultsHref && (hasSearchFilters || isMarketplaceDetail) ? (
+                  <>
+                    <Link
+                      to={backToResultsHref}
+                      data-testid="back-to-results"
+                      aria-label={isMarketplaceDetail && !hasSearchFilters ? "Back to all listings" : "Search results"}
+                    >
+                      {isMarketplaceDetail && !hasSearchFilters ? "Back to all listings" : "Search results"}
+                    </Link>
+                    {isMarketplaceDetail && !hasSearchFilters && (
+                      <Link
+                        to="/"
+                        data-testid="back-to-all-listings"
+                        style={{ display: 'none' }}
+                        aria-hidden="true"
+                      >
+                        Back to all listings
+                      </Link>
+                    )}
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                  </>
+                ) : (
+                  <>
+                    <Link to="/">Home</Link>
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                    <Link to={isMarketplaceDetail ? "/" : "/#our-homes"}>{isMarketplaceDetail ? "All Homes" : "Stays"}</Link>
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                  </>
+                )}
+                <span aria-current="page">{getListingDisplayName(data.id, data.property_name)}</span>
+              </nav>
+
+              {/* TASK-1039953: Clear "Back to Results" button returning to /search or previous search state */}
+              <Link
+                to={backToResultsHref || (isMarketplaceDetail ? "/" : "/search")}
+                data-testid="back-to-results-btn"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-primary hover:text-black bg-bg-muted hover:bg-neutral-200/80 px-3 py-1.5 rounded-lg border border-border-subtle transition-colors"
+                aria-label="Back to Results"
+              >
+                ← Back to Results
+              </Link>
+            </div>
 
             {/* ---- Title row ---- */}
             <div className="pp-title-row">
@@ -2505,8 +2598,7 @@ useEffect(() => {
                                     {'★'.repeat(Math.min(5, r.rating))}{'☆'.repeat(Math.max(0, 5 - r.rating))}
                                   </div>
                                 )}
-                                {r.body && <p className="pp-v2-review-body">{r.body}</p>}
-                                {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
+                                {r.body && r.body.trim() !== "" && <p className="pp-v2-review-body">{r.body}</p>}
                                 {r.photoUrls && r.photoUrls.length > 0 && (
                                   <div className="pp-review-photos" style={{ display: 'flex', gap: 8, margin: '8px 0', flexWrap: 'wrap' }} data-testid="review-photos">
                                     {r.photoUrls.map((url, pIdx) => (
@@ -2808,7 +2900,7 @@ useEffect(() => {
                         timezoneId={data.timezoneId}
                         coverPhotoUrl={primaryImage}
                         maxGuests={data.maxGuests}
-                        propertySlug={propertySlugParam}
+                        propertySlug={propertySlug}
                         unitSlug={unitSlugParam}
                         // TASK-102485: tell the widget the listing lookup FAILED (vs still
                         // resolving) so that with listingId undefined it fail-closes with the
@@ -2824,6 +2916,14 @@ useEffect(() => {
                         cancellationTier={data.cancellationTier ?? null}
                         cancellationWindowHours={data.cancellationWindowHours ?? null}
                         graceHours={data.graceHours ?? null}
+                        accommodationType={data.accommodationType ?? null}
+                        dormGenderPolicy={data.dormGenderPolicy ?? null}
+                        dormBedCount={data.dormBedCount ?? null}
+                        isParentCluster={data.isParentCluster ?? (data.clusterRole ? data.clusterRole.toUpperCase() === 'PARENT' : undefined)}
+                        clusterRole={data.clusterRole ?? null}
+                        clusterId={data.clusterId ?? null}
+                        securityDepositAmount={data.securityDepositAmount ?? null}
+                        hasSmallPartyPricing={Boolean(data.hasSmallPartyPricing || (data as unknown as { occupancyPricingEnabled?: boolean }).occupancyPricingEnabled)}
                         onStickySummaryChange={setStickyBookingSummary}
                         tenantContext={effectiveTenantCtx}
                       />
@@ -3069,9 +3169,13 @@ useEffect(() => {
           </div>
         )}
 
-        {/* TASK-1728: Guest Assistant FAQ widget */}
+        {/* TASK-1728 / TASK-10298986: Guest Assistant FAQ widget with target tenant scoping */}
         <Suspense fallback={null}>
-          <GuestAssistant listingId={resolvedListingId ?? data.listingId ?? null} />
+          <GuestAssistant
+            listingId={resolvedListingId ?? data.listingId ?? null}
+            tenantSlug={effectiveTenantCtx?.slug ?? tenantSlugFromUrl ?? null}
+            tenantId={effectiveTenantCtx?.id ?? (data as { tenantId?: number | null })?.tenantId ?? null}
+          />
         </Suspense>
 
         {/* TASK-102116: floating "Chat with Host on WhatsApp" bubble with pre-filled

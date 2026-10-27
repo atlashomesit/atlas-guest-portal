@@ -23,7 +23,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Lock, ShieldCheck } from 'lucide-react';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
@@ -70,11 +70,19 @@ import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
+import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
+import { fetchListingById } from '@/api/listingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
+import { dormNeedsGenderAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
+import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
+import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
+import { reportUpiPaid } from '@/api/payment';
 import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
-import { getIstCalendarDate, toCalendarISO } from '@/utils/date';
+import { getIstCalendarDate, toCalendarISO, istInstantFromCalendarDate } from '@/utils/date';
+import { resolveListing } from '@/utils/listingResolver';
 import { isMarketplaceMode } from '@/tenant/tenantResolver';
 import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
 
@@ -208,6 +216,10 @@ type CheckoutHoldCache = {
   holdCancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
   holdCancellationWindowHours?: number | null;
   holdGraceHours?: number | null;
+  /** HSL-011: the dorm's gender rule, so a reload keeps asking the tick. */
+  holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
+  holdSecurityDepositAmount?: number | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
@@ -328,38 +340,108 @@ function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => voi
 
 // ── GuestDetailsPage ─────────────────────────────────────────────────────────
 
+const normalizeDateParam = (val: string | null): string | null => {
+  if (!val) return null;
+  const trimmed = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [y, m, d] = trimmed.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return istInstantFromCalendarDate(dateObj).toISOString();
+  }
+  const parsed = new Date(trimmed);
+  return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+};
+
 const GuestDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { propertySlug, unitSlug } = useParams<{ propertySlug: string; unitSlug: string }>();
   const { booking, updateBooking } = useBooking();
   const brandName = getTenantBrandName();
   const { currency, formatINR } = useCurrency();
   const [holdHydrationDone, setHoldHydrationDone] = useState(false);
 
-  // TASK-2882: rehydrate the stay draft (and a still-live hold, if the guest already tapped Pay) from sessionStorage
-  // after a hard reload before showing the "pick dates" modal.
+  // TASK-10298987: Parse direct deep-link URL search params from router location.search (or window.location.search fallback)
+  const urlParams = useMemo(() => {
+    const search = location.search || (typeof window !== 'undefined' ? window.location.search : '');
+    const sp = new URLSearchParams(search);
+    const rawCheckIn = sp.get('checkIn') || sp.get('checkin');
+    const rawCheckOut = sp.get('checkOut') || sp.get('checkout');
+    const rawGuests = sp.get('guests');
+    const rawListingId = sp.get('listingId') || sp.get('listing_id');
+    const rawRatePlanId = sp.get('ratePlanId') || sp.get('listingRatePlanId');
+    return {
+      checkIn: normalizeDateParam(rawCheckIn),
+      checkOut: normalizeDateParam(rawCheckOut),
+      guests: rawGuests ? Math.max(1, parseInt(rawGuests, 10) || 1) : null,
+      tenant: sp.get('tenant')?.trim() || null,
+      listingId: rawListingId && !isNaN(Number(rawListingId)) ? Number(rawListingId) : null,
+      ratePlanId: rawRatePlanId && !isNaN(Number(rawRatePlanId)) ? Number(rawRatePlanId) : null,
+    };
+  }, [location.search]);
+
+  // TASK-2882 & TASK-10298987: hydrate the stay draft from URL query params (deep link) or sessionStorage
+  // after a reload or direct deep-link before showing the "pick dates" modal.
   useEffect(() => {
-    if (!(booking.holdListingId || booking.holdId) || !booking.checkIn || !booking.checkOut) {
+    if (urlParams.checkIn && urlParams.checkOut) {
+      const cached = loadCheckoutHold();
+      const listingIdFromUnit = unitSlug && !isNaN(Number(unitSlug)) ? Number(unitSlug) : null;
+      const effectiveListingId = urlParams.listingId ?? listingIdFromUnit ?? (cached?.holdListingId ?? null);
+
+      updateBooking({
+        checkIn: urlParams.checkIn,
+        checkOut: urlParams.checkOut,
+        guests: urlParams.guests ?? cached?.guests ?? booking.guests ?? 2,
+        holdListingId: effectiveListingId ?? booking.holdListingId ?? null,
+        holdPropertySlug: propertySlug ?? cached?.holdPropertySlug ?? booking.holdPropertySlug ?? null,
+        holdUnitSlug: unitSlug ?? cached?.holdUnitSlug ?? booking.holdUnitSlug ?? null,
+        holdTenantSlug: urlParams.tenant ?? cached?.holdTenantSlug ?? booking.holdTenantSlug ?? null,
+        listingRatePlanId: urlParams.ratePlanId ?? cached?.listingRatePlanId ?? booking.listingRatePlanId ?? null,
+        ratePlanName: cached?.ratePlanName ?? booking.ratePlanName ?? null,
+        holdListingName: cached?.holdListingName ?? booking.holdListingName ?? null,
+        holdPriceBreakdown: cached?.holdPriceBreakdown ?? booking.holdPriceBreakdown ?? null,
+        holdCancellationTier: cached?.holdCancellationTier ?? booking.holdCancellationTier ?? null,
+        holdCancellationWindowHours: cached?.holdCancellationWindowHours ?? booking.holdCancellationWindowHours ?? null,
+        holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
+        holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
+        holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
+      });
+
+      if (!effectiveListingId && unitSlug) {
+        resolveListing(unitSlug, undefined, urlParams.tenant ?? booking.holdTenantSlug ?? null)
+          .then((l) => {
+            if (l?.id && !isNaN(Number(l.id))) {
+              updateBooking({
+                holdListingId: Number(l.id),
+                holdListingName: l.name ?? null,
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    } else if (!(booking.holdListingId || booking.holdId) || !booking.checkIn || !booking.checkOut) {
       const cached = loadCheckoutHold();
       if (cached) {
         updateBooking({
-          holdId: cached.holdId ?? null,
-          holdExpiresAt: cached.holdExpiresAt ?? null,
-          holdToken: cached.holdToken ?? null,
-          holdListingId: cached.holdListingId ?? null,
-          holdPropertySlug: cached.holdPropertySlug ?? null,
-          holdUnitSlug: cached.holdUnitSlug ?? null,
-          holdTenantSlug: cached.holdTenantSlug ?? null,
-          holdListingName: cached.holdListingName ?? null,
-          holdPriceBreakdown: cached.holdPriceBreakdown ?? null,
-          holdCancellationTier: cached.holdCancellationTier ?? null,
-          holdCancellationWindowHours: cached.holdCancellationWindowHours ?? null,
-          holdGraceHours: cached.holdGraceHours ?? null,
-          checkIn: cached.checkIn ?? null,
-          checkOut: cached.checkOut ?? null,
+          holdId: cached.holdId ?? booking.holdId ?? null,
+          holdExpiresAt: cached.holdExpiresAt ?? booking.holdExpiresAt ?? null,
+          holdToken: cached.holdToken ?? booking.holdToken ?? null,
+          holdListingId: cached.holdListingId ?? booking.holdListingId ?? null,
+          holdPropertySlug: cached.holdPropertySlug ?? booking.holdPropertySlug ?? null,
+          holdUnitSlug: cached.holdUnitSlug ?? booking.holdUnitSlug ?? null,
+          holdTenantSlug: cached.holdTenantSlug ?? booking.holdTenantSlug ?? null,
+          holdListingName: cached.holdListingName ?? booking.holdListingName ?? null,
+          holdPriceBreakdown: cached.holdPriceBreakdown ?? booking.holdPriceBreakdown ?? null,
+          holdCancellationTier: cached.holdCancellationTier ?? booking.holdCancellationTier ?? null,
+          holdCancellationWindowHours: cached.holdCancellationWindowHours ?? booking.holdCancellationWindowHours ?? null,
+          holdGraceHours: cached.holdGraceHours ?? booking.holdGraceHours ?? null,
+          holdDormGenderPolicy: cached.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
+          holdSecurityDepositAmount: cached.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
+          checkIn: cached.checkIn ?? booking.checkIn ?? null,
+          checkOut: cached.checkOut ?? booking.checkOut ?? null,
           guests: cached.guests ?? booking.guests,
-          listingRatePlanId: cached.listingRatePlanId ?? null,
-          ratePlanName: cached.ratePlanName ?? null,
+          listingRatePlanId: cached.listingRatePlanId ?? booking.listingRatePlanId ?? null,
+          ratePlanName: cached.ratePlanName ?? booking.ratePlanName ?? null,
         });
       }
     }
@@ -376,7 +458,7 @@ const GuestDetailsPage: React.FC = () => {
       () => {},
       () => {},
     );
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only preload
+  }, []);
 
   // ── Hold state from context ──────────────────────────────────────────────
   const holdId = booking.holdId;
@@ -428,7 +510,11 @@ const GuestDetailsPage: React.FC = () => {
   // guest's typed details, which are persisted to sessionStorage below.
   // FOUNDER RULED 2026-10-19: there is NO hold on arrival — the draft is the listing, dates and quote handed over by
   // Reserve. The hold (and its clock) exists only after the guest taps Pay.
-  const hasDraft = Boolean((holdListingId || holdId) && booking.checkIn && booking.checkOut);
+  // TASK-10298987: if checkIn/checkOut are present in URL search params or in booking state,
+  // hasDraft is true so direct deep links with search params never block the guest.
+  const hasDraft = Boolean(
+    ((holdListingId || holdId || (propertySlug && unitSlug)) && (booking.checkIn || urlParams.checkIn) && (booking.checkOut || urlParams.checkOut))
+  );
 
   // ── Hold countdown (shown ONLY while a hold is live, i.e. during payment) ──────────────────────
   const [countdown, setCountdown] = useState(() =>
@@ -573,6 +659,12 @@ const GuestDetailsPage: React.FC = () => {
   const houseRulesRowRef = useRef<HTMLDivElement>(null);
   /** A listing with no host-written rules shows no tick and never blocks a booking on missing host data. */
   const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
+  // HSL-011: a women-only / men-only dorm (policy straight from the listing API, carried by Reserve) needs a required
+  // tick before Pay. It gates the Pay button and is sent as `dormGenderAcknowledged`; the API stores it with the listing's policy.
+  const dormAckRequired = dormNeedsGenderAcknowledgement(booking.holdDormGenderPolicy);
+  const [dormAckAccepted, setDormAckAccepted] = useState(false);
+  const [dormAckError, setDormAckError] = useState('');
+  const dormAckRowRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
@@ -582,6 +674,43 @@ const GuestDetailsPage: React.FC = () => {
     });
     return () => controller.abort();
   }, [holdListingId, effectiveTenantSlug]);
+
+  // TASK-1039977 / PAY-006: Refundable security deposit resolution & consent
+  const [listingSecurityDeposit, setListingSecurityDeposit] = useState<number | null>(null);
+
+  useEffect(() => {
+    const id = holdListingId != null ? Number(holdListingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return;
+    if (booking.holdSecurityDepositAmount != null) return;
+    const ac = new AbortController();
+    void fetchListingById(id, ac.signal)
+      .then((l) => {
+        if (!ac.signal.aborted) {
+          const raw = l?.securityDepositAmount ?? (l as Record<string, unknown>)?.SecurityDepositAmount;
+          const val = Number(raw);
+          if (Number.isFinite(val) && val > 0) {
+            setListingSecurityDeposit(val);
+          }
+        }
+      })
+      .catch(() => { /* non-critical */ });
+    return () => ac.abort();
+  }, [holdListingId, booking.holdSecurityDepositAmount]);
+
+  const effectiveSecurityDepositAmount =
+    booking.holdSecurityDepositAmount ??
+    checkoutInfo?.securityDepositAmount ??
+    listingSecurityDeposit ??
+    null;
+
+  const depositRequired =
+    typeof effectiveSecurityDepositAmount === 'number' &&
+    Number.isFinite(effectiveSecurityDepositAmount) &&
+    effectiveSecurityDepositAmount > 0;
+
+  const [depositAccepted, setDepositAccepted] = useState(false);
+  const [depositError, setDepositError] = useState('');
+  const depositRowRef = useRef<HTMLDivElement>(null);
   // TASK-10050 (DPDP guarded consent): transactional WhatsApp must NOT be pre-checked.
   // The previous `true` default meant consent was assumed unless the guest actively
   // opted out — a dark pattern that fails DPDP §6 "free, specific, informed" and
@@ -621,6 +750,8 @@ const GuestDetailsPage: React.FC = () => {
       holdCancellationTier: booking.holdCancellationTier ?? null,
       holdCancellationWindowHours: booking.holdCancellationWindowHours ?? null,
       holdGraceHours: booking.holdGraceHours ?? null,
+      holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
+      holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
@@ -634,7 +765,7 @@ const GuestDetailsPage: React.FC = () => {
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
     booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
-    booking.holdGraceHours, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
+    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
@@ -690,7 +821,12 @@ const GuestDetailsPage: React.FC = () => {
   // The widget's legacy estimate fallback may retain a positive fee for an absorbed hold.
   // Raw hold metadata drives only visible rows; total/payment calculation stays unchanged.
   const displayedFeeAmount = feeAmount(priceBreakdown?.paymentFeeDisplay?.amount) ?? convenienceFeeAmount;
-  const nights = priceBreakdown?.nights ?? 0;
+  const nights =
+    priceBreakdown?.nights && priceBreakdown.nights > 0
+      ? priceBreakdown.nights
+      : (booking.checkIn && booking.checkOut
+          ? Math.max(1, Math.round((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000))
+          : 0);
 
   const addOnsTotal = useMemo(
     () =>
@@ -889,6 +1025,14 @@ const GuestDetailsPage: React.FC = () => {
     if (houseRulesRequired && !houseRulesAccepted) { setHouseRulesError('Please accept the house rules to continue.'); valid = false; }
     else { setHouseRulesError(''); }
 
+    // HSL-011: women-only / men-only dorm - the guest must confirm the rule before Pay.
+    if (dormAckRequired && !dormAckAccepted) { setDormAckError('Please confirm the dorm rule to continue.'); valid = false; }
+    else { setDormAckError(''); }
+
+    // TASK-1039977 / PAY-006: refundable security deposit consent
+    if (depositRequired && !depositAccepted) { setDepositError('Please accept the refundable security deposit terms to continue.'); valid = false; }
+    else { setDepositError(''); }
+
     setFormErrors(errors);
     if (!valid) {
       requestAnimationFrame(() => {
@@ -911,6 +1055,16 @@ const GuestDetailsPage: React.FC = () => {
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
+        if (dormAckRequired && !dormAckAccepted) {
+          dormAckRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          dormAckRowRef.current?.querySelector('input')?.focus();
+          return;
+        }
+        if (depositRequired && !depositAccepted) {
+          depositRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          depositRowRef.current?.querySelector('input')?.focus();
+          return;
+        }
         if (houseRulesRequired && !houseRulesAccepted) {
           houseRulesRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           houseRulesRowRef.current?.querySelector('input')?.focus();
@@ -923,7 +1077,7 @@ const GuestDetailsPage: React.FC = () => {
       });
     }
     return valid;
-  }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted]);
+  }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted, depositRequired, depositAccepted]);
 
   // ── Promo blur handler ────────────────────────────────────────────────────
   const handlePromoBlur = useCallback(async () => {
@@ -1034,9 +1188,58 @@ const GuestDetailsPage: React.FC = () => {
     checkoutSettledRef.current = false; // a new hold starts a new abandon/settle cycle
     const expiresIso = typeof newExpiry === 'string' ? newExpiry : new Date(newExpiry).toISOString();
     const token = typeof prepToken === 'string' ? prepToken : null;
+    latestHoldRef.current = {
+      holdId: Number(newHoldId),
+      holdToken: token,
+      holdTenantSlug: effectiveTenantSlug ?? null,
+      holdExpiresAt: expiresIso,
+    };
     updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
     return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
   }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, effectiveTenantSlug, updateBooking]);
+
+  // ── PAY-010: UPI_QR / UPI_DEEPLINK checkout ──────────────────────────────────
+  const [upiCheckout, setUpiCheckout] = useState<{
+    order: UpiOrder;
+    amountInr: number;
+    bookingId: number;
+    bookingToken: string | null;
+  } | null>(null);
+  const [upiReportBusy, setUpiReportBusy] = useState(false);
+  const [upiReportError, setUpiReportError] = useState<string | null>(null);
+
+  /** "I have paid": tell the host, then show the booking page's "waiting for the host to confirm" state. Never marks it paid. */
+  const handleUpiIHavePaid = useCallback(async () => {
+    if (!upiCheckout || upiReportBusy) return;
+    setUpiReportBusy(true);
+    setUpiReportError(null);
+    try {
+      await reportUpiPaid(upiCheckout.bookingId, upiCheckout.bookingToken, effectiveTenantSlug);
+      try {
+        sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+        sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+      } catch { /* ignore */ }
+      updateBooking({
+        holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+        holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
+        holdListingName: null, holdCancellationTier: null,
+        holdCancellationWindowHours: null, holdGraceHours: null,
+        holdSecurityDepositAmount: null,
+        paymentHoldBookingId: null, paymentHoldToken: null,
+      });
+      const token = upiCheckout.bookingToken;
+      navigate(
+        token
+          ? `/booking/${upiCheckout.bookingId}?t=${encodeURIComponent(token)}`
+          : `/booking/${upiCheckout.bookingId}`,
+        { replace: true },
+      );
+    } catch (err) {
+      setUpiReportError(err instanceof Error ? err.message : 'Could not tell the host. Please try again.');
+    } finally {
+      setUpiReportBusy(false);
+    }
+  }, [upiCheckout, upiReportBusy, effectiveTenantSlug, updateBooking, navigate]);
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
@@ -1090,12 +1293,15 @@ const GuestDetailsPage: React.FC = () => {
         guestConsentAccepted: consentAccepted,
         // FOUNDER RULED 2026-10-19: the server re-checks this when the listing has house rules.
         houseRulesAccepted,
+        // HSL-011: the dorm gender-rule tick. The API requires it (400 DORM_GENDER_ACK_REQUIRED) on women-only / men-only dorms,
+        // stores it with the policy it read from the listing, and ignores it everywhere else.
+        dormGenderAcknowledged: dormAckAccepted,
         guestPurposeConsents: {
           booking_contact: consentAccepted,
           transactional_whatsapp: whatsappOptIn,
           marketing: marketingOptIn,
         },
-        securityDepositAccepted: false,
+        securityDepositAccepted: depositRequired ? depositAccepted : false,
         guestInfo: {
           name: formData.name.trim(),
           email: formData.email.trim(),
@@ -1117,9 +1323,9 @@ const GuestDetailsPage: React.FC = () => {
         // Details and house rules carried no clock and closed no OTA night. A live hold is reused as is
         // ("Try again" keeps the same hold — no fresh clock per try). Otherwise the nights are re-checked and the
         // hold started right now; if the nights are gone the 409 below says so BEFORE any money moves.
-        let activeHoldId: number | null = holdId != null ? Number(holdId) : null;
-        let activeHoldToken: string | null = holdToken ?? null;
-        let activeHoldExpiresAt: string | null = holdExpiresAt ?? null;
+        let activeHoldId: number | null = (holdId != null ? Number(holdId) : null) ?? latestHoldRef.current.holdId;
+        let activeHoldToken: string | null = holdToken ?? latestHoldRef.current.holdToken;
+        let activeHoldExpiresAt: string | null = holdExpiresAt ?? latestHoldRef.current.holdExpiresAt;
         const holdIsLive =
           activeHoldId != null &&
           activeHoldExpiresAt != null &&
@@ -1257,6 +1463,22 @@ const GuestDetailsPage: React.FC = () => {
           pendingBookingTokenRef.current = bookingToken;
           pendingBookingIdRef.current = bookingId; // TASK-8219: available to the pagehide/unmount abandon guard
 
+          // PAY-010: a UPI_QR / UPI_DEEPLINK host gets no Razorpay order — show the UPI link / QR instead of launching
+          // Razorpay with the host's UPI address as the key (which failed, so these guests could not pay at all). The
+          // panel shows the amount the order charged, so the price shown is the price paid.
+          const upiOrder = parseUpiOrder(responseData);
+          if (upiOrder) {
+            // The guest may pay from their UPI app at any moment from here on: never abandon (release) this hold from
+            // the page. The server's 10-minute sweep still releases it if nobody says they paid.
+            checkoutSettledRef.current = true;
+            currentAttemptIdempotencyKeyRef.current = null;
+            setUpiReportError(null);
+            setUpiCheckout({ order: upiOrder, amountInr: Number(respAmountInr), bookingId, bookingToken });
+            track('payment_init', holdListingId ? Number(holdListingId) : 0);
+            setIsSubmitting(false);
+            return;
+          }
+
           if (isServerTotalConfirmRequired(amountPaise, displayTotal)) {
             pendingRazorpayLaunchRef.current = {
               keyId,
@@ -1379,6 +1601,7 @@ const GuestDetailsPage: React.FC = () => {
                         holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
                         holdListingName: null, holdCancellationTier: null,
                         holdCancellationWindowHours: null, holdGraceHours: null,
+                        holdSecurityDepositAmount: null,
                         paymentHoldBookingId: null, paymentHoldToken: null,
                       });
                       const token = pendingBookingTokenRef.current;
@@ -1404,9 +1627,11 @@ const GuestDetailsPage: React.FC = () => {
                     // TASK-10087: terminal outcome — anonymous identifiers only, no PII
                     // (payment/order IDs stay in the visible recovery message, never in the event).
                     track(TerminalCheckoutOutcomeEvents.ChargedUnconfirmed, holdListingId ? Number(holdListingId) : 0);
+                    const waBase = getWhatsAppLink();
+                    const waSection = waBase ? ` or contact us on WhatsApp (${waBase}?text=${waText})` : '';
                     setOrderError(
                       `Payment received but we could not confirm your booking yet. Payment ID: ${paymentId} · Booking #${bookingId}. ` +
-                        `We will retry automatically for about 5 minutes — if your stay is not confirmed by then, tap "Check again" below or contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
+                        `We will retry automatically for about 5 minutes — if your stay is not confirmed by then, tap "Check again" below${waSection} ` +
                         `or email ${getContactEmail()}. No need to pay again.`,
                     );
                     const pollToken = pendingBookingTokenRef.current;
@@ -1646,7 +1871,7 @@ const GuestDetailsPage: React.FC = () => {
     [
       isSubmitting, validateForm, holdId, holdToken, holdExpiresAt, phoneDialCode, formData,
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
-      houseRulesAccepted, checkoutInfo, hasDraft, startHoldAtPay,
+      houseRulesAccepted, dormAckAccepted, depositRequired, depositAccepted, checkoutInfo, hasDraft, startHoldAtPay,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
     ],
@@ -1694,6 +1919,18 @@ const GuestDetailsPage: React.FC = () => {
   // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
   // it while consent is unchecked scrolls the consent box into view and flashes it.
   const scrollToConsent = useCallback(() => {
+    // HSL-011: the dorm rule tick sits above the house rules, so point at it first.
+    if (dormAckRequired && !dormAckAccepted) {
+      setDormAckError('Please confirm the dorm rule to continue.');
+      dormAckRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // TASK-1039977 / PAY-006: refundable security deposit consent
+    if (depositRequired && !depositAccepted) {
+      setDepositError('Please accept the refundable security deposit terms to continue.');
+      depositRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     // The house-rules tick (when the host wrote rules) comes first on the page, so point at it first.
     if (houseRulesRequired && !houseRulesAccepted) {
       setHouseRulesError('Please accept the house rules to continue.');
@@ -1704,7 +1941,7 @@ const GuestDetailsPage: React.FC = () => {
     consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setConsentFlash(true);
     window.setTimeout(() => setConsentFlash(false), 1200);
-  }, [houseRulesRequired, houseRulesAccepted]);
+  }, [houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted, depositRequired, depositAccepted]);
 
   // TASK-4537: Determine if the error message indicates a charged-but-unconfirmed state
   // that warrants showing clickable support affordance.
@@ -1721,6 +1958,7 @@ const GuestDetailsPage: React.FC = () => {
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
       holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
       holdCancellationTier: null, holdCancellationWindowHours: null, holdGraceHours: null,
+      holdSecurityDepositAmount: null,
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
   }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken, effectiveTenantSlug]);
@@ -1861,10 +2099,10 @@ const GuestDetailsPage: React.FC = () => {
   const trialPayAtProperty = isTenantTrialPayAtPropertyOnly(tenantCtx);
   const whatsappHandoffUrl = (() => {
     const digits = (whatsappNumber || '').replace(/\D/g, '');
+    if (!digits) return null;
+    const fullDigits = digits.length === 10 ? `91${digits}` : digits;
     const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
-    if (digits) return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-    // No host number known: on the host's own site the site contact is the host's; on the marketplace there is no safe number.
-    return isMarketplaceMode() ? '' : `${getWhatsAppLink()}?text=${encodeURIComponent(text)}`;
+    return `https://wa.me/${fullDigits}?text=${encodeURIComponent(text)}`;
   })();
   // FOUNDER RULED 2026-10-19: the failed-payment contact is the HOST's WhatsApp (pre-written with the room, dates, guests,
   // amount and the guest's name; the guest only taps Send), else a call link to the host's phone, else nothing.
@@ -1876,19 +2114,26 @@ const GuestDetailsPage: React.FC = () => {
     checkOutLabel: checkOutDisplay,
     nights,
     guests: booking.guests ?? 1,
-    amountInr: chargeInr,
+    amountInr: razorpayAmountPaise != null && razorpayAmountPaise > 0 ? razorpayAmountPaise / 100 : chargeInr,
     guestName: formData.name,
   });
   // Charged-but-unconfirmed (the money WAS taken) keeps the site-level support links below; only the failed-payment panel is host-first.
-  const paymentFailureWhatsAppUrl = `${getWhatsAppLink()}?text=${encodeURIComponent(
-    'Hi, my payment went through but my booking is not confirmed yet. Can you help?',
-  )}`;
+  const waBase = getWhatsAppLink();
+  const paymentFailureWhatsAppUrl = waBase
+    ? `${waBase}?text=${encodeURIComponent(
+        'Hi, my payment went through but my booking is not confirmed yet. Can you help?',
+      )}`
+    : '';
   const paymentFailureTelLink = getTelLink();
   const paymentFailureEmail = getContactEmail();
   const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment received — booking not confirmed')}`;
 
-  /** Pay needs the consent tick, and the house-rules tick when the host wrote rules. */
-  const readyToPay = consentAccepted && (!houseRulesRequired || houseRulesAccepted);
+  /** Pay needs consent, house rules when present, dorm rule when present, and deposit consent when configured. */
+  const readyToPay =
+    consentAccepted &&
+    (!houseRulesRequired || houseRulesAccepted) &&
+    (!dormAckRequired || dormAckAccepted) &&
+    (!depositRequired || depositAccepted);
   const payDisabled = isSubmitting || !readyToPay || notTakingBookings;
 
   return (
@@ -1950,8 +2195,9 @@ const GuestDetailsPage: React.FC = () => {
         )}
       </div>
 
-      {/* ── Hold expired modal (the 10 minutes after Pay ended) ── */}
-      {holdExpired && (
+      {/* ── Hold expired modal (the 10 minutes after Pay ended) ──
+          PAY-010: not over the UPI panel — a guest who already paid by UPI must still be able to tap "I have paid". */}
+      {holdExpired && !upiCheckout && (
         <div ref={expiredDialogRef} className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-expired-title">
           <div className="gd-modal">
             <div className="gd-modal-icon"><IconClock size={22}/></div>
@@ -2444,6 +2690,16 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             </div>
 
+            {/* HSL-011: women-only / men-only dorm - REQUIRED rule tick before Pay. Renders nothing for any other listing. */}
+            <div ref={dormAckRowRef}>
+              <DormGenderAcknowledgement
+                policy={booking.holdDormGenderPolicy}
+                accepted={dormAckAccepted}
+                onChange={(next) => { setDormAckAccepted(next); if (next) setDormAckError(''); }}
+                error={dormAckError}
+              />
+            </div>
+
             {/* FOUNDER RULED 2026-10-19: the host's own house rules, with a REQUIRED "I accept" tick before Pay.
                 Renders nothing when the host wrote no rules (a listing with no rules never blocks a booking). */}
             <div ref={houseRulesRowRef}>
@@ -2455,6 +2711,66 @@ const GuestDetailsPage: React.FC = () => {
                 variant="details"
               />
             </div>
+
+            {/* PAY-006 / TASK-1039977: Refundable security deposit disclosure banner & consent */}
+            {depositRequired && (
+              <div
+                ref={depositRowRef}
+                className="gd-deposit-section"
+                data-testid="security-deposit-banner"
+                style={{
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--gd-line-strong, #e2e8f0)',
+                  background: 'var(--gd-surface-muted, #f8fafc)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                  <ShieldCheck size={20} style={{ color: 'var(--gd-accent, #0f766e)', marginTop: '2px', flexShrink: 0 }} />
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--gd-ink, #0f172a)' }}>
+                      Refundable Security Deposit: {displayPrice(effectiveSecurityDepositAmount ?? 0)}
+                    </h4>
+                    <p style={{ margin: '0.25rem 0 0.75rem 0', fontSize: '0.85rem', color: 'var(--gd-ink-soft, #475569)', lineHeight: 1.4 }}>
+                      A refundable security deposit of <b>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</b> is required for this stay.
+                      This deposit covers incidental damages and is refunded after checkout inspection according to host policy.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={`gd-consent-row required${depositAccepted ? ' checked' : ''}`}
+                  data-testid="guest-booking-deposit-consent-row"
+                  style={{ marginTop: '0.5rem' }}
+                >
+                  <input
+                    id="gd-deposit-consent"
+                    type="checkbox"
+                    checked={depositAccepted}
+                    onChange={(e) => {
+                      setDepositAccepted(e.target.checked);
+                      if (e.target.checked) setDepositError('');
+                    }}
+                    aria-invalid={Boolean(depositError)}
+                    aria-describedby={depositError ? 'gd-deposit-error' : undefined}
+                    data-testid="guest-booking-deposit-consent"
+                  />
+                  <div className="gd-consent-body">
+                    <label htmlFor="gd-deposit-consent">
+                      I understand and accept the refundable security deposit of{' '}
+                      <b>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</b> for this stay.
+                    </label>
+                    <span className="gd-consent-tag">Required · Refundable Deposit Policy</span>
+                  </div>
+                </div>
+                {depositError && (
+                  <div id="gd-deposit-error" className="gd-input-help error" role="alert" style={{ marginTop: '0.25rem' }}>
+                    {depositError}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Native consent controls keep one focus stop per choice and independent policy links. */}
             <div className="gd-consent">
@@ -2484,6 +2800,21 @@ const GuestDetailsPage: React.FC = () => {
                 </label>
               </div>
             </div>
+
+            {/* PAY-010: UPI_QR / UPI_DEEPLINK host — pay by UPI link / QR, then "I have paid" (host confirms). */}
+            {upiCheckout && (
+              <UpiPaymentPanel
+                order={upiCheckout.order}
+                amountInr={upiCheckout.amountInr}
+                payeeName={getTenantContext()?.displayMerchantName ?? brandName}
+                countdown={countdown}
+                holdActive={holdLive}
+                isMobile={isMobileCheckoutUserAgent(typeof navigator !== 'undefined' ? navigator.userAgent : '')}
+                onIHavePaid={() => void handleUpiIHavePaid()}
+                busy={upiReportBusy}
+                error={upiReportError}
+              />
+            )}
 
             {/* FOUNDER RULED 2026-10-19: after the FIRST failed payment — "Payment didn't go through" with [Try again]
                 and [Message the host on WhatsApp] (the HOST's number, pre-written; never Atlas's). */}
@@ -2546,9 +2877,11 @@ const GuestDetailsPage: React.FC = () => {
                         >
                           {chargedUnconfirmedChecking ? 'Checking…' : 'Check again'}
                         </button>
-                        <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
-                          <IconWhatsApp size={14} /> WhatsApp us
-                        </a>
+                        {paymentFailureWhatsAppUrl ? (
+                          <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
+                            <IconWhatsApp size={14} /> WhatsApp us
+                          </a>
+                        ) : null}
                         <a href={paymentFailureTelLink}>Call {formatDisplayNumber()}</a>
                         <a href={paymentFailureMailto}>Email {paymentFailureEmail}</a>
                       </div>
@@ -2654,6 +2987,17 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Price block */}
           <div className="gd-price-rows">
+            {/* TASK-1039948: Direct booking pricing tier public display */}
+            {(booking.ratePlanName || booking.ratePlanMealPlan || booking.ratePlanCancellationPolicy || freeCancellationCopy) && (
+              <div style={{ marginBottom: 6 }}>
+                <PricingTierDisplay
+                  ratePlanName={booking.ratePlanName}
+                  mealPlanLabel={booking.ratePlanMealPlan}
+                  cancellationPolicy={booking.ratePlanCancellationPolicy || freeCancellationCopy?.deadlineFormatted}
+                  isCompact
+                />
+              </div>
+            )}
             <div className="gd-price-row" data-testid="price-line-base">
               <div className="desc">
                 <span>
@@ -2738,6 +3082,35 @@ const GuestDetailsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* PAY-006 / TASK-1039977: Refundable security deposit breakdown line in aside */}
+          {depositRequired && (
+            <div
+              className="gd-deposit-recap"
+              data-testid="security-deposit-breakdown"
+              style={{
+                marginTop: '0.75rem',
+                marginBottom: '0.75rem',
+                padding: '0.625rem 0.75rem',
+                borderRadius: '0.5rem',
+                background: 'var(--gd-surface-muted, #f8fafc)',
+                border: '1px solid var(--gd-line, #e2e8f0)',
+                fontSize: '0.85rem',
+                color: 'var(--gd-ink-soft, #475569)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--gd-ink, #0f172a)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Refundable security deposit
+                  <FeeInfoTip fee="securityDeposit" label="Refundable security deposit" testId="fee-info-security-deposit" />
+                </span>
+                <span>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</span>
+              </div>
+              <div style={{ marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--gd-ink-faint, #64748b)' }}>
+                Held separately per host policy · Refundable upon checkout inspection
+              </div>
+            </div>
+          )}
+
           {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 — Razorpay on-behalf-of
               disclosure for white-label / custom-domain tenants only. */}
           {tenantCtx?.legalContactPack?.isCustomDomain && (
@@ -2769,11 +3142,15 @@ const GuestDetailsPage: React.FC = () => {
               {/* Pay microcopy */}
               {!readyToPay && (
                 <div className="gd-pay-microcopy">
-                  {houseRulesRequired && !houseRulesAccepted && !consentAccepted
-                    ? 'Tick the house rules and the consent box to enable payment.'
-                    : houseRulesRequired && !houseRulesAccepted
-                      ? 'Tick the house rules to enable payment.'
-                      : 'Tick the consent box to enable payment.'}
+                  {dormAckRequired && !dormAckAccepted
+                    ? 'Confirm the dorm rule and tick the consent box to enable payment.'
+                    : depositRequired && !depositAccepted
+                      ? 'Tick the refundable security deposit agreement to enable payment.'
+                      : houseRulesRequired && !houseRulesAccepted && !consentAccepted
+                        ? 'Tick the house rules and the consent box to enable payment.'
+                        : houseRulesRequired && !houseRulesAccepted
+                          ? 'Tick the house rules to enable payment.'
+                          : 'Tick the consent box to enable payment.'}
                 </div>
               )}
               {readyToPay && (
@@ -2837,7 +3214,11 @@ const GuestDetailsPage: React.FC = () => {
                 <IconWhatsApp size={16}/>
                 <div>
                   <b>Online payment is not available for this property.</b><br/>
-                  <span>Contact the host on WhatsApp to confirm your dates.</span>
+                  <span>
+                    {whatsappHandoffUrl
+                      ? 'Contact the host on WhatsApp to confirm your dates.'
+                      : 'Please contact the host directly to make a reservation.'}
+                  </span>
                   {trialPayAtProperty && (
                     <div data-testid="guest-trial-pay-at-property-notice" style={{ marginTop: 4 }}>
                       {TRIAL_PAY_AT_PROPERTY_COPY}
@@ -2990,24 +3371,27 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
           : <>Direct booking with the host · <b>no OTA fee</b></>}
       </span>
     </div>
-    {whatsappNumber && (
-      <div className="gd-trust-row">
-        <span style={{ color: '#25D366' }}><IconWhatsApp size={14}/></span>
-        <span>
-          Stuck?{' '}
-          <a
-            // TASK-4294/TASK-4300: use the canonical contact helpers — getWhatsAppLink() carries
-            // the 91 country code and formatDisplayNumber() shows "+91-…", instead of the raw
-            // tenant whatsappBookingPhone (no +, no country code, wrong number on the marketplace).
-            href={getWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            WhatsApp {brandName} on {formatDisplayNumber()}
-          </a>
-        </span>
-      </div>
-    )}
+    {(() => {
+      const digits = (whatsappNumber || '').replace(/\D/g, '');
+      if (!digits) return null;
+      const fullDigits = digits.length === 10 ? `91${digits}` : digits;
+      const prefill = encodeURIComponent(`Hi ${brandName}, I need help with my booking.`);
+      return (
+        <div className="gd-trust-row">
+          <span style={{ color: '#25D366' }}><IconWhatsApp size={14}/></span>
+          <span>
+            Stuck?{' '}
+            <a
+              href={`https://wa.me/${fullDigits}?text=${prefill}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              WhatsApp {brandName} on {formatDisplayNumber()}
+            </a>
+          </span>
+        </div>
+      );
+    })()}
   </div>
 );
 

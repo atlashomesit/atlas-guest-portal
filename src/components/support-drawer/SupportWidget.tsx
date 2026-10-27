@@ -1,3 +1,4 @@
+import { useBookingContentVisible } from '@/hooks/useBookingContentVisible';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { matchPath, useLocation } from "react-router-dom";
 
@@ -35,7 +36,7 @@ const SupportWidgetContent = () => {
   const assistantContextKey = `${assistantTenant}:${listingId ?? ''}`;
 
   const [isOpen, setIsOpen] = useState(false);
-  const [bookingContentVisible, setBookingContentVisible] = useState(false);
+  const bookingContentVisible = useBookingContentVisible();
   const [pageUrl, setPageUrl] = useState("");
   const [footerOffset, setFooterOffset] = useState(0);
   const [callbackPhone, setCallbackPhone] = useState("");
@@ -65,31 +66,6 @@ const SupportWidgetContent = () => {
     }
     wasOpenRef.current = isOpen;
   }, [isOpen]);
-  useEffect(() => {
-    if (typeof IntersectionObserver === 'undefined') return;
-    let visibleByElement = new Map<Element, boolean>();
-    const visibility = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (visibleByElement.has(entry.target)) visibleByElement.set(entry.target, entry.isIntersecting);
-      }
-      setBookingContentVisible([...visibleByElement.values()].some(Boolean));
-    }, { rootMargin: '0px 0px 96px 0px' });
-    const syncBookingContent = () => {
-      const next = [...document.querySelectorAll('[data-testid="guest-message-composer"], [data-testid="checkout-briefing"]')];
-      if (next.length === visibleByElement.size && next.every((element) => visibleByElement.has(element))) return;
-      visibility.disconnect();
-      visibleByElement = new Map(next.map((element) => [element, visibleByElement.get(element) ?? false]));
-      setBookingContentVisible([...visibleByElement.values()].some(Boolean));
-      next.forEach((element) => visibility.observe(element));
-    };
-    // Keep the floating pill clear of host checkout instructions and the message
-    // composer. Both load asynchronously and can remount for a different booking.
-    // Observer callbacks contain only changed targets, so retain each target's state.
-    const changes = new MutationObserver(syncBookingContent);
-    changes.observe(document.body, { childList: true, subtree: true });
-    syncBookingContent();
-    return () => { changes.disconnect(); visibility.disconnect(); };
-  }, []);
   /** Lift floating trigger on `/` so it clears the hero date widget on phones (E2E mobile-viewport). */
   const [narrowViewport, setNarrowViewport] = useState(false);
   const routePath = location?.pathname ?? "";

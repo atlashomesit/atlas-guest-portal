@@ -12,6 +12,7 @@ import { settle } from '../test/settle';
 
 vi.mock('../api/listingClient', () => ({
   fetchPublicListings: vi.fn(() => Promise.reject(new Error('network'))),
+  resolveStaticMaxGuests: (property: any) => property?.maxGuests ?? property?.max_guests ?? 2,
 }));
 
 vi.mock('../components/search/SearchResultsMap', () => ({

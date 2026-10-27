@@ -16,6 +16,10 @@ import { createRazorpayWindowWatch, isRazorpayContainerVisible } from '@/utils/r
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
+import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
+import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
+import { reportUpiPaid } from '@/api/payment';
+import { isMobileCheckoutUserAgent } from '@/utils/razorpayCheckoutOptions';
 import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -441,6 +445,7 @@ export function DateGuestPicker({
 function GuestDetailsForm({
   listing,
   tenantName,
+  tenantSlug,
   checkIn,
   checkOut,
   guests,
@@ -450,6 +455,7 @@ function GuestDetailsForm({
 }: {
   listing: EmbedListingSummary;
   tenantName: string;
+  tenantSlug: string;
   checkIn: Date;
   checkOut: Date;
   guests: number;
@@ -492,6 +498,26 @@ function GuestDetailsForm({
   const [houseRulesAccepted, setHouseRulesAccepted] = useState(false);
   const [paymentFailure, setPaymentFailure] = useState<{ reasonText: string } | null>(null);
   const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
+  // PAY-010: UPI_QR / UPI_DEEPLINK host — UPI link / QR instead of Razorpay; "I have paid" waits for the host.
+  const [upiCheckout, setUpiCheckout] = useState<{
+    order: UpiOrder; amountInr: number; bookingId: number; bookingToken: string | null;
+  } | null>(null);
+  const [upiReported, setUpiReported] = useState(false);
+  const [upiReportBusy, setUpiReportBusy] = useState(false);
+  const [upiReportError, setUpiReportError] = useState<string | null>(null);
+  const handleUpiIHavePaid = async () => {
+    if (!upiCheckout || upiReportBusy) return;
+    setUpiReportBusy(true);
+    setUpiReportError(null);
+    try {
+      await reportUpiPaid(upiCheckout.bookingId, upiCheckout.bookingToken, tenantSlug);
+      setUpiReported(true);
+    } catch (err) {
+      setUpiReportError(err instanceof Error ? err.message : 'Could not tell the host. Please try again.');
+    } finally {
+      setUpiReportBusy(false);
+    }
+  };
   useEffect(() => {
     const controller = new AbortController();
     void fetchListingCheckoutInfo(listing.id, undefined, controller.signal).then((info) => {
@@ -595,7 +621,7 @@ function GuestDetailsForm({
         // Step 1: init-hold (only when no live hold exists or it has expired)
         const holdRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
           method: 'POST',
-          headers: getOrderRequestHeaders(idempotencyKey),
+          headers: getOrderRequestHeaders(idempotencyKey, tenantSlug),
           body: JSON.stringify({
             bookingDraft: {
               listingId: listing.id,
@@ -620,7 +646,7 @@ function GuestDetailsForm({
       // Step 2: final-charge (Razorpay order)
       const orderRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
         method: 'POST',
-        headers: getOrderRequestHeaders(idempotencyKey),
+        headers: getOrderRequestHeaders(idempotencyKey, tenantSlug),
         body: JSON.stringify({
           holdId: hold.holdId,
           holdToken: hold.prepToken,
@@ -649,6 +675,14 @@ function GuestDetailsForm({
       };
       const amountPaise = razorpayOrderAmountInrToPaise(Number(order.amount));
 
+      // PAY-010: a UPI_QR / UPI_DEEPLINK host gets no Razorpay order; show the UPI panel instead of launching Razorpay.
+      const upiOrder = parseUpiOrder(order);
+      if (upiOrder) {
+        setUpiCheckout({ order: upiOrder, amountInr: Number(order.amount), bookingId: order.bookingId, bookingToken: order.bookingToken });
+        setSubmitting(false);
+        return;
+      }
+
       // Step 3: open Razorpay modal
       const loaded = await loadRazorpayScript();
       if (!loaded) throw new Error('Payment script failed to load. Please try again.');
@@ -667,7 +701,7 @@ function GuestDetailsForm({
           try {
             const verifyRes = await fetch(buildApiUrl('/api/Razorpay/verify'), {
               method: 'POST',
-              headers: getOrderRequestHeaders(crypto.randomUUID()),
+              headers: getOrderRequestHeaders(crypto.randomUUID(), tenantSlug),
               body: JSON.stringify({
                 bookingId: order.bookingId,
                 razorpayOrderId: response.razorpay_order_id,
@@ -864,6 +898,34 @@ function GuestDetailsForm({
             I accept the refundable security deposit of {formatCurrency(listing.securityDepositAmount ?? 0)}.
           </span>
         </label>
+      )}
+
+      {upiCheckout && !upiReported && (
+        <UpiPaymentPanel
+          order={upiCheckout.order}
+          amountInr={upiCheckout.amountInr}
+          payeeName={tenantName}
+          countdown={holdCountdown}
+          holdActive={heldHold != null && new Date(heldHold.holdExpiresAt).getTime() > Date.now()}
+          isMobile={isMobileCheckoutUserAgent(typeof navigator !== 'undefined' ? navigator.userAgent : '')}
+          onIHavePaid={() => { void handleUpiIHavePaid(); }}
+          busy={upiReportBusy}
+          error={upiReportError}
+        />
+      )}
+      {upiCheckout && upiReported && (
+        <div role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="embed-upi-awaiting-host">
+          <b className="block">Waiting for the host to confirm your payment</b>
+          <span className="block">We told the host you paid. Your booking is confirmed once they see the money arrive.</span>
+          <a
+            href={`${window.location.origin}/booking/${upiCheckout.bookingId}${upiCheckout.bookingToken ? `?t=${encodeURIComponent(upiCheckout.bookingToken)}` : ''}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-block font-semibold underline"
+          >
+            View your booking &rarr;
+          </a>
+        </div>
       )}
 
       {paymentFailure && !submitting && (
@@ -1117,6 +1179,7 @@ export default function EmbedPage() {
         <GuestDetailsForm
           listing={selectedListing}
           tenantName={config.tenantName}
+          tenantSlug={config.tenantSlug}
           checkIn={checkIn}
           checkOut={checkOut}
           guests={guests}

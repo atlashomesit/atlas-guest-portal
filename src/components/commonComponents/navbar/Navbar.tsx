@@ -7,7 +7,7 @@ import MobileSearchPill from './MobileSearchPill';
 import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
 import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
-import { getTenantBrandName } from '../../../tenant/displayBrand';
+import { resolveTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldShowHostAcquisitionCtas } from '../../../tenant/tenantOverrides';
 import { getTenantSlug, isMarketplaceMode, isAtlastaysMarketplaceSurface } from '../../../tenant/tenantResolver';
 import { getAdminPortalLoginUrl } from '../../../config/adminPortal';
@@ -47,7 +47,7 @@ const Navbar = () => {
     slug,
   });
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
-  const brandName = getTenantBrandName();
+  const brandName = resolveTenantBrandName(tenant);
   const showLogo = !overrides.hideLogo;
   const showHostAcquisition = shouldShowHostAcquisitionCtas(tenant, overrides);
 

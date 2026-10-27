@@ -34,6 +34,14 @@ const mocks = vi.hoisted(() => ({
   fetchCalendarPricing: vi.fn(),
   fetchGuestPriceBreakdown: vi.fn(),
   booking: { checkIn: null as string | null, checkOut: null as string | null, guests: 2 },
+  // TASK-10298998: switchable so the same widget can be measured on an ONLINE host and a WhatsApp hand-off host.
+  tenant: {
+    slug: 'atlas',
+    name: 'Atlastays',
+    paymentProvider: 'RAZORPAY' as string | null,
+    bookingMode: 'ONLINE' as 'ONLINE' | 'WHATSAPP',
+  },
+  sticky: { totalAmount: null as number | null },
 }));
 
 vi.mock('@/runtime-config', async (importOriginal) => ({
@@ -43,12 +51,7 @@ vi.mock('@/runtime-config', async (importOriginal) => ({
 // An ONLINE Razorpay tenant, so `hasOnlinePaymentRail()` is true and the processing-fee row
 // renders — the branch where the Total prefers the server `finalAmount`.
 vi.mock('@/tenant/tenantContext', () => ({
-  getTenantContext: () => ({
-    slug: 'atlas',
-    name: 'Atlastays',
-    paymentProvider: 'RAZORPAY',
-    bookingMode: 'ONLINE' as const,
-  }),
+  getTenantContext: () => ({ ...mocks.tenant }),
 }));
 vi.mock('@/api/client', () => ({
   buildApiUrl: (path: string) => `http://localhost:5120${path}`,
@@ -129,6 +132,9 @@ async function renderBreakdown(scenario: Scenario) {
           listingName="Atlas 501 PH"
           propertySlug="atlas501-ph"
           unitSlug="ph"
+          onStickySummaryChange={(summary: { totalAmount: number | null }) => {
+            mocks.sticky.totalAmount = summary.totalAmount;
+          }}
         />
       </MemoryRouter>,
     );
@@ -153,6 +159,11 @@ async function renderBreakdown(scenario: Scenario) {
 
   return {
     total: money(totalRow.querySelector('.lv-num')?.textContent),
+    // TASK-10298998: the headline "₹X total · N nights · all fees included" in the booking box.
+    boxTotal: money(screen.getByTestId('bw-per-night-price').textContent),
+    boxSub: document.querySelector('.lv-booking-sub')?.textContent ?? '',
+    stickyTotal: mocks.sticky.totalAmount,
+    feeRow: rowsContainer.querySelector('[data-testid="bw-bd-service-fee-row"]'),
     // Founder ruling 2026-10-21: the direct-booking discount is its own line ("−₹2,100"), so a minus row
     // subtracts — exactly as a guest reading the breakdown would add it up.
     lineTotal: itemRows.reduce((sum, r) => {
@@ -178,6 +189,9 @@ afterEach(() => {
   cleanup();
   mocks.booking.checkIn = null;
   mocks.booking.checkOut = null;
+  mocks.tenant.paymentProvider = 'RAZORPAY';
+  mocks.tenant.bookingMode = 'ONLINE';
+  mocks.sticky.totalAmount = null;
 });
 
 describe('UnitBookingWidget — TASK-8293: rendered line items sum to the rendered Total', () => {
@@ -348,5 +362,80 @@ describe('UnitBookingWidget — TASK-8293: rendered line items sum to the render
     expect(screen.getByTestId('bw-bd-tourist-tax-row')).toBeInTheDocument();
     expect(lineTotal).toBe(total);
     expect(total).toBe(10800);
+  });
+});
+
+/**
+ * TASK-10298998 (founder ruling 2026-10-21: the price shown is the price charged). The guest-journey check saw
+ * comfort-cove / grove-and-co / vistara-stays boxes read "₹10,000 total · all fees included" while
+ * `GET /api/pricing/guest-breakdown` returned finalAmount ₹10,300 (3% fee, CustomerPays), and read it as "the
+ * box drops the fee when the host has no direct discount". Measured: those three hosts are bookingMode
+ * WHATSAPP — no gateway, so checkout (POST /api/Razorpay/order) refuses with 422 and nothing is ever charged on
+ * the site; the ₹300 fee in the quote is never collected (TASK-7428: no processor, no fee). The discount is
+ * not the variable — the payment rail is. These four cases pin both axes: with and without a direct discount,
+ * on an ONLINE host (box = the quote's finalAmount, fee line shown) and on a no-gateway host (box = the room
+ * price, no fee line), with the sticky bar and the breakdown always equal to the box.
+ */
+describe('UnitBookingWidget — TASK-10298998: the booking box total is what this site charges', () => {
+  // Comfort Cove's live numbers, 23 → 25 Oct, 2 guests: ₹5,000 × 2, fee 3% = ₹300.
+  const noDiscount = {
+    baseAmount: 10000,
+    discountAmount: 0,
+    losDiscountAmount: 0,
+    lastMinuteDiscountAmount: 0,
+    repeatGuestDiscountAmount: 0,
+    longStayDiscountAmount: 0,
+    convenienceFeeAmount: 300,
+    touristTaxAmount: 0,
+    gstPercent: 0,
+    gstAmount: 0,
+    finalAmount: 10300,
+  };
+  // Same stay with a 25% direct discount (the Atlas Homes shape): net 7,500, fee 3% = 225.
+  const withDiscount = { ...noDiscount, discountAmount: 2500, convenienceFeeAmount: 225, finalAmount: 7725 };
+
+  it('ONLINE host, no direct discount: box = sticky = breakdown = quote finalAmount, fee line shown', async () => {
+    const r = await renderBreakdown({ nights: 2, calendarPerNight: 5000, quote: noDiscount });
+    expect(r.boxTotal).toBe(10300);
+    expect(r.stickyTotal).toBe(10300);
+    expect(r.total).toBe(10300);
+    expect(r.lineTotal).toBe(10300);
+    expect(r.feeRow).not.toBeNull();
+    expect(money(r.feeRow?.querySelector('.lv-num')?.textContent)).toBe(300);
+    expect(r.boxSub).toContain('all fees included');
+  });
+
+  it('ONLINE host, 25% direct discount: box = sticky = breakdown = quote finalAmount, fee line shown', async () => {
+    const r = await renderBreakdown({ nights: 2, calendarPerNight: 3750, quote: withDiscount });
+    expect(r.boxTotal).toBe(7725);
+    expect(r.stickyTotal).toBe(7725);
+    expect(r.total).toBe(7725);
+    expect(r.lineTotal).toBe(7725);
+    expect(r.directDiscount).toBe(2500);
+    expect(money(r.feeRow?.querySelector('.lv-num')?.textContent)).toBe(225);
+  });
+
+  it('WhatsApp hand-off host (no gateway), no direct discount: box shows the room price, never a fee nobody charges', async () => {
+    mocks.tenant.bookingMode = 'WHATSAPP';
+    mocks.tenant.paymentProvider = null;
+    const r = await renderBreakdown({ nights: 2, calendarPerNight: 5000, quote: noDiscount });
+    expect(r.boxTotal).toBe(10000);
+    expect(r.stickyTotal).toBe(10000);
+    expect(r.total).toBe(10000);
+    expect(r.lineTotal).toBe(10000);
+    expect(r.feeRow).toBeNull();
+    expect(r.labels.join(' ')).not.toMatch(/payment processing/i);
+  });
+
+  it('WhatsApp hand-off host (no gateway), 25% direct discount: box shows the discounted room price, no fee', async () => {
+    mocks.tenant.bookingMode = 'WHATSAPP';
+    mocks.tenant.paymentProvider = null;
+    const r = await renderBreakdown({ nights: 2, calendarPerNight: 3750, quote: withDiscount });
+    expect(r.boxTotal).toBe(7500);
+    expect(r.stickyTotal).toBe(7500);
+    expect(r.total).toBe(7500);
+    expect(r.lineTotal).toBe(7500);
+    expect(r.directDiscount).toBe(2500);
+    expect(r.feeRow).toBeNull();
   });
 });

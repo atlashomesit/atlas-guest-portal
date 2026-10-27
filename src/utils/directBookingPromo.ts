@@ -10,9 +10,6 @@ import {
 import type { TenantInfo } from "../tenant/tenantContext";
 import { hasOnlinePaymentRail } from "../tenant/paymentRail";
 
-/** Illustrative OTA guest-side fees (service + payment friction), not a guarantee. */
-export const ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT = 18;
-
 /** Marketing deep-link for Airbnb 2026 terms context (TASK-1941 / TASK-1944). */
 export const PMS_AIRBNB_2026_TERMS_URL = "https://atlaspms.in/airbnb-2026-tnc";
 
@@ -46,8 +43,9 @@ export function resolveDirectBookingPromo(
     (hasOnlinePaymentRail(tenant ?? null)
       ? "Pay with UPI or cards via Razorpay. Your price is guaranteed at checkout."
       : "Your price is guaranteed at checkout — no hidden OTA markups.");
-  const savingsStripLine =
-    "Booking direct can save you about 18–30% vs typical OTA guest totals (fees and markups vary by site).";
+  // GUEST-037: no fixed savings percentage here. The only saving shown on a page is one computed
+  // from the real quote (struck rate vs total); the homepage hero just states the price promise.
+  const savingsStripLine = "Book direct: the price you see is the price you pay.";
   return { show, effectiveDiscountPercent, headline, sub, savingsStripLine };
 }
 

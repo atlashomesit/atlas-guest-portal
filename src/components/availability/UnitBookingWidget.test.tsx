@@ -1361,10 +1361,21 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
     await settle();
     const strip = screen.getByTestId('bw-trust-strip-text');
     // The refund the server would actually issue here is nil — the copy must not promise otherwise.
-    expect(strip.textContent).toBe('Standard cancellation policy applies for this stay.');
+    expect(strip.textContent).toBe(
+      'Strict policy: Full refund if cancelled 7+ days before check-in. No refund within 7 days of check-in.',
+    );
+    expect(strip.textContent).not.toMatch(/standard cancellation/i);
     expect(strip.textContent).not.toMatch(/free cancellation/i);
     // The grace window is voided for these dates, so advertising it would over-promise the refund.
     expect(screen.queryByTestId('bw-grace-window-strip')).toBeNull();
+  });
+
+  it('GUEST-037: no "illustrative" OTA savings line is rendered next to the quote', async () => {
+    await renderWidget();
+    await setCheckin(40);
+    await settle();
+    expect(screen.queryByTestId('bw-direct-savings-line')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/illustrative|vs typical booking sites/i);
   });
 
   it('never renders an empty trust strip (a bare check icon with blank text)', async () => {

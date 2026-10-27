@@ -1,3 +1,9 @@
+/**
+ * @vitest-environment node
+ *
+ * Node, not the suite-wide jsdom: importing vitest.config.ts pulls in vite/esbuild, and esbuild
+ * refuses to load under jsdom. This file asserts on config shape and touches no DOM.
+ */
 import { describe, expect, it } from "vitest";
 import vitestConfig from "../vitest.config";
 

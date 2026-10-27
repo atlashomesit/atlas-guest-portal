@@ -1,6 +1,7 @@
 import type { PaymentFeeDisplay } from "../utils/paymentFeeCopy";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { CancellationTier } from '@/utils/cancellationPolicy';
+import type { DormGenderPolicy } from '@/utils/dormListing';
 
 /** Price breakdown forwarded from the widget to GuestDetailsPage (session-only, not persisted). */
 export type BookingPriceBreakdown = {
@@ -59,9 +60,16 @@ type BookingState = {
   holdCancellationTier: CancellationTier | null;
   holdCancellationWindowHours: number | null;
   holdGraceHours: number | null;
+  /** HSL-011: the dorm's gender rule (from the listing API) forwarded from UnitBookingWidget; null for a non-dorm or a mixed-unstated listing (session-only). */
+  holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** TASK-1039977 / PAY-006: Refundable security deposit configured on the listing (session-only). */
+  holdSecurityDepositAmount?: number | null;
   /** MRP-002: Selected rate plan ID and display name forwarded from UnitBookingWidget (session-only). */
   listingRatePlanId?: number | null;
   ratePlanName?: string | null;
+  /** TASK-1039948: Selected rate plan meal plan and cancellation policy for direct booking pricing tier display. */
+  ratePlanMealPlan?: string | null;
+  ratePlanCancellationPolicy?: string | null;
 };
 
 type BookingContextValue = {
@@ -98,8 +106,11 @@ const defaultState: BookingState = {
   holdCancellationTier: null,
   holdCancellationWindowHours: null,
   holdGraceHours: null,
+  holdSecurityDepositAmount: null,
   listingRatePlanId: null,
   ratePlanName: null,
+  ratePlanMealPlan: null,
+  ratePlanCancellationPolicy: null,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
@@ -139,8 +150,11 @@ const loadState = (): BookingState => {
       holdCancellationTier: null,
       holdCancellationWindowHours: null,
       holdGraceHours: null,
+      holdSecurityDepositAmount: null,
       listingRatePlanId: null,
       ratePlanName: null,
+      ratePlanMealPlan: null,
+      ratePlanCancellationPolicy: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);

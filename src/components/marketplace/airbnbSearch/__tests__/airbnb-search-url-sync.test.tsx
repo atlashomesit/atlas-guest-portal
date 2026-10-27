@@ -77,8 +77,8 @@ describe('TASK-102058 AirbnbSearchBar URL sync', () => {
     expect(screen.getByText('2 guests')).toBeInTheDocument();
   });
 
-  it('MKT-022 allows destination-only search without travel dates and navigates to /search', async () => {
-    renderBarAt('/');
+  it('TASK-10298931 destination-only search on / updates / in-place preserving brand=atlastays without dumping to /search', async () => {
+    renderBarAt('/?brand=atlastays');
 
     await settle();
     fireEvent.change(screen.getByTestId('airbnb-search-destination'), { target: { value: 'Manali' } });
@@ -88,11 +88,32 @@ describe('TASK-102058 AirbnbSearchBar URL sync', () => {
     await settle();
 
     const probe = screen.getByTestId('location-probe').textContent ?? '';
-    expect(probe).toContain('/search?');
+    expect(probe.startsWith('/?')).toBe(true);
+    expect(probe).not.toContain('/search');
     const params = new URLSearchParams(probe.split('?')[1] ?? '');
-    expect(params.get('destination')).toBe('Manali');
+    expect(params.get('city')).toBe('Manali');
+    expect(params.get('brand')).toBe('atlastays');
+    expect(params.get('guests')).toBe('2');
     expect(params.get('checkIn')).toBeNull();
     expect(params.get('checkOut')).toBeNull();
+  });
+
+  it('destination-only search from /search preserves brand=atlastays and includes location', async () => {
+    renderBarAt('/search?brand=atlastays');
+
+    await settle();
+    fireEvent.change(screen.getByTestId('airbnb-search-destination'), { target: { value: 'Goa' } });
+    await settle();
+
+    fireEvent.submit(screen.getByTestId('airbnb-search-bar'));
+    await settle();
+
+    const probe = screen.getByTestId('location-probe').textContent ?? '';
+    expect(probe.startsWith('/search?')).toBe(true);
+    const params = new URLSearchParams(probe.split('?')[1] ?? '');
+    expect(params.get('brand')).toBe('atlastays');
+    expect(params.get('destination')).toBe('Goa');
+    expect(params.get('location')).toBe('Goa');
   });
 });
 

@@ -1,9 +1,13 @@
 /**
- * TASK-103146: Sub-4-star suppression on guest sites (founder ruling 2026-10-09)
+ * TASK-103146 / TASK-10299093 / TASK-10299094:
+ * Sub-4-star suppression and empty body review suppression on guest sites (founder ruling 2026-10-09).
  * Merges native and external reviews for public guest presentation.
- * Filters out reviews with rating < 4 or null, and suppresses empty review cards (no body and no title).
+ * Filters out reviews with rating < 4 or null, and suppresses reviews with empty or whitespace-only bodies.
+ * Preserves '<3' heart emoticons and comparison operators while safely stripping actual HTML tags.
  * Corrects external review attribution (Google, Airbnb, Booking.com).
  */
+
+import { stripHtmlPreservingEmoticons } from '../../utils/sanitizeReviewText';
 
 export type ListingReviewRow = {
   id: number;
@@ -16,6 +20,7 @@ export type ListingReviewRow = {
   createdAt: string;
   photoUrls?: string[] | null;
   isVerifiedStay?: boolean;
+  isHidden?: boolean;
   ratingCleanliness?: number | null;
   ratingValue?: number | null;
   ratingCheckin?: number | null;
@@ -34,6 +39,7 @@ export type ExternalReviewRow = {
   hostResponse?: string | null;
   hostResponseAt?: string | null;
   respondedAt?: string | null;
+  isHidden?: boolean;
 };
 
 export type DisplayReviewRow = ListingReviewRow & {
@@ -64,12 +70,13 @@ export function normalizeReviewSource(source?: string | null): string | undefine
 }
 
 /**
- * TASK-10298750: Strips raw OTA scraper prefixes ("Public review:", "Headline:", "Positive:", "Negative:")
- * so scraped boilerplate never renders on guest storefronts.
+ * TASK-10298750 / TASK-10299094: Strips raw OTA scraper prefixes ("Public review:", "Headline:", "Positive:", "Negative:")
+ * and HTML tags while preserving heart emoticons ('<3') and math/comparison signs ('< 20 sqm').
  */
 export function stripReviewScraperBoilerplate(raw?: string | null): string {
   if (!raw) return '';
-  return raw
+  const sanitized = stripHtmlPreservingEmoticons(raw);
+  return sanitized
     .replace(/\r\n/g, '\n')
     .split('\n')
     .map((line) =>
@@ -88,21 +95,26 @@ export function mergeListingAndExternalReviews(
   external: ExternalReviewRow[],
 ): DisplayReviewRow[] {
   const validExternal = (external || []).filter((r) => {
+    if (r.isHidden) return false;
     const rating = Number(r.rating);
     if (isNaN(rating) || rating < 4) return false;
-    return stripReviewScraperBoilerplate(r.body).length > 0;
+    const rawBody = (r.body || (r as { comment?: string | null }).comment || '').trim();
+    if (!rawBody) return false;
+    const cleaned = stripReviewScraperBoilerplate(rawBody);
+    return cleaned.trim().length > 0;
   });
 
   const externalRows: DisplayReviewRow[] = validExternal.map((r, idx) => {
     const cleanSource = normalizeReviewSource(r.source);
     const isGoogle = (cleanSource ?? '').toLowerCase() === 'google' || (!cleanSource && !r.sourceUrl);
-    const cleanedBody = stripReviewScraperBoilerplate(r.body);
+    const rawBody = r.body || (r as { comment?: string | null }).comment;
+    const cleanedBody = stripReviewScraperBoilerplate(rawBody).trim();
     return {
       id: -(idx + 1),
       displayKey: `ext-${idx}-${r.reviewDate ?? ''}`,
       guestName: r.guestName ?? (isGoogle ? 'Google user' : cleanSource ? `${cleanSource} guest` : 'Guest'),
       rating: Number(r.rating) || 5,
-      body: cleanedBody || null,
+      body: cleanedBody,
       createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
       isGoogle,
       source: cleanSource,
@@ -113,15 +125,23 @@ export function mergeListingAndExternalReviews(
   });
 
   const validNative = (native || []).filter((r) => {
+    if (r.isHidden) return false;
     const rating = Number(r.rating);
     if (isNaN(rating) || rating < 4) return false;
-    return Boolean((r.body && r.body.trim().length > 0) || (r.title && r.title.trim().length > 0));
+    const rawBody = (r.body || (r as { comment?: string | null }).comment || '').trim();
+    if (!rawBody) return false;
+    const body = stripHtmlPreservingEmoticons(rawBody).trim();
+    return body.length > 0;
   });
 
-  const nativeRows: DisplayReviewRow[] = validNative.map((r) => ({
-    ...r,
-    displayKey: `native-${r.id}`,
-  }));
+  const nativeRows: DisplayReviewRow[] = validNative.map((r) => {
+    const sanitizedBody = stripHtmlPreservingEmoticons(r.body || (r as { comment?: string | null }).comment).trim();
+    return {
+      ...r,
+      body: sanitizedBody,
+      displayKey: `native-${r.id}`,
+    };
+  });
 
   return [...nativeRows, ...externalRows].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

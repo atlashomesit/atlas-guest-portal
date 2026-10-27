@@ -5,6 +5,7 @@ import { getAccessibilityDeclarations } from '@/utils/amenityCodes';
 import { getTenantContext } from '@/tenant/tenantContext';
 import { getTenantOverrides, getTenantListingAddress } from '@/tenant/tenantOverrides';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { readDormListingFields } from '@/utils/dormListing';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -183,6 +184,20 @@ export type PublicListing = {
    * for booking" notice. Undefined on legacy payloads (treated as published/live).
    */
   publishStatus?: string;
+  /** HSL-011: `Listing.AccommodationType` ("HostelDorm" sells a bed, not a room). Absent for non-dorm payloads. */
+  accommodationType?: string | null;
+  /** HSL-011: `Listing.DormGenderPolicy` - FemaleOnly / MaleOnly / Mixed. Null when the API states none. */
+  dormGenderPolicy?: 'FemaleOnly' | 'MaleOnly' | 'Mixed' | null;
+  /** TASK-1039977 / PAY-006: refundable security deposit configured on listing (null/0 = none). */
+  securityDepositAmount?: number | null;
+  /** TASK-10299183: online payment / checkout gateway available for listing. */
+  onlinePaymentsAvailable?: boolean;
+  /** TASK-10299183: whether small-party discount pricing is configured. */
+  hasSmallPartyPricing?: boolean;
+  /** CLU-011: cluster role and id from public listing DTO (API only) */
+  clusterRole?: string | null;
+  clusterId?: number | null;
+  isParentCluster?: boolean | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -306,6 +321,33 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     })(),
     // TASK-2739-v1: publish state drives noindex + the "not yet available" notice on Draft detail pages.
     publishStatus: typeof payload.publishStatus === 'string' ? payload.publishStatus : undefined,
+    // HSL-011: dorm facts come from the API only (never guessed from the listing name).
+    ...(() => {
+      const dorm = readDormListingFields(payload);
+      return { accommodationType: dorm.accommodationType, dormGenderPolicy: dorm.dormGenderPolicy };
+    })(),
+    securityDepositAmount: (() => {
+      const raw = payload.securityDepositAmount ?? payload.SecurityDepositAmount;
+      if (raw == null || raw === '') return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
+    onlinePaymentsAvailable: payload.onlinePaymentsAvailable !== false && payload.OnlinePaymentsAvailable !== false,
+    hasSmallPartyPricing: Boolean(payload.hasSmallPartyPricing || payload.HasSmallPartyPricing || payload.occupancyPricingEnabled || payload.OccupancyPricingEnabled),
+    clusterRole: (() => {
+      const raw = payload.clusterRole ?? payload.ClusterRole;
+      return typeof raw === 'string' && raw.trim() ? raw.trim().toUpperCase() : null;
+    })(),
+    clusterId: (() => {
+      const raw = payload.clusterId ?? payload.ClusterId;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
+    isParentCluster: (() => {
+      if (typeof payload.isParentCluster === 'boolean') return payload.isParentCluster;
+      const role = payload.clusterRole ?? payload.ClusterRole;
+      return typeof role === 'string' && role.trim().toUpperCase() === 'PARENT';
+    })(),
   };
 }
 

@@ -209,7 +209,7 @@ describe('TASK-101875 stale Show-more response is discarded on filter change', (
       pageSize: 20,
     });
     await settle();
-    expect(screen.getByText('Listing 101')).toBeInTheDocument();
+    expect(screen.getByText('Studio 101')).toBeInTheDocument();
 
     // …then the stale old-filter page-2 lands. Without the TASK-101875 guard it appends
     // Listing 21..27 onto the fresh grid and rewinds `page`.
@@ -219,8 +219,8 @@ describe('TASK-101875 stale Show-more response is discarded on filter change', (
 
     // Only the active filter's results survive and paging tracks the new filter's sequence.
     expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
-    expect(screen.getByText('Listing 101')).toBeInTheDocument();
-    expect(screen.getByText('Listing 102')).toBeInTheDocument();
+    expect(screen.getByText('Studio 101')).toBeInTheDocument();
+    expect(screen.getByText('Studio 102')).toBeInTheDocument();
     expect(screen.queryByText('Listing 21')).not.toBeInTheDocument();
     expect(screen.queryByText('Listing 1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('marketplace-load-more')).not.toBeInTheDocument();

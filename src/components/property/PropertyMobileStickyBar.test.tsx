@@ -32,7 +32,9 @@ class MockIntersectionObserver {
 }
 
 function lastObserver(): MockIntersectionObserver {
-  const io = MockIntersectionObserver.instances[MockIntersectionObserver.instances.length - 1];
+  const io =
+    MockIntersectionObserver.instances.find((i) => i.observed.length > 0) ??
+    MockIntersectionObserver.instances[0];
   if (!io) throw new Error("expected an IntersectionObserver to be created");
   return io;
 }
@@ -184,12 +186,13 @@ describe("PropertyMobileStickyBar", () => {
   });
 });
 
-describe("approved booking review shortcut (GUEST-022)", () => {
-  it("triggers the ready booking form submit directly on one tap, then returns to dates as readiness changes", () => {
+describe("approved booking review shortcut (UXV-2026-10-18-04)", () => {
+  it("focuses the ready booking form without submitting, then returns to dates as readiness changes", () => {
     const trigger = document.createElement("button"); trigger.id = "unit-booking-dates";
     const openDates = vi.fn(); trigger.addEventListener("click", openDates);
     const form = document.createElement("form"); form.dataset.testid = "guest-booking-form"; form.tabIndex = -1; form.dataset.canReviewBooking = "true";
     const reserve = document.createElement("button"); reserve.dataset.testid = "guest-booking-submit"; reserve.type = "submit"; form.append(reserve);
+    form.scrollIntoView = vi.fn();
     const reserveClick = vi.fn(); reserve.addEventListener("click", reserveClick);
     const submit = vi.fn((event: Event) => event.preventDefault()); form.addEventListener("submit", submit);
     document.body.append(trigger, form);
@@ -198,12 +201,20 @@ describe("approved booking review shortcut (GUEST-022)", () => {
     const view = render(<PropertyMobileStickyBar {...props} summary={ready} />);
     fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
     expect(screen.getByTestId("mobile-sticky-book-now")).toHaveTextContent("Review booking");
-    expect(reserveClick).toHaveBeenCalledTimes(1);
+    expect(form).toHaveFocus();
+    expect(form.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(reserveClick).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
     expect(openDates).not.toHaveBeenCalled();
     // A child render can invalidate readiness before the summary effect reaches the bar.
     form.dataset.canReviewBooking = "false";
     fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
     expect(openDates).toHaveBeenCalledTimes(1);
+    form.dataset.canReviewBooking = "true";
+    reserve.disabled = true;
+    fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
+    expect(openDates).toHaveBeenCalledTimes(2);
+    reserve.disabled = false;
     for (const summary of [
       { ...ready, hasCompleteDates: false, canReviewBooking: false, totalAmount: null },
       { ...ready, datesUnavailable: true, canReviewBooking: false },
@@ -214,8 +225,9 @@ describe("approved booking review shortcut (GUEST-022)", () => {
       expect(screen.getByTestId("mobile-sticky-book-now")).not.toHaveTextContent("Review booking");
       fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
     }
-    expect(openDates).toHaveBeenCalledTimes(5);
-    expect(reserveClick).toHaveBeenCalledTimes(1);
+    expect(openDates).toHaveBeenCalledTimes(6);
+    expect(reserveClick).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
     view.unmount(); form.remove(); trigger.remove();
   });
 

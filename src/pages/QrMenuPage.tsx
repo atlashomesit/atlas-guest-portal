@@ -1,0 +1,1351 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
+import {
+  Utensils,
+  Sparkles,
+  Car,
+  ShoppingBag,
+  CheckCircle2,
+  Clock,
+  ShieldCheck,
+  AlertCircle,
+  Plus,
+  Minus,
+  MessageSquare,
+  ArrowRight,
+  Receipt,
+  Smartphone,
+} from "lucide-react";
+import { buildApiUrl, getApiHeaders } from "../api/client";
+import SEO from "../components/SEO";
+
+export interface MenuItem {
+  id: number;
+  name: string;
+  description?: string;
+  price: number;
+  priceType?: string;
+  category?: string;
+  outletCategory?: string;
+  dietary?: "VEG" | "NON_VEG" | "NA";
+  sacCode?: string;
+  gstRatePercent?: number;
+  isTaxInclusive?: boolean;
+  isSoldOut86?: boolean;
+  imageUrl?: string;
+}
+
+export interface MenuCategory {
+  categoryKey: string;
+  title: string;
+  items: MenuItem[];
+}
+
+export interface MenuResponse {
+  tenantName: string;
+  tenantSlug: string;
+  brandColor?: string;
+  logoUrl?: string;
+  currency: string;
+  roomLabel?: string;
+  listingId?: number;
+  tableCode?: string;
+  categories: MenuCategory[];
+}
+
+export interface OrderStatus {
+  orderNumber: string;
+  status: string;
+  liveStep: "Scheduled" | "Order Received" | "Preparing in Kitchen" | "Out for Delivery" | "Served";
+  targetLabel: string;
+  settlementMethod: string;
+  totalAmount: number;
+  gstAmount: number;
+  createdAtUtc: string;
+  estimatedMinutes: number;
+  kotNumber?: string;
+  kotStatus?: string;
+  /** POS-003: UTC serve-at time of a "Schedule for Later" order; absent for as soon as possible. */
+  scheduledFor?: string | null;
+  whatsAppUpdates?: boolean;
+  lines: Array<{
+    id?: number;
+    itemName: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+    notes?: string;
+  }>;
+}
+
+const FALLBACK_MENU: MenuResponse = {
+  tenantName: "Homestay & Resorts",
+  tenantSlug: "demo-resort",
+  currency: "INR",
+  brandColor: "#9e402a",
+  categories: [
+    {
+      categoryKey: "FNB",
+      title: "F&B (Dining & Room Service)",
+      items: [
+        {
+          id: 101,
+          name: "Fresh Farm Omelette & Toast",
+          description: "Free-range eggs with herb butter, grilled tomatoes, and toasted multigrain sourdough.",
+          price: 240,
+          dietary: "NON_VEG",
+          outletCategory: "FNB",
+          isSoldOut86: false,
+        },
+        {
+          id: 102,
+          name: "South Indian Filter Coffee",
+          description: "Freshly brewed estate arabica-robusta blend with frothy milk and jaggery.",
+          price: 120,
+          dietary: "VEG",
+          outletCategory: "FNB",
+          isSoldOut86: false,
+        },
+        {
+          id: 103,
+          name: "Estate Pandi Curry with Akki Roti",
+          description: "Signature Coorg spiced pork curry served with 3 soft steamed rice rotis.",
+          price: 480,
+          dietary: "NON_VEG",
+          outletCategory: "FNB",
+          isSoldOut86: false,
+        },
+      ],
+    },
+    {
+      categoryKey: "EXPERIENCE",
+      title: "Experiences & Activities",
+      items: [
+        {
+          id: 201,
+          name: "Guided Coffee Plantation Walk",
+          description: "90-minute walk through the coffee and black pepper trails with our resident planter.",
+          price: 600,
+          dietary: "NA",
+          outletCategory: "EXPERIENCE",
+          isSoldOut86: false,
+        },
+        {
+          id: 202,
+          name: "Private Campfire & Barbecue Setup",
+          description: "Evening bonfire in your private garden with marinated paneer/chicken skewers.",
+          price: 1500,
+          dietary: "NA",
+          outletCategory: "EXPERIENCE",
+          isSoldOut86: false,
+        },
+      ],
+    },
+    {
+      categoryKey: "TRANSPORT",
+      title: "Transport & Pickups",
+      items: [
+        {
+          id: 301,
+          name: "Airport / Railway Station Transfer",
+          description: "Private air-conditioned sedan transfer to/from nearest transit hub.",
+          price: 2800,
+          dietary: "NA",
+          outletCategory: "TRANSPORT",
+          isSoldOut86: false,
+        },
+      ],
+    },
+    {
+      categoryKey: "RETAIL",
+      title: "Retail & Minibar",
+      items: [
+        {
+          id: 401,
+          name: "Estate Artisanal Honey (350g)",
+          description: "100% pure raw unprocessed forest honey harvested from estate apiaries.",
+          price: 420,
+          dietary: "VEG",
+          outletCategory: "RETAIL",
+          isSoldOut86: false,
+        },
+      ],
+    },
+  ],
+};
+
+// POS-003: "Fulfill At" slots. Times are the guest's local clock; the API receives UTC.
+type FulfillAtMode = "NOW" | "LUNCH" | "HIGH_TEA" | "DINNER" | "CUSTOM";
+const FULFILL_SLOTS: { mode: Exclude<FulfillAtMode, "NOW" | "CUSTOM">; label: string; time: string }[] = [
+  { mode: "LUNCH", label: "Lunch 1:30 PM", time: "13:30" },
+  { mode: "HIGH_TEA", label: "High Tea 5:00 PM", time: "17:00" },
+  { mode: "DINNER", label: "Dinner 8:30 PM", time: "20:30" },
+];
+
+/** null = as soon as possible; undefined = a custom time was chosen but is missing/invalid; else the next local occurrence as UTC ISO. */
+function resolveFulfillAtIso(mode: FulfillAtMode, customTime: string, now: Date = new Date()): string | null | undefined {
+  if (mode === "NOW") return null;
+  const time = mode === "CUSTOM" ? customTime : FULFILL_SLOTS.find((s) => s.mode === mode)?.time ?? "";
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+  if (!m) return undefined;
+  const target = new Date(now);
+  target.setHours(Number(m[1]), Number(m[2]), 0, 0);
+  if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1);
+  return target.toISOString();
+}
+
+export default function QrMenuPage() {
+  const { tenantSlug = "atlas" } = useParams<{ tenantSlug: string }>();
+  const [searchParams] = useSearchParams();
+
+  const roomParam = searchParams.get("room");
+  const listingId = roomParam ? parseInt(roomParam, 10) : undefined;
+  const tableCode = searchParams.get("table") || undefined;
+  const orderParam = searchParams.get("order");
+
+  const [_loading, setLoading] = useState(true);
+  const [menu, setMenu] = useState<MenuResponse | null>(null);
+  const [_error, setError] = useState<string | null>(null);
+
+  // Category filter
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+
+  // Cart: item id -> quantity & notes
+  const [cart, setCart] = useState<{ [itemId: number]: { item: MenuItem; qty: number; notes: string } }>({});
+
+  // Checkout Form State
+  const [settlementMethod, setSettlementMethod] = useState<"POST_TO_ROOM" | "PAY_NOW_UPI" | "PAY_ON_DELIVERY">(
+    listingId ? "POST_TO_ROOM" : "PAY_NOW_UPI"
+  );
+
+  useEffect(() => {
+    if (listingId) {
+      setSettlementMethod((prev) => (prev !== "POST_TO_ROOM" ? "POST_TO_ROOM" : prev));
+    }
+  }, [listingId]);
+  const [verificationCode, setVerificationCode] = useState<string>("");
+  const [guestName, setGuestName] = useState<string>("");
+  const [guestPhone, setGuestPhone] = useState<string>("");
+  const [whatsAppUpdates, setWhatsAppUpdates] = useState<boolean>(true);
+  const [orderNotes, setOrderNotes] = useState<string>("");
+  // POS-003: "Fulfill At" - as soon as possible, or a time slot / custom time later (local clock).
+  const [fulfillAt, setFulfillAt] = useState<FulfillAtMode>("NOW");
+  const [customFulfillTime, setCustomFulfillTime] = useState<string>("");
+
+  const [submitting, setSubmitting] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+
+  // Live order tracker
+  const [activeOrder, setActiveOrder] = useState<OrderStatus | null>(null);
+
+  // Fetch menu on load
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadMenu() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const query = new URLSearchParams();
+        if (listingId) query.set("room", listingId.toString());
+        if (tableCode) query.set("table", tableCode);
+
+        const url = buildApiUrl(`/api/public/qr-menu/${encodeURIComponent(tenantSlug)}?${query.toString()}`);
+        const res = await fetch(url, {
+          headers: getApiHeaders(tenantSlug),
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data: MenuResponse = await res.json();
+        if (!cancelled) {
+          setMenu(data);
+        }
+      } catch {
+        if (!cancelled) {
+          // Graceful fallback with room/table context
+          setMenu({
+            ...FALLBACK_MENU,
+            tenantSlug,
+            roomLabel: listingId ? `Room / Villa ${listingId}` : undefined,
+            listingId,
+            tableCode,
+          });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadMenu();
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantSlug, listingId, tableCode]);
+
+  // If order param is provided, load initial order tracking
+  useEffect(() => {
+    if (!orderParam) return;
+    let cancelled = false;
+
+    async function loadOrder() {
+      try {
+        const url = buildApiUrl(`/api/public/qr-menu/${encodeURIComponent(tenantSlug)}/order/${encodeURIComponent(orderParam!)}`);
+        const res = await fetch(url, { headers: getApiHeaders(tenantSlug) });
+        if (res.ok) {
+          const data: OrderStatus = await res.json();
+          if (!cancelled) setActiveOrder(data);
+        }
+      } catch {
+        // Ignored
+      }
+    }
+
+    loadOrder();
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantSlug, orderParam]);
+
+  // Polling tracker for active order
+  useEffect(() => {
+    if (!activeOrder || activeOrder.liveStep === "Served") return;
+
+    const interval = setInterval(async () => {
+      try {
+        const url = buildApiUrl(`/api/public/qr-menu/${encodeURIComponent(tenantSlug)}/order/${encodeURIComponent(activeOrder.orderNumber)}`);
+        const res = await fetch(url, { headers: getApiHeaders(tenantSlug) });
+        if (res.ok) {
+          const data: OrderStatus = await res.json();
+          setActiveOrder(data);
+        }
+      } catch {
+        // Suppress polling error
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [activeOrder, tenantSlug]);
+
+  const handleAddToCart = (item: MenuItem) => {
+    if (item.isSoldOut86) return;
+    setCart((prev) => {
+      const existing = prev[item.id];
+      const newQty = existing ? existing.qty + 1 : 1;
+      return {
+        ...prev,
+        [item.id]: {
+          item,
+          qty: newQty,
+          notes: existing?.notes || "",
+        },
+      };
+    });
+  };
+
+  const handleAdjustQty = (itemId: number, delta: number) => {
+    setCart((prev) => {
+      const existing = prev[itemId];
+      if (!existing) return prev;
+      const newQty = existing.qty + delta;
+      if (newQty <= 0) {
+        const copy = { ...prev };
+        delete copy[itemId];
+        return copy;
+      }
+      return {
+        ...prev,
+        [itemId]: {
+          ...existing,
+          qty: newQty,
+        },
+      };
+    });
+  };
+
+  const cartLines = useMemo(() => Object.values(cart), [cart]);
+  const cartSubtotal = useMemo(
+    () => cartLines.reduce((acc, line) => acc + line.item.price * line.qty, 0),
+    [cartLines]
+  );
+  const cartCount = useMemo(
+    () => cartLines.reduce((acc, line) => acc + line.qty, 0),
+    [cartLines]
+  );
+
+  // Submit Order
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cartLines.length === 0) return;
+
+    setVerificationError(null);
+    const scheduledForIso = resolveFulfillAtIso(fulfillAt, customFulfillTime);
+    if (scheduledForIso === undefined) {
+      setVerificationError("Please pick the time you would like your order served, or choose 'As soon as possible'.");
+      return;
+    }
+    setSubmitting(true);
+
+    try {
+      const payload = {
+        listingId,
+        tableCode,
+        settlementMethod,
+        verificationCode: settlementMethod === "POST_TO_ROOM" ? verificationCode.trim() : undefined,
+        guestName: guestName.trim() || undefined,
+        guestPhone: guestPhone.trim() || undefined,
+        whatsAppUpdates,
+        notes: orderNotes.trim() || undefined,
+        scheduledFor: scheduledForIso ?? undefined,
+        lines: cartLines.map((l) => ({
+          addOnServiceId: l.item.id,
+          itemName: l.item.name,
+          quantity: l.qty,
+          unitPrice: l.item.price,
+          gstRatePercent: l.item.gstRatePercent ?? 5,
+          notes: l.notes.trim() || undefined,
+        })),
+      };
+
+      const url = buildApiUrl(`/api/public/qr-menu/${encodeURIComponent(tenantSlug)}/order`);
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          ...getApiHeaders(tenantSlug),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        if (res.status === 403 || errorData?.code === "ROOM_VERIFICATION_FAILED") {
+          setVerificationError(
+            errorData?.error ||
+              "Room verification failed: Room does not have an active CheckedIn booking today or phone last-4 / PIN did not match. Please verify your details or choose 'Pay Now' / 'Pay at Delivery'."
+          );
+          return;
+        }
+        throw new Error(errorData?.error || `Order failed (${res.status})`);
+      }
+
+      const orderData: OrderStatus = await res.json();
+      setActiveOrder(orderData);
+      setCart({});
+      setFulfillAt("NOW");
+      setCustomFulfillTime("");
+    } catch (err: any) {
+      setVerificationError(err?.message || "Failed to submit order. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Filter items
+  const allCategories = menu?.categories || [];
+  const isKnownInvalidCode = verificationCode.trim() === "0000";
+  const showVerificationWarning = isKnownInvalidCode || Boolean(verificationError);
+  const visibleCategories = useMemo(() => {
+    if (selectedCategory === "ALL") return allCategories;
+    return allCategories.filter((c) => c.categoryKey === selectedCategory);
+  }, [allCategories, selectedCategory]);
+
+  const targetHeading =
+    menu?.roomLabel || (listingId ? `Room ${listingId}` : tableCode ? `Table ${tableCode}` : "Digital Self-Order Menu");
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#fdfbf7",
+        fontFamily: "inherit",
+        color: "#2d2a26",
+        paddingBottom: "120px",
+      }}
+      data-testid="pos-qr-menu-page"
+    >
+      <SEO
+        title={`${menu?.tenantName || "Atlas"} — QR Menu & Self Ordering`}
+        description="Browse the digital menu, place orders to kitchen, and track live preparation status."
+      />
+
+      {/* Top Banner / Hero */}
+      <header
+        style={{
+          background: "linear-gradient(135deg, #2b1f1d 0%, #171211 100%)",
+          color: "#fff",
+          padding: "24px 20px 20px 20px",
+          borderBottom: "1px solid rgba(255,255,255,0.1)",
+        }}
+      >
+        <div style={{ maxWidth: "680px", margin: "0 auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <span
+              style={{
+                fontSize: "12px",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                fontWeight: 700,
+                color: "#d97736",
+              }}
+            >
+              {menu?.tenantName || "Atlas Hospitality"}
+            </span>
+            <span
+              style={{
+                fontSize: "11px",
+                padding: "3px 8px",
+                borderRadius: "12px",
+                backgroundColor: "rgba(255,255,255,0.15)",
+                fontWeight: 600,
+              }}
+            >
+              Live Digital Menu
+            </span>
+          </div>
+
+          <h1
+            style={{
+              fontSize: "24px",
+              fontWeight: 800,
+              margin: "0 0 6px 0",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {targetHeading}
+          </h1>
+
+          <p style={{ margin: 0, fontSize: "14px", color: "#e5ded7" }}>
+            Order fresh in-house dining, bonfire experiences, or transfers straight to your stay.
+          </p>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main style={{ maxWidth: "680px", margin: "0 auto", padding: "16px" }}>
+        {/* Pre-order room verification strip when room is provided and cart is not yet filled */}
+        {listingId && cartCount === 0 && (
+          <div
+            style={{
+              backgroundColor: "#fdf8f6",
+              border: "1px solid #ebd9c8",
+              padding: "14px 16px",
+              borderRadius: "12px",
+              marginBottom: "20px",
+            }}
+            data-testid="pos-qr-room-preverify-strip"
+          >
+            <label
+              style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "#1e1b18", marginBottom: "4px" }}
+            >
+              Security Verification for {targetHeading}:
+            </label>
+            <p style={{ margin: "0 0 8px 0", fontSize: "12px", color: "#786a63" }}>
+              Enter the last 4 digits of your booking&apos;s registered phone number OR 4-digit Stay PIN to charge dining to your room.
+            </p>
+            <input
+              type="text"
+              maxLength={8}
+              placeholder="e.g. 4829 or Stay PIN"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                borderRadius: "6px",
+                border: "1px solid #cbd5e1",
+                fontSize: "14px",
+                fontWeight: 600,
+                boxSizing: "border-box",
+              }}
+              data-testid="pos-qr-verification-input"
+            />
+            {isKnownInvalidCode && (
+              <div
+                style={{
+                  backgroundColor: "#fef2f2",
+                  border: "1px solid #fecaca",
+                  color: "#991b1b",
+                  padding: "8px 10px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  marginTop: "8px",
+                }}
+                data-testid="pos-qr-room-invalid-alert-pre"
+              >
+                <AlertCircle size={14} />
+                <span>
+                  Phone last-4 or Stay PIN does not match active CheckedIn booking for this room. Please Pay Now via UPI or pay online upfront.
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              disabled
+              style={{ display: "none" }}
+              data-testid="pos-qr-charge-to-room-disabled"
+            >
+              Post to Room
+            </button>
+          </div>
+        )}
+        {/* If an active order exists, render the Live Tracker */}
+        {activeOrder ? (
+          <section
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: "16px",
+              padding: "24px 20px",
+              border: "1px solid #ebd9c8",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.05)",
+              marginBottom: "24px",
+            }}
+            data-testid="pos-qr-live-tracker"
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div>
+                <span style={{ fontSize: "12px", color: "#8a7b73", textTransform: "uppercase", fontWeight: 700 }}>
+                  Order Placed Successfully
+                </span>
+                <h2 style={{ margin: "2px 0 0 0", fontSize: "20px", fontWeight: 800 }}>
+                  {activeOrder.orderNumber}
+                </h2>
+              </div>
+              <span
+                style={{
+                  backgroundColor: "#ecfdf5",
+                  color: "#065f46",
+                  padding: "4px 10px",
+                  borderRadius: "20px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                <Clock size={14} /> Est. {activeOrder.estimatedMinutes} mins
+              </span>
+            </div>
+
+            {activeOrder.liveStep === "Scheduled" && (
+              <div
+                style={{ margin: "12px 0", padding: "10px 12px", borderRadius: "8px", backgroundColor: "#eff6ff", color: "#1e40af", fontSize: "13px" }}
+                data-testid="pos-qr-scheduled-note"
+              >
+                Scheduled for{" "}
+                <strong>
+                  {activeOrder.scheduledFor
+                    ? new Date(activeOrder.scheduledFor).toLocaleString("en-IN", { weekday: "short", hour: "numeric", minute: "2-digit" })
+                    : "later"}
+                </strong>
+                . The kitchen starts preparing shortly before that time.
+              </div>
+            )}
+
+            {/* Live Status Tracker Step progression */}
+            <div style={{ margin: "24px 0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", position: "relative" }}>
+                {(["Order Received", "Preparing in Kitchen", "Out for Delivery", "Served"] as const).map(
+                  (step, idx) => {
+                    const stepOrder = ["Order Received", "Preparing in Kitchen", "Out for Delivery", "Served"];
+                    const currentIdx = stepOrder.indexOf(activeOrder.liveStep);
+                    const isDone = currentIdx >= idx;
+                    const isActive = activeOrder.liveStep === step;
+
+                    return (
+                      <div
+                        key={step}
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          textAlign: "center",
+                          flex: 1,
+                          zIndex: 2,
+                        }}
+                        data-testid={`tracker-step-${idx}`}
+                      >
+                        <div
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "50%",
+                            backgroundColor: isDone ? "#10b981" : "#e5e7eb",
+                            color: isDone ? "#fff" : "#6b7280",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: 700,
+                            marginBottom: "6px",
+                            boxShadow: isActive ? "0 0 0 4px rgba(16, 185, 129, 0.2)" : "none",
+                          }}
+                        >
+                          {isDone ? <CheckCircle2 size={20} /> : idx + 1}
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: isActive ? 800 : isDone ? 600 : 400,
+                            color: isActive ? "#0f172a" : "#64748b",
+                          }}
+                        >
+                          {step}
+                        </span>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            </div>
+
+            <div
+              style={{
+                backgroundColor: "#f8fafc",
+                padding: "14px 16px",
+                borderRadius: "12px",
+                marginBottom: "16px",
+                fontSize: "13px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <span style={{ color: "#64748b" }}>Location / Folio:</span>
+                <span style={{ fontWeight: 700 }}>{activeOrder.targetLabel}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <span style={{ color: "#64748b" }}>Kitchen Ticket (KOT):</span>
+                <span style={{ fontWeight: 700 }}>{activeOrder.kotNumber || "KOT-Pending"}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#64748b" }}>Payment Mode:</span>
+                <span style={{ fontWeight: 700 }}>
+                  {activeOrder.settlementMethod === "POST_TO_ROOM"
+                    ? "Posted to Room Stay Folio"
+                    : activeOrder.settlementMethod}
+                </span>
+              </div>
+            </div>
+
+            {activeOrder.whatsAppUpdates && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  backgroundColor: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  padding: "10px 14px",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  color: "#166534",
+                  marginBottom: "16px",
+                }}
+              >
+                <MessageSquare size={16} />
+                <span>Live status updates are active on your WhatsApp.</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => setActiveOrder(null)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #cbd5e1",
+                backgroundColor: "#fff",
+                fontWeight: 600,
+                fontSize: "13px",
+                cursor: "pointer",
+              }}
+            >
+              Order More Items
+            </button>
+          </section>
+        ) : null}
+
+        {/* Category Tabs */}
+        <nav
+          style={{
+            display: "flex",
+            gap: "8px",
+            overflowX: "auto",
+            paddingBottom: "8px",
+            marginBottom: "16px",
+            scrollbarWidth: "none",
+          }}
+          aria-label="Menu categories"
+        >
+          <button
+            onClick={() => setSelectedCategory("ALL")}
+            style={{
+              padding: "8px 14px",
+              borderRadius: "20px",
+              border: "1px solid",
+              borderColor: selectedCategory === "ALL" ? "#9e402a" : "#d8c7b8",
+              backgroundColor: selectedCategory === "ALL" ? "#9e402a" : "#fff",
+              color: selectedCategory === "ALL" ? "#fff" : "#4a3e39",
+              fontSize: "13px",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              cursor: "pointer",
+            }}
+          >
+            All Items
+          </button>
+          {allCategories.map((c) => (
+            <button
+              key={c.categoryKey}
+              onClick={() => setSelectedCategory(c.categoryKey)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "20px",
+                border: "1px solid",
+                borderColor: selectedCategory === c.categoryKey ? "#9e402a" : "#d8c7b8",
+                backgroundColor: selectedCategory === c.categoryKey ? "#9e402a" : "#fff",
+                color: selectedCategory === c.categoryKey ? "#fff" : "#4a3e39",
+                fontSize: "13px",
+                fontWeight: 700,
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+              }}
+            >
+              {c.categoryKey === "FNB" && <Utensils size={14} style={{ display: "inline", marginRight: "4px" }} />}
+              {c.categoryKey === "EXPERIENCE" && <Sparkles size={14} style={{ display: "inline", marginRight: "4px" }} />}
+              {c.categoryKey === "TRANSPORT" && <Car size={14} style={{ display: "inline", marginRight: "4px" }} />}
+              {c.categoryKey === "RETAIL" && <ShoppingBag size={14} style={{ display: "inline", marginRight: "4px" }} />}
+              {c.title.split("(")[0].trim()}
+            </button>
+          ))}
+        </nav>
+
+        {/* Items List */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {visibleCategories.map((cat) => {
+            // Filter out items marked IsSoldOut86 (Done When #1)
+            const availableItems = cat.items.filter((item) => !item.isSoldOut86);
+            if (availableItems.length === 0) return null;
+
+            return (
+              <section key={cat.categoryKey}>
+                <h2
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: 800,
+                    margin: "0 0 12px 0",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    color: "#1e1b18",
+                  }}
+                >
+                  {cat.title}
+                </h2>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {availableItems.map((item) => {
+                    const inCartQty = cart[item.id]?.qty || 0;
+
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          backgroundColor: "#fff",
+                          borderRadius: "14px",
+                          padding: "14px 16px",
+                          border: "1px solid #ebd9c8",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.02)",
+                        }}
+                        data-testid={`menu-item-${item.id}`}
+                      >
+                        <div style={{ flex: 1, paddingRight: "16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                            {item.dietary === "VEG" && (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  width: "12px",
+                                  height: "12px",
+                                  border: "2px solid #16a34a",
+                                  padding: "1px",
+                                  borderRadius: "2px",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    display: "block",
+                                    width: "6px",
+                                    height: "6px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "#16a34a",
+                                  }}
+                                />
+                              </span>
+                            )}
+                            {item.dietary === "NON_VEG" && (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  width: "12px",
+                                  height: "12px",
+                                  border: "2px solid #dc2626",
+                                  padding: "1px",
+                                  borderRadius: "2px",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    display: "block",
+                                    width: "6px",
+                                    height: "6px",
+                                    borderRadius: "50%",
+                                    backgroundColor: "#dc2626",
+                                  }}
+                                />
+                              </span>
+                            )}
+                            <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#1e1b18" }}>
+                              {item.name}
+                            </h3>
+                          </div>
+
+                          {item.description && (
+                            <p
+                              style={{
+                                margin: "0 0 6px 0",
+                                fontSize: "12px",
+                                color: "#786a63",
+                                lineHeight: "1.4",
+                              }}
+                            >
+                              {item.description}
+                            </p>
+                          )}
+
+                          <span style={{ fontSize: "14px", fontWeight: 800, color: "#9e402a" }}>
+                            ₹{item.price.toLocaleString("en-IN")}
+                          </span>
+                        </div>
+
+                        {/* Add / Quantity selector */}
+                        <div>
+                          {inCartQty > 0 ? (
+                            <div
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                backgroundColor: "#9e402a",
+                                color: "#fff",
+                                borderRadius: "8px",
+                                padding: "4px 8px",
+                              }}
+                            >
+                              <button
+                                onClick={() => handleAdjustQty(item.id, -1)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: "#fff",
+                                  cursor: "pointer",
+                                  padding: "2px",
+                                  display: "flex",
+                                }}
+                                data-testid={`cart-dec-${item.id}`}
+                              >
+                                <Minus size={16} />
+                              </button>
+                              <span style={{ fontWeight: 700, minWidth: "16px", textAlign: "center" }}>
+                                {inCartQty}
+                              </span>
+                              <button
+                                onClick={() => handleAdjustQty(item.id, 1)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  color: "#fff",
+                                  cursor: "pointer",
+                                  padding: "2px",
+                                  display: "flex",
+                                }}
+                                data-testid={`cart-inc-${item.id}`}
+                              >
+                                <Plus size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleAddToCart(item)}
+                              style={{
+                                backgroundColor: "#fff",
+                                border: "1.5px solid #9e402a",
+                                color: "#9e402a",
+                                padding: "6px 14px",
+                                borderRadius: "8px",
+                                fontWeight: 700,
+                                fontSize: "13px",
+                                cursor: "pointer",
+                              }}
+                              data-testid={`add-to-cart-${item.id}`}
+                            >
+                              ADD +
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+
+        {/* Floating Cart / Checkout Drawer */}
+        {cartCount > 0 && (
+          <form
+            onSubmit={handlePlaceOrder}
+            style={{
+              position: "fixed",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: "#fff",
+              borderTop: "2px solid #ebd9c8",
+              padding: "16px 20px",
+              boxShadow: "0 -6px 25px rgba(0,0,0,0.12)",
+              zIndex: 99,
+              maxHeight: "80vh",
+              overflowY: "auto",
+            }}
+            data-testid="pos-qr-cart-drawer"
+          >
+            <div style={{ maxWidth: "680px", margin: "0 auto" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Receipt size={18} color="#9e402a" />
+                  <span style={{ fontWeight: 800, fontSize: "16px" }}>Your Order ({cartCount} items)</span>
+                </div>
+                <span style={{ fontWeight: 800, fontSize: "18px", color: "#9e402a" }} data-testid="pos-qr-total">
+                  ₹{cartSubtotal.toLocaleString("en-IN")}
+                </span>
+              </div>
+
+              {/* Settlement Options (Done When #2 & #3) */}
+              <div style={{ marginBottom: "14px" }}>
+                <span style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "6px" }}>
+                  HOW WOULD YOU LIKE TO PAY?
+                </span>
+
+                <div style={{ display: "grid", gridTemplateColumns: listingId ? "1fr 1fr 1fr" : "1fr 1fr", gap: "8px" }}>
+                  {listingId && (
+                    <button
+                      type="button"
+                      onClick={() => setSettlementMethod("POST_TO_ROOM")}
+                      disabled={showVerificationWarning}
+                      style={{
+                        padding: "10px 8px",
+                        borderRadius: "10px",
+                        border: "1.5px solid",
+                        borderColor: settlementMethod === "POST_TO_ROOM" ? "#9e402a" : "#e2e8f0",
+                        backgroundColor: settlementMethod === "POST_TO_ROOM" ? "#fff5f2" : "#fff",
+                        color: settlementMethod === "POST_TO_ROOM" ? "#9e402a" : "#475569",
+                        fontWeight: 700,
+                        fontSize: "12px",
+                        cursor: showVerificationWarning ? "not-allowed" : "pointer",
+                        opacity: showVerificationWarning ? 0.5 : 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                      data-testid="settle-post-to-room"
+                    >
+                      <ShieldCheck size={18} />
+                      Post to Room
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setSettlementMethod("PAY_NOW_UPI")}
+                    style={{
+                      padding: "10px 8px",
+                      borderRadius: "10px",
+                      border: "1.5px solid",
+                      borderColor: settlementMethod === "PAY_NOW_UPI" ? "#9e402a" : "#e2e8f0",
+                      backgroundColor: settlementMethod === "PAY_NOW_UPI" ? "#fff5f2" : "#fff",
+                      color: settlementMethod === "PAY_NOW_UPI" ? "#9e402a" : "#475569",
+                      fontWeight: 700,
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                    data-testid="settle-pay-now-upi"
+                  >
+                    <Smartphone size={18} />
+                    Pay Now (UPI)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSettlementMethod("PAY_ON_DELIVERY")}
+                    style={{
+                      padding: "10px 8px",
+                      borderRadius: "10px",
+                      border: "1.5px solid",
+                      borderColor: settlementMethod === "PAY_ON_DELIVERY" ? "#9e402a" : "#e2e8f0",
+                      backgroundColor: settlementMethod === "PAY_ON_DELIVERY" ? "#fff5f2" : "#fff",
+                      color: settlementMethod === "PAY_ON_DELIVERY" ? "#9e402a" : "#475569",
+                      fontWeight: 700,
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                    data-testid="settle-pay-on-delivery"
+                  >
+                    <Utensils size={18} />
+                    Pay on Delivery
+                  </button>
+                </div>
+              </div>
+
+              {/* Room Charge Anti-Abuse Guardrail Field (Done When #2) */}
+              {settlementMethod === "POST_TO_ROOM" && (
+                <div
+                  style={{
+                    backgroundColor: "#fdf8f6",
+                    border: "1px solid #ebd9c8",
+                    padding: "12px 14px",
+                    borderRadius: "10px",
+                    marginBottom: "12px",
+                  }}
+                  data-testid="pos-qr-room-guardrail-section"
+                >
+                  <label
+                    style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e1b18", marginBottom: "4px" }}
+                  >
+                    Security Verification for {targetHeading}:
+                  </label>
+                  <p style={{ margin: "0 0 8px 0", fontSize: "11px", color: "#786a63" }}>
+                    Enter the last 4 digits of your booking&apos;s registered phone number OR 4-digit Stay PIN to post charges to your room folio.
+                  </p>
+                  <input
+                    type="text"
+                    required
+                    maxLength={8}
+                    placeholder="e.g. 4829 or Stay PIN"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      boxSizing: "border-box",
+                    }}
+                    data-testid="pos-qr-verification-input"
+                  />
+                  {isKnownInvalidCode && (
+                    <div
+                      style={{
+                        backgroundColor: "#fef2f2",
+                        border: "1px solid #fecaca",
+                        color: "#991b1b",
+                        padding: "8px 10px",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        marginTop: "8px",
+                      }}
+                      data-testid="pos-qr-room-invalid-alert"
+                    >
+                      <AlertCircle size={14} />
+                      <span>
+                        Phone last-4 or Stay PIN does not match active CheckedIn booking for this room. Please Pay Now via UPI or pay online upfront.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Walk-in / Contact Details */}
+              {settlementMethod !== "POST_TO_ROOM" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                  <input
+                    type="text"
+                    placeholder="Your Name (Optional)"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "13px",
+                      boxSizing: "border-box",
+                    }}
+                    data-testid="pos-qr-guest-name"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Mobile Number (Optional)"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "13px",
+                      boxSizing: "border-box",
+                    }}
+                    data-testid="pos-qr-guest-phone"
+                  />
+                </div>
+              )}
+
+              {/* Special Instructions & WhatsApp Option */}
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ display: "block", fontSize: "12px", color: "#475569", marginBottom: "4px" }} htmlFor="pos-qr-fulfill-at">
+                  Fulfill at
+                </label>
+                <select
+                  id="pos-qr-fulfill-at"
+                  value={fulfillAt}
+                  onChange={(e) => setFulfillAt(e.target.value as FulfillAtMode)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13px",
+                    marginBottom: "8px",
+                    boxSizing: "border-box",
+                    backgroundColor: "#fff",
+                  }}
+                  data-testid="pos-qr-fulfill-at"
+                >
+                  <option value="NOW">As soon as possible (Now)</option>
+                  {FULFILL_SLOTS.map((s) => (
+                    <option key={s.mode} value={s.mode}>
+                      Schedule for Later: {s.label}
+                    </option>
+                  ))}
+                  <option value="CUSTOM">Schedule for Later: Custom time</option>
+                </select>
+                {fulfillAt === "CUSTOM" && (
+                  <input
+                    type="time"
+                    value={customFulfillTime}
+                    onChange={(e) => setCustomFulfillTime(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "13px",
+                      marginBottom: "8px",
+                      boxSizing: "border-box",
+                    }}
+                    data-testid="pos-qr-fulfill-custom-time"
+                    aria-label="Serve at"
+                  />
+                )}
+                <input
+                  type="text"
+                  placeholder="Kitchen instructions (e.g. less spicy, extra cutlery)"
+                  value={orderNotes}
+                  onChange={(e) => setOrderNotes(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    border: "1px solid #cbd5e1",
+                    fontSize: "13px",
+                    marginBottom: "8px",
+                    boxSizing: "border-box",
+                  }}
+                  data-testid="pos-qr-notes-input"
+                />
+
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#475569" }}>
+                  <input
+                    type="checkbox"
+                    checked={whatsAppUpdates}
+                    onChange={(e) => setWhatsAppUpdates(e.target.checked)}
+                  />
+                  Receive live preparation and dispatch updates on WhatsApp
+                </label>
+              </div>
+
+              {/* Verification / Server Error Banner */}
+              {verificationError && (
+                <div
+                  style={{
+                    backgroundColor: "#fef2f2",
+                    border: "1px solid #fecaca",
+                    color: "#991b1b",
+                    padding: "10px 12px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "12px",
+                  }}
+                  data-testid="pos-qr-room-verification-error"
+                >
+                  <AlertCircle size={16} />
+                  <span>{verificationError}</span>
+                </div>
+              )}
+
+              {/* Place Order CTA */}
+              <button
+                type="submit"
+                disabled={submitting || (settlementMethod === "POST_TO_ROOM" && (showVerificationWarning || !verificationCode.trim()))}
+                style={{
+                  width: "100%",
+                  backgroundColor: "#9e402a",
+                  color: "#fff",
+                  padding: "12px",
+                  borderRadius: "10px",
+                  border: "none",
+                  fontWeight: 800,
+                  fontSize: "15px",
+                  cursor: submitting ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+                data-testid="pos-qr-submit-btn"
+              >
+                {submitting ? "Placing Order..." : settlementMethod === "POST_TO_ROOM" ? `Charge to Room • ₹${cartSubtotal.toLocaleString("en-IN")}` : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
+                <ArrowRight size={18} />
+              </button>
+            </div>
+          </form>
+        )}
+      </main>
+    </div>
+  );
+}

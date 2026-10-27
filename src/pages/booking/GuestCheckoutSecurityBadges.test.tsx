@@ -95,6 +95,7 @@ describe("TASK-102074: checkout order-summary trust badges", () => {
       name: "Offline Host",
       paymentProvider: null,
       bookingMode: "WHATSAPP",
+      whatsappBookingPhone: "+919876543210",
     };
 
     await renderPage();

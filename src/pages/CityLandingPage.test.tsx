@@ -23,6 +23,7 @@ const goaListing = {
   propertyName: "Atlas Coastal Villa",
   propertyAddress: "Near Calangute Beach, North Goa, India",
   name: "Garden-view room",
+  displayName: "Garden-view room",
   baseNightlyRate: 4500,
   photoUrls: [] as string[],
   coverPhotoUrl: null as string | null,
@@ -33,6 +34,7 @@ const goaListing = {
 
 describe("CityLandingPage", () => {
   beforeEach(() => {
+    _resetTenantResolutionForTests();
     vi.mocked(fetchPublicListings).mockReset();
   });
 

@@ -1,4 +1,5 @@
 import HostIdentityLabel from '@/components/property/HostIdentityLabel';
+import HostelDormBadge, { isHostelDorm } from '../hostel/HostelDormBadge';
 import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 import React, { useMemo, useState } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
@@ -16,12 +17,17 @@ import {
   type CancellationTier,
 } from "../../utils/cancellationPolicy";
 import { hasOnlinePaymentRail } from "../../tenant/paymentRail";
+import { getListingDisplayName } from "../../lib/listingDisplayName";
 
 type ListingCardProps = {
   hostIdentityVerified?: unknown;
   marketplace?: boolean;
   id: string;
   name: string;
+  displayName?: string | null;
+  publicTitle?: string | null;
+  nameFormatted?: string | null;
+  title?: string | null;
   location: string;
   neighborhoods?: string[];
   image: string;
@@ -32,6 +38,9 @@ type ListingCardProps = {
   /** TASK-4012: review count for rating chip */
   reviewCount?: number | null;
   propertyType: string;
+  accommodationType?: string;
+  /** HSL-011: `Listing.DormGenderPolicy` from the API (FemaleOnly / MaleOnly / Mixed); never guessed from the name. */
+  dormGenderPolicy?: string | null;
   guests: number;
   bedrooms?: number | null;
   hasWifi?: boolean;
@@ -77,6 +86,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
   hostIdentityVerified,
   marketplace = false,
   name,
+  displayName,
+  publicTitle,
+  nameFormatted,
+  title,
   location,
   neighborhoods = [],
   image,
@@ -86,6 +99,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
   reviews,
   reviewCount,
   propertyType,
+  accommodationType,
+  dormGenderPolicy,
   guests,
   bedrooms,
   hasWifi,
@@ -111,6 +126,13 @@ const ListingCard: React.FC<ListingCardProps> = ({
   const showRazorpayChip = hasOnlinePaymentRail();
   const { format: formatCurrency } = useCurrency();
   const { booking } = useBooking();
+
+  /** TASK-10299086: guest-facing display name, preferring displayName/publicTitle/title/nameFormatted over internal code */
+  const resolvedDisplayName = useMemo(() => {
+    const explicitName = displayName?.trim() || publicTitle?.trim() || nameFormatted?.trim();
+    const candidate = explicitName || title?.trim() || name;
+    return getListingDisplayName(id, candidate, explicitName || displayName) || candidate;
+  }, [id, name, displayName, publicTitle, title, nameFormatted]);
   const estimateNights = useMemo(() => {
     if (estimateNightsProp != null) return estimateNightsProp;
     const ci = booking.checkIn ? new Date(booking.checkIn) : null;
@@ -200,6 +222,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
     },
   ].filter((item) => item.visible);
 
+  const isHostel = isHostelDorm({ accommodationType: accommodationType || propertyType, propertyType });
+
   return (
     <article
       className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1"
@@ -210,12 +234,12 @@ const ListingCard: React.FC<ListingCardProps> = ({
         // the focusable element; clicks on the image area follow it naturally.
         <a
           href={href}
-          aria-label={`View photos and room ${name}`}
+          aria-label={`View photos and room ${resolvedDisplayName}`}
           className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]"
         >
           <OptimizedImage
             src={image?.trim() ? image : getPropertyDesignImage(id)}
-            alt={name}
+            alt={resolvedDisplayName}
             className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
             wrapperClassName="h-full"
             sizes="(max-width: 768px) 100vw, 33vw"
@@ -225,10 +249,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
           </span>
         </a>
       ) : (
-        <button type="button" onClick={onClick} aria-label={`View photos and room ${name}`} className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]">
+        <button type="button" onClick={onClick} aria-label={`View photos and room ${resolvedDisplayName}`} className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]">
           <OptimizedImage
             src={image?.trim() ? image : getPropertyDesignImage(id)}
-            alt={name}
+            alt={resolvedDisplayName}
             className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
             wrapperClassName="h-full"
             sizes="(max-width: 768px) 100vw, 33vw"
@@ -245,11 +269,11 @@ const ListingCard: React.FC<ListingCardProps> = ({
             <h3 className="text-lg font-semibold text-text-primary">
               {href ? (
                 <a href={href} className="block min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">
-                  {name}
+                  {resolvedDisplayName}
                 </a>
               ) : (
                 <button type="button" onClick={onClick} className="min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">
-                  {name}
+                  {resolvedDisplayName}
                 </button>
               )}
             </h3>
@@ -304,6 +328,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
         <HostIdentityLabel marketplace={marketplace} verified={hostIdentityVerified} />
 
+        <HostelDormBadge accommodationType={accommodationType || propertyType} propertyType={propertyType} genderPolicy={dormGenderPolicy} />
+
         {/* TASK-1360: Last-booked social-proof badge */}
         {lastBookedLabel && (
           <span className="inline-flex items-center gap-1 self-start rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-xs font-medium text-green-700">
@@ -356,6 +382,14 @@ const ListingCard: React.FC<ListingCardProps> = ({
                       {formatCurrency(originalPrice)}
                     </span>
                   )}
+                  {isHostel && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-semibold text-indigo-700"
+                      data-testid="hostel-per-bed-indicator"
+                    >
+                      Starting from per bed
+                    </span>
+                  )}
                   <div className="text-2xl font-bold leading-tight text-cta-primary">
                     {showTotal && processingFeePercent !== null ? (
                       <>
@@ -368,7 +402,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
                     ) : (
                       <>
                         {formatCurrency(finalPrice)}
-                        <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
+                        <span className="ml-1 text-sm font-semibold text-text-muted" data-testid="price-unit-label">
+                          {isHostel ? 'per bed / night' : '/ night'}
+                        </span>
                       </>
                     )}
                   </div>

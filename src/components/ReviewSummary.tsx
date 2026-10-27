@@ -45,6 +45,32 @@ const SENTIMENT_STYLES: Record<string, { bg: string; text: string; emoji: string
   negative: { bg: "bg-red-50",     text: "text-red-700",     emoji: "😕" },
 };
 
+const reviewSummaryCache = new Map<number, { promise: Promise<ReviewSummaryData | null>; expiresAt: number }>();
+
+export function _clearReviewSummaryCacheForTests(): void {
+  reviewSummaryCache.clear();
+}
+
+function fetchReviewSummary(listingId: number): Promise<ReviewSummaryData | null> {
+  const now = Date.now();
+  const cached = reviewSummaryCache.get(listingId);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+
+  const promise = fetch(buildApiUrl(`/api/listings/${listingId}/reviews/summary`), {
+    headers: getApiHeaders(),
+  })
+    .then((res) => {
+      if (res.status === 204 || !res.ok) return null;
+      return res.json() as Promise<ReviewSummaryData>;
+    })
+    .catch(() => null);
+
+  reviewSummaryCache.set(listingId, { promise, expiresAt: now + 5 * 60 * 1000 });
+  return promise;
+}
+
 export default function ReviewSummary({ listingId, verifiedStayCount }: ReviewSummaryProps) {
   const [data, setData] = useState<ReviewSummaryData | null>(null);
 
@@ -52,24 +78,9 @@ export default function ReviewSummary({ listingId, verifiedStayCount }: ReviewSu
     if (!listingId) return;
     let active = true;
 
-    fetch(buildApiUrl(`/api/listings/${listingId}/reviews/summary`), {
-      headers: getApiHeaders(),
-    })
-      .then((res) => {
-        if (!active) return;
-        if (res.status === 204) {
-          setData(null);
-          return;
-        }
-        if (!res.ok) return;
-        return res.json();
-      })
-      .then((json) => {
-        if (active && json) setData(json as ReviewSummaryData);
-      })
-      .catch(() => {
-        // Non-critical — silently skip if API unavailable or listing has no reviews.
-      });
+    void fetchReviewSummary(listingId).then((json) => {
+      if (active) setData(json);
+    });
 
     return () => {
       active = false;

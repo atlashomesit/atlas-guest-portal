@@ -192,7 +192,27 @@ describe("Slider hero search", () => {
     expect(screen.getByRole("status")).toHaveTextContent(/hero form ready/i);
   });
 
+  it("GUEST-037: pay-at-host tenant gets no '24 hours' refund chip (host arranges refunds)", () => {
+    vi.mocked(getTenantContext).mockReturnValue({
+      name: "Comfort Cove",
+      slug: "comfortcove",
+      isMarketplaceRoot: false,
+      paymentProvider: undefined,
+      bookingMode: "WHATSAPP",
+    });
+    renderSlider();
+    expect(screen.getByTestId("hero-refund-processing-chip")).toHaveTextContent("Host-managed refunds");
+    expect(screen.queryByText(/within 24 hours/i)).toBeNull();
+  });
+
   it("shows the inline trust strip without inventing free-cancellation hour counts (TASK-7201 / DESIGN-028)", () => {
+    vi.mocked(getTenantContext).mockReturnValue({
+      name: "Atlas Homestays",
+      slug: "atlas",
+      isMarketplaceRoot: true,
+      paymentProvider: "RAZORPAY",
+      bookingMode: "ONLINE",
+    });
     renderSlider();
     // Home v2: trust badges section replaced with inline strip inside the hero.
     // TASK-7201 / DESIGN-028: hero has no listing context — defer free-cancel deadlines to

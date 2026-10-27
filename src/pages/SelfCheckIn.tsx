@@ -4,9 +4,12 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
+import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
 
 interface CheckinDetails {
+  /** BNB-009: lets the page reach the booking-link-token guest endpoints (meal preferences). */
+  bookingId?: number;
   bookingRef: string;
   listingName: string;
   propertyAddress: string;
@@ -29,6 +32,12 @@ interface CheckinDetails {
   houseRulesSignedAt?: string | null;
   guestCount?: number | null;
   guestName?: string | null;
+  /**
+   * NOTIF-048: whether we can already reach the guest on WhatsApp / email. Booleans only, the API never
+   * returns the contact itself. When `guestHasDeliverablePhone` is false the WhatsApp number is required.
+   */
+  guestHasDeliverablePhone?: boolean;
+  guestHasUsableEmail?: boolean;
   /**
    * TASK-102915: split-stay legs, in date order. The public check-in endpoint
    * returns every leg with its dates plus the door code for the CURRENT leg
@@ -77,6 +86,21 @@ export interface GuestInfo {
   activeVerifyTab?: "digilocker" | "otp" | "photo";
 }
 
+/**
+ * NOTIF-048: quick client-side shape checks so an obvious typo is caught before the long flow finishes.
+ * The server (GuestPhoneNormalizer / EmailAddressRules) stays authoritative. Phone: an Indian mobile
+ * (10 digits starting 6-9, optionally with 0 or 91 in front) or an international +country-code number.
+ */
+function isPlausibleGuestPhone(raw: string): boolean {
+  const stripped = raw.trim().replace(/[\s\-().]/g, "");
+  if (stripped.startsWith("+")) return /^\+[1-9]\d{7,14}$/.test(stripped);
+  return /^(?:0|91)?[6-9]\d{9}$/.test(stripped);
+}
+
+function isPlausibleGuestEmail(raw: string): boolean {
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(raw.trim());
+}
+
 type Step = "auth" | "summary" | "id-upload" | "house-rules" | "damage-waiver" | "done";
 
 export default function SelfCheckIn() {
@@ -96,6 +120,11 @@ export default function SelfCheckIn() {
   }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // GUEST-030: a /check-in/{ref}?t=... link opens straight into the stay summary on the token
+  // alone; the last-name form is only the fallback when that link is invalid or expired.
+  const [autoVerifying, setAutoVerifying] = useState(Boolean(urlRef && token));
+  const [tokenFallbackNotice, setTokenFallbackNotice] = useState(false);
+  const autoVerifyStartedRef = useRef(false);
   const [govtIdType, setGovtIdType] = useState("");
   const [govtIdNumber, setGovtIdNumber] = useState("");
   const [rulesAccepted, setRulesAccepted] = useState(false);
@@ -115,6 +144,11 @@ export default function SelfCheckIn() {
   // TASK-4514: Collect arrival time and guest count in canonical flow
   const [arrivalTime, setArrivalTime] = useState("");
   const [guestCount, setGuestCount] = useState("");
+  // NOTIF-048: contact details typed on the summary step. Held in memory only (never logged or stored).
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhoneError, setContactPhoneError] = useState("");
+  const [contactEmailError, setContactEmailError] = useState("");
   // TASK-5125 / TASK-101110: do not default to India — a blank field must not overwrite a
   // host-set foreign nationality on complete (API also preserves host-set when nationality omitted).
   const [nationality, setNationality] = useState("");
@@ -288,8 +322,8 @@ export default function SelfCheckIn() {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File must be under 10 MB.");
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File must be under 5 MB.");
       return;
     }
 
@@ -317,6 +351,22 @@ export default function SelfCheckIn() {
       setError("Please enter the number of guests (at least 1) to continue.");
       return;
     }
+    // NOTIF-048: contact checks. The phone is required only when we have no number we can message.
+    let phoneMsg = "";
+    let emailMsg = "";
+    if (!contactPhone.trim()) {
+      if (details?.guestHasDeliverablePhone === false) {
+        phoneMsg = "Please enter your WhatsApp mobile number. We need it to send your Wi-Fi details, arrival directions and door passkey.";
+      }
+    } else if (!isPlausibleGuestPhone(contactPhone)) {
+      phoneMsg = "Please enter a valid WhatsApp mobile number. For a number outside India, start with + and the country code.";
+    }
+    if (contactEmail.trim() && !isPlausibleGuestEmail(contactEmail)) {
+      emailMsg = "Please enter a valid email address, for example name@example.com.";
+    }
+    setContactPhoneError(phoneMsg);
+    setContactEmailError(emailMsg);
+    if (phoneMsg || emailMsg) return;
     setError("");
     setGuests((prev) => {
       const updated: GuestInfo[] = [];
@@ -418,7 +468,8 @@ export default function SelfCheckIn() {
     try {
       const form = new FormData();
       form.append("signatureType", payload.signatureType);
-      if (payload.typedName) form.append("typedName", payload.typedName);
+      const effectiveTypedName = payload.typedName?.trim() || details?.guestName || "";
+      if (effectiveTypedName) form.append("typedName", effectiveTypedName);
       if (payload.signatureBlob) form.append("signatureBlob", payload.signatureBlob, "signature.png");
 
       const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
@@ -442,6 +493,27 @@ export default function SelfCheckIn() {
       setBusy(false);
     }
   };
+  const applyVerifiedDetails = (data: CheckinDetails) => {
+    setDetails(data);
+    setAlreadySigned(!!data.houseRulesSignedAt);
+    const countStr = data.guestCount ? String(data.guestCount) : (guestCount || "1");
+    setGuestCount(countStr);
+    const initialCount = parseInt(countStr, 10) || 1;
+    const initialGuests: GuestInfo[] = [];
+    for (let i = 0; i < initialCount; i++) {
+      initialGuests.push({
+        name: i === 0 && data.guestName ? data.guestName : "",
+        govtIdType: "",
+        govtIdNumber: "",
+        phoneNumber: "",
+        isVerified: false,
+        activeVerifyTab: "digilocker",
+      });
+    }
+    setGuests(initialGuests);
+    setStep("summary");
+  };
+
   const handleVerify = async () => {
     if (!bookingRef.trim() || !lastName.trim()) {
       setError("Please enter your booking reference and last name.");
@@ -459,30 +531,46 @@ export default function SelfCheckIn() {
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: CheckinDetails = await res.json();
-      setDetails(data);
-      setAlreadySigned(!!data.houseRulesSignedAt);
-      const countStr = data.guestCount ? String(data.guestCount) : (guestCount || "1");
-      setGuestCount(countStr);
-      const initialCount = parseInt(countStr, 10) || 1;
-      const initialGuests: GuestInfo[] = [];
-      for (let i = 0; i < initialCount; i++) {
-        initialGuests.push({
-          name: i === 0 && data.guestName ? data.guestName : "",
-          govtIdType: "",
-          govtIdNumber: "",
-          phoneNumber: "",
-          isVerified: false,
-          activeVerifyTab: "digilocker",
-        });
-      }
-      setGuests(initialGuests);
-      setStep("summary");
+      setTokenFallbackNotice(false);
+      applyVerifiedDetails(data);
     } catch {
       setError("Could not verify your booking. Please try again.");
     } finally {
       setBusy(false);
     }
   };
+
+  // GUEST-030: token-only auto-verify on mount. The API resolves the details READ on a valid
+  // booking-link token alone. The later steps (ID upload, waiver, complete) still send the last
+  // name, so it is taken from the verified booking's guest name the same way the API matches it
+  // (last word). Any failure drops quietly to the last-name form with a gentle notice.
+  useEffect(() => {
+    if (!urlRef || !token || autoVerifyStartedRef.current) return;
+    autoVerifyStartedRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(urlRef.trim())}?t=${encodeURIComponent(token)}`);
+        const res = await fetch(url, { headers: getApiHeaders() });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data: CheckinDetails = await res.json();
+        const derivedLastName = (data.guestName ?? "").trim().split(/\s+/).filter(Boolean).pop() ?? "";
+        if (!derivedLastName) throw new Error("no guest name");
+        if (cancelled) return;
+        setLastName(derivedLastName);
+        applyVerifiedDetails(data);
+      } catch {
+        if (!cancelled) setTokenFallbackNotice(true);
+      } finally {
+        if (!cancelled) setAutoVerifying(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      autoVerifyStartedRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per link (ref + token)
+  }, [urlRef, token]);
 
   const handleComplete = async () => {
     if (!details) return;
@@ -597,9 +685,33 @@ export default function SelfCheckIn() {
           isVerified: primary ? primary.isVerified : aadhaarVcVerified,
           verificationMethod: primary ? primary.verificationMethod : (aadhaarVcVerified ? "DigiLocker" : null),
           additionalGuests: additionalGuestsPayload.length > 0 ? additionalGuestsPayload : null,
+          // NOTIF-048: only sent when the guest typed something; the API validates and nothing is saved on a 400.
+          ...(contactPhone.trim() ? { guestPhone: contactPhone.trim() } : {}),
+          ...(contactEmail.trim() ? { guestEmail: contactEmail.trim() } : {}),
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        if (res.status === 400) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          if (body?.error === "INVALID_GUEST_PHONE" || body?.error === "INVALID_GUEST_EMAIL") {
+            // Nothing was saved. Take the guest back to the field so they can fix it.
+            setContactPhoneError(
+              body.error === "INVALID_GUEST_PHONE"
+                ? "That WhatsApp number doesn't look right. Please check it. For a number outside India, start with + and the country code."
+                : "",
+            );
+            setContactEmailError(
+              body.error === "INVALID_GUEST_EMAIL"
+                ? "That email address doesn't look right. Please enter your own email, for example name@example.com."
+                : "",
+            );
+            setShowSignModal(false);
+            setStep("summary");
+            return;
+          }
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
       setStep("done");
     } catch {
       setError("Could not save your check-in. Please try again.");
@@ -639,10 +751,31 @@ export default function SelfCheckIn() {
         )}
 
         {/* ── Step: Auth ─────────────────────────────────────────── */}
-        {step === "auth" && (
+        {step === "auth" && autoVerifying && (
+          <div
+            data-testid="checkin-auto-verifying"
+            role="status"
+            className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1 text-center"
+          >
+            <h1 className="text-2xl font-bold text-text-primary mb-1">Welcome</h1>
+            <p className="text-text-secondary text-sm">Opening your check-in…</p>
+          </div>
+        )}
+
+        {step === "auth" && !autoVerifying && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1">
             <h1 className="text-2xl font-bold text-text-primary mb-1">Welcome</h1>
             <p className="text-text-secondary text-sm mb-6">Enter your booking details to access check-in instructions.</p>
+
+            {tokenFallbackNotice && (
+              <p
+                data-testid="checkin-token-fallback-notice"
+                role="status"
+                className="rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm px-4 py-3 mb-4"
+              >
+                We couldn&apos;t open your check-in from this link — it may have expired. Enter your last name below to continue.
+              </p>
+            )}
 
             {error && (
               <p id="checkin-auth-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
@@ -778,6 +911,64 @@ export default function SelfCheckIn() {
                 placeholder="e.g. 2"
                 className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-5 focus:outline-none focus:ring-2 focus:ring-brand-primary"
               />
+            </div>
+
+            {/* NOTIF-048: contact details. No marketing consent is implied or pre-ticked. */}
+            <div className="mb-5 pt-4 border-t border-border-subtle" data-testid="checkin-contact-section">
+              <h3 className="text-sm font-semibold text-text-primary mb-3">Your contact details</h3>
+              <label htmlFor="checkin-contact-phone" className="block text-sm font-medium text-text-primary mb-1">
+                {details.guestHasDeliverablePhone === false ? "WhatsApp mobile number *" : "WhatsApp mobile number (optional)"}
+              </label>
+              <input
+                id="checkin-contact-phone"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                required={details.guestHasDeliverablePhone === false}
+                aria-required={details.guestHasDeliverablePhone === false ? true : undefined}
+                aria-invalid={contactPhoneError ? true : undefined}
+                aria-describedby={contactPhoneError ? "checkin-contact-phone-error" : "checkin-contact-phone-help"}
+                value={contactPhone}
+                onChange={(e) => {
+                  setContactPhone(e.target.value);
+                  if (contactPhoneError) setContactPhoneError("");
+                }}
+                placeholder="e.g. 98765 43210 or +44 7911 123456"
+                className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+              <p id="checkin-contact-phone-help" className="text-xs text-text-secondary mb-1">
+                {details.guestHasDeliverablePhone === false
+                  ? "Required to receive your Wi-Fi details, arrival directions and door passkey on WhatsApp."
+                  : "We already have a WhatsApp number for you. Add one here only if you want us to use a different number."}
+              </p>
+              {contactPhoneError && (
+                <p id="checkin-contact-phone-error" role="alert" className="text-xs text-red-700 mb-2">{contactPhoneError}</p>
+              )}
+
+              <label htmlFor="checkin-contact-email" className="block text-sm font-medium text-text-primary mb-1 mt-3">
+                Email address (optional)
+              </label>
+              <input
+                id="checkin-contact-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                aria-invalid={contactEmailError ? true : undefined}
+                aria-describedby={contactEmailError ? "checkin-contact-email-error" : "checkin-contact-email-help"}
+                value={contactEmail}
+                onChange={(e) => {
+                  setContactEmail(e.target.value);
+                  if (contactEmailError) setContactEmailError("");
+                }}
+                placeholder="name@example.com"
+                className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm mb-1 focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              />
+              <p id="checkin-contact-email-help" className="text-xs text-text-secondary mb-1">
+                Used to send your stay invoice.
+              </p>
+              {contactEmailError && (
+                <p id="checkin-contact-email-error" role="alert" className="text-xs text-red-700 mb-2">{contactEmailError}</p>
+              )}
             </div>
 
             {error && (
@@ -1263,12 +1454,12 @@ export default function SelfCheckIn() {
                               : `ID photo (${guestLabel})`}
                           </label>
                           <p id={idPhotoHelpId} className="text-xs text-text-muted mb-3">
-                            JPG, PNG, or PDF — max 10 MB
+                            JPG, PNG, or PDF — max 5 MB
                           </p>
 
                           {g.idFilePreview ? (
                             <div className="rounded-lg border border-border-subtle p-4 bg-white text-center">
-                              <img src={g.idFilePreview} alt="ID preview" className="max-h-48 mx-auto rounded-lg object-contain mb-3" />
+                              <img src={g.idFilePreview} alt="ID preview" data-testid="id-preview-thumbnail" className="max-h-48 mx-auto rounded-lg object-contain mb-3" />
                               <p className="text-xs text-text-primary font-medium mb-3">{g.idFile?.name}</p>
                               <div className="flex flex-wrap justify-center gap-2">
                                 <label className="cursor-pointer rounded-lg bg-bg-muted px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-surface border border-border-subtle transition">
@@ -1495,6 +1686,11 @@ export default function SelfCheckIn() {
               {details.wifiPassword && <InfoRow label="WiFi password" value={details.wifiPassword} />}
               {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
               {details.emergencyContactPhone && <InfoRow label="Emergency contact" value={details.emergencyContactPhone} />}
+            </div>
+
+            {/* BNB-009: meal choices saved to the host; the selector loads the summary and hides itself unless the server says to ask */}
+            <div className="mb-6">
+              <GuestDietarySelector bookingId={details.bookingId} token={token} />
             </div>
 
             {/* TASK-4510: Digital Guest Guidebook — shown after successful check-in */}

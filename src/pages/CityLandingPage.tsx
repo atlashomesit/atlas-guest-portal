@@ -6,6 +6,7 @@ import SEO from "@/components/SEO";
 import { fetchPublicListings, type PublicListing } from "@/api/listingClient";
 import { buildApiUrl } from "@/api/client";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "@/utils/guestImageUrl";
+import { getListingDisplayName } from "@/lib/listingDisplayName";
 import { buildHomeUnitPath, getPropertySlug } from "@/utils/navigation";
 import { listingMatchesCityKeywords, marketplaceListingMatchesCityKeywords } from "@/utils/cityListingFilter";
 import { withTenantBrandInCopy } from "@/tenant/displayBrand";
@@ -71,6 +72,7 @@ function toListingCardModel(listing: PublicListing) {
     listingId: listing.id,
     id: String(listing.id),
     name: listing.name || listing.propertyName || "Homestay",
+    displayName: listing.displayName ?? listing.name,
     location: listing.propertyAddress || listing.propertyName || "",
     neighborhoods: [] as string[],
     image,
@@ -79,6 +81,9 @@ function toListingCardModel(listing: PublicListing) {
     rating: hasVerifiedReviews ? rating : 0,
     reviews: hasVerifiedReviews ? reviews : 0,
     propertyType: "Homestay",
+    // HSL-011: dorm facts straight from the API payload (undefined for every non-dorm listing).
+    accommodationType: listing.accommodationType ?? undefined,
+    dormGenderPolicy: listing.dormGenderPolicy ?? null,
     guests: listing.maxGuests > 0 ? listing.maxGuests : 2,
     bedrooms: null as number | null,
     hasWifi: (listing.wifiSpeedMbps ?? 0) > 0,
@@ -106,6 +111,9 @@ type MarketplaceCityListingRow = {
   id: number;
   tenantSlug: string;
   title: string;
+  displayName?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
   city?: string | null;
   pricePerNight: number;
   maxGuests: number;
@@ -146,7 +154,12 @@ async function fetchAllMarketplaceListings(signal: AbortSignal): Promise<Marketp
 }
 
 function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCard {
-  const propertySlug = getPropertySlug({ name: item.title });
+  const displayTitle = getListingDisplayName(
+    item.id,
+    item.displayName?.trim() || item.title?.trim() || item.nameFormatted?.trim() || item.name?.trim() || "Homestay",
+    item.displayName,
+  );
+  const propertySlug = getPropertySlug({ name: displayTitle || item.title });
   const image = sanitizeGuestImageUrl(item.coverImageUrl) ?? "";
   const rating = item.rating ?? 0;
   const reviews = item.reviewCount ?? 0;
@@ -155,8 +168,9 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     propertySlug,
     listingId: item.id,
     id: String(item.id),
-    name: item.title || "Homestay",
-    location: item.city || item.title || "",
+    name: displayTitle,
+    displayName: item.displayName ?? displayTitle,
+    location: item.city || displayTitle || item.title || "",
     neighborhoods: [],
     image,
     price: item.pricePerNight ?? 0,
@@ -164,6 +178,9 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     rating: hasVerifiedReviews ? rating : 0,
     reviews: hasVerifiedReviews ? reviews : 0,
     propertyType: "Homestay",
+    // HSL-011: the marketplace row does not carry dorm facts; no badge until it does (never guessed from the title).
+    accommodationType: undefined,
+    dormGenderPolicy: null,
     guests: item.maxGuests > 0 ? item.maxGuests : 2,
     bedrooms: null,
     hasWifi: false,
@@ -351,6 +368,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
                   hostIdentityVerified={c.hostIdentityVerified}
                   id={c.id}
                   name={c.name}
+                  displayName={c.displayName}
                   location={c.location}
                   neighborhoods={c.neighborhoods}
                   image={c.image}
@@ -359,6 +377,8 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
                   rating={c.rating}
                   reviews={c.reviews}
                   propertyType={c.propertyType}
+                  accommodationType={c.accommodationType}
+                  dormGenderPolicy={c.dormGenderPolicy}
                   guests={c.guests}
                   bedrooms={c.bedrooms}
                   hasWifi={c.hasWifi}

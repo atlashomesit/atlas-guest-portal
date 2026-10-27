@@ -95,4 +95,26 @@ describe('TASK-7428: MOR footer disclosure is gated by half', () => {
 
     expect(container.textContent).not.toMatch(/razorpay/i);
   });
+
+  it('TASK-10298995: footer legal disclaimer and terms/privacy/contact links point to valid routes', async () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(
+      customDomainTenant({ paymentProvider: 'RAZORPAY', bookingMode: 'ONLINE' }),
+    );
+
+    await renderFooter();
+
+    const disclaimer = screen.getByTestId('footer-legal-disclaimer');
+    expect(disclaimer).toBeInTheDocument();
+    expect(disclaimer).toHaveTextContent(/Terms & Conditions/);
+    expect(disclaimer).toHaveTextContent(/Privacy Policy/);
+
+    const termsLinks = screen.getAllByRole('link', { name: /Terms/i });
+    expect(termsLinks.some((l) => l.getAttribute('href') === '/terms')).toBe(true);
+
+    const privacyLinks = screen.getAllByRole('link', { name: /Privacy/i });
+    expect(privacyLinks.some((l) => l.getAttribute('href') === '/privacy')).toBe(true);
+
+    const contactLinks = screen.getAllByRole('link', { name: /Contact/i });
+    expect(contactLinks.some((l) => l.getAttribute('href') === '/contact')).toBe(true);
+  });
 });

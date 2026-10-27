@@ -232,7 +232,28 @@ const Footer = () => {
                     <span>|</span>
                     <Link to="/privacy" className='hover:text-[var(--footer-link-hover)] transition-colors'>Privacy</Link>
                     <span>|</span>
-                    <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>                </div>
+                    <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>
+                </div>
+            </div>
+
+            {/* TASK-10298995: Legal disclaimer with valid route links */}
+            <div
+                data-testid="footer-legal-disclaimer"
+                className="mt-3 text-xs text-center text-[var(--footer-link)] max-w-2xl mx-auto"
+            >
+                By using this website, you agree to the{' '}
+                <Link to="/terms" className="underline hover:text-[var(--footer-link-hover)] transition-colors">
+                    Terms &amp; Conditions
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" className="underline hover:text-[var(--footer-link-hover)] transition-colors">
+                    Privacy Policy
+                </Link>
+                . For inquiries, reach out via our{' '}
+                <Link to="/contact" className="underline hover:text-[var(--footer-link-hover)] transition-colors">
+                    Contact page
+                </Link>
+                .
             </div>
 
             {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 disclosure — custom-domain
