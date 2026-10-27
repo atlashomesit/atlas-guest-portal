@@ -87,3 +87,15 @@ This supersedes only the identified placement/presentation/navigation decisions.
 The founder's approval of the proposals presented during 18–22 October includes [21 October r2](https://github.com/atlashomesit/atlas-ux-evidence/blob/main/docs/ux/daily-five/2026-10-21/r2/index.html#guest-property): WIDE-PROPERTY-SINGLE-R2-A places the existing booking column beside the single-photo gallery at desktop widths. UXV-2026-10-18-04 restores the ready phone shortcut's focus-only behavior without submitting. Existing pricing/availability guards, calendar fallback, rate-plan badge and Change plan control, imagery, colors, fees and checkout remain intact. Zero/multiple-photo layouts are outside this single-photo CSS rule.
 
 This is implementation authorization only. The actual comparison bundle and independent per-ID verdicts remain required; hold the draft PR with auto-merge disabled until Sreekar explicitly approves the exact final head.
+
+
+## Daily ten - 27 October 2026 implementation approval
+
+Sreekar approved immutable private `docs/ux/daily-five/2026-10-27/r1` (archive commit `04fcfb9cbc600d41716a011fda249a4e1d8380d5`): "I approve all 10 proposals for 27 October. Implement them and show me the actual before and after on mobile and wide screens for final approval before merging." Receipt: `2026-10-27/implemented-r1/APPROVAL.json`.
+
+This portal implements UXD-2026-10-27-01-A, 05-A, 06-A and 10-A only: gate unknown optional preferences after failed initial GET with read-only Retry and recovery focus; associate the existing correction labels; make the Pending host WhatsApp draft and helper factual using current booking identity; report upload uncertainty for a valid-photo HTTP 503. Preserve separately loaded consent/Withdraw, required transactional messages, preference and correction payloads, export/erasure, Confirmed wording and all other status eligibility, host destination, check-in/Google Calendar/ICS/Print, photo validation/auth/success/removal, profile drafts and deliberate file reselection. Existing colors and useful features remain.
+
+This supersedes only those four disclosed behaviors in r1. Earlier held work is unchanged. Actual four-viewport comparisons, native interactions and independent per-ID review remain required. Hold for Sreekar's separate final approval of the actual results and exact heads before any merge; no direct dev push, deployment or activation of held E2E tests.
+
+
+27 October 2026 implementation-review refinement (06-A only): keep the unchanged Pending helper immediately before the grouped WhatsApp/Google Calendar/ICS/Print actions. Inserting it between controls expanded the flex wrapping and newly obscured native keyboard focus at true 200% zoom; the compact original action group is restored while retaining the helper, all four actions, colors and existing floating widgets. This bounded preservation repair remains within r1 implementation authority and still requires refreshed native evidence, independent review and exact-head final approval.

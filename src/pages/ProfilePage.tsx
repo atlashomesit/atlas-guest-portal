@@ -85,6 +85,10 @@ export default function ProfilePage() {
         headers: { Accept: "application/json", ...getApiHeaders() },
         body: form,
       });
+      if (res.status === 503) {
+        setAvatarError("We couldn't upload your photo right now. The upload could not be confirmed. Please try again in a moment.");
+        return;
+      }
       if (!res.ok) throw new Error(await messageFromApiResponse(res));
       const data = await res.json() as { photoUrl?: string; url?: string };
       const nextUrl = data.photoUrl ?? data.url ?? null;
