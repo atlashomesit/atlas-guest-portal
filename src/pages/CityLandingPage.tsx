@@ -159,7 +159,10 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     item.displayName?.trim() || item.title?.trim() || item.nameFormatted?.trim() || item.name?.trim() || "Homestay",
     item.displayName,
   );
-  const propertySlug = getPropertySlug({ name: displayTitle || item.title });
+  // TASK-10299207: keep the URL slug anchored to the canonical listing title (`item.title` / `item.name`)
+  // while showing `displayTitle` on the card.
+  const rawSlugSource = item.title?.trim() || item.name?.trim() || displayTitle;
+  const propertySlug = getPropertySlug({ name: rawSlugSource });
   const image = sanitizeGuestImageUrl(item.coverImageUrl) ?? "";
   const rating = item.rating ?? 0;
   const reviews = item.reviewCount ?? 0;

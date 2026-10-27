@@ -2987,11 +2987,11 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Price block */}
           <div className="gd-price-rows">
-            {/* TASK-1039948: Direct booking pricing tier public display */}
-            {(booking.ratePlanName || booking.ratePlanMealPlan || booking.ratePlanCancellationPolicy || freeCancellationCopy) && (
+            {/* TASK-1039948 / TASK-10299208: Direct booking pricing tier public display (plain words only, never internal plan names) */}
+            {(booking.ratePlanMealPlan || booking.ratePlanCancellationPolicy) && (
               <div style={{ marginBottom: 6 }}>
                 <PricingTierDisplay
-                  ratePlanName={booking.ratePlanName}
+                  ratePlanName={null}
                   mealPlanLabel={booking.ratePlanMealPlan}
                   cancellationPolicy={booking.ratePlanCancellationPolicy || freeCancellationCopy?.deadlineFormatted}
                   isCompact

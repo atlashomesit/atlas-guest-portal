@@ -17,7 +17,8 @@ import { settle } from '../../test/settle';
 const task4303 = vi.hoisted(() => ({
   fetchCalendarPricing: vi.fn(),
   fetchGuestGstBreakdown: vi.fn(),
-  booking: { checkIn: null as string | null, checkOut: null as string | null, guests: 2 },
+  fetchPublicListingRatePlans: vi.fn<() => Promise<unknown[]>>(async () => []),
+  booking: { checkIn: null as string | null, checkOut: null as null | string, guests: 2 },
 }));
 
 // TASK-4830: a configurable availability-fetch mock so the failure suite below can make the
@@ -58,6 +59,7 @@ vi.mock('@/api/pricingClient', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   fetchCalendarPricing: task4303.fetchCalendarPricing,
   fetchGuestGstBreakdown: task4303.fetchGuestGstBreakdown,
+  fetchPublicListingRatePlans: (...args: unknown[]) => task4303.fetchPublicListingRatePlans(...(args as [])),
 }));
 vi.mock('@/api/listingClient', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -1658,4 +1660,148 @@ describe('UnitBookingWidget - TASK-1039690: per-date minStayArrival parity with 
     expect(screen.getByTestId('min-stay-badge')).toHaveTextContent('Minimum 2 nights');
   });
 });
+
+describe('UnitBookingWidget - TASK-10299208: rate plan badge honesty (single-plan vs multi-plan)', () => {
+  beforeEach(() => {
+    const todayIst = getIstStartOfDay();
+    const checkIn = toISODate(addDays(todayIst, 5));
+    const checkOut = toISODate(addDays(todayIst, 6));
+    task4303.booking.checkIn = checkIn;
+    task4303.booking.checkOut = checkOut;
+    task4303.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[checkIn, 4500]]),
+      convenienceFeePercent: 3,
+    });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({
+      baseAmount: 4500,
+      discountAmount: 0,
+      convenienceFeeAmount: 135,
+      finalAmount: 4635,
+      nights: 1,
+    });
+  });
+
+  afterEach(() => {
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+    task4303.fetchPublicListingRatePlans.mockResolvedValue([]);
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('shows no plan badge on a single-plan listing even when the plan is named "Atlas101 . Double" or "Standard Rate"', async () => {
+    task4303.fetchPublicListingRatePlans.mockResolvedValue([
+      {
+        id: 101,
+        listingId: 1,
+        name: 'Atlas101 . Double',
+        isDefault: true,
+        sortOrder: 0,
+        baseNightlyRate: 4500,
+        effectiveNightlyRate: 4500,
+        totalStayAmount: 4500,
+        guests: 2,
+        cancellationPolicy: 'Flexible',
+        cancellationSummary: 'Free cancellation up to 24 hours before check-in',
+        mealPlanCode: 'EP',
+        mealPlanLabel: 'Room Only',
+        isDerived: false,
+      },
+    ]);
+
+    const onStickySummaryChange = vi.fn();
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={1}
+          propertyId={1}
+          listingName="Atlas101"
+          propertySlug="atlas101"
+          unitSlug="1"
+          onStickySummaryChange={onStickySummaryChange}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+
+    expect(screen.queryByTestId('selected-rate-plan-badge')).toBeNull();
+    expect(screen.queryByTestId('pricing-tier-display')).toBeNull();
+    expect(screen.queryByText(/Atlas101\s*\.\s*Double/i)).toBeNull();
+
+    const lastSticky = onStickySummaryChange.mock.calls.at(-1)?.[0];
+    expect(lastSticky?.ratePlanLabel).toBeNull();
+    expect(lastSticky?.mealPlanCode).toBeNull();
+  });
+
+  it('shows plain meal words and cancellation policy on a multi-plan listing, never the internal plan name', async () => {
+    task4303.fetchPublicListingRatePlans.mockResolvedValue([
+      {
+        id: 201,
+        listingId: 3,
+        name: 'Atlas201 . Double',
+        isDefault: true,
+        sortOrder: 0,
+        baseNightlyRate: 4500,
+        effectiveNightlyRate: 4500,
+        totalStayAmount: 4500,
+        guests: 2,
+        cancellationPolicy: 'Flexible',
+        cancellationSummary: 'Free cancellation up to 24 hours before check-in',
+        mealPlanCode: 'EP',
+        mealPlanLabel: 'Room Only',
+        isDerived: false,
+      },
+      {
+        id: 202,
+        listingId: 3,
+        name: 'Standard Rate',
+        isDefault: false,
+        sortOrder: 1,
+        baseNightlyRate: 5100,
+        effectiveNightlyRate: 5100,
+        totalStayAmount: 5100,
+        guests: 2,
+        cancellationPolicy: 'NonRefundable',
+        cancellationSummary: 'Non-refundable',
+        mealPlanCode: 'CP',
+        mealPlanLabel: 'Breakfast Included',
+        isDerived: true,
+      },
+    ]);
+
+    const onStickySummaryChange = vi.fn();
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={3}
+          propertyId={1}
+          listingName="Atlas201"
+          propertySlug="atlas201"
+          unitSlug="3"
+          onStickySummaryChange={onStickySummaryChange}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+
+    // Multi-plan selector renders plain meal words, never "Atlas201 . Double" or "Standard Rate"
+    expect(screen.getByTestId('bw-rate-plan-selector')).toBeInTheDocument();
+    expect(screen.queryByTestId('selected-rate-plan-badge')).toBeNull();
+    expect(screen.queryByText(/Atlas201\s*\.\s*Double/i)).toBeNull();
+    expect(screen.queryByText(/Standard Rate/i)).toBeNull();
+    expect(screen.getByTestId('rate-plan-meal-badge')).toHaveTextContent('Room only, no meals');
+
+    const lastSticky = onStickySummaryChange.mock.calls.at(-1)?.[0];
+    expect(lastSticky?.ratePlanLabel).toBe('Room only, no meals');
+    expect(lastSticky?.mealPlanCode).toBeNull();
+  });
+});
+
 

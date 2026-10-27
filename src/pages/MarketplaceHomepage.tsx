@@ -135,7 +135,7 @@ export function resolveMarketplaceListingDisplayName(item: {
   return resolved || candidate || 'Listing';
 }
 
-function marketplaceListingPath(
+export function marketplaceListingPath(
   item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'> & {
     displayName?: string | null;
     publicTitle?: string | null;
@@ -145,8 +145,12 @@ function marketplaceListingPath(
   },
   searchSuffix = '',
 ): string {
-  const displayTitle = resolveMarketplaceListingDisplayName(item);
-  const propertySlug = getPropertySlug({ property_name: displayTitle || item.title });
+  // TASK-10299207: build the route slug from the raw listing name (`item.title` / `item.name`),
+  // never the humanised display name ("Suite 202"), so the link matches `acceptablePropertySlugs`
+  // and `functions/sitemap.xml.ts` (`/homes/atlas202/4?tenant=atlas`).
+  const rawSlugSource =
+    item.title?.trim() || item.name?.trim() || resolveMarketplaceListingDisplayName(item);
+  const propertySlug = getPropertySlug({ property_name: rawSlugSource });
   const base = buildHomeUnitPath(propertySlug, item.id);
   // TASK-102058: carry the active search criteria forward into the details URL
   // (mirrors SearchPage's querySuffix). Without this the details page hydrates

@@ -16,7 +16,10 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
   enrichMarketplaceCoverItems: async <T,>(items: T[]) => items,
 }));
 
-import MarketplaceHomepage, { resolveMarketplaceListingDisplayName } from './MarketplaceHomepage';
+import MarketplaceHomepage, {
+  marketplaceListingPath,
+  resolveMarketplaceListingDisplayName,
+} from './MarketplaceHomepage';
 import { settle } from '../test/settle';
 
 describe('TASK-10299086 — Marketplace cards display guest-facing display name', () => {
@@ -126,5 +129,23 @@ describe('TASK-10299086 — Marketplace cards display guest-facing display name'
 
     const headings = screen.getAllByRole('heading', { level: 2 });
     expect(headings.map((h) => h.textContent)).toEqual(['Studio 101', 'Penthouse 501']);
+
+    // TASK-10299207: card hrefs must use the listing slug (atlas101 / atlas501-ph), NOT the display name (studio-101 / penthouse-501).
+    const viewHomeLinks = screen.getAllByRole('link', { name: /view home/i });
+    expect(viewHomeLinks.map((a) => a.getAttribute('href'))).toEqual([
+      '/homes/atlas101/101?tenant=atlas',
+      '/homes/atlas501-ph/501?tenant=atlas',
+    ]);
+  });
+
+  it('TASK-10299207: marketplaceListingPath pins href to the listing slug, not the display name', () => {
+    expect(
+      marketplaceListingPath({
+        id: 4,
+        title: 'Atlas202',
+        displayName: 'Suite 202',
+        tenantSlug: 'atlas',
+      }),
+    ).toBe('/homes/atlas202/4?tenant=atlas');
   });
 });

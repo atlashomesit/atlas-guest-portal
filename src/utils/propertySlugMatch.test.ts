@@ -60,6 +60,12 @@ describe("TASK-7448: the canonical URL a link builder emits must resolve, not 40
     expect(propertySlugMatchesListing("atlas101", asRecord(ATLAS_1))).toBe(true);
   });
 
+  it("TASK-10299207: accepts both the canonical listing slug and the guest-facing display-name slug", () => {
+    const atlas202 = { id: 4, name: "Atlas202", propertyName: "Atlas Homes" };
+    expect(propertySlugMatchesListing("atlas202", asRecord(atlas202))).toBe(true);
+    expect(propertySlugMatchesListing("suite-202", asRecord(atlas202))).toBe(true);
+  });
+
   it("tolerates hyphenation differences", () => {
     expect(propertySlugMatchesListing("staybycityfocus", asRecord(STAYBYCF_185))).toBe(true);
   });

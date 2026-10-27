@@ -1705,10 +1705,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         ? null
         : freeCancellationCopy?.deadlineFormatted ?? null,
       datesUnavailable,
-      // Founder ruling 2026-10-21: never show an internal/OTA plan name ("Atlas501_PH . Double") to a guest.
-      // A label appears only when the guest actually chose between real options, in plain words.
+      // Founder ruling 2026-10-21 / TASK-10299208: never show an internal/OTA plan name ("Atlas501_PH . Double")
+      // or raw meal code ("EP") to a guest. A label appears only when the guest actually chose between real options, in plain words.
       ratePlanLabel: publicRatePlans.length > 1 ? plainMealLabel(selectedRatePlan?.mealPlanLabel) : null,
-      mealPlanCode: publicRatePlans.length > 1 ? (selectedRatePlan?.mealPlanCode ?? null) : null,
+      mealPlanCode: null,
       mealPlanLabel: null,
       hasMultipleRatePlans: publicRatePlans.length > 1,
     });
@@ -1924,10 +1924,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         checkOut: istInstantFromCalendarDate(checkoutIst).toISOString(),
         guests,
         listingRatePlanId: selectedRatePlanId,
-        ratePlanName: selectedRatePlan?.name ?? null,
-        ratePlanMealPlan: selectedRatePlan?.mealPlanLabel || selectedRatePlan?.mealPlanCode || null,
+        // TASK-10299208: never forward internal/OTA rate plan names; only pass plain meal + cancellation terms when the guest chose between options.
+        ratePlanName: null,
+        ratePlanMealPlan:
+          publicRatePlans.length > 1
+            ? plainMealLabel(selectedRatePlan?.mealPlanLabel || selectedRatePlan?.mealPlanCode)
+            : null,
         ratePlanCancellationPolicy:
-          cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy || null,
+          publicRatePlans.length > 1
+            ? (cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy || null)
+            : null,
       });
 
       // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
@@ -2424,11 +2430,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         )}
         {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (
         <div className="lv-price-rows">
-          {/* TASK-1039948: Direct booking pricing tier public display */}
-          {(selectedRatePlan || cancellationTrustText) && (
+          {/* TASK-1039948 / TASK-10299208: Direct booking pricing tier public display — only when the guest chose between options, in plain words (never internal ratePlanName) */}
+          {publicRatePlans.length > 1 && selectedRatePlan && (
             <div className="lv-price-row" style={{ display: 'block', paddingBottom: 6 }}>
               <PricingTierDisplay
-                ratePlanName={selectedRatePlan?.name}
+                ratePlanName={null}
                 cancellationPolicy={cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy}
                 mealPlanLabel={selectedRatePlan?.mealPlanLabel}
                 mealPlanCode={selectedRatePlan?.mealPlanCode}

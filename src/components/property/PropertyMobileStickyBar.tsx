@@ -8,6 +8,8 @@ import React from "react";
 import { formatCurrency } from "@/utils/formatting";
 import type { BookingStickySummary } from "@/components/availability/UnitBookingWidget";
 import { useBookingContentVisible } from "@/hooks/useBookingContentVisible";
+import { isInternalOrDefaultRatePlanName } from "@/components/pricing/PricingTierDisplay";
+import { plainMealLabel } from "@/utils/directBookingPrice";
 
 type Props = {
   bookable: boolean;
@@ -155,9 +157,16 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
     summary.totalAmount != null &&
     summary.totalAmount > 0;
   const pricingPending = summary?.pricingPending;
+  const rawPlanLabel = summary?.ratePlanLabel?.trim() || null;
+  const safePlanLabel =
+    rawPlanLabel && !isInternalOrDefaultRatePlanName(rawPlanLabel) ? rawPlanLabel : null;
+  const mealText =
+    summary?.mealPlanLabel?.trim() || summary?.mealPlanCode?.trim()
+      ? plainMealLabel(summary?.mealPlanLabel || summary?.mealPlanCode)
+      : null;
   const ratePlanBadgeText = [
-    summary?.ratePlanLabel?.trim() || null,
-    summary?.mealPlanLabel?.trim() || summary?.mealPlanCode?.trim() || null,
+    safePlanLabel,
+    mealText && mealText !== safePlanLabel ? mealText : null,
   ]
     .filter(Boolean)
     .join(" · ");
