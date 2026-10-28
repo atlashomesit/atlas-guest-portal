@@ -79,23 +79,33 @@ describe('Razorpay checkout amount unit boundary — every call site', () => {
       const site = checkoutCallSites.find((c) => relative(SRC_ROOT, c.path) === relPath);
       const content = site!.content;
 
+      // A call site is unit-safe in exactly one of two ways:
+      //   (a) it feeds the RUPEE `amount` of `POST /api/Razorpay/order` through
+      //       `razorpayOrderAmountInrToPaise`, or
+      //   (b) it feeds a field the API itself names `amountPaise` (the security-deposit
+      //       hold endpoints return PAISE natively - `RazorpayDepositHoldService` builds the
+      //       Razorpay order from `amountInr * 100` and echoes that same figure back as
+      //       `AmountPaise`). Converting that again would be a 100x overstatement, so the
+      //       conversion helper must NOT be required there (TASK-10299239 SecurityDepositPage).
+      const convertsRupees =
+        content.includes("from '@/utils/razorpayOrderAmount'") &&
+        /razorpayOrderAmountInrToPaise\(/.test(content);
+      const feedsNativePaise = /amount:\s*[A-Za-z_$][\w$]*\.amountPaise\b/.test(content);
+
       expect(
-        content,
-        `${relPath} constructs a Razorpay checkout but never imports razorpayOrderAmountInrToPaise. ` +
+        convertsRupees || feedsNativePaise,
+        `${relPath} constructs a Razorpay checkout but neither converts the API amount with ` +
+          'razorpayOrderAmountInrToPaise nor passes an API field named `amountPaise`. ' +
           'The order response `amount` is RUPEES; Razorpay checkout options are PAISE.',
-      ).toContain("from '@/utils/razorpayOrderAmount'");
+      ).toBe(true);
 
-      expect(
-        content,
-        `${relPath} constructs a Razorpay checkout but never calls razorpayOrderAmountInrToPaise.`,
-      ).toMatch(/razorpayOrderAmountInrToPaise\(/);
-
-      // The raw response field must never reach the checkout options directly.
+      // The raw response field must never reach the checkout options directly - neither the
+      // RUPEE `amount` nor a rupee `amountInr` (the deposit status field) may be passed as-is.
       expect(
         content,
         `${relPath} passes a raw \`amount\` into the Razorpay checkout options. ` +
           'Pass the converted paise value instead.',
-      ).not.toMatch(/amount:\s*(?:order|resp|response)\.amount\b/);
+      ).not.toMatch(/amount:\s*(?:order|resp|response)\.amount(?:Inr)?\b/);
     },
   );
 });
