@@ -91,6 +91,7 @@ import { getIstCalendarDate, toCalendarISO, istInstantFromCalendarDate } from '@
 import { resolveListing } from '@/utils/listingResolver';
 import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
+import { ADS_MEASUREMENT_CONSENT_SEGMENTS, resolveAdsMeasurementWho } from '@/content/consent/adsMeasurementConsent';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
 function abandonPaymentPendingCheckout(
@@ -742,6 +743,8 @@ const GuestDetailsPage: React.FC = () => {
   // guest must explicitly check the box to opt in.
   const [whatsappOptIn, setWhatsappOptIn] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  // TASK-1039907 (Meta CAPI): optional, UNticked, never persisted. Sent only when ticked (see guestPurposeConsents below).
+  const [adsMeasurementOptIn, setAdsMeasurementOptIn] = useState(false);
 
   // Persist guest PII to sessionStorage so a hard reload / Back nav doesn't lose it.
   // Consent is intentionally NOT persisted — DPDP consent must be actively given each session.
@@ -1379,6 +1382,8 @@ const GuestDetailsPage: React.FC = () => {
           booking_contact: consentAccepted,
           transactional_whatsapp: whatsappOptIn,
           marketing: marketingOptIn,
+          // TASK-1039907: only a TICKED box is sent. The API reads `false` as a withdrawal, so an unticked box must send nothing.
+          ...(adsMeasurementOptIn ? { ads_measurement: true } : {}),
         },
         securityDepositAccepted: depositRequired ? depositAccepted : false,
         guestInfo: {
@@ -1980,7 +1985,7 @@ const GuestDetailsPage: React.FC = () => {
     },
     [
       isSubmitting, validateForm, holdId, holdToken, holdExpiresAt, phoneDialCode, formData,
-      availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
+      availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, adsMeasurementOptIn, consentAccepted,
       houseRulesAccepted, dormAckAccepted, depositRequired, depositAccepted, checkoutInfo, hasDraft, startHoldAtPay,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, booking.listingRatePlanId,
       isMarketplaceCheckout, displayTotal,
@@ -2914,6 +2919,16 @@ const GuestDetailsPage: React.FC = () => {
                 <label htmlFor="gd-marketing-consent" className="gd-consent-body">Send me promotional offers and deals from <b>{consentEntityName}</b>.{' '}
                   <span style={{ color: 'var(--gd-faint)' }}>(Optional — you can withdraw anytime from your preferences link.)</span>
                 </label>
+              </div>
+              {/* TASK-1039907: optional ads measurement (Meta). Unticked by default; the label is the API's versioned consent text, word for word. */}
+              <div className={`gd-consent-row${adsMeasurementOptIn ? ' checked' : ''}`} data-testid="guest-booking-ads-measurement-consent-row">
+                <input id="gd-ads-measurement-consent" type="checkbox" checked={adsMeasurementOptIn} onChange={(e) => setAdsMeasurementOptIn(e.target.checked)} data-testid="guest-booking-ads-measurement-consent" />
+                <div className="gd-consent-body">
+                  <label htmlFor="gd-ads-measurement-consent" data-testid="guest-booking-ads-measurement-consent-text">
+                    {ADS_MEASUREMENT_CONSENT_SEGMENTS.beforeFirstWho}<b>{resolveAdsMeasurementWho(consentEntityName)}</b>{ADS_MEASUREMENT_CONSENT_SEGMENTS.beforeSecondWho}<b>{resolveAdsMeasurementWho(consentEntityName)}</b>{ADS_MEASUREMENT_CONSENT_SEGMENTS.afterSecondWho}
+                  </label>{' '}
+                  <span style={{ color: 'var(--gd-faint)' }}>(Optional — you can withdraw anytime from your preferences link.)</span>
+                </div>
               </div>
             </div>
 
