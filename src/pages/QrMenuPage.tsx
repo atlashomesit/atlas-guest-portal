@@ -47,9 +47,22 @@ export interface MenuResponse {
   brandColor?: string;
   logoUrl?: string;
   currency: string;
-  roomLabel?: string;
-  listingId?: number;
+  roomLabel?: string | null;
+  listingId?: number | null;
   tableCode?: string;
+  /**
+   * POS-011: what the room link in the URL turned out to be. NONE (no room), KEY (room key accepted), LEGACY (old numeric link, still
+   * inside its 30-day window), EXPIRED (old numeric link past the window), INVALID (key not recognised). Absent on an older API.
+   */
+  roomLinkStatus?: "NONE" | "KEY" | "LEGACY" | "EXPIRED" | "INVALID";
+  /** POS-011: the API's friendly "ask the front desk" text for EXPIRED / INVALID. */
+  roomLinkMessage?: string | null;
+  legacyLinkExpiresAtUtc?: string | null;
+  /** POS-011: too many wrong phone last-4 / PIN tries for this room - room charge is paused until roomChargeLockedUntilUtc. */
+  roomChargeLocked?: boolean;
+  roomChargeLockedUntilUtc?: string | null;
+  /** POS-011: the settlement methods to offer while room charge is locked or the link is unusable (empty = room charge available). */
+  roomChargeFallbackMethods?: string[];
   categories: MenuCategory[];
 }
 
@@ -76,6 +89,19 @@ export interface OrderStatus {
     totalPrice: number;
     notes?: string;
   }>;
+}
+
+/** POS-011: the same wording the API uses when a room link is not usable. */
+const ASK_FRONT_DESK_MESSAGE = "This room's QR link is no longer valid. Please ask the front desk for the current QR code.";
+const ROOM_LOCK_MESSAGE =
+  "Too many wrong codes were tried for this room, so charging it to the room is paused. Please pay now or pay on delivery, or ask the front desk.";
+
+/** "3:45 PM" in the guest's own clock; null when the API gave no usable time. */
+function formatRetryTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
 }
 
 const FALLBACK_MENU: MenuResponse = {
@@ -198,14 +224,39 @@ export default function QrMenuPage() {
   const { tenantSlug = "atlas" } = useParams<{ tenantSlug: string }>();
   const [searchParams] = useSearchParams();
 
+  // POS-011: the printed room QR is `?rk=<opaque key>`. The old numeric `?room=<listingId>` keeps working while the API allows it.
+  const roomKeyParam = searchParams.get("rk")?.trim() || undefined;
   const roomParam = searchParams.get("room");
-  const listingId = roomParam ? parseInt(roomParam, 10) : undefined;
+  const parsedRoom = roomParam ? parseInt(roomParam, 10) : NaN;
+  const urlListingId = Number.isFinite(parsedRoom) && parsedRoom > 0 ? parsedRoom : undefined;
   const tableCode = searchParams.get("table") || undefined;
   const orderParam = searchParams.get("order");
 
   const [_loading, setLoading] = useState(true);
   const [menu, setMenu] = useState<MenuResponse | null>(null);
   const [_error, setError] = useState<string | null>(null);
+  // POS-011: bumped only by the guest's own "Check again" tap, to re-read the menu (and with it the room lock).
+  const [menuReloadNonce, setMenuReloadNonce] = useState(0);
+  // POS-011: set by a 403 ROOM_CHARGE_LOCKED / ROOM_LINK_EXPIRED / ROOM_LINK_INVALID on the order itself.
+  const [roomLock, setRoomLock] = useState<{ until: string | null; message: string } | null>(null);
+  const [roomLinkProblem, setRoomLinkProblem] = useState<string | null>(null);
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+
+  // Which room (if any) this page may charge to. A room key is resolved by the API; a legacy numeric link is trusted from the URL
+  // until the API says otherwise. An expired / unknown link has no room at all.
+  const menuLinkStatus = menu?.roomLinkStatus;
+  const roomLinkBroken = roomLinkProblem !== null || menuLinkStatus === "EXPIRED" || menuLinkStatus === "INVALID";
+  const roomLinkNoticeText = roomLinkBroken ? roomLinkProblem ?? (menu?.roomLinkMessage || ASK_FRONT_DESK_MESSAGE) : null;
+  const menuListingId = typeof menu?.listingId === "number" && menu.listingId > 0 ? menu.listingId : undefined;
+  const listingId = roomLinkBroken ? undefined : roomKeyParam ? menuListingId : menuListingId ?? urlListingId;
+  const activeLock = roomLock ?? (menu?.roomChargeLocked === true ? { until: menu.roomChargeLockedUntilUtc ?? null, message: ROOM_LOCK_MESSAGE } : null);
+  const roomChargeAvailable = Boolean(listingId) && activeLock === null;
+  // While room charge is unavailable the API names the methods to offer; an empty list means no restriction.
+  const menuFallbackMethods = menu?.roomChargeFallbackMethods;
+  const fallbackList = !roomChargeAvailable && Array.isArray(menuFallbackMethods) ? menuFallbackMethods : [];
+  const restrictFallback = fallbackList.includes("PAY_NOW_UPI") || fallbackList.includes("PAY_ON_DELIVERY");
+  const offerPayNow = !restrictFallback || fallbackList.includes("PAY_NOW_UPI");
+  const offerPayOnDelivery = !restrictFallback || fallbackList.includes("PAY_ON_DELIVERY");
 
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -219,10 +270,13 @@ export default function QrMenuPage() {
   );
 
   useEffect(() => {
-    if (listingId) {
-      setSettlementMethod((prev) => (prev !== "POST_TO_ROOM" ? "POST_TO_ROOM" : prev));
-    }
-  }, [listingId]);
+    setSettlementMethod((prev) => {
+      if (roomChargeAvailable) return "POST_TO_ROOM";
+      if (prev === "PAY_NOW_UPI" && offerPayNow) return prev;
+      if (prev === "PAY_ON_DELIVERY" && offerPayOnDelivery) return prev;
+      return offerPayNow ? "PAY_NOW_UPI" : "PAY_ON_DELIVERY";
+    });
+  }, [roomChargeAvailable, offerPayNow, offerPayOnDelivery]);
   const [verificationCode, setVerificationCode] = useState<string>("");
   const [guestName, setGuestName] = useState<string>("");
   const [guestPhone, setGuestPhone] = useState<string>("");
@@ -248,7 +302,9 @@ export default function QrMenuPage() {
 
       try {
         const query = new URLSearchParams();
-        if (listingId) query.set("room", listingId.toString());
+        // POS-011: the room key wins; the numeric link is only sent when there is no key.
+        if (roomKeyParam) query.set("rk", roomKeyParam);
+        else if (urlListingId) query.set("room", urlListingId.toString());
         if (tableCode) query.set("table", tableCode);
 
         const url = buildApiUrl(`/api/public/qr-menu/${encodeURIComponent(tenantSlug)}?${query.toString()}`);
@@ -270,8 +326,8 @@ export default function QrMenuPage() {
           setMenu({
             ...FALLBACK_MENU,
             tenantSlug,
-            roomLabel: listingId ? `Room / Villa ${listingId}` : undefined,
-            listingId,
+            roomLabel: urlListingId ? `Room / Villa ${urlListingId}` : undefined,
+            listingId: urlListingId,
             tableCode,
           });
         }
@@ -284,7 +340,7 @@ export default function QrMenuPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantSlug, listingId, tableCode]);
+  }, [tenantSlug, roomKeyParam, urlListingId, tableCode, menuReloadNonce]);
 
   // If order param is provided, load initial order tracking
   useEffect(() => {
@@ -388,12 +444,15 @@ export default function QrMenuPage() {
       return;
     }
     setSubmitting(true);
+    setAttemptsRemaining(null);
 
     try {
       const payload = {
         listingId,
         tableCode,
         settlementMethod,
+        // POS-011: the room key from the printed QR; only a room charge needs it, and a legacy numeric link has none.
+        roomKey: settlementMethod === "POST_TO_ROOM" ? roomKeyParam : undefined,
         verificationCode: settlementMethod === "POST_TO_ROOM" ? verificationCode.trim() : undefined,
         guestName: guestName.trim() || undefined,
         guestPhone: guestPhone.trim() || undefined,
@@ -422,7 +481,25 @@ export default function QrMenuPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
+        if (errorData?.code === "ROOM_CHARGE_LOCKED") {
+          // POS-011: too many wrong codes for this room. Show when it ends and offer the other ways to pay. The order is NOT
+          // re-sent: the guest chooses Pay Now / Pay on Delivery, or taps "Check again" later.
+          let until: string | null = typeof errorData.lockedUntilUtc === "string" ? errorData.lockedUntilUtc : null;
+          if (!until) {
+            const headerSeconds = Number(res.headers?.get?.("Retry-After"));
+            const seconds = typeof errorData.retryAfterSeconds === "number" ? errorData.retryAfterSeconds : headerSeconds;
+            if (Number.isFinite(seconds) && seconds > 0) until = new Date(Date.now() + seconds * 1000).toISOString();
+          }
+          setRoomLock({ until, message: errorData.error || ROOM_LOCK_MESSAGE });
+          setVerificationCode("");
+          return;
+        }
+        if (errorData?.code === "ROOM_LINK_EXPIRED" || errorData?.code === "ROOM_LINK_INVALID") {
+          setRoomLinkProblem(errorData.error || ASK_FRONT_DESK_MESSAGE);
+          return;
+        }
         if (res.status === 403 || errorData?.code === "ROOM_VERIFICATION_FAILED") {
+          if (typeof errorData?.attemptsRemaining === "number") setAttemptsRemaining(errorData.attemptsRemaining);
           setVerificationError(
             errorData?.error ||
               "Room verification failed: Room does not have an active CheckedIn booking today or phone last-4 / PIN did not match. Please verify your details or choose 'Pay Now' / 'Pay at Delivery'."
@@ -455,6 +532,77 @@ export default function QrMenuPage() {
 
   const targetHeading =
     menu?.roomLabel || (listingId ? `Room ${listingId}` : tableCode ? `Table ${tableCode}` : "Digital Self-Order Menu");
+
+  // POS-011: a lock is only ever lifted by the guest asking again - we re-read the menu (which carries the lock) and never re-send an order.
+  const recheckRoomLock = () => {
+    setRoomLock(null);
+    setMenuReloadNonce((n) => n + 1);
+  };
+
+  const lockRetryTime = formatRetryTime(activeLock?.until);
+  const roomNotice = roomLinkNoticeText ? (
+    <div
+      role="status"
+      style={{
+        backgroundColor: "#fffbeb",
+        border: "1px solid #fde68a",
+        color: "#92400e",
+        padding: "10px 12px",
+        borderRadius: "10px",
+        fontSize: "12px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "8px",
+        marginBottom: "14px",
+      }}
+      data-testid="pos-qr-room-link-notice"
+    >
+      <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+      <span>{roomLinkNoticeText} You can still order here and choose Pay Now (UPI) or Pay on Delivery.</span>
+    </div>
+  ) : activeLock ? (
+    <div
+      role="alert"
+      style={{
+        backgroundColor: "#fffbeb",
+        border: "1px solid #fde68a",
+        color: "#92400e",
+        padding: "10px 12px",
+        borderRadius: "10px",
+        fontSize: "12px",
+        marginBottom: "14px",
+      }}
+      data-testid="pos-qr-room-locked-notice"
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+        <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+        <span>
+          {activeLock.message}
+          {lockRetryTime ? ` You can try charging to the room again after ${lockRetryTime}.` : ""}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={recheckRoomLock}
+        style={{
+          marginTop: "8px",
+          backgroundColor: "#fff",
+          border: "1px solid #d97706",
+          color: "#92400e",
+          borderRadius: "6px",
+          padding: "5px 10px",
+          fontWeight: 700,
+          fontSize: "12px",
+          cursor: "pointer",
+        }}
+        data-testid="pos-qr-room-lock-recheck"
+      >
+        Check again
+      </button>
+    </div>
+  ) : null;
+
+  const payMethodCount = (roomChargeAvailable ? 1 : 0) + (offerPayNow ? 1 : 0) + (offerPayOnDelivery ? 1 : 0);
 
   return (
     <div
@@ -526,8 +674,10 @@ export default function QrMenuPage() {
 
       {/* Main Container */}
       <main style={{ maxWidth: "680px", margin: "0 auto", padding: "16px" }}>
+        {/* POS-011: room link expired / unknown, or room charge paused: say so before the guest fills a cart */}
+        {cartCount === 0 && roomNotice}
         {/* Pre-order room verification strip when room is provided and cart is not yet filled */}
-        {listingId && cartCount === 0 && (
+        {roomChargeAvailable && cartCount === 0 && (
           <div
             style={{
               backgroundColor: "#fdf8f6",
@@ -1040,14 +1190,17 @@ export default function QrMenuPage() {
                 </span>
               </div>
 
+              {/* POS-011: room link / lock notice (the cart is open, so the page-top notice is hidden) */}
+              {roomNotice}
+
               {/* Settlement Options (Done When #2 & #3) */}
               <div style={{ marginBottom: "14px" }}>
                 <span style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "6px" }}>
                   HOW WOULD YOU LIKE TO PAY?
                 </span>
 
-                <div style={{ display: "grid", gridTemplateColumns: listingId ? "1fr 1fr 1fr" : "1fr 1fr", gap: "8px" }}>
-                  {listingId && (
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, payMethodCount)}, 1fr)`, gap: "8px" }}>
+                  {roomChargeAvailable && (
                     <button
                       type="button"
                       onClick={() => setSettlementMethod("POST_TO_ROOM")}
@@ -1075,6 +1228,7 @@ export default function QrMenuPage() {
                     </button>
                   )}
 
+                  {offerPayNow && (
                   <button
                     type="button"
                     onClick={() => setSettlementMethod("PAY_NOW_UPI")}
@@ -1098,7 +1252,9 @@ export default function QrMenuPage() {
                     <Smartphone size={18} />
                     Pay Now (UPI)
                   </button>
+                  )}
 
+                  {offerPayOnDelivery && (
                   <button
                     type="button"
                     onClick={() => setSettlementMethod("PAY_ON_DELIVERY")}
@@ -1122,11 +1278,12 @@ export default function QrMenuPage() {
                     <Utensils size={18} />
                     Pay on Delivery
                   </button>
+                  )}
                 </div>
               </div>
 
               {/* Room Charge Anti-Abuse Guardrail Field (Done When #2) */}
-              {settlementMethod === "POST_TO_ROOM" && (
+              {settlementMethod === "POST_TO_ROOM" && roomChargeAvailable && (
                 <div
                   style={{
                     backgroundColor: "#fdf8f6",
@@ -1315,6 +1472,11 @@ export default function QrMenuPage() {
                 >
                   <AlertCircle size={16} />
                   <span>{verificationError}</span>
+                  {attemptsRemaining !== null && attemptsRemaining > 0 && (
+                    <span style={{ fontWeight: 700 }} data-testid="pos-qr-attempts-remaining">
+                      You have {attemptsRemaining} {attemptsRemaining === 1 ? "try" : "tries"} left before charging to the room is paused.
+                    </span>
+                  )}
                 </div>
               )}
 
