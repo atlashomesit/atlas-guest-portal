@@ -81,6 +81,7 @@ import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
 import { dormNeedsGenderAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
+import { hostCallDigits } from '@/utils/hostCallDigits';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
 import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
 import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
@@ -2214,7 +2215,10 @@ const GuestDetailsPage: React.FC = () => {
     const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
     return `https://wa.me/${fullDigits}?text=${encodeURIComponent(text)}`;
   })();
-  const hostDirectPhoneDigits = checkoutInfo ? checkoutInfo.hostPhoneDigits : (isMarketplaceMode() ? null : (tenantCtx?.phone ? tenantCtx.phone.replace(/\D/g, '') : null));
+  // The site tenant's own number is the host's profile phone (`legalContactPack.contactPhone`); TenantInfo has no top-level `phone`.
+  // Never on the marketplace (the site tenant is the platform there), never Atlas's default number.
+  const siteHostPhoneDigits = isMarketplaceMode() ? null : hostCallDigits(tenantCtx?.legalContactPack?.contactPhone);
+  const hostDirectPhoneDigits = checkoutInfo ? checkoutInfo.hostPhoneDigits : siteHostPhoneDigits;
   const hostDirectPhoneLink = hostDirectPhoneDigits ? `tel:+${hostDirectPhoneDigits.replace(/^\+/, '')}` : null;
   // FOUNDER RULED 2026-10-19: the failed-payment contact is the HOST's WhatsApp (pre-written with the room, dates, guests,
   // amount and the guest's name; the guest only taps Send), else a call link to the host's phone, else nothing.

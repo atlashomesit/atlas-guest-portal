@@ -15,9 +15,10 @@ const ctx = vi.hoisted(() => ({
   tenant: {
     slug: 'grove-and-co',
     name: 'Grove & Co.',
-    paymentProvider: 'RAZORPAY',
+    paymentProvider: 'RAZORPAY' as string | undefined,
     bookingMode: 'ONLINE' as 'ONLINE' | 'WHATSAPP' | undefined,
     whatsappBookingPhone: '917032493290' as string | undefined,
+    legalContactPack: undefined as undefined | { contactPhone?: string },
   },
 }));
 
@@ -98,6 +99,7 @@ describe('TASK-10298848: Guest Payment Account Fallback', () => {
     ctx.info = baseInfo();
     ctx.tenant.bookingMode = 'ONLINE';
     ctx.tenant.paymentProvider = 'RAZORPAY';
+    ctx.tenant.legalContactPack = undefined;
   });
 
   afterEach(() => {
@@ -163,6 +165,36 @@ describe('TASK-10298848: Guest Payment Account Fallback', () => {
     const mobilePhoneCta = screen.getByTestId('guest-booking-phone-cta-mobile') as HTMLAnchorElement;
     expect(mobilePhoneCta).toBeInTheDocument();
     expect(mobilePhoneCta.href).toBe('tel:+919123456780');
+  });
+
+  it('without checkout info, the call link dials the site host own profile phone (legalContactPack.contactPhone), country code added', async () => {
+    // Checkout info could not be loaded, and the site tenant has no WhatsApp booking number and no payment provider: the only
+    // way to reach the host is the phone they entered in their profile. TenantInfo has no top-level `phone`.
+    ctx.info = null;
+    ctx.tenant.bookingMode = 'WHATSAPP';
+    ctx.tenant.paymentProvider = undefined;
+    ctx.tenant.whatsappBookingPhone = undefined;
+    ctx.tenant.legalContactPack = { contactPhone: '91234 56780' };
+
+    await renderPage();
+
+    expect(screen.queryByTestId('guest-booking-submit')).toBeNull();
+    expect(screen.queryByTestId('guest-booking-whatsapp-cta')).toBeNull();
+    const phoneCta = screen.getByTestId('guest-booking-phone-cta') as HTMLAnchorElement;
+    expect(phoneCta.href).toBe('tel:+919123456780');
+  });
+
+  it('without checkout info and without any host phone, shows no call link', async () => {
+    ctx.info = null;
+    ctx.tenant.bookingMode = 'WHATSAPP';
+    ctx.tenant.paymentProvider = undefined;
+    ctx.tenant.whatsappBookingPhone = undefined;
+    ctx.tenant.legalContactPack = undefined;
+
+    await renderPage();
+
+    expect(screen.queryByTestId('guest-booking-phone-cta')).toBeNull();
+    expect(screen.queryByTestId('guest-booking-whatsapp-cta')).toBeNull();
   });
 
   it('when order creation returns 422 PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT, gracefully recovers to fallback button', async () => {
