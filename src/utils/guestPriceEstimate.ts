@@ -196,6 +196,132 @@ export function discountPlugRow(grossRows: number, netAdjustRows: number, displa
   return Math.round(grossRows + netAdjustRows - displayTotal);
 }
 
+/**
+ * GUEST-049: Transparent checkout charge reconciliation so vague "Other charges"
+ * never appears to guests while keeping visible line items 100% equal to `displayTotal`.
+ */
+export type CheckoutChargeReconciliationInput = {
+  baseAmount: number;
+  cleaningFeeAmount: number;
+  extraGuestFeeAmount?: number;
+  weekendRateAdjustmentAmount?: number;
+  touristTaxAmount: number;
+  displayedFeeAmount: number;
+  addOnsTotal: number;
+  confirmedPromoDiscount: number;
+  referralDiscountAmount: number;
+  displayTotal: number;
+  nights: number;
+  stayGuestCount: number;
+  hasWeekendNight?: boolean;
+  appliedPromotionLabel?: string | null;
+};
+
+export type CheckoutChargeReconciliationResult = {
+  effectiveBaseAmount: number;
+  effectivePerNight: number;
+  extraGuestFeeRow: { label: string; amount: number } | null;
+  weekendAdjustmentRow: { label: string; amount: number } | null;
+  discountRow: { label: string; amount: number } | null;
+  reconciledIntoBaseAmount: number;
+};
+
+/** Returns true when [checkInIso, checkOutIso) includes a Friday (5) or Saturday (6) night. */
+export function stayIncludesWeekendNight(
+  checkInIso: string | null | undefined,
+  checkOutIso: string | null | undefined,
+): boolean {
+  if (!checkInIso || !checkOutIso) return false;
+  const start = new Date(checkInIso);
+  const end = new Date(checkOutIso);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() <= start.getTime()) {
+    return false;
+  }
+  const cursor = new Date(start.getTime());
+  let guard = 0;
+  while (cursor.getTime() < end.getTime() && guard < 366) {
+    // Shift by +05:30 so IST civil day-of-week is evaluated consistently across host timezones
+    const istDay = new Date(cursor.getTime() + 330 * 60 * 1000).getUTCDay();
+    if (istDay === 5 || istDay === 6) return true;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    guard += 1;
+  }
+  return false;
+}
+
+export function resolveCheckoutChargeReconciliation(
+  input: CheckoutChargeReconciliationInput,
+): CheckoutChargeReconciliationResult {
+  const base = Math.max(0, Math.round(Number(input.baseAmount) || 0));
+  if (base <= 0) {
+    return {
+      effectiveBaseAmount: 0,
+      effectivePerNight: 0,
+      extraGuestFeeRow: null,
+      weekendAdjustmentRow: null,
+      discountRow: null,
+      reconciledIntoBaseAmount: 0,
+    };
+  }
+  const cleaning = Math.max(0, Math.round(Number(input.cleaningFeeAmount) || 0));
+  const extraGuest = Math.max(0, Math.round(Number(input.extraGuestFeeAmount) || 0));
+  const explicitWeekend = Math.max(0, Math.round(Number(input.weekendRateAdjustmentAmount) || 0));
+  const touristTax = Math.max(0, Math.round(Number(input.touristTaxAmount) || 0));
+  const fee = Math.max(0, Number(input.displayedFeeAmount) || 0);
+  const netAdjust =
+    (Number(input.addOnsTotal) || 0) -
+    (Number(input.confirmedPromoDiscount) || 0) -
+    (Number(input.referralDiscountAmount) || 0);
+
+  const extraGuestFeeRow =
+    extraGuest > 0
+      ? {
+          label: `Extra guest fee (${input.stayGuestCount} ${input.stayGuestCount === 1 ? 'guest' : 'guests'})`,
+          amount: extraGuest,
+        }
+      : null;
+
+  const grossRows = base + cleaning + extraGuest + explicitWeekend + touristTax + fee;
+  const plug = discountPlugRow(grossRows, netAdjust, input.displayTotal);
+
+  let effectiveBaseAmount = base;
+  let weekendAdjustmentRow: { label: string; amount: number } | null =
+    explicitWeekend > 0 ? { label: 'Weekend rate adjustment', amount: explicitWeekend } : null;
+  let discountRow: { label: string; amount: number } | null = null;
+  let reconciledIntoBaseAmount = 0;
+
+  if (plug > 0) {
+    const promoLabel = input.appliedPromotionLabel?.trim();
+    discountRow = {
+      label: promoLabel || 'Discount',
+      amount: plug,
+    };
+  } else if (plug < 0) {
+    const positiveVariance = Math.abs(plug);
+    if (input.hasWeekendNight && explicitWeekend === 0) {
+      weekendAdjustmentRow = {
+        label: 'Weekend rate adjustment',
+        amount: positiveVariance,
+      };
+    } else {
+      effectiveBaseAmount = base + positiveVariance;
+      reconciledIntoBaseAmount = positiveVariance;
+    }
+  }
+
+  const effectivePerNight =
+    input.nights > 0 ? Math.round(effectiveBaseAmount / input.nights) : 0;
+
+  return {
+    effectiveBaseAmount,
+    effectivePerNight,
+    extraGuestFeeRow,
+    weekendAdjustmentRow,
+    discountRow,
+    reconciledIntoBaseAmount,
+  };
+}
+
 /** Legacy aliases retained for zero-GST compatibility (ADR-0107) */
 export function estTotalInclGst(
   perNight: number,

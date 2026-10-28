@@ -672,8 +672,16 @@
   .bc-popover .bc-chip { min-height: 44px; }
   .bc-popover .bc-cell-wrap { height: 48px; }
   .bc-popover .bc-footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  /* GUEST-045: WCAG 2.5.5 44x44px touch targets for guest counter +/- buttons on mobile viewports */
+  .bw-counter { gap: 10px; }
+  .bw-counter-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 18px; }
 }
-@media (pointer: coarse) { .bc-popover .bc-chip { min-height: 44px; } }
+@media (pointer: coarse) {
+  .bc-popover .bc-chip { min-height: 44px; }
+  /* GUEST-045: WCAG 2.5.5 44x44px touch targets for guest counter +/- buttons on coarse pointers */
+  .bw-counter { gap: 10px; }
+  .bw-counter-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 18px; }
+}
 
 /* Fit the full grid and legend above the booking form's next action on desktop. */
 @media (min-width: 761px) {

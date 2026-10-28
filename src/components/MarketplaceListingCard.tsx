@@ -15,6 +15,8 @@ export interface MarketplaceListingCardProps {
   nameFormatted?: string | null;
   slug?: string | null;
   pricePerNight?: number;
+  originalNightlyRate?: number | null;
+  appliedPromotionLabel?: string | null;
   city?: string | null;
   coverImageUrl?: string | null;
   maxGuests?: number;
@@ -38,6 +40,8 @@ export const MarketplaceListingCard: React.FC<MarketplaceListingCardProps> = ({
   nameFormatted,
   slug,
   pricePerNight,
+  originalNightlyRate,
+  appliedPromotionLabel,
   city,
   coverImageUrl,
   maxGuests,
@@ -151,9 +155,29 @@ export const MarketplaceListingCard: React.FC<MarketplaceListingCardProps> = ({
           </p>
         )}
         {pricePerNight != null && pricePerNight > 0 && (
-          <p className="text-sm font-bold text-text-primary" data-testid="marketplace-card-price">
-            ₹{pricePerNight.toLocaleString('en-IN')}{isHostel ? ' / bed / night' : '/night'}
-          </p>
+          <div data-testid="marketplace-card-price-wrap">
+            {appliedPromotionLabel?.trim() &&
+              originalNightlyRate != null &&
+              Math.round(originalNightlyRate) > Math.round(pricePerNight) && (
+                <span
+                  className="mb-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
+                  data-testid="marketplace-card-deal-badge"
+                >
+                  {appliedPromotionLabel.trim()}
+                </span>
+              )}
+            <p className="text-sm font-bold text-text-primary" data-testid="marketplace-card-price">
+              {originalNightlyRate != null && Math.round(originalNightlyRate) > Math.round(pricePerNight) && (
+                <del
+                  className="mr-1.5 font-normal text-text-muted"
+                  data-testid="marketplace-card-original-rate"
+                >
+                  ₹{Math.round(originalNightlyRate).toLocaleString('en-IN')}
+                </del>
+              )}
+              ₹{pricePerNight.toLocaleString('en-IN')}{isHostel ? ' / bed / night' : '/night'}
+            </p>
+          </div>
         )}
       </div>
     </article>

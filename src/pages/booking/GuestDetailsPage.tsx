@@ -57,7 +57,11 @@ import {
   razorpayOrderAmountInrToPaise,
 } from '@/utils/razorpayOrderAmount';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
-import { computeCheckoutTotal, discountPlugRow } from '@/utils/guestPriceEstimate';
+import {
+  computeCheckoutTotal,
+  resolveCheckoutChargeReconciliation,
+  stayIncludesWeekendNight,
+} from '@/utils/guestPriceEstimate';
 import {
   buildRazorpayCheckoutDisplayConfig,
   isMobileCheckoutUserAgent,
@@ -83,7 +87,7 @@ import { reportUpiPaid } from '@/api/payment';
 import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
 import { getIstCalendarDate, toCalendarISO, istInstantFromCalendarDate } from '@/utils/date';
 import { resolveListing } from '@/utils/listingResolver';
-import { isMarketplaceMode } from '@/tenant/tenantResolver';
+import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
@@ -220,6 +224,8 @@ type CheckoutHoldCache = {
   holdDormGenderPolicy?: DormGenderPolicy | null;
   /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
   holdSecurityDepositAmount?: number | null;
+  /** TASK-1040087: marketplace booking origin channel preserved across refreshes. */
+  holdBookingChannel?: 'marketplace' | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
@@ -370,6 +376,8 @@ const GuestDetailsPage: React.FC = () => {
     const rawGuests = sp.get('guests');
     const rawListingId = sp.get('listingId') || sp.get('listing_id');
     const rawRatePlanId = sp.get('ratePlanId') || sp.get('listingRatePlanId');
+    const rawBrand = sp.get('brand')?.trim().toLowerCase() ?? '';
+    const isMarketplaceBrand = rawBrand === 'atlastays' || rawBrand === 'marketplace';
     return {
       checkIn: normalizeDateParam(rawCheckIn),
       checkOut: normalizeDateParam(rawCheckOut),
@@ -377,6 +385,7 @@ const GuestDetailsPage: React.FC = () => {
       tenant: sp.get('tenant')?.trim() || null,
       listingId: rawListingId && !isNaN(Number(rawListingId)) ? Number(rawListingId) : null,
       ratePlanId: rawRatePlanId && !isNaN(Number(rawRatePlanId)) ? Number(rawRatePlanId) : null,
+      isMarketplaceBrand,
     };
   }, [location.search]);
 
@@ -405,6 +414,7 @@ const GuestDetailsPage: React.FC = () => {
         holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
+        holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
       });
 
       if (!effectiveListingId && unitSlug) {
@@ -437,6 +447,7 @@ const GuestDetailsPage: React.FC = () => {
           holdGraceHours: cached.holdGraceHours ?? booking.holdGraceHours ?? null,
           holdDormGenderPolicy: cached.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
           holdSecurityDepositAmount: cached.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
+          holdBookingChannel: cached.holdBookingChannel ?? booking.holdBookingChannel ?? null,
           checkIn: cached.checkIn ?? booking.checkIn ?? null,
           checkOut: cached.checkOut ?? booking.checkOut ?? null,
           guests: cached.guests ?? booking.guests,
@@ -469,6 +480,14 @@ const GuestDetailsPage: React.FC = () => {
 
   // TASK-102017: derive effective tenant slug from BookingContext hold state or URL search params
   const effectiveTenantSlug = booking.holdTenantSlug || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tenant') : null);
+
+  // TASK-1040087: attribute checkout to 'marketplace' ONLY when originated on Atlastays marketplace
+  // (never on direct tenant / white-label sites even if ?tenant=<slug> is present).
+  const isMarketplaceCheckout =
+    booking.holdBookingChannel === 'marketplace' ||
+    urlParams.isMarketplaceBrand ||
+    isMarketplaceMode() ||
+    isMarketplaceHostname();
 
   // Synchronize BookingContext and window.location query string if one was populated and the other missing
   useEffect(() => {
@@ -752,6 +771,7 @@ const GuestDetailsPage: React.FC = () => {
       holdGraceHours: booking.holdGraceHours ?? null,
       holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
       holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
+      holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : (booking.holdBookingChannel ?? null),
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
@@ -765,7 +785,9 @@ const GuestDetailsPage: React.FC = () => {
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
     booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
-    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
+    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount,
+    booking.holdBookingChannel, isMarketplaceCheckout,
+    booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
@@ -836,8 +858,10 @@ const GuestDetailsPage: React.FC = () => {
       }, 0),
     [availableAddOns, selectedAddOns, nights, stayGuestCount],
   );
-  // cleaningFeeAmount not in BookingPriceBreakdown — convenienceFee covers cleaning + service combined
-  const cleaningFeeAmount = 0;
+  // GUEST-049: honor itemized cleaning fee from server/hold breakdown when present
+  const cleaningFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.cleaningFee) || 0));
+  const extraGuestFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.extraGuestFee) || 0));
+  const weekendRateAdjustmentAmount = Math.max(0, Math.round(Number(priceBreakdown?.weekendRateAdjustmentAmount) || 0));
 
   const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
 
@@ -873,15 +897,61 @@ const GuestDetailsPage: React.FC = () => {
       referralDiscountAmount,
     });
 
-  // TASK-102392: the base row renders pre-discount `baseAmount` while the Total
-  // nets the global discount, so lines and Total disagree whenever a discount
-  // applies. Plug row reconciles them by construction (positive = discount,
-  // negative = Total carries what rows do not show).
-  const discountPlug = discountPlugRow(
-    baseAmount + cleaningFeeAmount + touristTaxAmount + displayedFeeAmount,
-    addOnsTotal - confirmedPromoDiscount - referralDiscountAmount,
-    displayTotal,
+  // GUEST-049 / TASK-102392: itemize known fee components (Cleaning fee, Extra guest fee,
+  // Weekend rate adjustment) and reconcile any residual server differential into the base
+  // accommodation row with an explanatory tooltip so "Other charges" never appears to guests
+  // while visible lines always sum 100% to `displayTotal`.
+  const hasWeekendNight = useMemo(
+    () => stayIncludesWeekendNight(booking.checkIn, booking.checkOut),
+    [booking.checkIn, booking.checkOut],
   );
+  const {
+    effectiveBaseAmount,
+    effectivePerNight,
+    extraGuestFeeRow,
+    weekendAdjustmentRow,
+    discountRow,
+    reconciledIntoBaseAmount,
+  } = resolveCheckoutChargeReconciliation({
+    baseAmount,
+    cleaningFeeAmount,
+    extraGuestFeeAmount,
+    weekendRateAdjustmentAmount,
+    touristTaxAmount,
+    displayedFeeAmount,
+    addOnsTotal,
+    confirmedPromoDiscount,
+    referralDiscountAmount,
+    displayTotal,
+    nights,
+    stayGuestCount,
+    hasWeekendNight,
+    appliedPromotionLabel: priceBreakdown?.appliedPromotionLabel ?? null,
+  });
+
+  useEffect(() => {
+    if (reconciledIntoBaseAmount > 0) {
+      console.warn('[GuestDetailsPage] Reconciled unitemized server rate differential into base accommodation row', {
+        reconciledIntoBaseAmount,
+        baseAmount,
+        displayTotal,
+      });
+    }
+  }, [reconciledIntoBaseAmount, baseAmount, displayTotal]);
+
+  const displayedPerNight = effectiveBaseAmount !== baseAmount ? effectivePerNight : perNight;
+  const originalNightlyRateForStrike =
+    typeof priceBreakdown?.originalNightlyRate === 'number' &&
+    Math.round(priceBreakdown.originalNightlyRate) > displayedPerNight &&
+    displayedPerNight > 0 &&
+    nights > 0
+      ? Math.round(priceBreakdown.originalNightlyRate)
+      : null;
+  const checkoutDealBadgeLabel =
+    priceBreakdown?.appliedPromotionLabel?.trim() &&
+    (originalNightlyRateForStrike != null || (discountRow != null && discountRow.amount > 0))
+      ? priceBreakdown.appliedPromotionLabel.trim()
+      : null;
 
   // ── Check-in/out display ─────────────────────────────────────────────────
   const checkInDisplay = booking.checkIn
@@ -1173,7 +1243,9 @@ const GuestDetailsPage: React.FC = () => {
           checkoutDate,
           guests: booking.guests ?? 1,
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         },
+        ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         currency: 'INR',
         // GuestInfo absent => init-hold mode on the API (it creates the hold; no Razorpay order yet).
         guestConsentAccepted: false,
@@ -1196,7 +1268,7 @@ const GuestDetailsPage: React.FC = () => {
     };
     updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
     return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
-  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, effectiveTenantSlug, updateBooking]);
+  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, isMarketplaceCheckout, effectiveTenantSlug, updateBooking]);
 
   // ── PAY-010: UPI_QR / UPI_DEEPLINK checkout ──────────────────────────────────
   const [upiCheckout, setUpiCheckout] = useState<{
@@ -1224,7 +1296,7 @@ const GuestDetailsPage: React.FC = () => {
         holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
         holdListingName: null, holdCancellationTier: null,
         holdCancellationWindowHours: null, holdGraceHours: null,
-        holdSecurityDepositAmount: null,
+        holdSecurityDepositAmount: null, holdBookingChannel: null,
         paymentHoldBookingId: null, paymentHoldToken: null,
       });
       const token = upiCheckout.bookingToken;
@@ -1290,6 +1362,7 @@ const GuestDetailsPage: React.FC = () => {
         // TASK-4354: prove ownership of the hold — server rejects a guessed holdId without this token.
         holdToken: activeHoldToken ?? undefined,
         currency: 'INR',
+        ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         guestConsentAccepted: consentAccepted,
         // FOUNDER RULED 2026-10-19: the server re-checks this when the listing has house rules.
         houseRulesAccepted,
@@ -1315,6 +1388,7 @@ const GuestDetailsPage: React.FC = () => {
           guestNationality: formData.nationality || 'India',
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         },
       });
 
@@ -1601,7 +1675,7 @@ const GuestDetailsPage: React.FC = () => {
                         holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
                         holdListingName: null, holdCancellationTier: null,
                         holdCancellationWindowHours: null, holdGraceHours: null,
-                        holdSecurityDepositAmount: null,
+                        holdSecurityDepositAmount: null, holdBookingChannel: null,
                         paymentHoldBookingId: null, paymentHoldToken: null,
                       });
                       const token = pendingBookingTokenRef.current;
@@ -1872,7 +1946,8 @@ const GuestDetailsPage: React.FC = () => {
       isSubmitting, validateForm, holdId, holdToken, holdExpiresAt, phoneDialCode, formData,
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
       houseRulesAccepted, dormAckAccepted, depositRequired, depositAccepted, checkoutInfo, hasDraft, startHoldAtPay,
-      holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
+      holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, booking.listingRatePlanId,
+      isMarketplaceCheckout, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
     ],
   );
@@ -3000,13 +3075,50 @@ const GuestDetailsPage: React.FC = () => {
             )}
             <div className="gd-price-row" data-testid="price-line-base">
               <div className="desc">
-                <span>
-                  {nights > 0 && perNight > 0
-                    ? `${displayPrice(perNight)} × ${nights} ${nights === 1 ? 'night' : 'nights'}`
-                    : 'Accommodation'}
+                <span style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                  {originalNightlyRateForStrike != null && (
+                    <del
+                      data-testid="checkout-original-nightly-rate"
+                      style={{ color: 'var(--gd-faint, #8b7b70)', fontWeight: 400 }}
+                    >
+                      {displayPrice(originalNightlyRateForStrike)}
+                    </del>
+                  )}
+                  <span>
+                    {nights > 0 && displayedPerNight > 0
+                      ? `${displayPrice(displayedPerNight)} × ${nights} ${nights === 1 ? 'night' : 'nights'}`
+                      : 'Accommodation'}
+                  </span>
+                  {reconciledIntoBaseAmount > 0 && (
+                    <FeeInfoTip
+                      fee="rateAdjustment"
+                      label="Accommodation rate details"
+                      testId="fee-info-rate-adjustment"
+                    />
+                  )}
                 </span>
+                {checkoutDealBadgeLabel && (
+                  <small>
+                    <span
+                      data-testid="checkout-deal-badge"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        marginTop: 2,
+                        padding: '1px 7px',
+                        borderRadius: 999,
+                        background: 'var(--gd-success-bg, #ecfdf5)',
+                        color: 'var(--gd-success, #047857)',
+                        fontWeight: 600,
+                        fontSize: 11,
+                      }}
+                    >
+                      {checkoutDealBadgeLabel}
+                    </span>
+                  </small>
+                )}
               </div>
-              <span className="num">{displayPrice(baseAmount)}</span>
+              <span className="num">{displayPrice(effectiveBaseAmount)}</span>
             </div>
             {cleaningFeeAmount > 0 && (
               <div className="gd-price-row" data-testid="cleaning-fee-row">
@@ -3016,6 +3128,28 @@ const GuestDetailsPage: React.FC = () => {
                   <FeeInfoTip fee="cleaning" label="Cleaning fee" testId="fee-info-cleaning" />
                 </span>
                 <span className="num">{displayPrice(cleaningFeeAmount)}</span>
+              </div>
+            )}
+            {extraGuestFeeRow && (
+              <div className="gd-price-row" data-testid="extra-guest-fee-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {extraGuestFeeRow.label}
+                  <FeeInfoTip fee="extraGuest" label={extraGuestFeeRow.label} testId="fee-info-extra-guest" />
+                </span>
+                <span className="num">{displayPrice(extraGuestFeeRow.amount)}</span>
+              </div>
+            )}
+            {weekendAdjustmentRow && (
+              <div className="gd-price-row" data-testid="weekend-adjustment-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {weekendAdjustmentRow.label}
+                  <FeeInfoTip
+                    fee="weekendAdjustment"
+                    label={weekendAdjustmentRow.label}
+                    testId="fee-info-weekend-adjustment"
+                  />
+                </span>
+                <span className="num">{displayPrice(weekendAdjustmentRow.amount)}</span>
               </div>
             )}
             {addOnsTotal > 0 && (
@@ -3061,13 +3195,12 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="num">{displayPrice(displayedFeeAmount)}</span>
               </div>
             )}
-            {/* TASK-102392: plug row so the visible lines sum exactly to the Total.
-                Positive = a global discount the base row already netted out; negative
-                = the Total carries an amount not shown by any row above. */}
-            {discountPlug !== 0 && (
-              <div className={`gd-price-row${discountPlug > 0 ? ' save' : ''}`} data-testid="price-line-discount-plug">
-                <span>{discountPlug > 0 ? 'Discount' : 'Other charges'}</span>
-                <span className="num">{discountPlug > 0 ? '−' : ''}{displayPrice(Math.abs(discountPlug))}</span>
+            {/* GUEST-049 / TASK-102392: positive discount row only — negative variances are itemized
+                above or reconciled into the accommodation rate so "Other charges" never appears. */}
+            {discountRow && (
+              <div className="gd-price-row save" data-testid="price-line-discount-plug">
+                <span>{discountRow.label}</span>
+                <span className="num">−{displayPrice(discountRow.amount)}</span>
               </div>
             )}
           </div>

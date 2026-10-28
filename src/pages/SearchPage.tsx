@@ -2031,6 +2031,14 @@ const SearchPage = () => {
                           <span className="inline-block h-12 w-28 rounded bg-bg-muted" data-testid="guest-listing-price-loading" aria-hidden />
                         ) : stayQuote ? (
                           <>
+                            {stayQuote.appliedPromotionLabel && stayQuote.savingsPercent > 0 && (
+                              <span
+                                className="mb-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
+                                data-testid="guest-listing-deal-badge"
+                              >
+                                {stayQuote.appliedPromotionLabel}
+                              </span>
+                            )}
                             {stayQuote.standardNightly != null && stayQuote.savingsPercent > 0 && (
                               <p className="text-xs" data-testid="guest-listing-direct-saving" style={{ margin: 0 }}>
                                 <span className="sr-only">Standard price </span>
@@ -2064,16 +2072,34 @@ const SearchPage = () => {
                       <>
                       {/* Founder ruling 2026-10-21: show the direct-booking saving next to the real price —
                           the daily-summary row is built from the checkout quote. */}
-                      {dailyBreakdown && dailyBreakdown.baseAmount > dailyBreakdown.actualPrice && dailyBreakdown.actualPrice > 0 && (
-                        <p className="text-xs" data-testid="guest-listing-direct-saving" style={{ margin: 0 }}>
-                          <span className="sr-only">Standard price </span>
-                          <span style={{ textDecoration: 'line-through', color: 'var(--text-muted, #6b5a55)' }}>
-                            {formatDisplayCurrency(dailyBreakdown.baseAmount)}
-                          </span>{' '}
-                          <span style={{ fontWeight: 600, color: '#b8472f' }}>
-                            {directSavingsLabel(Math.round(((dailyBreakdown.baseAmount - dailyBreakdown.actualPrice) / dailyBreakdown.baseAmount) * 100))}
-                          </span>
-                        </p>
+                      {dailyBreakdown &&
+                        (dailyBreakdown.originalNightlyRate ?? dailyBreakdown.baseAmount) > dailyBreakdown.actualPrice &&
+                        dailyBreakdown.actualPrice > 0 && (
+                        <>
+                          {dailyBreakdown.appliedPromotionLabel && (
+                            <span
+                              className="mb-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
+                              data-testid="guest-listing-deal-badge"
+                            >
+                              {dailyBreakdown.appliedPromotionLabel}
+                            </span>
+                          )}
+                          <p className="text-xs" data-testid="guest-listing-direct-saving" style={{ margin: 0 }}>
+                            <span className="sr-only">Standard price </span>
+                            <span style={{ textDecoration: 'line-through', color: 'var(--text-muted, #6b5a55)' }}>
+                              {formatDisplayCurrency(dailyBreakdown.originalNightlyRate ?? dailyBreakdown.baseAmount)}
+                            </span>{' '}
+                            <span style={{ fontWeight: 600, color: '#b8472f' }}>
+                              {directSavingsLabel(
+                                Math.round(
+                                  (((dailyBreakdown.originalNightlyRate ?? dailyBreakdown.baseAmount) - dailyBreakdown.actualPrice) /
+                                    (dailyBreakdown.originalNightlyRate ?? dailyBreakdown.baseAmount)) *
+                                    100,
+                                ),
+                              )}
+                            </span>
+                          </p>
+                        </>
                       )}
                       <p className="search-card__price-amt" data-testid="guest-listing-nightly-price">
                         {formatDisplayCurrency(displayedPrice)}

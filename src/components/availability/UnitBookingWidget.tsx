@@ -60,7 +60,7 @@ import { track } from '@/lib/events'; // TASK-1480
 import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantContext, type TenantInfo } from '@/tenant/tenantContext';
-import { isMarketplaceMode } from '@/tenant/tenantResolver';
+import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
 } from '@/utils/directBookingPromo';
 
@@ -1646,6 +1646,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             // TASK-10298998: same rule as the Total below — no gateway, no payment fee.
             paymentFeeCharged: showOnlinePaymentProcessing,
             paymentFeeAmount: serverPriceBreakdown.convenienceFeeAmount,
+            originalNightlyRate: serverPriceBreakdown.originalNightlyRate,
+            discountedNightlyRate: serverPriceBreakdown.discountedNightlyRate,
+            appliedPromotionLabel: serverPriceBreakdown.appliedPromotionLabel,
           })
         : null,
     [serverGstMatchesSelection, serverPriceBreakdown, priceDetails.nights, showOnlinePaymentProcessing],
@@ -1671,6 +1674,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             paymentFeeCharged: showOnlinePaymentProcessing,
             paymentFeeAmount:
               (effectiveDailyPricing.actualPrice * (effectiveDailyPricing.convenienceFeePercent ?? 0)) / 100,
+            originalNightlyRate: effectiveDailyPricing.originalNightlyRate,
+            discountedNightlyRate: effectiveDailyPricing.discountedNightlyRate,
+            appliedPromotionLabel: effectiveDailyPricing.appliedPromotionLabel,
           })
         : null,
     [effectiveDailyPricing, showOnlinePaymentProcessing],
@@ -1889,6 +1895,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       // (`verifiedTenantSlug`: the `tenantContext` prop, else ?tenant=), not the platform's.
       const holdTenantSlug = verifiedTenantSlug || tenantFromUrl || getApiHeaders(verifiedTenantSlug)['X-Tenant-Slug'] || null;
 
+      const brandParam = typeof window !== 'undefined'
+        ? new URLSearchParams(currentSearch).get('brand')?.trim().toLowerCase() ?? ''
+        : '';
+      const isMarketplaceOrigin =
+        isMarketplaceMode() ||
+        isMarketplaceHostname() ||
+        brandParam === 'atlastays' ||
+        brandParam === 'marketplace';
+
       // Store the stay draft in context and navigate to the details page. holdId / holdToken / holdExpiresAt stay null.
       updateBooking({
         holdId: null,
@@ -1899,6 +1914,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdTenantSlug,
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
+        holdBookingChannel: isMarketplaceOrigin ? 'marketplace' : null,
         holdPriceBreakdown: {
           paymentFeeDisplay: {
             percent: feePercent(Number((convenienceFeePercent * 100).toFixed(2))),
@@ -1914,6 +1930,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           nights: stayNights,
           currency: 'INR',
           touristTaxAmount: touristTaxLineAmount,
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.cleaningFee && serverPriceBreakdown.cleaningFee > 0
+            ? { cleaningFee: Math.round(serverPriceBreakdown.cleaningFee) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.extraGuestFee && serverPriceBreakdown.extraGuestFee > 0
+            ? { extraGuestFee: Math.round(serverPriceBreakdown.extraGuestFee) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.weekendRateAdjustmentAmount && serverPriceBreakdown.weekendRateAdjustmentAmount > 0
+            ? { weekendRateAdjustmentAmount: Math.round(serverPriceBreakdown.weekendRateAdjustmentAmount) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.originalNightlyRate && serverPriceBreakdown.originalNightlyRate > 0
+            ? { originalNightlyRate: Math.round(serverPriceBreakdown.originalNightlyRate) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.discountedNightlyRate && serverPriceBreakdown.discountedNightlyRate > 0
+            ? { discountedNightlyRate: Math.round(serverPriceBreakdown.discountedNightlyRate) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.appliedPromotionLabel
+            ? { appliedPromotionLabel: serverPriceBreakdown.appliedPromotionLabel }
+            : {}),
         },
         holdCancellationTier: effectiveRatePlanCancellationTier,
         holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
@@ -1965,10 +1999,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     dateBookabilityMap, today, tenantContext, verifiedTenantSlug,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
     breakdownFinalTotal, finalTotal, updateBooking, navigate, showOnlinePaymentProcessing,
-    convenienceFeePercent, touristTaxLineAmount,
+    convenienceFeePercent, touristTaxLineAmount, serverGstMatchesSelection, serverPriceBreakdown,
     resolvedCancellationWindowHours, resolvedGraceHours,
     selectedRatePlanId, selectedRatePlan, effectiveRatePlanCancellationTier, isSelectedRatePlanNonRefundable,
     isDorm, dormBedsLeft, dormGenderPolicy,
+    securityDepositAmount, publicRatePlans, cancellationTrustText,
   ]);
 
   // Hand-off link for the Reserve 422 above. Derived at render, not captured in handleReserve, so it
