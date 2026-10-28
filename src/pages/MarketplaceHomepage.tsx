@@ -1022,7 +1022,7 @@ export default function MarketplaceHomepage() {
                   {/* TASK-4511: keyword-bucketed sentiment chip — matches SearchPage.tsx card treatment.
                       TASK-10089: gated on provenance agreement — the chip (native reviews only)
                       renders only when the summary's verified-stay count agrees with the card. */}
-                  <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} />
+                  <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} lazy />
 
                   {/* TASK-10298999 (founder ruling 2026-10-21: price shown = price charged): the card reads the
                       same checkout quote as the listing page and the booking box — never the listing's
