@@ -139,6 +139,20 @@ describe('Listing page "About this home" shows the host description from Rooms &
     expect(screen.getByTestId('property-about-description').textContent).toBe(FULL_DESCRIPTION);
   });
 
+  it('renders descriptions with repaired mojibake (GUEST-038)', async () => {
+    mockFetchListingById.mockResolvedValue({
+      id: 637,
+      longDescription: 'â€¢ Cozy Villa âœ” Superhost\r\nVistaraâ€™s Haven â€“ Goa',
+      shortDescription: '',
+    });
+
+    render(page());
+
+    await settle();
+    const about = screen.getByTestId('property-about-description');
+    expect(about.textContent).toContain('• Cozy Villa ✔ Superhost\nVistara’s Haven – Goa');
+  });
+
   it('falls back to the Short description when the Full description is empty', async () => {
     mockFetchListingById.mockResolvedValue({ id: 637, longDescription: '', shortDescription: 'Stylish 2BHK near UB City.' });
 

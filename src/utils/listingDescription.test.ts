@@ -29,6 +29,14 @@ describe('resolveHostListingDescription', () => {
     );
   });
 
+  it('repairs double-encoded mojibake in host descriptions (GUEST-038)', () => {
+    expect(
+      resolveHostListingDescription({
+        longDescription: 'â€¢ Deluxe Stay âœ” WiFiÂ included\r\nVistaraâ€™s Villa â€“ Goa',
+      }),
+    ).toBe('• Deluxe Stay ✔ WiFi included\nVistara’s Villa – Goa');
+  });
+
   it('never uses SEO/meta copy or the tagline — returns empty so the page keeps its "Ask the host" state', () => {
     expect(
       resolveHostListingDescription({
@@ -67,5 +75,12 @@ describe('previewListingDescription', () => {
 
   it('does not leave the ellipsis dangling after a trailing line break', () => {
     expect(previewListingDescription('Intro\n\nMore text here', 7).preview).toBe('Intro…');
+  });
+
+  it('repairs mojibake before generating preview (GUEST-038)', () => {
+    expect(previewListingDescription('â€¢ Cozy room âœ” AC', 11)).toEqual({
+      preview: '• Cozy room…',
+      truncated: true,
+    });
   });
 });

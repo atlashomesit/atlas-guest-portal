@@ -78,6 +78,7 @@ import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
 import { previewListingDescription } from '@/utils/listingDescription';
+import { repairMojibake } from '@/utils/textUtils';
 import { buildGuestImageSrcSet, filterGuestImageUrls, GUEST_IMAGE_SRCSET_WIDTHS, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '@/utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '@/api/listingClient';
 import {
@@ -1494,7 +1495,7 @@ useEffect(() => {
                 '@context': 'https://schema.org',
                 '@type': 'LodgingBusiness',
                 name: getListingDisplayName(data.id, data.property_name),
-                description: (hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
+                description: repairMojibake(hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
                 image: primaryImageForLd,
                 url: pageUrlForLd,
                 address: {
@@ -1547,7 +1548,7 @@ useEffect(() => {
                           '@context': 'https://schema.org',
                           '@type': 'Place',
                           name: getListingDisplayName(data.id, data.property_name),
-                          description: (hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
+                          description: repairMojibake(hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
                           url: pageUrlForLd,
                       },
                   ]
@@ -1728,7 +1729,8 @@ useEffect(() => {
     const ppWaAskUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}` : '';
     // "About this home": the host's own description wins; the "Ask them" empty state only shows
     // once GET /listings/{id} has confirmed there is none (no flash before the detail lands).
-    const ppAboutText = hostDescription.text || data.property_description?.trim() || '';
+    // GUEST-038: pass descriptions through repairMojibake to fix double-encoded UTF-8 sequences.
+    const ppAboutText = repairMojibake(hostDescription.text || data.property_description?.trim() || '');
     const ppAboutPreview = previewListingDescription(ppAboutText);
     const ppShowAboutAskHost = !ppAboutText && !!ppWaAskUrl && hostDescription.loaded;
     const ppShowRegRow = (ppTenantOverrides.gstin != null) ||
