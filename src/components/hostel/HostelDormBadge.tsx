@@ -1,5 +1,5 @@
 import React from 'react';
-import { parseDormGenderPolicy, type DormGenderPolicy } from '@/utils/dormListing';
+import { isHostelDormType, parseDormGenderPolicy, type DormGenderPolicy } from '@/utils/dormListing';
 
 export type GenderPolicy = DormGenderPolicy;
 
@@ -30,21 +30,17 @@ export interface HostelDormBadgeProps {
   className?: string;
 }
 
+/**
+ * TASK-10299109: the badge reads "Sold by the Bed", so it belongs only on a listing that really sells beds:
+ * `Listing.AccommodationType === "HostelDorm"`, straight from the API. The PROPERTY type is not an input -
+ * a private room of a Hostel property is sold by the room and must not carry a dorm badge. `propertyType` stays
+ * in the signature only so existing callers still compile; it is ignored.
+ */
 export function isHostelDorm(props: {
   accommodationType?: string | null;
   propertyType?: string | null;
 }): boolean {
-  const acc = (props.accommodationType || '').toLowerCase();
-  const prop = (props.propertyType || '').toLowerCase();
-
-  return (
-    acc === 'hosteldorm' ||
-    prop === 'hosteldorm' ||
-    acc.includes('dorm') ||
-    prop.includes('dorm') ||
-    acc.includes('hostel') ||
-    prop.includes('hostel')
-  );
+  return isHostelDormType(props.accommodationType);
 }
 
 /** The API's own value, or null when it states none. Never inferred from the listing name. */

@@ -46,7 +46,6 @@ import {
   getAccessibilityDeclarations,
 } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
-import { isHostelDorm } from "../components/hostel/HostelDormBadge";
 import { isHostelDormType } from "../utils/dormListing";
 import { CONTACT } from "../config/contact";
 import { getPropertyDesignImage } from "../config/branding";
@@ -1878,7 +1877,8 @@ const SearchPage = () => {
               const dailyBreakdown = getDailyListingPricing(unit.numericId);
               // GUEST-034: with dates searched the card shows the quote for those dates and guests.
               const stayQuote = stayDisplayFor(unit.numericId);
-              const isHostel = isHostelDorm({ accommodationType: unit.accommodationType, propertyType: unit.propertyType }) || isHostelDormType(unit.accommodationType);
+              // TASK-10299109: per-bed wording only for a listing that really sells beds (accommodationType), not for every room of a Hostel property.
+              const isHostel = isHostelDormType(unit.accommodationType);
               const stayPriceLoading = Boolean(quoteStay) && stayPrices.get(unit.numericId)?.status !== "ready"
                 && stayPrices.get(unit.numericId)?.status !== "unavailable";
               const displayedPrice = stayQuote

@@ -222,7 +222,9 @@ const ListingCard: React.FC<ListingCardProps> = ({
     },
   ].filter((item) => item.visible);
 
-  const isHostel = isHostelDorm({ accommodationType: accommodationType || propertyType, propertyType });
+  // TASK-10299109: "per bed" and the dorm badge key on the LISTING's own accommodationType, never on the
+  // property type - a private room in a Hostel property is sold by the room.
+  const isHostel = isHostelDorm({ accommodationType });
 
   return (
     <article
@@ -328,7 +330,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
         <HostIdentityLabel marketplace={marketplace} verified={hostIdentityVerified} />
 
-        <HostelDormBadge accommodationType={accommodationType || propertyType} propertyType={propertyType} genderPolicy={dormGenderPolicy} />
+        <HostelDormBadge accommodationType={accommodationType} genderPolicy={dormGenderPolicy} />
 
         {/* TASK-1360: Last-booked social-proof badge */}
         {lastBookedLabel && (
