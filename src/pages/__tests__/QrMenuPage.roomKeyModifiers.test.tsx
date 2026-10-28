@@ -3,8 +3,10 @@
  *
  * POS-011 (guest half): the printed room QR is `/qr-menu/:slug?rk=<key>`; the page sends the key, shows the API's room-link
  * status, the lockout (with the retry time), and never retries a locked order by itself.
+ * POS-017 (guest half): per-item modifier groups with a picker that enforces min / max / required, the choices go on the order,
+ * and every price shown comes from the API (menu price plus deltas; no tax maths in the browser).
  */
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
@@ -12,6 +14,50 @@ import QrMenuPage from "../QrMenuPage";
 import { settle } from "@/test/settle";
 
 const PLAIN_ITEM = { id: 1, name: "Akki Roti (2 pcs)", price: 160, dietary: "VEG", outletCategory: "FNB", isSoldOut86: false };
+const COFFEE = {
+  id: 11,
+  name: "Cappuccino",
+  price: 200,
+  dietary: "VEG",
+  outletCategory: "FNB",
+  isSoldOut86: false,
+  modifierGroups: [
+    {
+      id: "g-milk",
+      name: "Milk choice",
+      minSelection: 1,
+      maxSelection: 1,
+      options: [
+        { id: "o-dairy", name: "Dairy milk", priceDelta: 0, isAvailable: true },
+        { id: "o-oat", name: "Oat milk", priceDelta: 40, dietaryFlag: "VEGAN", isAvailable: true },
+        { id: "o-gone", name: "Almond milk", priceDelta: 50, isAvailable: false },
+      ],
+    },
+    {
+      id: "g-extra",
+      name: "Extras",
+      minSelection: 0,
+      maxSelection: 2,
+      options: [
+        { id: "o-shot", name: "Extra shot", priceDelta: 30, isAvailable: true },
+        { id: "o-syrup", name: "Vanilla syrup", priceDelta: 20, isAvailable: true },
+        { id: "o-choc", name: "Chocolate", priceDelta: 25, isAvailable: true },
+      ],
+    },
+  ],
+};
+const IMPOSSIBLE = {
+  id: 12,
+  name: "Tasting Flight",
+  price: 500,
+  dietary: "NA",
+  outletCategory: "FNB",
+  isSoldOut86: false,
+  modifierGroups: [
+    { id: "g-pick", name: "Pick three", minSelection: 3, maxSelection: 3, options: [{ id: "only", name: "Only one", priceDelta: 0, isAvailable: true }] },
+  ],
+};
+
 function makeMenu(extra: Record<string, unknown> = {}) {
   return {
     tenantName: "Coorg Plantation Resort",
@@ -22,7 +68,7 @@ function makeMenu(extra: Record<string, unknown> = {}) {
     roomLinkStatus: "KEY",
     roomChargeLocked: false,
     roomChargeFallbackMethods: [],
-    categories: [{ categoryKey: "FNB", title: "F&B (Dining & Room Service)", items: [PLAIN_ITEM] }],
+    categories: [{ categoryKey: "FNB", title: "F&B (Dining & Room Service)", items: [PLAIN_ITEM, COFFEE, IMPOSSIBLE] }],
     ...extra,
   };
 }
@@ -266,5 +312,151 @@ describe("POS-011: room key on the guest QR menu", () => {
     expect(screen.getByTestId("pos-qr-room-verification-error")).toBeInTheDocument();
     expect(screen.getByTestId("pos-qr-attempts-remaining")).toHaveTextContent("3 tries left");
     expect(screen.getByTestId("settle-post-to-room")).toBeInTheDocument(); // not locked yet
+  });
+});
+
+describe("POS-017: modifier groups on the guest QR menu", () => {
+  beforeEach(() => {
+    // A table QR: no room, so the guest pays now / on delivery.
+    menuResponse = () => reply(200, makeMenu({ listingId: null, roomLabel: null, roomLinkStatus: "NONE" }));
+  });
+
+  function openCoffeePicker() {
+    fireEvent.click(screen.getByTestId("add-to-cart-11"));
+    return within(screen.getByTestId("modifier-picker-11"));
+  }
+
+  test("an item with groups opens a picker (only available options) instead of adding straight away; plain items still add directly", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await settle();
+
+    fireEvent.click(screen.getByTestId("add-to-cart-1"));
+    expect(screen.getByTestId("pos-qr-cart-drawer")).toBeInTheDocument();
+    cleanup();
+
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await settle();
+    const picker = openCoffeePicker();
+    expect(screen.queryByTestId("pos-qr-cart-drawer")).toBeNull();
+    expect(picker.getByText("Milk choice")).toBeInTheDocument();
+    expect(picker.getByText("Extras")).toBeInTheDocument();
+    expect(picker.getByRole("radio", { name: /Oat milk/ })).toBeInTheDocument();
+    expect(picker.getByText("+₹40")).toBeInTheDocument();
+    expect(picker.queryByText(/Almond milk/)).toBeNull(); // unavailable option is never offered
+    expect(picker.getAllByRole("checkbox")).toHaveLength(3);
+  });
+
+  test("a required group blocks the add with a plain message", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await settle();
+    openCoffeePicker();
+
+    fireEvent.click(screen.getByTestId("modifier-picker-add-11"));
+    expect(screen.getByTestId("modifier-error-g-milk")).toHaveTextContent("Choose 1 option for Milk choice.");
+    expect(screen.queryByTestId("pos-qr-cart-drawer")).toBeNull();
+  });
+
+  test("the maximum is enforced, the choices are priced from menu price plus deltas, and the order sends ids only", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await settle();
+    const picker = openCoffeePicker();
+
+    fireEvent.click(picker.getByRole("radio", { name: /Oat milk/ }));
+    fireEvent.click(picker.getByRole("checkbox", { name: /Extra shot/ }));
+    fireEvent.click(picker.getByRole("checkbox", { name: /Vanilla syrup/ }));
+    fireEvent.click(picker.getByRole("checkbox", { name: /Chocolate/ }));
+    expect(picker.getByRole("checkbox", { name: /Chocolate/ })).not.toBeChecked();
+    expect(screen.getByTestId("modifier-error-g-extra")).toHaveTextContent("You can choose at most 2 for Extras.");
+
+    fireEvent.click(screen.getByTestId("modifier-picker-add-11"));
+    expect(screen.getByTestId("pos-qr-cart-drawer")).toBeInTheDocument();
+    expect(screen.queryByTestId("modifier-picker-11")).toBeNull();
+    expect(screen.getByTestId("pos-qr-total").textContent).toContain("290"); // 200 + 40 + 30 + 20
+    const line = screen.getByTestId("pos-qr-cart-line");
+    expect(line).toHaveTextContent("Cappuccino");
+    expect(line).toHaveTextContent("Milk choice: Oat milk (+₹40)");
+    expect(line).toHaveTextContent("Extras: Extra shot (+₹30), Vanilla syrup (+₹20)");
+
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await settle();
+    const [body] = postBodies();
+    expect(body.lines).toHaveLength(1);
+    expect(body.lines[0].addOnServiceId).toBe(11);
+    expect(body.lines[0].quantity).toBe(1);
+    expect(body.lines[0].unitPrice).toBe(200); // the menu price; the server adds the deltas itself
+    expect(body.lines[0].modifiers).toEqual([
+      { groupId: "g-milk", optionId: "o-oat" },
+      { groupId: "g-extra", optionId: "o-shot" },
+      { groupId: "g-extra", optionId: "o-syrup" },
+    ]);
+  });
+
+  test("the same choices add to one line; different choices make a second line", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await settle();
+
+    let picker = openCoffeePicker();
+    fireEvent.click(picker.getByRole("radio", { name: /Oat milk/ }));
+    fireEvent.click(screen.getByTestId("modifier-picker-add-11"));
+
+    picker = openCoffeePicker();
+    fireEvent.click(picker.getByRole("radio", { name: /Oat milk/ }));
+    fireEvent.click(screen.getByTestId("modifier-picker-add-11"));
+    expect(screen.getAllByTestId("pos-qr-cart-line")).toHaveLength(1);
+    expect(screen.getByTestId("pos-qr-total").textContent).toContain("480"); // 2 x 240
+
+    picker = openCoffeePicker();
+    fireEvent.click(picker.getByRole("radio", { name: /Dairy milk/ }));
+    fireEvent.click(screen.getByTestId("modifier-picker-add-11"));
+    expect(screen.getAllByTestId("pos-qr-cart-line")).toHaveLength(2);
+    expect(screen.getByTestId("pos-qr-total").textContent).toContain("680"); // 2 x 240 + 200
+
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await settle();
+    const [body] = postBodies();
+    expect(body.lines).toHaveLength(2);
+    expect(body.lines.map((l: any) => l.quantity).sort()).toEqual([1, 2]);
+  });
+
+  test("a group nobody can satisfy (needs more options than exist) cannot be ordered", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await settle();
+    expect(screen.getByTestId("add-to-cart-12")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("add-to-cart-12"));
+    expect(screen.queryByTestId("modifier-picker-12")).toBeNull();
+    expect(screen.queryByTestId("pos-qr-cart-drawer")).toBeNull();
+  });
+
+  test("the tracker shows the API's line text and totals as returned", async () => {
+    orderHandler = (body) =>
+      successOrder(body, {
+        totalAmount: 252,
+        gstAmount: 12,
+        lines: [
+          {
+            id: 1,
+            itemName: "Cappuccino",
+            quantity: 1,
+            unitPrice: 240,
+            baseUnitPrice: 200,
+            totalPrice: 240,
+            modifiersText: "Milk choice: Oat milk (+₹40.00)",
+            modifiers: [{ groupId: "g-milk", groupName: "Milk choice", optionId: "o-oat", optionName: "Oat milk", priceDelta: 40 }],
+          },
+        ],
+      });
+    renderQrMenu("/qr-menu/coorg-resort?table=T4");
+    await settle();
+    const picker = openCoffeePicker();
+    fireEvent.click(picker.getByRole("radio", { name: /Oat milk/ }));
+    fireEvent.click(screen.getByTestId("modifier-picker-add-11"));
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await settle();
+
+    const lines = screen.getByTestId("pos-qr-order-lines");
+    expect(lines).toHaveTextContent("Cappuccino");
+    expect(lines).toHaveTextContent("Milk choice: Oat milk (+₹40.00)");
+    expect(lines).toHaveTextContent("₹240");
+    expect(screen.getByTestId("pos-qr-order-total")).toHaveTextContent("₹252");
   });
 });

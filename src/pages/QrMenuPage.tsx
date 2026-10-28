@@ -18,6 +18,20 @@ import {
 } from "lucide-react";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
+import ModifierPicker from "../components/qrmenu/ModifierPicker";
+import {
+  buildLineKey,
+  describeModifiers,
+  isOrderable,
+  parseModifierGroups,
+  selectedModifiers,
+  selectionToPayload,
+  unitPriceWithModifiers,
+  type ModifierGroup,
+  type ModifierPick,
+  type ModifierSelection,
+  type SelectedModifier,
+} from "../components/qrmenu/modifiers";
 
 export interface MenuItem {
   id: number;
@@ -33,6 +47,8 @@ export interface MenuItem {
   isTaxInclusive?: boolean;
   isSoldOut86?: boolean;
   imageUrl?: string;
+  /** POS-017: modifier groups the guest can pick from (the API sends only the available options). Read through parseModifierGroups. */
+  modifierGroups?: unknown;
 }
 
 export interface MenuCategory {
@@ -88,7 +104,23 @@ export interface OrderStatus {
     unitPrice: number;
     totalPrice: number;
     notes?: string;
+    /** POS-017: item price before the chosen modifier deltas (unitPrice already includes them). */
+    baseUnitPrice?: number;
+    /** POS-017: the API's text for the guest's choices, e.g. "Milk choice: Oat milk (+₹40.00)". */
+    modifiersText?: string | null;
   }>;
+}
+
+/** POS-017: one line of the guest's cart - the item plus the choices that make it a distinct line. */
+interface CartLine {
+  key: string;
+  item: MenuItem;
+  qty: number;
+  notes: string;
+  picks: ModifierPick[];
+  modifiers: SelectedModifier[];
+  /** Menu price + the chosen deltas, as the API will price it (display only; the server recomputes). */
+  unitPrice: number;
 }
 
 /** POS-011: the same wording the API uses when a room link is not usable. */
@@ -103,6 +135,8 @@ function formatRetryTime(iso: string | null | undefined): string | null {
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
 }
+
+const formatRupees = (amount: number): string => amount.toLocaleString("en-IN", { maximumFractionDigits: 2 });
 
 const FALLBACK_MENU: MenuResponse = {
   tenantName: "Homestay & Resorts",
@@ -261,8 +295,10 @@ export default function QrMenuPage() {
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
 
-  // Cart: item id -> quantity & notes
-  const [cart, setCart] = useState<{ [itemId: number]: { item: MenuItem; qty: number; notes: string } }>({});
+  // Cart: line key (item id, plus the chosen modifiers when it has any) -> line
+  const [cart, setCart] = useState<{ [lineKey: string]: CartLine }>({});
+  // POS-017: the item whose modifier picker is open
+  const [pickerItemId, setPickerItemId] = useState<number | null>(null);
 
   // Checkout Form State
   const [settlementMethod, setSettlementMethod] = useState<"POST_TO_ROOM" | "PAY_NOW_UPI" | "PAY_ON_DELIVERY">(
@@ -386,35 +422,51 @@ export default function QrMenuPage() {
     return () => clearInterval(interval);
   }, [activeOrder, tenantSlug]);
 
-  const handleAddToCart = (item: MenuItem) => {
+  /** POS-017: add one unit of the item with the given choices; the same choices land on the same line, other choices make a new line. */
+  const addLine = (item: MenuItem, picks: ModifierPick[] = [], modifiers: SelectedModifier[] = []) => {
     if (item.isSoldOut86) return;
+    const key = buildLineKey(item.id, picks);
     setCart((prev) => {
-      const existing = prev[item.id];
-      const newQty = existing ? existing.qty + 1 : 1;
+      const existing = prev[key];
       return {
         ...prev,
-        [item.id]: {
-          item,
-          qty: newQty,
-          notes: existing?.notes || "",
-        },
+        [key]: existing
+          ? { ...existing, qty: existing.qty + 1 }
+          : { key, item, qty: 1, notes: "", picks, modifiers, unitPrice: unitPriceWithModifiers(item.price, modifiers) },
       };
     });
   };
 
-  const handleAdjustQty = (itemId: number, delta: number) => {
+  const handleAddToCart = (item: MenuItem) => {
+    if (item.isSoldOut86) return;
+    const groups = parseModifierGroups(item.modifierGroups);
+    if (groups.length === 0) {
+      addLine(item);
+      return;
+    }
+    // An item with choices opens its picker; a group nobody can satisfy cannot be ordered at all.
+    if (!isOrderable(groups)) return;
+    setPickerItemId((current) => (current === item.id ? null : item.id));
+  };
+
+  const handlePickerAdd = (item: MenuItem, groups: ModifierGroup[], selection: ModifierSelection) => {
+    addLine(item, selectionToPayload(groups, selection), selectedModifiers(groups, selection));
+    setPickerItemId(null);
+  };
+
+  const handleAdjustQty = (lineKey: string, delta: number) => {
     setCart((prev) => {
-      const existing = prev[itemId];
+      const existing = prev[lineKey];
       if (!existing) return prev;
       const newQty = existing.qty + delta;
       if (newQty <= 0) {
         const copy = { ...prev };
-        delete copy[itemId];
+        delete copy[lineKey];
         return copy;
       }
       return {
         ...prev,
-        [itemId]: {
+        [lineKey]: {
           ...existing,
           qty: newQty,
         },
@@ -423,8 +475,9 @@ export default function QrMenuPage() {
   };
 
   const cartLines = useMemo(() => Object.values(cart), [cart]);
+  // Display total only: menu price + chosen deltas per unit, summed in paise. The API prices and taxes the order itself.
   const cartSubtotal = useMemo(
-    () => cartLines.reduce((acc, line) => acc + line.item.price * line.qty, 0),
+    () => cartLines.reduce((acc, line) => acc + Math.round(line.unitPrice * 100) * line.qty, 0) / 100,
     [cartLines]
   );
   const cartCount = useMemo(
@@ -463,9 +516,12 @@ export default function QrMenuPage() {
           addOnServiceId: l.item.id,
           itemName: l.item.name,
           quantity: l.qty,
+          // The menu price, as before: the server prices the line itself (menu price + the chosen deltas) and ignores this.
           unitPrice: l.item.price,
           gstRatePercent: l.item.gstRatePercent ?? 5,
           notes: l.notes.trim() || undefined,
+          // POS-017: ids only; the API checks them against the item's groups and prices them from the catalogue.
+          modifiers: l.picks.length > 0 ? l.picks : undefined,
         })),
       };
 
@@ -882,6 +938,39 @@ export default function QrMenuPage() {
               </div>
             </div>
 
+            {/* POS-017: what was ordered, with the API's own text for the choices and the API's prices (no maths here) */}
+            {Array.isArray(activeOrder.lines) && activeOrder.lines.length > 0 && (
+              <ul
+                style={{ listStyle: "none", margin: "0 0 16px 0", padding: "0 4px", fontSize: "13px" }}
+                data-testid="pos-qr-order-lines"
+              >
+                {activeOrder.lines.map((line, idx) => (
+                  <li key={line.id ?? idx} style={{ padding: "6px 0", borderBottom: "1px solid #f1ebe4" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                      <span style={{ fontWeight: 700 }}>
+                        {line.quantity} × {line.itemName}
+                      </span>
+                      {typeof line.totalPrice === "number" && Number.isFinite(line.totalPrice) && (
+                        <span style={{ fontWeight: 700 }}>₹{formatRupees(line.totalPrice)}</span>
+                      )}
+                    </div>
+                    {line.modifiersText && (
+                      <div style={{ fontSize: "12px", color: "#786a63", marginTop: "2px" }}>{line.modifiersText}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {typeof activeOrder.totalAmount === "number" && Number.isFinite(activeOrder.totalAmount) && activeOrder.totalAmount > 0 && (
+              <div
+                style={{ display: "flex", justifyContent: "space-between", margin: "0 4px 16px 4px", fontSize: "14px", fontWeight: 800 }}
+                data-testid="pos-qr-order-total"
+              >
+                <span>Order total</span>
+                <span>₹{formatRupees(activeOrder.totalAmount)}</span>
+              </div>
+            )}
+
             {activeOrder.whatsAppUpdates && (
               <div
                 style={{
@@ -1000,11 +1089,17 @@ export default function QrMenuPage() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {availableItems.map((item) => {
-                    const inCartQty = cart[item.id]?.qty || 0;
+                    const modifierGroups = parseModifierGroups(item.modifierGroups);
+                    const hasModifiers = modifierGroups.length > 0;
+                    const orderable = isOrderable(modifierGroups);
+                    // An item with choices is added through its picker, so its row shows how many are already in the order.
+                    const inCartQty = hasModifiers
+                      ? cartLines.reduce((sum, l) => (l.item.id === item.id ? sum + l.qty : sum), 0)
+                      : cart[String(item.id)]?.qty || 0;
 
                     return (
+                      <div key={item.id}>
                       <div
-                        key={item.id}
                         style={{
                           backgroundColor: "#fff",
                           borderRadius: "14px",
@@ -1088,7 +1183,7 @@ export default function QrMenuPage() {
 
                         {/* Add / Quantity selector */}
                         <div>
-                          {inCartQty > 0 ? (
+                          {inCartQty > 0 && !hasModifiers ? (
                             <div
                               style={{
                                 display: "inline-flex",
@@ -1101,7 +1196,7 @@ export default function QrMenuPage() {
                               }}
                             >
                               <button
-                                onClick={() => handleAdjustQty(item.id, -1)}
+                                onClick={() => handleAdjustQty(String(item.id), -1)}
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -1118,7 +1213,7 @@ export default function QrMenuPage() {
                                 {inCartQty}
                               </span>
                               <button
-                                onClick={() => handleAdjustQty(item.id, 1)}
+                                onClick={() => handleAdjustQty(String(item.id), 1)}
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -1133,24 +1228,41 @@ export default function QrMenuPage() {
                               </button>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => handleAddToCart(item)}
-                              style={{
-                                backgroundColor: "#fff",
-                                border: "1.5px solid #9e402a",
-                                color: "#9e402a",
-                                padding: "6px 14px",
-                                borderRadius: "8px",
-                                fontWeight: 700,
-                                fontSize: "13px",
-                                cursor: "pointer",
-                              }}
-                              data-testid={`add-to-cart-${item.id}`}
-                            >
-                              ADD +
-                            </button>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                              <button
+                                onClick={() => handleAddToCart(item)}
+                                disabled={hasModifiers && !orderable}
+                                style={{
+                                  backgroundColor: "#fff",
+                                  border: "1.5px solid #9e402a",
+                                  color: "#9e402a",
+                                  padding: "6px 14px",
+                                  borderRadius: "8px",
+                                  fontWeight: 700,
+                                  fontSize: "13px",
+                                  cursor: hasModifiers && !orderable ? "not-allowed" : "pointer",
+                                  opacity: hasModifiers && !orderable ? 0.5 : 1,
+                                }}
+                                data-testid={`add-to-cart-${item.id}`}
+                              >
+                                {hasModifiers && !orderable ? "Unavailable" : hasModifiers ? "CHOOSE +" : "ADD +"}
+                              </button>
+                              {hasModifiers && inCartQty > 0 && (
+                                <span style={{ fontSize: "11px", fontWeight: 700, color: "#9e402a" }}>{inCartQty} in your order</span>
+                              )}
+                            </div>
                           )}
                         </div>
+                      </div>
+                      {hasModifiers && orderable && pickerItemId === item.id && (
+                        <ModifierPicker
+                          itemId={item.id}
+                          itemName={item.name}
+                          groups={modifierGroups}
+                          onAdd={(selection) => handlePickerAdd(item, modifierGroups, selection)}
+                          onCancel={() => setPickerItemId(null)}
+                        />
+                      )}
                       </div>
                     );
                   })}
@@ -1189,6 +1301,48 @@ export default function QrMenuPage() {
                   ₹{cartSubtotal.toLocaleString("en-IN")}
                 </span>
               </div>
+
+              {/* POS-017: each line with its chosen options and its price (menu price + deltas); the API prices the order itself */}
+              <ul style={{ listStyle: "none", margin: "0 0 12px 0", padding: 0 }} data-testid="pos-qr-cart-lines">
+                {cartLines.map((line) => (
+                  <li
+                    key={line.key}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", padding: "6px 0", borderBottom: "1px solid #f1ebe4" }}
+                    data-testid="pos-qr-cart-line"
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b18" }}>{line.item.name}</div>
+                      {line.modifiers.length > 0 && (
+                        <div style={{ fontSize: "11px", color: "#786a63", marginTop: "1px" }}>{describeModifiers(line.modifiers)}</div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        aria-label={`Remove one ${line.item.name}`}
+                        onClick={() => handleAdjustQty(line.key, -1)}
+                        style={{ background: "none", border: "1px solid #d8c7b8", borderRadius: "6px", cursor: "pointer", padding: "2px", display: "flex", color: "#4a3e39" }}
+                        data-testid={`line-dec-${line.key}`}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span style={{ fontWeight: 700, minWidth: "14px", textAlign: "center", fontSize: "13px" }}>{line.qty}</span>
+                      <button
+                        type="button"
+                        aria-label={`Add one more ${line.item.name}`}
+                        onClick={() => handleAdjustQty(line.key, 1)}
+                        style={{ background: "none", border: "1px solid #d8c7b8", borderRadius: "6px", cursor: "pointer", padding: "2px", display: "flex", color: "#4a3e39" }}
+                        data-testid={`line-inc-${line.key}`}
+                      >
+                        <Plus size={14} />
+                      </button>
+                      <span style={{ fontSize: "13px", fontWeight: 700, minWidth: "52px", textAlign: "right" }}>
+                        ₹{formatRupees(Math.round(line.unitPrice * 100) * line.qty / 100)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
 
               {/* POS-011: room link / lock notice (the cart is open, so the page-top notice is hidden) */}
               {roomNotice}
