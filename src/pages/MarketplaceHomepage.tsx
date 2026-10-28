@@ -76,6 +76,10 @@ type MarketplaceItem = {
   // Missing metadata must remain unknown, without a platform-wide percentage fallback.
   chargesOnlinePaymentFee?: boolean;
   convenienceFeePercent?: number;
+  // MKT-029: true only when the booking auto-confirms on payment with no host approval (Razorpay, Stripe or
+  // Atlas-managed routing). UPI hosts need to confirm the payment first, so the API sends false for them.
+  // Missing metadata (an older API) is "unknown": no chip, never a guess.
+  isInstantBookable?: boolean;
   // TASK-10298932: Amenity filtering support
   amenityCodes?: string[];
   amenities?: (string | { code?: string; name?: string; title?: string })[];
@@ -895,6 +899,18 @@ export default function MarketplaceHomepage() {
                     </Link>
                   </h2>
                   <HostIdentityLabel marketplace verified={item.hostIdentityVerified} />
+
+                  {/* MKT-029: only an explicit `true` from the API earns the chip; a missing field is unknown. */}
+                  {item.isInstantBookable === true && (
+                    <span
+                      data-testid="marketplace-instant-book-chip"
+                      title="Pay online and your booking is confirmed straight away, with no host approval"
+                      className="inline-flex items-center gap-1 self-start rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800"
+                    >
+                      <span aria-hidden>⚡</span>
+                      Instant Book
+                    </span>
+                  )}
 
                   {/* TASK-4511: Trust signal badges */}
                   {(item.hasVerifiedPhotos || item.isGstRegistered) && (
