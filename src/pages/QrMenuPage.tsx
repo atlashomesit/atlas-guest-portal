@@ -18,6 +18,20 @@ import {
 } from "lucide-react";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
+import ModifierPicker from "../components/qrmenu/ModifierPicker";
+import {
+  buildLineKey,
+  describeModifiers,
+  isOrderable,
+  parseModifierGroups,
+  selectedModifiers,
+  selectionToPayload,
+  unitPriceWithModifiers,
+  type ModifierGroup,
+  type ModifierPick,
+  type ModifierSelection,
+  type SelectedModifier,
+} from "../components/qrmenu/modifiers";
 
 export interface MenuItem {
   id: number;
@@ -33,6 +47,8 @@ export interface MenuItem {
   isTaxInclusive?: boolean;
   isSoldOut86?: boolean;
   imageUrl?: string;
+  /** POS-017: modifier groups the guest can pick from (the API sends only the available options). Read through parseModifierGroups. */
+  modifierGroups?: unknown;
 }
 
 export interface MenuCategory {
@@ -47,9 +63,22 @@ export interface MenuResponse {
   brandColor?: string;
   logoUrl?: string;
   currency: string;
-  roomLabel?: string;
-  listingId?: number;
+  roomLabel?: string | null;
+  listingId?: number | null;
   tableCode?: string;
+  /**
+   * POS-011: what the room link in the URL turned out to be. NONE (no room), KEY (room key accepted), LEGACY (old numeric link, still
+   * inside its 30-day window), EXPIRED (old numeric link past the window), INVALID (key not recognised). Absent on an older API.
+   */
+  roomLinkStatus?: "NONE" | "KEY" | "LEGACY" | "EXPIRED" | "INVALID";
+  /** POS-011: the API's friendly "ask the front desk" text for EXPIRED / INVALID. */
+  roomLinkMessage?: string | null;
+  legacyLinkExpiresAtUtc?: string | null;
+  /** POS-011: too many wrong phone last-4 / PIN tries for this room - room charge is paused until roomChargeLockedUntilUtc. */
+  roomChargeLocked?: boolean;
+  roomChargeLockedUntilUtc?: string | null;
+  /** POS-011: the settlement methods to offer while room charge is locked or the link is unusable (empty = room charge available). */
+  roomChargeFallbackMethods?: string[];
   categories: MenuCategory[];
 }
 
@@ -75,8 +104,39 @@ export interface OrderStatus {
     unitPrice: number;
     totalPrice: number;
     notes?: string;
+    /** POS-017: item price before the chosen modifier deltas (unitPrice already includes them). */
+    baseUnitPrice?: number;
+    /** POS-017: the API's text for the guest's choices, e.g. "Milk choice: Oat milk (+₹40.00)". */
+    modifiersText?: string | null;
   }>;
 }
+
+/** POS-017: one line of the guest's cart - the item plus the choices that make it a distinct line. */
+interface CartLine {
+  key: string;
+  item: MenuItem;
+  qty: number;
+  notes: string;
+  picks: ModifierPick[];
+  modifiers: SelectedModifier[];
+  /** Menu price + the chosen deltas, as the API will price it (display only; the server recomputes). */
+  unitPrice: number;
+}
+
+/** POS-011: the same wording the API uses when a room link is not usable. */
+const ASK_FRONT_DESK_MESSAGE = "This room's QR link is no longer valid. Please ask the front desk for the current QR code.";
+const ROOM_LOCK_MESSAGE =
+  "Too many wrong codes were tried for this room, so charging it to the room is paused. Please pay now or pay on delivery, or ask the front desk.";
+
+/** "3:45 PM" in the guest's own clock; null when the API gave no usable time. */
+function formatRetryTime(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+}
+
+const formatRupees = (amount: number): string => amount.toLocaleString("en-IN", { maximumFractionDigits: 2 });
 
 const FALLBACK_MENU: MenuResponse = {
   tenantName: "Homestay & Resorts",
@@ -198,20 +258,47 @@ export default function QrMenuPage() {
   const { tenantSlug = "atlas" } = useParams<{ tenantSlug: string }>();
   const [searchParams] = useSearchParams();
 
+  // POS-011: the printed room QR is `?rk=<opaque key>`. The old numeric `?room=<listingId>` keeps working while the API allows it.
+  const roomKeyParam = searchParams.get("rk")?.trim() || undefined;
   const roomParam = searchParams.get("room");
-  const listingId = roomParam ? parseInt(roomParam, 10) : undefined;
+  const parsedRoom = roomParam ? parseInt(roomParam, 10) : NaN;
+  const urlListingId = Number.isFinite(parsedRoom) && parsedRoom > 0 ? parsedRoom : undefined;
   const tableCode = searchParams.get("table") || undefined;
   const orderParam = searchParams.get("order");
 
   const [_loading, setLoading] = useState(true);
   const [menu, setMenu] = useState<MenuResponse | null>(null);
   const [_error, setError] = useState<string | null>(null);
+  // POS-011: bumped only by the guest's own "Check again" tap, to re-read the menu (and with it the room lock).
+  const [menuReloadNonce, setMenuReloadNonce] = useState(0);
+  // POS-011: set by a 403 ROOM_CHARGE_LOCKED / ROOM_LINK_EXPIRED / ROOM_LINK_INVALID on the order itself.
+  const [roomLock, setRoomLock] = useState<{ until: string | null; message: string } | null>(null);
+  const [roomLinkProblem, setRoomLinkProblem] = useState<string | null>(null);
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null);
+
+  // Which room (if any) this page may charge to. A room key is resolved by the API; a legacy numeric link is trusted from the URL
+  // until the API says otherwise. An expired / unknown link has no room at all.
+  const menuLinkStatus = menu?.roomLinkStatus;
+  const roomLinkBroken = roomLinkProblem !== null || menuLinkStatus === "EXPIRED" || menuLinkStatus === "INVALID";
+  const roomLinkNoticeText = roomLinkBroken ? roomLinkProblem ?? (menu?.roomLinkMessage || ASK_FRONT_DESK_MESSAGE) : null;
+  const menuListingId = typeof menu?.listingId === "number" && menu.listingId > 0 ? menu.listingId : undefined;
+  const listingId = roomLinkBroken ? undefined : roomKeyParam ? menuListingId : menuListingId ?? urlListingId;
+  const activeLock = roomLock ?? (menu?.roomChargeLocked === true ? { until: menu.roomChargeLockedUntilUtc ?? null, message: ROOM_LOCK_MESSAGE } : null);
+  const roomChargeAvailable = Boolean(listingId) && activeLock === null;
+  // While room charge is unavailable the API names the methods to offer; an empty list means no restriction.
+  const menuFallbackMethods = menu?.roomChargeFallbackMethods;
+  const fallbackList = !roomChargeAvailable && Array.isArray(menuFallbackMethods) ? menuFallbackMethods : [];
+  const restrictFallback = fallbackList.includes("PAY_NOW_UPI") || fallbackList.includes("PAY_ON_DELIVERY");
+  const offerPayNow = !restrictFallback || fallbackList.includes("PAY_NOW_UPI");
+  const offerPayOnDelivery = !restrictFallback || fallbackList.includes("PAY_ON_DELIVERY");
 
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
 
-  // Cart: item id -> quantity & notes
-  const [cart, setCart] = useState<{ [itemId: number]: { item: MenuItem; qty: number; notes: string } }>({});
+  // Cart: line key (item id, plus the chosen modifiers when it has any) -> line
+  const [cart, setCart] = useState<{ [lineKey: string]: CartLine }>({});
+  // POS-017: the item whose modifier picker is open
+  const [pickerItemId, setPickerItemId] = useState<number | null>(null);
 
   // Checkout Form State
   const [settlementMethod, setSettlementMethod] = useState<"POST_TO_ROOM" | "PAY_NOW_UPI" | "PAY_ON_DELIVERY">(
@@ -219,10 +306,13 @@ export default function QrMenuPage() {
   );
 
   useEffect(() => {
-    if (listingId) {
-      setSettlementMethod((prev) => (prev !== "POST_TO_ROOM" ? "POST_TO_ROOM" : prev));
-    }
-  }, [listingId]);
+    setSettlementMethod((prev) => {
+      if (roomChargeAvailable) return "POST_TO_ROOM";
+      if (prev === "PAY_NOW_UPI" && offerPayNow) return prev;
+      if (prev === "PAY_ON_DELIVERY" && offerPayOnDelivery) return prev;
+      return offerPayNow ? "PAY_NOW_UPI" : "PAY_ON_DELIVERY";
+    });
+  }, [roomChargeAvailable, offerPayNow, offerPayOnDelivery]);
   const [verificationCode, setVerificationCode] = useState<string>("");
   const [guestName, setGuestName] = useState<string>("");
   const [guestPhone, setGuestPhone] = useState<string>("");
@@ -248,7 +338,9 @@ export default function QrMenuPage() {
 
       try {
         const query = new URLSearchParams();
-        if (listingId) query.set("room", listingId.toString());
+        // POS-011: the room key wins; the numeric link is only sent when there is no key.
+        if (roomKeyParam) query.set("rk", roomKeyParam);
+        else if (urlListingId) query.set("room", urlListingId.toString());
         if (tableCode) query.set("table", tableCode);
 
         const url = buildApiUrl(`/api/public/qr-menu/${encodeURIComponent(tenantSlug)}?${query.toString()}`);
@@ -270,8 +362,8 @@ export default function QrMenuPage() {
           setMenu({
             ...FALLBACK_MENU,
             tenantSlug,
-            roomLabel: listingId ? `Room / Villa ${listingId}` : undefined,
-            listingId,
+            roomLabel: urlListingId ? `Room / Villa ${urlListingId}` : undefined,
+            listingId: urlListingId,
             tableCode,
           });
         }
@@ -284,7 +376,7 @@ export default function QrMenuPage() {
     return () => {
       cancelled = true;
     };
-  }, [tenantSlug, listingId, tableCode]);
+  }, [tenantSlug, roomKeyParam, urlListingId, tableCode, menuReloadNonce]);
 
   // If order param is provided, load initial order tracking
   useEffect(() => {
@@ -330,35 +422,51 @@ export default function QrMenuPage() {
     return () => clearInterval(interval);
   }, [activeOrder, tenantSlug]);
 
-  const handleAddToCart = (item: MenuItem) => {
+  /** POS-017: add one unit of the item with the given choices; the same choices land on the same line, other choices make a new line. */
+  const addLine = (item: MenuItem, picks: ModifierPick[] = [], modifiers: SelectedModifier[] = []) => {
     if (item.isSoldOut86) return;
+    const key = buildLineKey(item.id, picks);
     setCart((prev) => {
-      const existing = prev[item.id];
-      const newQty = existing ? existing.qty + 1 : 1;
+      const existing = prev[key];
       return {
         ...prev,
-        [item.id]: {
-          item,
-          qty: newQty,
-          notes: existing?.notes || "",
-        },
+        [key]: existing
+          ? { ...existing, qty: existing.qty + 1 }
+          : { key, item, qty: 1, notes: "", picks, modifiers, unitPrice: unitPriceWithModifiers(item.price, modifiers) },
       };
     });
   };
 
-  const handleAdjustQty = (itemId: number, delta: number) => {
+  const handleAddToCart = (item: MenuItem) => {
+    if (item.isSoldOut86) return;
+    const groups = parseModifierGroups(item.modifierGroups);
+    if (groups.length === 0) {
+      addLine(item);
+      return;
+    }
+    // An item with choices opens its picker; a group nobody can satisfy cannot be ordered at all.
+    if (!isOrderable(groups)) return;
+    setPickerItemId((current) => (current === item.id ? null : item.id));
+  };
+
+  const handlePickerAdd = (item: MenuItem, groups: ModifierGroup[], selection: ModifierSelection) => {
+    addLine(item, selectionToPayload(groups, selection), selectedModifiers(groups, selection));
+    setPickerItemId(null);
+  };
+
+  const handleAdjustQty = (lineKey: string, delta: number) => {
     setCart((prev) => {
-      const existing = prev[itemId];
+      const existing = prev[lineKey];
       if (!existing) return prev;
       const newQty = existing.qty + delta;
       if (newQty <= 0) {
         const copy = { ...prev };
-        delete copy[itemId];
+        delete copy[lineKey];
         return copy;
       }
       return {
         ...prev,
-        [itemId]: {
+        [lineKey]: {
           ...existing,
           qty: newQty,
         },
@@ -367,8 +475,9 @@ export default function QrMenuPage() {
   };
 
   const cartLines = useMemo(() => Object.values(cart), [cart]);
+  // Display total only: menu price + chosen deltas per unit, summed in paise. The API prices and taxes the order itself.
   const cartSubtotal = useMemo(
-    () => cartLines.reduce((acc, line) => acc + line.item.price * line.qty, 0),
+    () => cartLines.reduce((acc, line) => acc + Math.round(line.unitPrice * 100) * line.qty, 0) / 100,
     [cartLines]
   );
   const cartCount = useMemo(
@@ -388,12 +497,15 @@ export default function QrMenuPage() {
       return;
     }
     setSubmitting(true);
+    setAttemptsRemaining(null);
 
     try {
       const payload = {
         listingId,
         tableCode,
         settlementMethod,
+        // POS-011: the room key from the printed QR; only a room charge needs it, and a legacy numeric link has none.
+        roomKey: settlementMethod === "POST_TO_ROOM" ? roomKeyParam : undefined,
         verificationCode: settlementMethod === "POST_TO_ROOM" ? verificationCode.trim() : undefined,
         guestName: guestName.trim() || undefined,
         guestPhone: guestPhone.trim() || undefined,
@@ -404,9 +516,12 @@ export default function QrMenuPage() {
           addOnServiceId: l.item.id,
           itemName: l.item.name,
           quantity: l.qty,
+          // The menu price, as before: the server prices the line itself (menu price + the chosen deltas) and ignores this.
           unitPrice: l.item.price,
           gstRatePercent: l.item.gstRatePercent ?? 5,
           notes: l.notes.trim() || undefined,
+          // POS-017: ids only; the API checks them against the item's groups and prices them from the catalogue.
+          modifiers: l.picks.length > 0 ? l.picks : undefined,
         })),
       };
 
@@ -422,7 +537,25 @@ export default function QrMenuPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
+        if (errorData?.code === "ROOM_CHARGE_LOCKED") {
+          // POS-011: too many wrong codes for this room. Show when it ends and offer the other ways to pay. The order is NOT
+          // re-sent: the guest chooses Pay Now / Pay on Delivery, or taps "Check again" later.
+          let until: string | null = typeof errorData.lockedUntilUtc === "string" ? errorData.lockedUntilUtc : null;
+          if (!until) {
+            const headerSeconds = Number(res.headers?.get?.("Retry-After"));
+            const seconds = typeof errorData.retryAfterSeconds === "number" ? errorData.retryAfterSeconds : headerSeconds;
+            if (Number.isFinite(seconds) && seconds > 0) until = new Date(Date.now() + seconds * 1000).toISOString();
+          }
+          setRoomLock({ until, message: errorData.error || ROOM_LOCK_MESSAGE });
+          setVerificationCode("");
+          return;
+        }
+        if (errorData?.code === "ROOM_LINK_EXPIRED" || errorData?.code === "ROOM_LINK_INVALID") {
+          setRoomLinkProblem(errorData.error || ASK_FRONT_DESK_MESSAGE);
+          return;
+        }
         if (res.status === 403 || errorData?.code === "ROOM_VERIFICATION_FAILED") {
+          if (typeof errorData?.attemptsRemaining === "number") setAttemptsRemaining(errorData.attemptsRemaining);
           setVerificationError(
             errorData?.error ||
               "Room verification failed: Room does not have an active CheckedIn booking today or phone last-4 / PIN did not match. Please verify your details or choose 'Pay Now' / 'Pay at Delivery'."
@@ -455,6 +588,77 @@ export default function QrMenuPage() {
 
   const targetHeading =
     menu?.roomLabel || (listingId ? `Room ${listingId}` : tableCode ? `Table ${tableCode}` : "Digital Self-Order Menu");
+
+  // POS-011: a lock is only ever lifted by the guest asking again - we re-read the menu (which carries the lock) and never re-send an order.
+  const recheckRoomLock = () => {
+    setRoomLock(null);
+    setMenuReloadNonce((n) => n + 1);
+  };
+
+  const lockRetryTime = formatRetryTime(activeLock?.until);
+  const roomNotice = roomLinkNoticeText ? (
+    <div
+      role="status"
+      style={{
+        backgroundColor: "#fffbeb",
+        border: "1px solid #fde68a",
+        color: "#92400e",
+        padding: "10px 12px",
+        borderRadius: "10px",
+        fontSize: "12px",
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "8px",
+        marginBottom: "14px",
+      }}
+      data-testid="pos-qr-room-link-notice"
+    >
+      <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+      <span>{roomLinkNoticeText} You can still order here and choose Pay Now (UPI) or Pay on Delivery.</span>
+    </div>
+  ) : activeLock ? (
+    <div
+      role="alert"
+      style={{
+        backgroundColor: "#fffbeb",
+        border: "1px solid #fde68a",
+        color: "#92400e",
+        padding: "10px 12px",
+        borderRadius: "10px",
+        fontSize: "12px",
+        marginBottom: "14px",
+      }}
+      data-testid="pos-qr-room-locked-notice"
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+        <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+        <span>
+          {activeLock.message}
+          {lockRetryTime ? ` You can try charging to the room again after ${lockRetryTime}.` : ""}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={recheckRoomLock}
+        style={{
+          marginTop: "8px",
+          backgroundColor: "#fff",
+          border: "1px solid #d97706",
+          color: "#92400e",
+          borderRadius: "6px",
+          padding: "5px 10px",
+          fontWeight: 700,
+          fontSize: "12px",
+          cursor: "pointer",
+        }}
+        data-testid="pos-qr-room-lock-recheck"
+      >
+        Check again
+      </button>
+    </div>
+  ) : null;
+
+  const payMethodCount = (roomChargeAvailable ? 1 : 0) + (offerPayNow ? 1 : 0) + (offerPayOnDelivery ? 1 : 0);
 
   return (
     <div
@@ -526,8 +730,10 @@ export default function QrMenuPage() {
 
       {/* Main Container */}
       <main style={{ maxWidth: "680px", margin: "0 auto", padding: "16px" }}>
+        {/* POS-011: room link expired / unknown, or room charge paused: say so before the guest fills a cart */}
+        {cartCount === 0 && roomNotice}
         {/* Pre-order room verification strip when room is provided and cart is not yet filled */}
-        {listingId && cartCount === 0 && (
+        {roomChargeAvailable && cartCount === 0 && (
           <div
             style={{
               backgroundColor: "#fdf8f6",
@@ -732,6 +938,39 @@ export default function QrMenuPage() {
               </div>
             </div>
 
+            {/* POS-017: what was ordered, with the API's own text for the choices and the API's prices (no maths here) */}
+            {Array.isArray(activeOrder.lines) && activeOrder.lines.length > 0 && (
+              <ul
+                style={{ listStyle: "none", margin: "0 0 16px 0", padding: "0 4px", fontSize: "13px" }}
+                data-testid="pos-qr-order-lines"
+              >
+                {activeOrder.lines.map((line, idx) => (
+                  <li key={line.id ?? idx} style={{ padding: "6px 0", borderBottom: "1px solid #f1ebe4" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                      <span style={{ fontWeight: 700 }}>
+                        {line.quantity} × {line.itemName}
+                      </span>
+                      {typeof line.totalPrice === "number" && Number.isFinite(line.totalPrice) && (
+                        <span style={{ fontWeight: 700 }}>₹{formatRupees(line.totalPrice)}</span>
+                      )}
+                    </div>
+                    {line.modifiersText && (
+                      <div style={{ fontSize: "12px", color: "#786a63", marginTop: "2px" }}>{line.modifiersText}</div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {typeof activeOrder.totalAmount === "number" && Number.isFinite(activeOrder.totalAmount) && activeOrder.totalAmount > 0 && (
+              <div
+                style={{ display: "flex", justifyContent: "space-between", margin: "0 4px 16px 4px", fontSize: "14px", fontWeight: 800 }}
+                data-testid="pos-qr-order-total"
+              >
+                <span>Order total</span>
+                <span>₹{formatRupees(activeOrder.totalAmount)}</span>
+              </div>
+            )}
+
             {activeOrder.whatsAppUpdates && (
               <div
                 style={{
@@ -850,11 +1089,17 @@ export default function QrMenuPage() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {availableItems.map((item) => {
-                    const inCartQty = cart[item.id]?.qty || 0;
+                    const modifierGroups = parseModifierGroups(item.modifierGroups);
+                    const hasModifiers = modifierGroups.length > 0;
+                    const orderable = isOrderable(modifierGroups);
+                    // An item with choices is added through its picker, so its row shows how many are already in the order.
+                    const inCartQty = hasModifiers
+                      ? cartLines.reduce((sum, l) => (l.item.id === item.id ? sum + l.qty : sum), 0)
+                      : cart[String(item.id)]?.qty || 0;
 
                     return (
+                      <div key={item.id}>
                       <div
-                        key={item.id}
                         style={{
                           backgroundColor: "#fff",
                           borderRadius: "14px",
@@ -938,7 +1183,7 @@ export default function QrMenuPage() {
 
                         {/* Add / Quantity selector */}
                         <div>
-                          {inCartQty > 0 ? (
+                          {inCartQty > 0 && !hasModifiers ? (
                             <div
                               style={{
                                 display: "inline-flex",
@@ -951,7 +1196,7 @@ export default function QrMenuPage() {
                               }}
                             >
                               <button
-                                onClick={() => handleAdjustQty(item.id, -1)}
+                                onClick={() => handleAdjustQty(String(item.id), -1)}
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -968,7 +1213,7 @@ export default function QrMenuPage() {
                                 {inCartQty}
                               </span>
                               <button
-                                onClick={() => handleAdjustQty(item.id, 1)}
+                                onClick={() => handleAdjustQty(String(item.id), 1)}
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -983,24 +1228,41 @@ export default function QrMenuPage() {
                               </button>
                             </div>
                           ) : (
-                            <button
-                              onClick={() => handleAddToCart(item)}
-                              style={{
-                                backgroundColor: "#fff",
-                                border: "1.5px solid #9e402a",
-                                color: "#9e402a",
-                                padding: "6px 14px",
-                                borderRadius: "8px",
-                                fontWeight: 700,
-                                fontSize: "13px",
-                                cursor: "pointer",
-                              }}
-                              data-testid={`add-to-cart-${item.id}`}
-                            >
-                              ADD +
-                            </button>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                              <button
+                                onClick={() => handleAddToCart(item)}
+                                disabled={hasModifiers && !orderable}
+                                style={{
+                                  backgroundColor: "#fff",
+                                  border: "1.5px solid #9e402a",
+                                  color: "#9e402a",
+                                  padding: "6px 14px",
+                                  borderRadius: "8px",
+                                  fontWeight: 700,
+                                  fontSize: "13px",
+                                  cursor: hasModifiers && !orderable ? "not-allowed" : "pointer",
+                                  opacity: hasModifiers && !orderable ? 0.5 : 1,
+                                }}
+                                data-testid={`add-to-cart-${item.id}`}
+                              >
+                                {hasModifiers && !orderable ? "Unavailable" : hasModifiers ? "CHOOSE +" : "ADD +"}
+                              </button>
+                              {hasModifiers && inCartQty > 0 && (
+                                <span style={{ fontSize: "11px", fontWeight: 700, color: "#9e402a" }}>{inCartQty} in your order</span>
+                              )}
+                            </div>
                           )}
                         </div>
+                      </div>
+                      {hasModifiers && orderable && pickerItemId === item.id && (
+                        <ModifierPicker
+                          itemId={item.id}
+                          itemName={item.name}
+                          groups={modifierGroups}
+                          onAdd={(selection) => handlePickerAdd(item, modifierGroups, selection)}
+                          onCancel={() => setPickerItemId(null)}
+                        />
+                      )}
                       </div>
                     );
                   })}
@@ -1040,14 +1302,59 @@ export default function QrMenuPage() {
                 </span>
               </div>
 
+              {/* POS-017: each line with its chosen options and its price (menu price + deltas); the API prices the order itself */}
+              <ul style={{ listStyle: "none", margin: "0 0 12px 0", padding: 0 }} data-testid="pos-qr-cart-lines">
+                {cartLines.map((line) => (
+                  <li
+                    key={line.key}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", padding: "6px 0", borderBottom: "1px solid #f1ebe4" }}
+                    data-testid="pos-qr-cart-line"
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b18" }}>{line.item.name}</div>
+                      {line.modifiers.length > 0 && (
+                        <div style={{ fontSize: "11px", color: "#786a63", marginTop: "1px" }}>{describeModifiers(line.modifiers)}</div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        aria-label={`Remove one ${line.item.name}`}
+                        onClick={() => handleAdjustQty(line.key, -1)}
+                        style={{ background: "none", border: "1px solid #d8c7b8", borderRadius: "6px", cursor: "pointer", padding: "2px", display: "flex", color: "#4a3e39" }}
+                        data-testid={`line-dec-${line.key}`}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span style={{ fontWeight: 700, minWidth: "14px", textAlign: "center", fontSize: "13px" }}>{line.qty}</span>
+                      <button
+                        type="button"
+                        aria-label={`Add one more ${line.item.name}`}
+                        onClick={() => handleAdjustQty(line.key, 1)}
+                        style={{ background: "none", border: "1px solid #d8c7b8", borderRadius: "6px", cursor: "pointer", padding: "2px", display: "flex", color: "#4a3e39" }}
+                        data-testid={`line-inc-${line.key}`}
+                      >
+                        <Plus size={14} />
+                      </button>
+                      <span style={{ fontSize: "13px", fontWeight: 700, minWidth: "52px", textAlign: "right" }}>
+                        ₹{formatRupees(Math.round(line.unitPrice * 100) * line.qty / 100)}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* POS-011: room link / lock notice (the cart is open, so the page-top notice is hidden) */}
+              {roomNotice}
+
               {/* Settlement Options (Done When #2 & #3) */}
               <div style={{ marginBottom: "14px" }}>
                 <span style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "6px" }}>
                   HOW WOULD YOU LIKE TO PAY?
                 </span>
 
-                <div style={{ display: "grid", gridTemplateColumns: listingId ? "1fr 1fr 1fr" : "1fr 1fr", gap: "8px" }}>
-                  {listingId && (
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, payMethodCount)}, 1fr)`, gap: "8px" }}>
+                  {roomChargeAvailable && (
                     <button
                       type="button"
                       onClick={() => setSettlementMethod("POST_TO_ROOM")}
@@ -1075,6 +1382,7 @@ export default function QrMenuPage() {
                     </button>
                   )}
 
+                  {offerPayNow && (
                   <button
                     type="button"
                     onClick={() => setSettlementMethod("PAY_NOW_UPI")}
@@ -1098,7 +1406,9 @@ export default function QrMenuPage() {
                     <Smartphone size={18} />
                     Pay Now (UPI)
                   </button>
+                  )}
 
+                  {offerPayOnDelivery && (
                   <button
                     type="button"
                     onClick={() => setSettlementMethod("PAY_ON_DELIVERY")}
@@ -1122,11 +1432,12 @@ export default function QrMenuPage() {
                     <Utensils size={18} />
                     Pay on Delivery
                   </button>
+                  )}
                 </div>
               </div>
 
               {/* Room Charge Anti-Abuse Guardrail Field (Done When #2) */}
-              {settlementMethod === "POST_TO_ROOM" && (
+              {settlementMethod === "POST_TO_ROOM" && roomChargeAvailable && (
                 <div
                   style={{
                     backgroundColor: "#fdf8f6",
@@ -1315,6 +1626,11 @@ export default function QrMenuPage() {
                 >
                   <AlertCircle size={16} />
                   <span>{verificationError}</span>
+                  {attemptsRemaining !== null && attemptsRemaining > 0 && (
+                    <span style={{ fontWeight: 700 }} data-testid="pos-qr-attempts-remaining">
+                      You have {attemptsRemaining} {attemptsRemaining === 1 ? "try" : "tries"} left before charging to the room is paused.
+                    </span>
+                  )}
                 </div>
               )}
 
