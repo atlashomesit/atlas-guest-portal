@@ -239,6 +239,8 @@ interface BookingSummary {
   propertyLongitude?: number;
   /** TASK-1254: Booking reference for self check-in flow (ExternalReservationId or ATL-{id} fallback). */
   bookingRef?: string;
+  /** GUEST-053: Assigned smart-lock door code & key access on Stay Hub upon check-in completion. */
+  doorCode?: string | null;
   /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
   preferredLanguage?: string | null;
   // TASK-4510: Digital Guest Guidebook
@@ -369,6 +371,12 @@ export default function BookingConfirmationPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
   const [copyRefManual, setCopyRefManual] = useState(false);
+  const [doorCodeCopied, setDoorCodeCopied] = useState(false);
+  const copyDoorCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+  }, []);
   const [shareLanguage, setShareLanguage] = useState<"en" | "hi" | "te">("en");
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "success" | "failed">("pending");
   const [paymentFailureReason, setPaymentFailureReason] = useState<string | null>(null);
@@ -784,8 +792,9 @@ export default function BookingConfirmationPage() {
   );
   const messageHostWhatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${messageHostWhatsappText}` : "";
   // GUEST-031/GUEST-030: canonical check-in deep-link, carries the booking token.
-  const hubCheckinPath = booking.bookingRef && (token || booking.status === "Confirmed" || booking.status === "CheckedIn")
-    ? `/check-in/${encodeURIComponent(booking.bookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ""}`
+  const effectiveBookingRef = booking.bookingRef || (booking.bookingId ? `ATL-${booking.bookingId}` : "");
+  const hubCheckinPath = effectiveBookingRef && (token || booking.status === "Confirmed" || booking.status === "CheckedIn")
+    ? `/check-in/${encodeURIComponent(effectiveBookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ""}`
     : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
@@ -847,6 +856,38 @@ export default function BookingConfirmationPage() {
       gstInvoiceNumber: booking.gstInvoiceNumber ?? null,
     };
     openPrintableHtml(buildReceiptHtml(args));
+  }
+
+  // GUEST-053: copy door code with 1-tap and clipboard fallback
+  async function handleCopyDoorCode() {
+    if (!booking?.doorCode) return;
+    try {
+      await navigator.clipboard.writeText(booking.doorCode);
+      setDoorCodeCopied(true);
+      if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+      copyDoorCodeTimerRef.current = setTimeout(() => setDoorCodeCopied(false), 2000);
+      return;
+    } catch {
+      /* fallback */
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = booking.doorCode;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) {
+        setDoorCodeCopied(true);
+        if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+        copyDoorCodeTimerRef.current = setTimeout(() => setDoorCodeCopied(false), 2000);
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   // TASK-102057: open a printable Stay Guide (check-in, WiFi, directions, host contacts).
@@ -1260,13 +1301,54 @@ export default function BookingConfirmationPage() {
                 Check in online, save your stay to your calendar, message your host and print your stay guide.
               </p>
             </div>
+            {/* GUEST-053: Display assigned smart-lock door code & key access on Stay Hub upon check-in completion */}
+            {booking.doorCode && (
+              <div
+                data-testid="access-door-code-card"
+                className="rounded-xl border border-border-subtle bg-bg-surface p-4 shadow-sm space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg" aria-hidden="true">🔑</span>
+                    <h3 className="text-sm font-semibold text-text-primary">Access &amp; Door Code</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyDoorCode}
+                    data-testid="copy-door-code-btn"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle bg-bg-page px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-bg-surface transition-colors"
+                  >
+                    {doorCodeCopied ? "✓ Copied!" : "Copy Code"}
+                  </button>
+                </div>
+                <div className="flex items-baseline gap-3 bg-bg-page rounded-lg p-3 border border-border-subtle">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Door Code:</span>
+                  <span className="text-xl font-mono font-bold tracking-widest text-text-primary" data-testid="door-code-value">
+                    {booking.doorCode}
+                  </span>
+                  {doorCodeCopied && (
+                    <span className="text-xs text-emerald-600 font-medium ml-auto" data-testid="door-code-copied-confirmation">
+                      Copied to clipboard
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-text-secondary leading-relaxed space-y-1" data-testid="door-lock-instructions">
+                  <p>Enter this code on the smart lock keypad to unlock.</p>
+                  {booking.checkinInstructions && (
+                    <p>{booking.checkinInstructions}</p>
+                  )}
+                </div>
+              </div>
+            )}
             {hubCheckinPath && (
               <Link
                 to={hubCheckinPath}
                 data-testid="stay-hub-checkin"
                 className="flex items-center justify-between gap-4 rounded-xl bg-brand-primary text-white px-4 py-3.5 hover:bg-brand-primary/90 transition-colors"
               >
-                <span className="text-sm font-semibold">Complete Web Check-In &amp; Get Door Code</span>
+                <span className="text-sm font-semibold">
+                  {booking.doorCode ? "✓ Checked In — View Door & Key Access" : "Complete Web Check-In"}
+                </span>
                 <span className="shrink-0 text-lg" aria-hidden>→</span>
               </Link>
             )}

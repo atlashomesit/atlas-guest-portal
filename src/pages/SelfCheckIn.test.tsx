@@ -118,3 +118,44 @@ describe("SelfCheckIn token auto-verify (GUEST-030)", () => {
     expect(screen.queryByTestId("checkin-token-fallback-notice")).not.toBeInTheDocument();
   });
 });
+
+describe("SelfCheckIn auto-resume completed check-in (GUEST-042)", () => {
+  test("returning to a completed check-in token renders the completed stay screen directly without re-prompting for ID or house rules", async () => {
+    fetchMock().mockResolvedValueOnce(
+      json({
+        ...details,
+        wifiName: "LakeLoft-Guest",
+        wifiPassword: "pass-1234",
+        doorCode: "5678",
+        emergencyContactPhone: "+919876543210",
+        checkInSubmittedAtUtc: "2026-10-25T14:30:00Z",
+        isCompleted: true,
+      }),
+    );
+
+    renderAt("/check-in/ATL-4242?t=tok-123");
+    await settle();
+
+    // Directly in completed view (You're checked in!)
+    expect(screen.getByRole("heading", { name: "You're checked in!" })).toBeInTheDocument();
+    expect(screen.getByText("WiFi")).toBeInTheDocument();
+    expect(screen.getByText("LakeLoft-Guest")).toBeInTheDocument();
+    expect(screen.getByText("Door code")).toBeInTheDocument();
+    expect(screen.getByText("5678")).toBeInTheDocument();
+    expect(screen.getByText("Emergency contact")).toBeInTheDocument();
+
+    // No prompts for ID upload or house rules
+    expect(screen.queryByText(/House rules/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("checkin-house-rules-continue")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Government ID/i)).not.toBeInTheDocument();
+
+    // Secondary button to update guest details is present and transitions back to summary
+    const updateBtn = screen.getByRole("button", { name: "Update Guest Details" });
+    expect(updateBtn).toBeInTheDocument();
+    fireEvent.click(updateBtn);
+    await settle();
+
+    // Now in summary step
+    expect(screen.getByRole("heading", { name: "Lake View Loft" })).toBeInTheDocument();
+  });
+});

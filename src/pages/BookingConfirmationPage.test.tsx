@@ -186,3 +186,84 @@ describe("BookingConfirmationPage TASK-5178 add-on upsell", () => {
     expect(screen.queryByText(/Make your stay even better/i)).not.toBeInTheDocument();
   });
 });
+
+describe("BookingConfirmationPage door code access & key card (GUEST-053)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  test("renders dedicated Access & Door Code card with 1-tap copy button and lock instructions when doorCode is present", async () => {
+    window.sessionStorage.setItem("booking_101_payment_status", "success");
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    vi.mocked(global.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/guest/bookings/101/summary")) {
+        return jsonResponse({
+          ...summaryBody,
+          bookingRef: "ATL-101",
+          doorCode: "7890",
+          checkinInstructions: "Turn the keypad dial after code.",
+        });
+      }
+      if (url.includes("/api/public/bookings/101/modification-requests")) return jsonResponse([]);
+      if (url.includes("/listings/777/add-ons")) return jsonResponse([]);
+      if (url.includes("/bookings/101/payment-status")) return jsonResponse({ status: "Paid" });
+      return jsonResponse({});
+    });
+
+    renderPage("/booking/101?t=tok-access");
+    await settle();
+
+    // Dedicated Access & Door Code card is rendered
+    const card = screen.getByTestId("access-door-code-card");
+    expect(card).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Access & Door Code" })).toBeInTheDocument();
+    expect(screen.getByText("7890")).toBeInTheDocument();
+    expect(screen.getByTestId("door-lock-instructions")).toHaveTextContent(/Turn the keypad dial after code/i);
+
+    // Primary CTA changes to "✓ Checked In — View Door & Key Access"
+    expect(screen.getByText("✓ Checked In — View Door & Key Access")).toBeInTheDocument();
+
+    // 1-tap copy button copies code and provides visual confirmation
+    const copyBtn = screen.getByTestId("copy-door-code-btn");
+    expect(copyBtn).toHaveTextContent("Copy Code");
+    fireEvent.click(copyBtn);
+    await settle();
+
+    expect(writeTextMock).toHaveBeenCalledWith("7890");
+    expect(screen.getByTestId("copy-door-code-btn")).toHaveTextContent("✓ Copied!");
+    expect(screen.getByTestId("door-code-copied-confirmation")).toHaveTextContent("Copied to clipboard");
+  });
+
+  test("does not render door code card and shows standard check-in CTA when doorCode is absent", async () => {
+    window.sessionStorage.setItem("booking_101_payment_status", "success");
+    vi.mocked(global.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/guest/bookings/101/summary")) {
+        return jsonResponse({
+          ...summaryBody,
+          bookingRef: "ATL-101",
+          doorCode: undefined,
+        });
+      }
+      if (url.includes("/api/public/bookings/101/modification-requests")) return jsonResponse([]);
+      if (url.includes("/listings/777/add-ons")) return jsonResponse([]);
+      if (url.includes("/bookings/101/payment-status")) return jsonResponse({ status: "Paid" });
+      return jsonResponse({});
+    });
+
+    renderPage("/booking/101?t=tok-access");
+    await settle();
+
+    expect(screen.queryByTestId("access-door-code-card")).not.toBeInTheDocument();
+    expect(screen.queryByText("✓ Checked In — View Door & Key Access")).not.toBeInTheDocument();
+    expect(screen.getByText("Complete Web Check-In")).toBeInTheDocument();
+  });
+});
