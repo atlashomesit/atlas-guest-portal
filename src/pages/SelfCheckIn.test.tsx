@@ -159,3 +159,121 @@ describe("SelfCheckIn auto-resume completed check-in (GUEST-042)", () => {
     expect(screen.getByRole("heading", { name: "Lake View Loft" })).toBeInTheDocument();
   });
 });
+
+describe("SelfCheckIn FRRO Form C nationality & stay-date validation (GUEST-041)", () => {
+  test("renders comprehensive alphabetical ISO nationalities in nationality selector", async () => {
+    fetchMock().mockResolvedValueOnce(json(details));
+
+    renderAt("/check-in/ATL-4242?t=tok-123");
+    await settle();
+
+    // Advance to ID upload step
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    await settle();
+
+    const nationalitySelect = screen.getByLabelText("Nationality") as HTMLSelectElement;
+    expect(nationalitySelect).toBeInTheDocument();
+
+    const options = Array.from(nationalitySelect.options).map((o) => o.value);
+    const requiredCountries = [
+      "Australia",
+      "France",
+      "Germany",
+      "Italy",
+      "Japan",
+      "Malaysia",
+      "Netherlands",
+      "Singapore",
+      "Spain",
+      "Switzerland",
+      "Thailand",
+      "UAE",
+    ];
+
+    for (const country of requiredCountries) {
+      expect(options).toContain(country);
+    }
+
+    // Selecting a foreign nationality reveals FRRO Form C fields and sets ID type to Passport
+    expect(screen.queryByTestId("checkin-foreign-guest-fields")).not.toBeInTheDocument();
+    fireEvent.change(nationalitySelect, { target: { value: "Germany" } });
+    await settle();
+
+    expect(screen.getByTestId("checkin-foreign-guest-fields")).toBeInTheDocument();
+    expect(screen.getByLabelText(/ID type/i)).toHaveValue("Passport");
+  });
+
+  test("shows inline error when visa expiry date is before or during stay and blocks advancing", async () => {
+    fetchMock().mockResolvedValueOnce(json(details));
+
+    renderAt("/check-in/ATL-4242?t=tok-123");
+    await settle();
+
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    await settle();
+
+    const nationalitySelect = screen.getByLabelText("Nationality");
+    fireEvent.change(nationalitySelect, { target: { value: "France" } });
+    await settle();
+
+    // Fill guest name
+    fireEvent.change(screen.getByLabelText(/Full name/i), { target: { value: "Jean Dupont" } });
+    fireEvent.change(screen.getByLabelText(/ID number/i), { target: { value: "FP123456" } });
+
+    // Fill foreign guest fields
+    fireEvent.change(screen.getByLabelText("Passport number"), { target: { value: "FP123456" } });
+    fireEvent.change(screen.getByLabelText("Passport expiry date"), { target: { value: "2027-12-31" } });
+    fireEvent.change(screen.getByLabelText("Date of birth"), { target: { value: "1992-05-15" } });
+    fireEvent.change(screen.getByLabelText("Visa number"), { target: { value: "V9876543" } });
+    fireEvent.change(screen.getByLabelText("Visa type"), { target: { value: "Tourist" } });
+
+    // Set visa expiry date before checkout date ("2026-11-04")
+    fireEvent.change(screen.getByLabelText("Visa expiry date"), { target: { value: "2026-11-03" } });
+    await settle();
+
+    // Inline error/warning must be displayed
+    const expectedError = "Visa must be valid through your checkout date (2026-11-04) for Indian FRRO compliance.";
+    expect(screen.getByTestId("checkin-visa-expiry-error")).toHaveTextContent(expectedError);
+    expect(screen.getByTestId("checkin-form-c-badge")).toHaveTextContent("Form C details required");
+
+    // Attempting to advance should be blocked
+    fireEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await settle();
+
+    expect(screen.getByTestId("checkin-id-error")).toHaveTextContent(expectedError);
+    expect(screen.queryByText(/House rules/i)).not.toBeInTheDocument();
+
+    // Fixing visa expiry to checkout date (or later) clears inline error and allows Form C ready
+    fireEvent.change(screen.getByLabelText("Visa expiry date"), { target: { value: "2026-11-04" } });
+    await settle();
+
+    expect(screen.queryByTestId("checkin-visa-expiry-error")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checkin-form-c-badge")).toHaveTextContent("✓ Form C ready");
+  });
+
+  test("validates that passport expiry date must be after checkout date", async () => {
+    fetchMock().mockResolvedValueOnce(json(details));
+
+    renderAt("/check-in/ATL-4242?t=tok-123");
+    await settle();
+
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    await settle();
+
+    fireEvent.change(screen.getByLabelText("Nationality"), { target: { value: "Italy" } });
+    await settle();
+
+    // Set passport expiry to exactly checkout date ("2026-11-04") — passport must be valid AFTER checkout date
+    fireEvent.change(screen.getByLabelText("Passport expiry date"), { target: { value: "2026-11-04" } });
+    await settle();
+
+    const expectedPassportError = "Passport must be valid after your checkout date (2026-11-04).";
+    expect(screen.getByTestId("checkin-passport-expiry-error")).toHaveTextContent(expectedPassportError);
+
+    // Extending passport expiry date beyond checkout date clears the error
+    fireEvent.change(screen.getByLabelText("Passport expiry date"), { target: { value: "2026-11-05" } });
+    await settle();
+
+    expect(screen.queryByTestId("checkin-passport-expiry-error")).not.toBeInTheDocument();
+  });
+});

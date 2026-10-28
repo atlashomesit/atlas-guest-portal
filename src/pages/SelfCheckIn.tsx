@@ -109,6 +109,144 @@ function isPlausibleGuestEmail(raw: string): boolean {
 
 type Step = "auth" | "summary" | "id-upload" | "house-rules" | "damage-waiver" | "done";
 
+/**
+ * GUEST-041: Comprehensive alphabetical ISO nationality list for FRRO Form C compliance.
+ */
+const ISO_NATIONALITIES = [
+  "Afghanistan",
+  "Albania",
+  "Algeria",
+  "Andorra",
+  "Angola",
+  "Argentina",
+  "Armenia",
+  "Australia",
+  "Austria",
+  "Azerbaijan",
+  "Bahamas",
+  "Bahrain",
+  "Bangladesh",
+  "Barbados",
+  "Belarus",
+  "Belgium",
+  "Belize",
+  "Benin",
+  "Bhutan",
+  "Bolivia",
+  "Bosnia and Herzegovina",
+  "Botswana",
+  "Brazil",
+  "Brunei",
+  "Bulgaria",
+  "Cambodia",
+  "Cameroon",
+  "Canada",
+  "Chile",
+  "China",
+  "Colombia",
+  "Costa Rica",
+  "Croatia",
+  "Cuba",
+  "Cyprus",
+  "Czech Republic",
+  "Denmark",
+  "Dominican Republic",
+  "Ecuador",
+  "Egypt",
+  "El Salvador",
+  "Estonia",
+  "Ethiopia",
+  "Fiji",
+  "Finland",
+  "France",
+  "Georgia",
+  "Germany",
+  "Ghana",
+  "Greece",
+  "Guatemala",
+  "Honduras",
+  "Hong Kong",
+  "Hungary",
+  "Iceland",
+  "India",
+  "Indonesia",
+  "Iran",
+  "Iraq",
+  "Ireland",
+  "Israel",
+  "Italy",
+  "Jamaica",
+  "Japan",
+  "Jordan",
+  "Kazakhstan",
+  "Kenya",
+  "Kuwait",
+  "Kyrgyzstan",
+  "Laos",
+  "Latvia",
+  "Lebanon",
+  "Lithuania",
+  "Luxembourg",
+  "Malaysia",
+  "Maldives",
+  "Malta",
+  "Mauritius",
+  "Mexico",
+  "Monaco",
+  "Mongolia",
+  "Morocco",
+  "Myanmar",
+  "Namibia",
+  "Nepal",
+  "Netherlands",
+  "New Zealand",
+  "Nigeria",
+  "Norway",
+  "Oman",
+  "Pakistan",
+  "Panama",
+  "Paraguay",
+  "Peru",
+  "Philippines",
+  "Poland",
+  "Portugal",
+  "Qatar",
+  "Romania",
+  "Russia",
+  "Rwanda",
+  "Saudi Arabia",
+  "Senegal",
+  "Serbia",
+  "Singapore",
+  "Slovakia",
+  "Slovenia",
+  "South Africa",
+  "South Korea",
+  "Spain",
+  "Sri Lanka",
+  "Sweden",
+  "Switzerland",
+  "Taiwan",
+  "Tanzania",
+  "Thailand",
+  "Turkey",
+  "UAE",
+  "Uganda",
+  "Ukraine",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States",
+  "Uruguay",
+  "Uzbekistan",
+  "Vatican City",
+  "Venezuela",
+  "Vietnam",
+  "Yemen",
+  "Zambia",
+  "Zimbabwe",
+  "Other",
+] as const;
+
 export default function SelfCheckIn() {
   const brandName = getTenantBrandName();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
@@ -170,6 +308,33 @@ export default function SelfCheckIn() {
     nationality.trim() !== "" &&
     nationality.trim().toLowerCase() !== "india" &&
     nationality.trim().toLowerCase() !== "in";
+
+  // GUEST-041: Stay-date validation for passport and visa expiry (FRRO Form C compliance)
+  const checkoutDateStr = details?.checkoutDate ? details.checkoutDate.slice(0, 10) : "";
+  const visaExpiryStr = visaExpiryDate.trim().slice(0, 10);
+  const passportExpiryStr = passportExpiryDate.trim().slice(0, 10);
+
+  const isVisaExpiredForStay = Boolean(
+    isForeignGuest &&
+    checkoutDateStr &&
+    visaExpiryStr &&
+    visaExpiryStr < checkoutDateStr
+  );
+
+  const isPassportExpiredForStay = Boolean(
+    isForeignGuest &&
+    checkoutDateStr &&
+    passportExpiryStr &&
+    passportExpiryStr <= checkoutDateStr
+  );
+
+  const visaExpiryError = isVisaExpiredForStay
+    ? `Visa must be valid through your checkout date (${details?.checkoutDate}) for Indian FRRO compliance.`
+    : "";
+
+  const passportExpiryError = isPassportExpiredForStay
+    ? `Passport must be valid after your checkout date (${details?.checkoutDate}).`
+    : "";
   // TASK-5131: Aadhaar VC preferred; photo upload is explicit fallback only
   const [aadhaarVcVerified, setAadhaarVcVerified] = useState(false);
   // TASK-102530: setAadhaarMasked is still called live from updateGuest() and
@@ -419,6 +584,18 @@ export default function SelfCheckIn() {
       return;
     }
 
+    // GUEST-041: Stay-date validation for foreign guests before proceeding
+    if (isForeignGuest && checkoutDateStr) {
+      if (isVisaExpiredForStay) {
+        setError(visaExpiryError);
+        return;
+      }
+      if (isPassportExpiredForStay) {
+        setError(passportExpiryError);
+        return;
+      }
+    }
+
     for (let i = 0; i < guests.length; i++) {
       const g = guests[i];
       const label = i === 0 ? "Guest 1 (Primary Guest)" : `Guest ${i + 1}`;
@@ -603,6 +780,21 @@ export default function SelfCheckIn() {
     if (!details) return;
     setBusy(true);
     setError("");
+
+    // GUEST-041: Stay-date validation for foreign guests before completing
+    if (isForeignGuest && checkoutDateStr) {
+      if (isVisaExpiredForStay) {
+        setError(visaExpiryError);
+        setBusy(false);
+        return;
+      }
+      if (isPassportExpiredForStay) {
+        setError(passportExpiryError);
+        setBusy(false);
+        return;
+      }
+    }
+
     try {
       // TASK-4346: Upload ID document if provided
       let idDocumentUrl: string | null = null;
@@ -1045,16 +1237,11 @@ export default function SelfCheckIn() {
               }}
             >
               <option value="">Select nationality</option>
-              <option value="India">India</option>
-              <option value="United States">United States</option>
-              <option value="United States (OCI)">United States (OCI)</option>
-              <option value="United Kingdom">United Kingdom</option>
-              <option value="United Kingdom (OCI)">United Kingdom (OCI)</option>
-              <option value="Canada">Canada</option>
-              <option value="Australia">Australia</option>
-              <option value="Germany">Germany</option>
-              <option value="France">France</option>
-              <option value="Other">Other</option>
+              {ISO_NATIONALITIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
 
             {isForeignGuest && (
@@ -1067,7 +1254,9 @@ export default function SelfCheckIn() {
                   visaNumber.trim() &&
                   visaType.trim() &&
                   visaExpiryDate.trim() &&
-                  dateOfBirth.trim() ? (
+                  dateOfBirth.trim() &&
+                  !isVisaExpiredForStay &&
+                  !isPassportExpiredForStay ? (
                     <span
                       data-testid="checkin-form-c-badge"
                       className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800"
@@ -1104,10 +1293,19 @@ export default function SelfCheckIn() {
                     <input
                       id="checkin-passport-expiry"
                       type="date"
-                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      className={`w-full rounded-lg border ${passportExpiryError ? "border-red-500" : "border-border-subtle"} px-4 py-2.5 text-sm focus:outline-none focus:ring-2 ${passportExpiryError ? "focus:ring-red-500" : "focus:ring-brand-primary"} bg-white`}
                       value={passportExpiryDate}
                       onChange={(e) => setPassportExpiryDate(e.target.value)}
                     />
+                    {passportExpiryError && (
+                      <p
+                        data-testid="checkin-passport-expiry-error"
+                        role="alert"
+                        className="mt-1 text-xs text-red-600 font-medium"
+                      >
+                        {passportExpiryError}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="checkin-dob" className="block text-sm font-medium text-text-primary mb-1">
@@ -1168,10 +1366,19 @@ export default function SelfCheckIn() {
                     <input
                       id="checkin-visa-expiry"
                       type="date"
-                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      className={`w-full rounded-lg border ${visaExpiryError ? "border-red-500" : "border-border-subtle"} px-4 py-2.5 text-sm focus:outline-none focus:ring-2 ${visaExpiryError ? "focus:ring-red-500" : "focus:ring-brand-primary"} bg-white`}
                       value={visaExpiryDate}
                       onChange={(e) => setVisaExpiryDate(e.target.value)}
                     />
+                    {visaExpiryError && (
+                      <p
+                        data-testid="checkin-visa-expiry-error"
+                        role="alert"
+                        className="mt-1 text-xs text-red-600 font-medium"
+                      >
+                        {visaExpiryError}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="checkin-oci-number" className="block text-sm font-medium text-text-primary mb-1">
@@ -1556,7 +1763,7 @@ export default function SelfCheckIn() {
             </div>
 
             {error && (
-              <p id="checkin-id-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
+              <p id="checkin-id-error" data-testid="checkin-id-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
             )}
 
             <label className="flex items-start gap-3 cursor-pointer mb-5">
