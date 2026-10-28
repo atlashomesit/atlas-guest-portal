@@ -66,6 +66,14 @@ const CITY_LANDING_KEYWORDS: Record<(typeof CITY_LANDING_SLUGS)[number], string[
 const ATLAS_CITY_PATHS = CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`);
 
 /**
+ * MKT-040: the `/destinations` city directory hub (MKT-034, `src/pages/DestinationsPage.tsx`). Like the city guides it links to it is
+ * Atlas marketplace content: the page sends a white-label tenant domain home, so it is advertised on Atlas hosts only and never in
+ * `SHARED_SITEMAP_PATHS`. It is a static page that does not depend on listing supply, so (unlike the city guides) it is listed even
+ * when the supply lookup fails. `/explore` is an alias of it and is deliberately not listed (one canonical URL per page).
+ */
+const ATLAS_HUB_PATHS = ["/destinations"];
+
+/**
  * MKT-006: cross-tenant `GET /marketplace/listings` row shape this function needs
  * (`MarketplaceListingDto`).
  */
@@ -152,7 +160,7 @@ const SHARED_CORE_PATHS = [
   "/terms",
 ];
 
-const CORE_PATHS = [...SHARED_CORE_PATHS, ...ATLAS_CITY_PATHS];
+const CORE_PATHS = [...SHARED_CORE_PATHS, ...ATLAS_HUB_PATHS, ...ATLAS_CITY_PATHS];
 
 /** Paths every tenant sitemap includes (no Atlas SEO city guides). */
 export const SHARED_SITEMAP_PATHS = SHARED_CORE_PATHS;
@@ -331,7 +339,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
 
   // TASK-7194: omit /homestays-in-* from white-label tenant sitemaps.
   const corePaths = isMarketplaceHost(host)
-    ? [...SHARED_CORE_PATHS, ...cityPaths]
+    ? [...SHARED_CORE_PATHS, ...ATLAS_HUB_PATHS, ...cityPaths]
     : isAtlasHost
       ? CORE_PATHS
       : SHARED_CORE_PATHS;

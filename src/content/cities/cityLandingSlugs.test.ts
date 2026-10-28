@@ -37,6 +37,15 @@ describe("MKT-014 / MKT-017: city landing slug registry", () => {
     expect(narrowed).toBe("bengaluru");
   });
 
+  // MKT-040: atlas-api `ReservedSlugs.NewClaimsOnly` reserves exactly these nine so a NEW tenant cannot be slugged "goa" and be shadowed by
+  // the city redirect on atlastays.com. atlas-api's `ReservedSlugsCityGuideTests` carries the same literal nine. Adding or renaming a
+  // city fails this test until the API list is updated too (and the other way round).
+  it("MKT-040: is exactly the nine slugs atlas-api reserves against new tenant claims", () => {
+    expect([...CITY_LANDING_SLUGS].sort()).toEqual(
+      ["bengaluru", "coorg", "goa", "gurugram", "guwahati", "hyderabad", "jalandhar", "manali", "nashik"],
+    );
+  });
+
   it("isCityLandingSlug rejects values not in the registry", () => {
     expect(isCityLandingSlug("atlantis")).toBe(false);
     expect(isCityLandingSlug("")).toBe(false);
