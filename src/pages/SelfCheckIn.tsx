@@ -31,6 +31,11 @@ interface CheckinDetails {
    * house rules; null until then. Lets a resumed self check-in skip re-showing the checkbox.
    */
   houseRulesSignedAt?: string | null;
+  /**
+   * GUEST-042: timestamp of check-in submission or completed status from backend.
+   */
+  checkInSubmittedAtUtc?: string | null;
+  isCompleted?: boolean | null;
   guestCount?: number | null;
   guestName?: string | null;
   /**
@@ -529,7 +534,11 @@ export default function SelfCheckIn() {
       });
     }
     setGuests(initialGuests);
-    setStep("summary");
+    if (data.checkInSubmittedAtUtc || data.isCompleted) {
+      setStep("done");
+    } else {
+      setStep("summary");
+    }
   };
 
   const handleVerify = async () => {
@@ -1730,12 +1739,22 @@ export default function SelfCheckIn() {
               />
             </div>
 
-            <a
-              href="/"
-              className="inline-block rounded-xl border border-border-subtle px-6 py-3 text-sm font-medium text-text-primary hover:border-brand-primary transition"
-            >
-              Back to homepage
-            </a>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setStep("summary")}
+                data-testid="update-guest-details-btn"
+                className="inline-block rounded-xl border border-border-subtle px-6 py-3 text-sm font-medium text-text-primary hover:border-brand-primary transition"
+              >
+                Update Guest Details
+              </button>
+              <a
+                href="/"
+                className="inline-block rounded-xl border border-border-subtle px-6 py-3 text-sm font-medium text-text-primary hover:border-brand-primary transition"
+              >
+                Back to homepage
+              </a>
+            </div>
           </div>
         )}
       </div>
