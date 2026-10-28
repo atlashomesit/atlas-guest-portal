@@ -78,6 +78,7 @@ import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
 import { fetchListingById } from '@/api/listingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
 import { dormNeedsGenderAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
@@ -3039,15 +3040,11 @@ const GuestDetailsPage: React.FC = () => {
             )}
           </form>
 
-          {/* Pay rail (mobile only — desktop in aside) */}
-          <div className="gd-pay-rail gd-pay-rail--mobile">
-            <span className="gd-pay-rail-label">Pay with</span>
-            <span className="gd-pay-mark">UPI</span>
-            <span className="gd-pay-mark">VISA</span>
-            <span className="gd-pay-mark">RuPay</span>
-            <span className="gd-pay-mark">Net banking</span>
-            <span className="gd-pay-mark razorpay">Razorpay</span>
-          </div>
+          {/* Pay rail (mobile only — desktop in aside). Gated on the online rail:
+              never on the TASK-8048 WhatsApp-handoff branch. */}
+          {hasOnlineRail && (
+            <GuestCheckoutPaymentBadges className="gd-pay-rail--mobile" />
+          )}
 
           {/* Security badges (mobile only — desktop in aside). Gated on the online rail:
               never on the TASK-8048 WhatsApp-handoff branch. */}
@@ -3346,14 +3343,7 @@ const GuestDetailsPage: React.FC = () => {
               )}
 
               {/* Pay rail (desktop) */}
-              <div className="gd-pay-rail">
-                <span className="gd-pay-rail-label">Pay with</span>
-                <span className="gd-pay-mark">UPI</span>
-                <span className="gd-pay-mark">VISA</span>
-                <span className="gd-pay-mark">RuPay</span>
-                <span className="gd-pay-mark">Net banking</span>
-                <span className="gd-pay-mark razorpay">Razorpay</span>
-              </div>
+              <GuestCheckoutPaymentBadges />
 
               {/* Security badges — gated on the online rail: never rendered on the
                   TASK-8048 WhatsApp-handoff branch where there is no gateway to claim. */}
@@ -4526,6 +4516,12 @@ const gdStyles = `
   text-transform: uppercase;
   color: #765b45;
 }
+.gd-pay-rail-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .gd-pay-mark {
   display: inline-flex;
   align-items: center;
@@ -4540,6 +4536,16 @@ const gdStyles = `
   letter-spacing: 0.04em;
 }
 .gd-pay-mark.razorpay { color: #072654; }
+.gd-pay-mark--upi { color: #5f259f; font-weight: 800; }
+.gd-pay-mark--gpay { color: #1a73e8; }
+.gd-pay-mark--phonepe { color: #5f259f; }
+.gd-pay-mark--paytm { color: #002e6e; }
+.gd-pay-mark--bhim { color: #00796b; }
+.gd-pay-mark--cards { color: #4a5568; }
+.gd-pay-mark--visa { color: #1a1f71; }
+.gd-pay-mark--mastercard { color: #eb001b; }
+.gd-pay-mark--rupay { color: #097939; }
+.gd-pay-mark--netbanking { color: #2d3748; }
 .gd-pay-rail--mobile { display: flex; }
 @media (min-width: 1024px) { .gd-pay-rail--mobile { display: none; } }
 

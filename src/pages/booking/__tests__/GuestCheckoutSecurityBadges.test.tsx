@@ -7,8 +7,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BookingProvider } from "@/contexts/BookingContext";
-import GuestDetailsPage from "./GuestDetailsPage";
-import { settle } from "../../test/settle";
+import GuestDetailsPage from "../GuestDetailsPage";
+import { settle } from "../../../test/settle";
 
 vi.mock("@/lib/events", () => ({ track: vi.fn(), TerminalCheckoutOutcomeEvents: {} }));
 
@@ -64,8 +64,21 @@ afterEach(() => {
 
 const BADGES = ["256-Bit SSL Encrypted", "RBI-Regulated Gateway", "Instant Booking Confirmation"];
 
-describe("TASK-102074: checkout order-summary trust badges", () => {
-  it("renders security badges on an online-rail tenant (desktop aside + mobile in-form)", async () => {
+const PAYMENT_METHOD_CLAIMS = [
+  "UPI",
+  "Google Pay",
+  "PhonePe",
+  "Paytm",
+  "BHIM",
+  "Credit/Debit Cards",
+  "Visa",
+  "Mastercard",
+  "RuPay",
+  "NetBanking",
+];
+
+describe("TASK-102074 & GUEST-032: checkout trust and payment badges", () => {
+  it("renders security and payment rail badges on an online-rail tenant (desktop aside + mobile in-form)", async () => {
     mockTenant.ctx = {
       slug: "atlas",
       name: "Atlastays",
@@ -82,6 +95,22 @@ describe("TASK-102074: checkout order-summary trust badges", () => {
         expect(badge).toHaveTextContent(claim);
       }
     }
+
+    // GUEST-032: upfront payment method affordances/badges on checkout
+    const paymentRails = screen.getAllByTestId("checkout-payment-rail-badges");
+    expect(paymentRails.length).toBe(2); // desktop aside + mobile in-form region
+    for (const rail of paymentRails) {
+      for (const method of PAYMENT_METHOD_CLAIMS) {
+        expect(rail).toHaveTextContent(method);
+      }
+    }
+
+    // Individual badges carrying readable accessible labels
+    for (const method of PAYMENT_METHOD_CLAIMS) {
+      const items = screen.getAllByLabelText(method);
+      expect(items.length).toBeGreaterThanOrEqual(2);
+    }
+
     // Online CTA present, WhatsApp handoff absent.
     expect(screen.getByTestId("guest-booking-submit")).toBeInTheDocument();
     expect(screen.getByTestId("guest-booking-submit-mobile")).toBeInTheDocument();
@@ -89,7 +118,7 @@ describe("TASK-102074: checkout order-summary trust badges", () => {
     expect(screen.queryByTestId("guest-booking-whatsapp-cta-mobile")).not.toBeInTheDocument();
   });
 
-  it("does not render security badges on the WhatsApp-handoff branch", async () => {
+  it("does not render security or payment rail badges on the WhatsApp-handoff branch", async () => {
     mockTenant.ctx = {
       slug: "qa-offline",
       name: "Offline Host",
@@ -101,14 +130,18 @@ describe("TASK-102074: checkout order-summary trust badges", () => {
     await renderPage();
 
     expect(screen.queryByTestId("guest-checkout-security-badges")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("checkout-payment-rail-badges")).not.toBeInTheDocument();
     expect(screen.queryByText("Secure checkout")).not.toBeInTheDocument();
-    // WhatsApp CTA present, no Pay button, no security claims.
+    // WhatsApp CTA present, no Pay button, no security or payment rail claims.
     expect(screen.getByTestId("guest-booking-whatsapp-cta")).toBeInTheDocument();
     expect(screen.getByTestId("guest-booking-whatsapp-cta-mobile")).toBeInTheDocument();
     expect(screen.queryByTestId("guest-booking-submit")).not.toBeInTheDocument();
     expect(screen.queryByTestId("guest-booking-submit-mobile")).not.toBeInTheDocument();
     for (const claim of BADGES) {
       expect(screen.queryByText(claim)).not.toBeInTheDocument();
+    }
+    for (const method of PAYMENT_METHOD_CLAIMS) {
+      expect(screen.queryByLabelText(method)).not.toBeInTheDocument();
     }
   });
 });
