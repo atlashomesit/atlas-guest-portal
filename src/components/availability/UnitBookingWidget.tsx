@@ -54,6 +54,8 @@ import FomoBar from '@/components/FomoBar';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import ParentChildCrossSellBanner, { isParentListing, type ChildRoomPreview } from '../cluster/ParentChildCrossSellBanner';
 import { fetchClusterChildrenAvailability, type ClusterChildrenAvailability } from '@/api/clusterChildrenClient';
+import { fetchSisterAvailability, type SisterSpillover } from '@/api/sisterAvailabilityClient';
+import SisterPropertySpillover from './SisterPropertySpillover';
 import HostelDormBadge from '../hostel/HostelDormBadge';
 import { bedsLeftForNights, isHostelDormType, type DormGenderPolicy } from '@/utils/dormListing';
 import { track } from '@/lib/events'; // TASK-1480
@@ -1493,6 +1495,27 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return () => ac.abort();
   }, [isParentOfCluster, datesUnavailable, listingId, crossSellCheckIn, crossSellCheckOut, verifiedTenantSlug]);
 
+  // CHN-012: the chosen nights are genuinely taken (a booking / hold / block - NOT a failed availability read or a failed listing
+  // lookup) -> ask for a sister property of the same brand that is free for the same dates and guest count. Read-only: the API
+  // answers `sourceSoldOut` itself, and any failure simply shows no cards.
+  const nightsGenuinelyTaken = availabilityConflict || checkinUnavailable;
+  const sisterPropertyId = Number(propertyId);
+  const [sisterSpillover, setSisterSpillover] = useState<SisterSpillover | null>(null);
+  useEffect(() => {
+    setSisterSpillover(null);
+    if (!nightsGenuinelyTaken || !Number.isInteger(sisterPropertyId) || sisterPropertyId <= 0 || !crossSellCheckIn || !crossSellCheckOut) return;
+    const ac = new AbortController();
+    void fetchSisterAvailability(
+      sisterPropertyId, crossSellCheckIn, crossSellCheckOut, guests, verifiedTenantSlug, ac.signal,
+    ).then((result) => {
+      if (!ac.signal.aborted) setSisterSpillover(result);
+    });
+    return () => ac.abort();
+  }, [nightsGenuinelyTaken, sisterPropertyId, crossSellCheckIn, crossSellCheckOut, guests, verifiedTenantSlug]);
+  // Marketplace pages read the host tenant from ?tenant=; keep it on the sister link so that page resolves the same brand.
+  const sisterTenantParam =
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tenant')?.trim() || null : null;
+
   // TASK-102023: gate range pricing pending, fallback estimate, and Reserve on the failure state
   // covering the selected range. If the selected range falls within the shown month, use that
   // fetch's failure state; otherwise use the selected-range fetch's failure state.
@@ -2721,6 +2744,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             checkOut={crossSellCheckOut}
             propertySlug={propertySlug}
             onSelectChildRoom={(room: ChildRoomPreview) => room.href && navigate(room.href)}
+          />
+        </div>
+      )}
+
+      {/* CHN-012: the property is full for these dates -> sister-property cards (nothing renders unless the API returned some) */}
+      {nightsGenuinelyTaken && sisterSpillover && (
+        <div className="mt-3">
+          <SisterPropertySpillover
+            data={sisterSpillover}
+            checkIn={crossSellCheckIn}
+            checkOut={crossSellCheckOut}
+            guests={guests}
+            tenantSlug={sisterTenantParam}
           />
         </div>
       )}
