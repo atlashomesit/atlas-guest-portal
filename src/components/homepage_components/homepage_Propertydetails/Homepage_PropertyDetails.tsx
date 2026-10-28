@@ -478,6 +478,7 @@ import {
 // REV-046: QR "Guest feedback" notes. Own list, own block, never merged into the reviews above.
 import { normalizeGuestFeedback, type GuestFeedbackItem } from '@/components/property/guestFeedback';
 import GuestFeedbackSection from '@/components/property/GuestFeedbackCards';
+import ReviewLocaleChip from '@/components/property/ReviewLocaleChip'; // REV-041
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
@@ -2694,6 +2695,7 @@ useEffect(() => {
                                     <div className="pp-v2-review-date">
                                       {new Date(r.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
                                     </div>
+                                    <ReviewLocaleChip locale={r.locale} />
                                   </div>
                                 </div>
                                 {r.hostResponse && (

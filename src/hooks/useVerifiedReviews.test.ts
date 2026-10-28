@@ -249,3 +249,29 @@ describe('useVerifiedReviews — review-QR guest feedback (REV-046)', () => {
     expect(result.current.guestFeedback).toEqual([]);
   });
 });
+
+describe('useVerifiedReviews — author name and locale (REV-041)', () => {
+  const respondWithExternal = (externalReviews: Record<string, unknown>[]) =>
+    vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/listings/101/reviews')) return Promise.resolve({ ok: true, json: async () => ({ reviews: [] }) });
+      if (url.includes('/api/public/listings/101')) return Promise.resolve({ ok: true, json: async () => ({ externalReviews }) });
+      return Promise.resolve({ ok: false, json: async () => null });
+    });
+
+  it('uses the real author name when the stored guest name is the generic placeholder, and carries the locale', async () => {
+    vi.stubGlobal(
+      'fetch',
+      respondWithExternal([
+        { guestName: 'Guest', authorName: 'Amelie Dubois', locale: 'fr-FR', rating: 5, body: 'Superbe séjour.', reviewDate: '2026-10-03', source: 'airbnb' },
+        { guestName: 'Ravi Kumar', authorName: 'Ravi K', locale: null, rating: 5, body: 'Peaceful.', reviewDate: '2026-10-02', source: 'airbnb' },
+        { guestName: 'Guest', rating: 5, body: 'Nice.', reviewDate: '2026-10-01', source: 'airbnb' },
+      ]),
+    );
+
+    const { result } = renderHook(() => useVerifiedReviews([101], 5));
+    await settle();
+
+    expect(result.current.reviews.map((r) => r.firstName)).toEqual(['Amelie', 'Ravi', 'Guest']);
+    expect(result.current.reviews.map((r) => r.locale ?? null)).toEqual(['fr-FR', null, null]);
+  });
+});

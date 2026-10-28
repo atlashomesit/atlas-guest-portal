@@ -36,6 +36,10 @@ export type ListingReviewRow = {
 
 export type ExternalReviewRow = {
   guestName?: string | null;
+  /** REV-041: the reviewer's real name from the OTA (Channex/Airbnb); the API already uses it when guestName is a placeholder. */
+  authorName?: string | null;
+  /** REV-041: the language/locale the review was written in, e.g. 'fr-FR'. */
+  locale?: string | null;
   rating?: number | null;
   body?: string | null;
   reviewDate?: string;
@@ -49,10 +53,73 @@ export type ExternalReviewRow = {
 
 export type DisplayReviewRow = ListingReviewRow & {
   displayKey: string;
+  /** REV-041: external reviews only. */
+  authorName?: string | null;
+  /** REV-041: external reviews only; a validated locale code such as 'fr-FR', or null. */
+  locale?: string | null;
   isGoogle?: boolean;
   source?: string;
   sourceUrl?: string | null;
 };
+
+/** Names that mean "the OTA did not give us the reviewer's name". */
+const GENERIC_REVIEWER_NAMES = new Set(['guest', 'a guest', 'anonymous', 'anonymous guest', 'unknown']);
+
+/**
+ * REV-041: true for a missing/blank name or an OTA placeholder such as "Guest". The API already swaps a
+ * placeholder for the real author name; this keeps the page right against an API that has not been redeployed.
+ */
+export function isGenericReviewerName(name?: string | null): boolean {
+  const trimmed = (name ?? '').trim().toLowerCase();
+  return trimmed === '' || GENERIC_REVIEWER_NAMES.has(trimmed);
+}
+
+/**
+ * REV-041: the name to show on a review card. A real guest name wins; a placeholder or blank guest name falls
+ * back to the author name; with no author name the stored guest name is kept (so "Guest" is never lost).
+ * Returns null when there is nothing at all. The result is plain text: render it as a React child only.
+ */
+export function resolveReviewerName(guestName?: string | null, authorName?: string | null): string | null {
+  const guest = (guestName ?? '').trim();
+  const author = (authorName ?? '').trim();
+  if (guest && !isGenericReviewerName(guest)) return guest;
+  if (author) return author;
+  return guest || null;
+}
+
+const LOCALE_PATTERN = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$/;
+
+/**
+ * REV-041: validates a review locale ("fr-FR", "pt_BR") and returns it in BCP-47 form, or null when blank or
+ * malformed. A value that is not a locale code is dropped rather than shown.
+ */
+export function normalizeReviewLocale(locale?: string | null): string | null {
+  const code = (locale ?? '').trim().replace(/_/g, '-');
+  if (!code || code.length > 24 || !LOCALE_PATTERN.test(code)) return null;
+  return code;
+}
+
+/**
+ * REV-041: a readable language label for a review locale ("fr-FR" -> "French (France)") through
+ * Intl.DisplayNames, or the raw code when the runtime cannot name it. Null when there is no valid locale.
+ */
+export function formatReviewLocaleLabel(locale?: string | null): string | null {
+  const code = normalizeReviewLocale(locale);
+  if (!code) return null;
+  try {
+    const names = new Intl.DisplayNames(['en'], { type: 'language', languageDisplay: 'standard' });
+    const language = code.split('-')[0];
+    const languageName = names.of(language);
+    // An unknown language comes back as the code itself: show the code, not a half-named label.
+    if (!languageName || languageName.toLowerCase() === language.toLowerCase()) return code;
+    const full = names.of(code);
+    // An unknown region reads "English (Unknown Region)": the language alone is the honest label then.
+    if (!full || /unknown/i.test(full)) return languageName;
+    return full;
+  } catch {
+    return code;
+  }
+}
 
 /**
  * TASK-103154 (REV-011): Normalizes review source string for public display.
@@ -117,7 +184,11 @@ export function mergeListingAndExternalReviews(
     return {
       id: -(idx + 1),
       displayKey: `ext-${idx}-${r.reviewDate ?? ''}`,
-      guestName: r.guestName ?? (isGoogle ? 'Google user' : cleanSource ? `${cleanSource} guest` : 'Guest'),
+      guestName:
+        resolveReviewerName(r.guestName, r.authorName) ??
+        (isGoogle ? 'Google user' : cleanSource ? `${cleanSource} guest` : 'Guest'),
+      authorName: r.authorName?.trim() || null,
+      locale: normalizeReviewLocale(r.locale),
       rating: Number(r.rating) || 5,
       body: cleanedBody,
       createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),

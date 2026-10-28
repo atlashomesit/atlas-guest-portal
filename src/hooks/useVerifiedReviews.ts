@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 
-import { normalizeReviewSource } from "@/components/property/reviewMerge";
+import { normalizeReviewLocale, normalizeReviewSource, resolveReviewerName } from "@/components/property/reviewMerge";
 import { normalizeGuestFeedback, type GuestFeedbackItem } from "@/components/property/guestFeedback";
 import { stripHtmlPreservingEmoticons } from "@/utils/sanitizeReviewText";
 
@@ -28,6 +28,8 @@ export type VerifiedReview = {
   text: string;
   createdAt: string;
   source?: string;
+  /** REV-041: validated locale of an imported review ("fr-FR"), absent for native reviews. */
+  locale?: string | null;
 };
 
 type ReviewDto = {
@@ -42,6 +44,10 @@ type ReviewDto = {
 
 type ExternalReviewDto = {
   guestName?: string | null;
+  /** REV-041 */
+  authorName?: string | null;
+  /** REV-041 */
+  locale?: string | null;
   rating?: number | null;
   body?: string | null;
   reviewDate?: string | null;
@@ -161,11 +167,12 @@ export function useVerifiedReviews(
             const cleanSource = normalizeReviewSource(ext.source) ?? (ext.sourceUrl?.includes("google") ? "Google" : undefined);
             collected.push({
               id: -(collected.length + 1),
-              firstName: firstNameOnly(ext.guestName),
+              firstName: firstNameOnly(resolveReviewerName(ext.guestName, ext.authorName)),
               rating,
               text,
               createdAt: ext.reviewDate ? `${ext.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
               source: cleanSource,
+              locale: normalizeReviewLocale(ext.locale),
             });
           }
         }

@@ -146,3 +146,29 @@ describe('TestimonialsSection — review-QR guest feedback (REV-046)', () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+describe('TestimonialsSection — review language chip (REV-041)', () => {
+  it('shows a language chip on a review that has a locale and none on one that does not', () => {
+    vi.spyOn(useTenantListingsModule, 'useTenantListings').mockReturnValue({
+      properties: [{ listingId: 101 } as any],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+    vi.spyOn(useVerifiedReviewsModule, 'useVerifiedReviews').mockReturnValue({
+      reviews: [
+        { id: -1, firstName: 'Amelie', rating: 5, text: 'Superbe séjour.', createdAt: '2026-10-03T00:00:00.000Z', source: 'Airbnb', locale: 'fr-FR' },
+        { id: 2, firstName: 'Rahul', rating: 5, text: 'Clean rooms.', createdAt: '2026-09-28T00:00:00.000Z' },
+      ],
+      guestFeedback: [],
+      loading: false,
+    } as any);
+
+    render(<TestimonialsSection />);
+
+    const chips = screen.getAllByTestId('review-locale-chip');
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent('French (France)');
+    expect(chips[0].closest('div[class*="rounded-2xl"]')).toHaveTextContent('Amelie');
+  });
+});

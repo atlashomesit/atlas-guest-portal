@@ -8,6 +8,7 @@ import {
 } from "../../config/homepageUxFlags";
 import { useTenantListings } from "../../hooks/useTenantListings";
 import { useVerifiedReviews } from "../../hooks/useVerifiedReviews";
+import ReviewLocaleChip from "../property/ReviewLocaleChip";
 import {
   ANONYMOUS_GUEST_NAME,
   GUEST_FEEDBACK_LABEL,
@@ -295,6 +296,7 @@ const TestimonialsSection = () => {
                   <div>
                     <p className="font-semibold text-text-primary leading-tight">{r.firstName}</p>
                     <p className="text-xs text-text-muted">{r.source ? `${r.source} review` : "Verified stay"}</p>
+                    <ReviewLocaleChip locale={r.locale} />
                   </div>
                 </div>
               </div>

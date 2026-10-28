@@ -488,3 +488,105 @@ describe('Homepage_PropertyDetails listing JSON-LD (TASK-102732 item 4)', () => 
   });
 });
 
+
+describe('REV-041: reviewer name and language chip on guest review cards', () => {
+  const stub = () => {
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const json = (body: unknown) =>
+        Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      if (url.includes('/public/listings/101')) {
+        return json({
+          externalReviews: [
+            {
+              guestName: 'Guest',
+              authorName: 'Amelie Dubois',
+              locale: 'fr-FR',
+              rating: 5,
+              body: 'Superbe séjour, hôtes adorables.',
+              reviewDate: '2026-10-03',
+              source: 'Airbnb',
+            },
+            { guestName: 'Rahul', rating: 5, body: 'Peaceful stay with great views.', reviewDate: '2026-10-02', source: 'Airbnb' },
+            {
+              guestName: 'Mallory',
+              locale: '<img src=x onerror=alert(1)>',
+              rating: 5,
+              body: 'Hostile locale string must not render.',
+              reviewDate: '2026-10-01',
+              source: 'Airbnb',
+            },
+          ],
+        });
+      }
+      if (url.includes('/listings/101/reviews')) return json({ averageRating: 0, totalCount: 0, reviews: [] });
+      return json({});
+    }) as unknown as typeof fetch;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetTenantContextForTests();
+    document.head.querySelector('script[data-seo-json-ld]')?.remove();
+    mockUseTenantListings.mockReturnValue({
+      listings: [],
+      properties: [
+        {
+          id: 101,
+          listingId: 101,
+          property_name: 'Atlas101',
+          property_location: '165, KPHB 7th Phase',
+          property_img: ['https://cdn.example.com/img1.jpg'],
+          property_amenities: [],
+          property_description: '',
+          property_rating: 4.9,
+          property_reviews: 10,
+          property_price: 2500,
+        },
+      ],
+      state: 'success',
+      refetch: vi.fn(),
+    });
+  });
+
+  it('shows the real author name and a language chip, as plain text', async () => {
+    mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+    const originalFetch = global.fetch;
+    stub();
+    try {
+      render(
+        <MemoryRouter initialEntries={['/homes/atlas101/101']}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+            </Routes>
+          </Suspense>
+        </MemoryRouter>,
+      );
+      await settle();
+      await settle();
+
+      const grid = screen.getByTestId('reviews-grid');
+      const cards = within(grid).getAllByRole('article');
+      expect(cards).toHaveLength(3);
+
+      const amelie = cards.find((c) => c.textContent?.includes('Superbe'))!;
+      expect(within(amelie).getByText('Amelie Dubois')).toBeInTheDocument();
+      expect(amelie).not.toHaveTextContent(/\bGuest\b/);
+      expect(within(amelie).getByTestId('review-locale-chip')).toHaveTextContent('French (France)');
+
+      const rahul = cards.find((c) => c.textContent?.includes('Peaceful'))!;
+      expect(within(rahul).queryByTestId('review-locale-chip')).not.toBeInTheDocument();
+
+      const mallory = cards.find((c) => c.textContent?.includes('Hostile'))!;
+      expect(within(mallory).queryByTestId('review-locale-chip')).not.toBeInTheDocument();
+      expect(grid.querySelector('img[src="x"]')).toBeNull();
+
+      // The JSON-LD author is the real name too.
+      const ld = JSON.stringify(readJsonLd());
+      expect(ld).toContain('Amelie Dubois');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});

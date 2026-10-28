@@ -247,4 +247,56 @@ describe('Heritage PropertyDetails listing JSON-LD (REV-013)', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('REV-041: shows the real author name and a language chip on external review cards, as plain text', async () => {
+    mockResolveListing.mockResolvedValue({ id: 505, propertyId: 505 });
+    const originalFetch = global.fetch;
+    const json = (body: unknown) =>
+      Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/public/listings/505')) {
+        return json({
+          externalReviews: [
+            { guestName: 'Guest', authorName: 'Amelie Dubois', locale: 'fr-FR', rating: 5, body: 'Superbe séjour, hôtes adorables.', reviewDate: '2026-10-03', source: 'Airbnb' },
+            { guestName: 'Rahul', rating: 5, body: 'Peaceful stay with great views.', reviewDate: '2026-10-02', source: 'Airbnb' },
+            { guestName: 'Mallory', locale: '<img src=x onerror=alert(1)>', rating: 5, body: 'Hostile locale string must not render.', reviewDate: '2026-10-01', source: 'Airbnb' },
+          ],
+        });
+      }
+      if (url.includes('/listings/505/reviews')) return json({ averageRating: 0, totalCount: 0, reviews: [] });
+      return json({});
+    }) as unknown as typeof fetch;
+
+    try {
+      render(
+        <MemoryRouter initialEntries={['/homes/heritagevilla/505']}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/homes/:propertySlug/:unitSlug" element={<HeritagePropertyDetails />} />
+            </Routes>
+          </Suspense>
+        </MemoryRouter>,
+      );
+      await settle();
+      await settle();
+
+      const grid = screen.getByTestId('reviews-grid');
+      const cards = within(grid).getAllByRole('article');
+      expect(cards).toHaveLength(3);
+
+      const amelie = cards.find((c) => c.textContent?.includes('Superbe'))!;
+      expect(within(amelie).getByText('Amelie Dubois')).toBeInTheDocument();
+      expect(within(amelie).getByTestId('review-locale-chip')).toHaveTextContent('French (France)');
+
+      const rahul = cards.find((c) => c.textContent?.includes('Peaceful'))!;
+      expect(within(rahul).queryByTestId('review-locale-chip')).not.toBeInTheDocument();
+
+      const mallory = cards.find((c) => c.textContent?.includes('Hostile'))!;
+      expect(within(mallory).queryByTestId('review-locale-chip')).not.toBeInTheDocument();
+      expect(grid.querySelector('img[src="x"]')).toBeNull();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });

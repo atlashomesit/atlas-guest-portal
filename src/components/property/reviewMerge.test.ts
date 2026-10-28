@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatReviewLocaleLabel,
+  isGenericReviewerName,
   mergeListingAndExternalReviews,
+  normalizeReviewLocale,
+  resolveReviewerName,
   stripReviewScraperBoilerplate,
   type ExternalReviewRow,
   type ListingReviewRow,
@@ -237,3 +241,106 @@ describe('mergeListingAndExternalReviews (TASK-103146)', () => {
   });
 });
 
+
+describe('REV-041: author name and locale on external review rows', () => {
+  it('carries authorName and a normalised locale through the merge', () => {
+    const external: ExternalReviewRow[] = [
+      {
+        guestName: 'Hans M.',
+        authorName: 'Hans Müller',
+        locale: 'de-DE',
+        rating: 5,
+        body: 'Wunderbarer Aufenthalt.',
+        reviewDate: '2026-10-01',
+        source: 'Airbnb',
+      },
+      { guestName: 'Priya', rating: 5, body: 'Lovely stay.', reviewDate: '2026-10-02', source: 'Airbnb' },
+    ];
+
+    const result = mergeListingAndExternalReviews([], external);
+
+    const hans = result.find((r) => r.body === 'Wunderbarer Aufenthalt.')!;
+    expect(hans.authorName).toBe('Hans Müller');
+    expect(hans.locale).toBe('de-DE');
+    expect(hans.guestName).toBe('Hans M.');
+    const priya = result.find((r) => r.body === 'Lovely stay.')!;
+    expect(priya.authorName ?? null).toBeNull();
+    expect(priya.locale ?? null).toBeNull();
+  });
+
+  it('shows the real author name when the stored guest name is the generic OTA placeholder', () => {
+    const external: ExternalReviewRow[] = [
+      { guestName: 'Guest', authorName: 'Amelie Dubois', locale: 'fr-FR', rating: 5, body: 'Superbe séjour.', reviewDate: '2026-10-03', source: 'Airbnb' },
+      { guestName: '  ', authorName: 'Kenji Sato', rating: 5, body: 'Great host.', reviewDate: '2026-10-02', source: 'Booking.com' },
+      { guestName: 'Guest', rating: 5, body: 'No author given.', reviewDate: '2026-10-01', source: 'Airbnb' },
+    ];
+
+    const result = mergeListingAndExternalReviews([], external);
+
+    expect(result.map((r) => r.guestName)).toEqual(['Amelie Dubois', 'Kenji Sato', 'Guest']);
+  });
+
+  it('keeps a real guest name over the author name', () => {
+    const external: ExternalReviewRow[] = [
+      { guestName: 'Ravi K', authorName: 'Ravi Kumar', rating: 5, body: 'Peaceful.', reviewDate: '2026-10-01', source: 'Airbnb' },
+    ];
+    const result = mergeListingAndExternalReviews([], external);
+    expect(result[0].guestName).toBe('Ravi K');
+  });
+
+  it('drops a malformed locale instead of rendering it', () => {
+    const external: ExternalReviewRow[] = [
+      { guestName: 'A', locale: '<img src=x onerror=alert(1)>', rating: 5, body: 'One.', reviewDate: '2026-10-03', source: 'Airbnb' },
+      { guestName: 'B', locale: '   ', rating: 5, body: 'Two.', reviewDate: '2026-10-02', source: 'Airbnb' },
+      { guestName: 'C', locale: 'pt_BR', rating: 5, body: 'Three.', reviewDate: '2026-10-01', source: 'Airbnb' },
+    ];
+    const result = mergeListingAndExternalReviews([], external);
+    expect(result.map((r) => r.locale ?? null)).toEqual([null, null, 'pt-BR']);
+  });
+});
+
+describe('REV-041: reviewer name and locale helpers', () => {
+  it('isGenericReviewerName flags only placeholder names', () => {
+    expect(isGenericReviewerName('Guest')).toBe(true);
+    expect(isGenericReviewerName('  guest ')).toBe(true);
+    expect(isGenericReviewerName('A guest')).toBe(true);
+    expect(isGenericReviewerName('')).toBe(true);
+    expect(isGenericReviewerName(null)).toBe(true);
+    expect(isGenericReviewerName('Guest House Fan')).toBe(false);
+    expect(isGenericReviewerName('Amelie')).toBe(false);
+  });
+
+  it('resolveReviewerName prefers a real guest name, then the author name, then whatever was stored', () => {
+    expect(resolveReviewerName('Ravi K', 'Ravi Kumar')).toBe('Ravi K');
+    expect(resolveReviewerName('Guest', 'Amelie Dubois')).toBe('Amelie Dubois');
+    expect(resolveReviewerName(null, 'Amelie Dubois')).toBe('Amelie Dubois');
+    expect(resolveReviewerName('Guest', null)).toBe('Guest');
+    expect(resolveReviewerName('Guest', '  ')).toBe('Guest');
+    expect(resolveReviewerName(null, null)).toBeNull();
+    expect(resolveReviewerName('', '')).toBeNull();
+  });
+
+  it('normalizeReviewLocale accepts BCP-47 style codes only', () => {
+    expect(normalizeReviewLocale('fr-FR')).toBe('fr-FR');
+    expect(normalizeReviewLocale(' pt_BR ')).toBe('pt-BR');
+    expect(normalizeReviewLocale('en')).toBe('en');
+    expect(normalizeReviewLocale('')).toBeNull();
+    expect(normalizeReviewLocale(null)).toBeNull();
+    expect(normalizeReviewLocale(undefined)).toBeNull();
+    expect(normalizeReviewLocale('<b>fr</b>')).toBeNull();
+    expect(normalizeReviewLocale('this is not a locale')).toBeNull();
+  });
+
+  it('formatReviewLocaleLabel makes a readable language label and falls back to the raw code', () => {
+    expect(formatReviewLocaleLabel('fr-FR')).toBe('French (France)');
+    expect(formatReviewLocaleLabel('en-IN')).toBe('English (India)');
+    expect(formatReviewLocaleLabel('es-ES')).toBe('Spanish (Spain)');
+    expect(formatReviewLocaleLabel('de')).toBe('German');
+    // Unknown language: the code is all we can honestly show.
+    expect(formatReviewLocaleLabel('zz-ZZ')).toBe('zz-ZZ');
+    expect(formatReviewLocaleLabel('xx')).toBe('xx');
+    expect(formatReviewLocaleLabel('')).toBeNull();
+    expect(formatReviewLocaleLabel(null)).toBeNull();
+    expect(formatReviewLocaleLabel('<script>')).toBeNull();
+  });
+});
