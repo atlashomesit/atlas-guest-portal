@@ -4,7 +4,7 @@ import './navbar.css';
 import './mobile-search.css';
 import MobileSearchPill from './MobileSearchPill';
 
-import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
+import { primaryNav, ctaNav, tripsMenuNav, resolveNavTo } from '../../../config/navigation';
 import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { resolveTenantBrandName } from '../../../tenant/displayBrand';
@@ -318,7 +318,7 @@ const Navbar = () => {
             {visibleNavItems.map((item) => (
               <NavLink
                 key={item.label}
-                to={item.to}
+                to={resolveNavTo(item, { marketplace: isMarketplaceBrand, search: location.search })}
                 className={navLinkClass}
               >
                 {item.label}
@@ -459,7 +459,7 @@ const Navbar = () => {
             <NavLink
               key={item.label}
               onClick={closeMobile}
-              to={item.to}
+              to={resolveNavTo(item, { marketplace: isMarketplaceBrand, search: location.search })}
               className="block py-2"
             >
               {item.label}

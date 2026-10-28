@@ -117,4 +117,32 @@ describe('TASK-7428: MOR footer disclosure is gated by half', () => {
     const contactLinks = screen.getAllByRole('link', { name: /Contact/i });
     expect(contactLinks.some((l) => l.getAttribute('href') === '/contact')).toBe(true);
   });
+
+  it('TASK-10299142: marketplace footer Stays link targets the grid anchor and keeps the active search dates', async () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(
+      customDomainTenant({ paymentProvider: 'RAZORPAY', bookingMode: 'ONLINE' }),
+    );
+    const { default: Footer } = await import('./Footer');
+    render(
+      <MemoryRouter initialEntries={['/search?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2']}>
+        <Footer />
+      </MemoryRouter>,
+    );
+    const stays = screen.getAllByRole('link', { name: /^Stays$/i });
+    expect(stays.length).toBeGreaterThan(0);
+    for (const link of stays) {
+      expect(link.getAttribute('href')).toBe(
+        '/?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2#our-homes',
+      );
+    }
+  });
+
+  it('TASK-10299142: tenant storefront footer Stays link is unchanged', async () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(
+      customDomainTenant({ paymentProvider: 'RAZORPAY', bookingMode: 'ONLINE' }),
+    );
+    await renderFooter();
+    const stays = screen.getAllByRole('link', { name: /^Stays$/i });
+    expect(stays.every((l) => l.getAttribute('href') === '/#our-homes')).toBe(true);
+  });
 });

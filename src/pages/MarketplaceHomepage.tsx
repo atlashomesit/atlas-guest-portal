@@ -27,6 +27,8 @@ import { isHostelDormType } from '@/utils/dormListing';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
 import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
+import { OUR_HOMES_ANCHOR_ID } from '@/config/navigation'; // TASK-10299142
+import { useScrollToHash } from '@/hooks/useScrollToHash'; // TASK-10299142
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -238,6 +240,8 @@ export default function MarketplaceHomepage() {
   const [marketplaceProperties, setMarketplaceProperties] = useState<MarketplacePropertyApi[]>([]);
   // TASK-4413: read dates and guest count from URL params (from AirbnbSearchBar)
   const [searchParams, setSearchParams] = useSearchParams();
+  // TASK-10299142: an in-app click on "Stays" (/?...#our-homes) does not make the browser scroll; do it once the grid is in the DOM.
+  useScrollToHash();
 
   // TASK-1039950: sync category and amenity filter pills with URL query parameters
   const categoryParam = searchParams.get('category')?.toLowerCase();
@@ -828,7 +832,8 @@ export default function MarketplaceHomepage() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketplace-grid">
+      {/* TASK-10299142: the header/footer "Stays" link targets #our-homes; on the marketplace that is this grid. */}
+      <div id={OUR_HOMES_ANCHOR_ID} className="mt-8 grid scroll-mt-28 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketplace-grid">
         {/* TASK-1875: skeleton cards while loading */}
         {loading && Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
 

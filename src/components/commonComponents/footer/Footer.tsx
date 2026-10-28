@@ -3,15 +3,15 @@ import { FaFacebook, FaTwitter, FaYoutube, FaInstagram, FaMapMarkerAlt, FaWhatsa
 import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
-import { Link } from 'react-router-dom';
-import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
+import { Link, useLocation } from 'react-router-dom';
+import { helpNav, moreNav, primaryNav, resolveNavTo } from '../../../config/navigation';
 import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { TrustBanner } from './TrustBanner';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
-import { getTenantSlug } from '../../../tenant/tenantResolver';
+import { getTenantSlug, isMarketplaceMode } from '../../../tenant/tenantResolver';
 import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getGuestFacingPhone, getWhatsAppPhone } from '../../../config/contact';
 
@@ -28,6 +28,9 @@ const iconMap = {
 
 const Footer = () => {
     const tenant = getTenantContext();
+    const location = useLocation();
+    // TASK-10299142: same marketplace predicate the Navbar uses, so the Stays link behaves alike in both places.
+    const isMarketplaceNav = location.search.includes('brand=atlastays') || isMarketplaceMode();
     const brandName = getTenantBrandName();
     const socialLabelByIcon: Record<string, string> = {
         FaFacebook: `Visit ${brandName} on Facebook`,
@@ -172,7 +175,7 @@ const Footer = () => {
                     <h2 className='font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight' style={{ fontFamily: 'var(--font-family-display)' }}>Quick Links</h2>
                     <div className='flex flex-col gap-2 text-base'>
                         {primaryNav.filter((item) => !item.hidden).map((item) => (
-                            <Link key={item.label} to={item.to} className='text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors'>
+                            <Link key={item.label} to={resolveNavTo(item, { marketplace: isMarketplaceNav, search: location.search })} className='text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors'>
                                 {item.label}
                             </Link>
                         ))}
