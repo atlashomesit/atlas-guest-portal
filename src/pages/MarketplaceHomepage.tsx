@@ -14,6 +14,7 @@ import { useMarketplaceCardPrices, type MarketplaceCardPrice } from '@/hooks/use
 import { sizedForPartyFirst } from '@/utils/smallParty'; // GUEST-033
 import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
+import ExploreDestinationsStrip from '@/components/marketplace/ExploreDestinationsStrip'; // MKT-034
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
@@ -729,6 +730,10 @@ export default function MarketplaceHomepage() {
       <div className="mt-8">
         <AirbnbSearchBar />
       </div>
+
+      {/* MKT-034: one-click city directory under the hero. Thumbnails borrow a real photo from the listings already loaded;
+          no stay counts here (one loaded page would under-report) - /destinations carries those. */}
+      <ExploreDestinationsStrip listings={items} />
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <input

@@ -68,6 +68,8 @@ const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage")
 const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 const AtlasOnlyCityLanding = React.lazy(() => import("./pages/AtlasOnlyCityLanding"))
+const DestinationsPage = React.lazy(() => import("./pages/DestinationsPage"))
+const CityVanityRedirect = React.lazy(() => import("./components/CityVanityRedirect"))
 // TASK-2612: Two-step booking flow — guest details step after Reserve
 const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
 // TASK-8093: Embeddable booking widget (iframe entry)
@@ -263,6 +265,23 @@ function AppWrapper() {
                   <AtlasOnlyCityLanding citySlug={citySlug} />
                 </Suspense>,
                 `city-landing-${citySlug}-route`,
+              )}
+            />
+          ))}
+          {/* MKT-034: city directory hub. /explore is an alias of /destinations. Both MUST stay before /:shortCode. */}
+          <Route path="/destinations" element={withBoundary(<Suspense fallback={<LazyFallback />}><DestinationsPage /></Suspense>, "destinations-route")} />
+          <Route path="/explore" element={withBoundary(<Suspense fallback={<LazyFallback />}><DestinationsPage /></Suspense>, "explore-route")} />
+          {/* MKT-034: naked city slugs (/coorg) redirect to /homestays-in-coorg on the marketplace surface. MUST stay before /:shortCode.
+              No static short link (shortLinkMap) shares a slug with a city (pinned in cityVanityRoutes.test.tsx). */}
+          {CITY_LANDING_SLUGS.map((citySlug) => (
+            <Route
+              key={`vanity-${citySlug}`}
+              path={`/${citySlug}`}
+              element={withBoundary(
+                <Suspense fallback={<LazyFallback />}>
+                  <CityVanityRedirect citySlug={citySlug} />
+                </Suspense>,
+                `city-vanity-${citySlug}-route`,
               )}
             />
           ))}
