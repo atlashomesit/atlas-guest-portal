@@ -166,6 +166,9 @@ const IconCheck = ({ size = 14 }: { size?: number }) => (
 const IconWhatsApp = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.6.1-.2.3-.7.9-.9 1-.2.2-.3.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.9-.7-1.4-1.7-1.6-2-.2-.3 0-.4.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.1c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2 0 1.3.9 2.5 1.1 2.7.1.2 1.8 2.8 4.5 3.9.6.3 1.1.4 1.5.5.6.2 1.2.2 1.7.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 0 0-8.6 15.1L2 22l4.9-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-2.9-.4-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3a8.3 8.3 0 1 1 6.9 3.7z"/></svg>
 );
+const IconPhone = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+);
 const IconAlert = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
 );
@@ -1324,11 +1327,12 @@ const GuestDetailsPage: React.FC = () => {
         return;
       }
       if (!validateForm()) return;
-      // TASK-8048: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
+      // TASK-8048 / TASK-10298848: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
       // 2026-10-19: also fail closed on the LISTING OWNER's own answer (checkout-info) — on the atlastays.com marketplace the
       // site's tenant is the platform, so a host with no payment provider looked payable and a guest reached the order API.
       if (!hasOnlinePaymentRail(getTenantContext()) || checkoutInfo?.onlinePaymentsAvailable === false) {
-        setOrderError('Online payment is not available for this property. Please contact the host on WhatsApp to complete your booking.');
+        setHostOffline(true);
+        setOrderError(null);
         return;
       }
 
@@ -1877,14 +1881,44 @@ const GuestDetailsPage: React.FC = () => {
 
         // Detect timeout errors
         const isTimeout = axiosErr?.code === 'ECONNABORTED' || axiosErr?.message?.includes('timeout');
-        const apiCode = typeof data?.code === 'string' ? data.code : '';
+        const apiCode = typeof data?.code === 'string'
+          ? data.code
+          : typeof (data as { errorCode?: string })?.errorCode === 'string'
+            ? (data as { errorCode: string }).errorCode
+            : typeof (data as { error?: { code?: string } })?.error?.code === 'string'
+              ? (data as { error: { code: string } }).error.code
+              : '';
+
+        const isProviderNotConfigured =
+          isProviderNotConfiguredError(err) ||
+          ((status === 422 || status === 503) && (
+            apiCode === 'PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT' ||
+            apiCode === 'PAYMENT_PROVIDER_NOT_CONFIGURED' ||
+            serverMessage.includes('PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT') ||
+            serverMessage.includes('PAYMENT_PROVIDER_NOT_CONFIGURED')
+          ));
 
         if (isTimeout) {
           setOrderError('Payment initialization timed out. Please check your connection and try again.');
-        } else if (isProviderNotConfiguredError(err)) {
-          // The host cannot take an online payment (the API checks this BEFORE it holds the nights): hand the guest to the host.
+        } else if (isProviderNotConfigured) {
+          // TASK-10298848: The host cannot take an online payment (PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT):
+          // Immediately hide online pay and gracefully display the WhatsApp / Request to Book fallback CTA.
           setHostOffline(true);
           setOrderError(null);
+          setPaymentCancelled(false);
+          setPaymentFailure(null);
+          setCheckoutInfo((prev) => (prev ? { ...prev, onlinePaymentsAvailable: false } : {
+            listingId: Number(holdListingId) || 0,
+            hostName: null,
+            hasHouseRules: false,
+            houseRulesText: null,
+            houseRulesPdfUrl: null,
+            houseRulesStructuredJson: null,
+            hostWhatsAppDigits: null,
+            hostPhoneDigits: null,
+            bookingMode: 'WHATSAPP',
+            onlinePaymentsAvailable: false,
+          }));
         } else if (status === 409 && apiCode === 'CHECKOUT_HOLD_EXPIRED') {
           // The 10 minutes ended before this call: the nights were released. Drop the lapsed hold; the next Pay tap re-checks the
           // dates and starts a fresh one. No money moved.
@@ -2179,6 +2213,8 @@ const GuestDetailsPage: React.FC = () => {
     const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
     return `https://wa.me/${fullDigits}?text=${encodeURIComponent(text)}`;
   })();
+  const hostDirectPhoneDigits = checkoutInfo ? checkoutInfo.hostPhoneDigits : (isMarketplaceMode() ? null : (tenantCtx?.phone ? tenantCtx.phone.replace(/\D/g, '') : null));
+  const hostDirectPhoneLink = hostDirectPhoneDigits ? `tel:+${hostDirectPhoneDigits.replace(/^\+/, '')}` : null;
   // FOUNDER RULED 2026-10-19: the failed-payment contact is the HOST's WhatsApp (pre-written with the room, dates, guests,
   // amount and the guest's name; the guest only taps Send), else a call link to the host's phone, else nothing.
   const failedPaymentContact = buildHostFailureContact({
@@ -3348,9 +3384,12 @@ const GuestDetailsPage: React.FC = () => {
                 <div>
                   <b>Online payment is not available for this property.</b><br/>
                   <span>
+                    Online payment is currently not enabled for this property.{' '}
                     {whatsappHandoffUrl
                       ? 'Contact the host on WhatsApp to confirm your dates.'
-                      : 'Please contact the host directly to make a reservation.'}
+                      : hostDirectPhoneLink
+                        ? 'Contact the host directly by phone to confirm your dates.'
+                        : 'Please contact the host directly to make a reservation.'}
                   </span>
                   {trialPayAtProperty && (
                     <div data-testid="guest-trial-pay-at-property-notice" style={{ marginTop: 4 }}>
@@ -3368,15 +3407,43 @@ const GuestDetailsPage: React.FC = () => {
                     className="gd-pay"
                     style={{ textDecoration: 'none' }}
                     data-testid="guest-booking-whatsapp-cta"
+                    aria-label="Contact Host via WhatsApp / Request to Book"
                   >
-                    <IconWhatsApp size={16}/> WhatsApp host to confirm
+                    <IconWhatsApp size={16}/> Contact Host via WhatsApp · Request to Book
+                    <span className="sr-only"> (WhatsApp host to confirm)</span>
                   </a>
                   <div className="gd-pay-microcopy">You'll be connected directly to the host — no payment taken on this site.</div>
                 </>
+              ) : hostDirectPhoneLink ? (
+                <>
+                  <a
+                    href={hostDirectPhoneLink}
+                    className="gd-pay"
+                    style={{ textDecoration: 'none' }}
+                    data-testid="guest-booking-phone-cta"
+                    aria-label="Contact Host / Request to Book"
+                  >
+                    <IconPhone size={16}/> Contact Host (Call) · Request to Book
+                  </a>
+                  <div className="gd-pay-microcopy">
+                    Call the host directly to request your booking — no online payment required.
+                  </div>
+                </>
               ) : (
-                <div className="gd-pay-microcopy" data-testid="guest-booking-no-host-number">
-                  Please contact the host directly to make a reservation.
-                </div>
+                <>
+                  <a
+                    href={getContactEmail() ? `mailto:${getContactEmail()}?subject=${encodeURIComponent(`Request to Book: ${propertyName || 'Property'}`)}` : '/contact'}
+                    className="gd-pay"
+                    style={{ textDecoration: 'none' }}
+                    data-testid="guest-booking-request-cta"
+                    aria-label="Request to Book"
+                  >
+                    Request to Book
+                  </a>
+                  <div className="gd-pay-microcopy" data-testid="guest-booking-no-host-number">
+                    Please contact the host directly to make a reservation.
+                  </div>
+                </>
               )}
             </>
           )}
@@ -3441,13 +3508,30 @@ const GuestDetailsPage: React.FC = () => {
             className="gd-mobile-bar-cta"
             style={{ textDecoration: 'none' }}
             data-testid="guest-booking-whatsapp-cta-mobile"
+            aria-label="Contact Host via WhatsApp / Request to Book"
           >
-            <IconWhatsApp size={14}/> WhatsApp host
+            <IconWhatsApp size={14}/> Contact Host via WhatsApp · Request to Book
+          </a>
+        ) : hostDirectPhoneLink ? (
+          <a
+            href={hostDirectPhoneLink}
+            className="gd-mobile-bar-cta"
+            style={{ textDecoration: 'none' }}
+            data-testid="guest-booking-phone-cta-mobile"
+            aria-label="Contact Host / Request to Book"
+          >
+            <IconPhone size={14}/> Request to Book (Call)
           </a>
         ) : (
-          <button type="button" className="gd-mobile-bar-cta" disabled data-testid="guest-booking-no-host-number-mobile">
-            Contact the host directly
-          </button>
+          <a
+            href={getContactEmail() ? `mailto:${getContactEmail()}?subject=${encodeURIComponent(`Request to Book: ${propertyName || 'Property'}`)}` : '/contact'}
+            className="gd-mobile-bar-cta"
+            style={{ textDecoration: 'none' }}
+            data-testid="guest-booking-no-host-number-mobile"
+            aria-label="Request to Book"
+          >
+            Request to Book
+          </a>
         )}
       </div>
 

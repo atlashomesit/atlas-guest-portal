@@ -32,10 +32,40 @@ const PROVIDER_NOT_CONFIGURED_422_CODES: ReadonlySet<string> = new Set([
  */
 export function isProviderNotConfiguredError(error: unknown): boolean {
   const response = (error as { response?: { status?: number; data?: unknown } } | null | undefined)?.response;
-  if (response?.status !== 422 || typeof response.data !== 'object' || response.data === null) return false;
+  if (!response || (response.status !== 422 && response.status !== 503) || typeof response.data !== 'object' || response.data === null) {
+    return false;
+  }
   const body = response.data as Record<string, unknown>;
-  const code = (typeof body.code === 'string' ? body.code : typeof body.Code === 'string' ? body.Code : '').trim();
-  return PROVIDER_NOT_CONFIGURED_422_CODES.has(code);
+  const rawCode =
+    typeof body.code === 'string'
+      ? body.code
+      : typeof body.Code === 'string'
+        ? body.Code
+        : typeof body.errorCode === 'string'
+          ? body.errorCode
+          : typeof (body.error as Record<string, unknown> | null)?.code === 'string'
+            ? ((body.error as Record<string, unknown>).code as string)
+            : '';
+  const code = rawCode.trim();
+  if (code.includes('PLATFORM')) return false;
+  if (PROVIDER_NOT_CONFIGURED_422_CODES.has(code)) return true;
+
+  const rawMsg =
+    typeof body.message === 'string'
+      ? body.message
+      : typeof (body.error as Record<string, unknown> | null)?.message === 'string'
+        ? ((body.error as Record<string, unknown>).message as string)
+        : '';
+  if (rawMsg && !rawMsg.includes('PLATFORM')) {
+    if (
+      rawMsg.includes('PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT') ||
+      rawMsg.includes('PAYMENT_PROVIDER_NOT_CONFIGURED')
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
