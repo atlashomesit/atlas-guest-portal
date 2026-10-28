@@ -2439,12 +2439,12 @@ useEffect(() => {
                           </div>
                         </div>
                         <div className="pp-v2-reviews-detail">
-                        {/* TASK-101380 / REV-030: per-star distribution from blended ratingStarCounts if available. */}
+                        {/* TASK-101380 / REV-030 / TASK-1040056: per-star distribution from blended ratingStarCounts or merged reviews. */}
                         <RatingDistribution
-                          ratings={api.reviews.map((r) => Number(r.rating))}
-                          totalCount={api.totalCount}
+                          ratings={ppMergedReviews.map((r) => Math.round(Number(r.rating)))}
+                          totalCount={ppCombinedReviewCount}
                           starCounts={publicRatingStarCounts}
-                          otherSourcesCount={publicRatingStarCounts ? 0 : externalReviewsFromApi.length}
+                          otherSourcesCount={publicRatingStarCounts ? 0 : 0}
                         />
                         {/* Sub-rating bars derived from API reviews if available */}
                         {api.reviews.length > 0 && (() => {
@@ -2465,7 +2465,7 @@ useEffect(() => {
                           ].filter(b => b.v != null);
                           if (bars.length === 0) {
                             // The distribution already states the count and source; do not repeat it.
-                            if (publicRatingStarCounts || starDistribution(api.reviews.map((r) => Number(r.rating)), api.totalCount)) return null;
+                            if (publicRatingStarCounts || starDistribution(ppMergedReviews.map((r) => Math.round(Number(r.rating))), ppCombinedReviewCount)) return null;
                             return (
                               <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
                                 <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#1a1a2e' }}>Overall rating</p>

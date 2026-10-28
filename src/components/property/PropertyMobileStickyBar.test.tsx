@@ -1,5 +1,5 @@
 import React from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -31,7 +31,7 @@ class MockIntersectionObserver {
   }
 }
 
-function lastObserver(): MockIntersectionObserver {
+function _lastObserver(): MockIntersectionObserver {
   const io =
     MockIntersectionObserver.instances.find((i) => i.observed.length > 0) ??
     MockIntersectionObserver.instances[0];
