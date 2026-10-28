@@ -10,6 +10,7 @@ import { trackEvent } from "../../utils/analytics";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
 import { getTenantBrandName } from "../../tenant/displayBrand";
 import { getTenantContext } from "../../tenant/tenantContext";
+import { OPEN_SUPPORT_EVENT } from "../property/propertyHelpEvents";
 import { submitCallbackRequest } from "../support/callbackService";
 import CallbackRequestForm from "./CallbackRequestForm";
 import ChatbotPlaceholder from "./ChatbotPlaceholder";
@@ -78,7 +79,9 @@ const SupportWidgetContent = () => {
   const bottomSpacing = useMemo(() => {
     const base = 20;
     const homeHeroLift = routePath === "/" && narrowViewport ? 112 : 0;
-    return `calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + ${base + footerOffset + homeHeroLift}px)`;
+    // --pp-sticky-bar-offset: the property page's phone sticky bar publishes its live height here
+    // (0px when hidden / not shown / on any other page), so the drawer opens ABOVE the bar.
+    return `calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + var(--pp-sticky-bar-offset, 0px) + ${base + footerOffset + homeHeroLift}px)`;
   }, [footerOffset, routePath, narrowViewport]);
 
   const whatsappLink = useMemo(
@@ -156,8 +159,8 @@ const SupportWidgetContent = () => {
       setIsOpen(true);
       trackEvent("chat_opened", { surface: "support_widget", entryPoint: "sticky_bar" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
     };
-    window.addEventListener("atlas:open-support", openFromStickyBar);
-    return () => window.removeEventListener("atlas:open-support", openFromStickyBar);
+    window.addEventListener(OPEN_SUPPORT_EVENT, openFromStickyBar);
+    return () => window.removeEventListener(OPEN_SUPPORT_EVENT, openFromStickyBar);
   }, [analyticsMetadata.route, analyticsMetadata.listingId]);
 
   const handleClose = () => {

@@ -10,6 +10,7 @@ import { buildApiUrl, getApiHeaders } from '../api/client';
 import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useBookingContentVisible } from '../hooks/useBookingContentVisible';
+import { LISTING_FAQ_BODY_ATTR, OPEN_LISTING_FAQ_EVENT } from './property/propertyHelpEvents';
 
 interface FaqEntry {
   q: string;
@@ -166,6 +167,22 @@ export default function GuestAssistant({ listingId, tenantSlug, tenantId }: Gues
     );
   }, [faqs, query]);
 
+  // The phone sticky bar hides this floating trigger; its Chat chooser offers the panel instead,
+  // but only while the listing has FAQs (same condition that renders the trigger), and opens it
+  // through OPEN_LISTING_FAQ_EVENT.
+  const hasFaqs = faqs.length > 0;
+  useEffect(() => {
+    if (!hasFaqs) return undefined;
+    document.body.setAttribute(LISTING_FAQ_BODY_ATTR, 'true');
+    return () => document.body.removeAttribute(LISTING_FAQ_BODY_ATTR);
+  }, [hasFaqs]);
+  useEffect(() => {
+    if (!hasFaqs) return undefined;
+    const openFromChooser = () => setIsOpen(true);
+    window.addEventListener(OPEN_LISTING_FAQ_EVENT, openFromChooser);
+    return () => window.removeEventListener(OPEN_LISTING_FAQ_EVENT, openFromChooser);
+  }, [hasFaqs]);
+
   // Don't render if no valid listing
   if (!listingId || isNaN(Number(listingId))) return null;
 
@@ -206,7 +223,7 @@ export default function GuestAssistant({ listingId, tenantSlug, tenantId }: Gues
           {/* Backdrop */}
           <div
             role="presentation"
-            className="fixed inset-0 bg-black/30 z-[calc(var(--z-floating)+1)]"
+            className="fixed inset-0 bg-black/30 z-[calc(var(--z-modal)+1)]"
             onClick={() => setIsOpen(false)}
           />
 
@@ -217,7 +234,7 @@ export default function GuestAssistant({ listingId, tenantSlug, tenantId }: Gues
             aria-modal="true"
             aria-label="Listing FAQ"
             className={[
-              'fixed bottom-0 left-0 right-0 z-[calc(var(--z-floating)+2)]',
+              'fixed bottom-0 left-0 right-0 z-[calc(var(--z-modal)+2)]',
               'flex flex-col bg-bg-surface',
               'rounded-t-2xl shadow-level4',
               'max-h-[75vh]',

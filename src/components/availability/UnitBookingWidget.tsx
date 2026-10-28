@@ -2118,7 +2118,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       </div>
 
       {displayCoverUrl && (
-        <div className="overflow-hidden rounded-xl border border-border-subtle mb-2" style={{ marginTop: -4 }}>
+        <div className="lv-booking-preview overflow-hidden rounded-xl border border-border-subtle mb-2" style={{ marginTop: 'var(--lv-preview-mt, -4px)' }}>
           <OptimizedImage
             src={displayCoverUrl}
             alt={listingName ? `${listingName} — preview` : 'Listing preview'}

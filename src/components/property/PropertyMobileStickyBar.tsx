@@ -10,16 +10,25 @@ import type { BookingStickySummary } from "@/components/availability/UnitBooking
 import { useBookingContentVisible } from "@/hooks/useBookingContentVisible";
 import { isInternalOrDefaultRatePlanName } from "@/components/pricing/PricingTierDisplay";
 import { plainMealLabel } from "@/utils/directBookingPrice";
+import { trackEvent } from "@/utils/analytics";
+import {
+  FLOATER_STACK_CLEARANCE_PX,
+  LISTING_FAQ_BODY_ATTR,
+  NEAR_FOOTER_BODY_ATTR,
+  OPEN_LISTING_FAQ_EVENT,
+  OPEN_SUPPORT_EVENT,
+  STICKY_BAR_OFFSET_VAR,
+  STICKY_CHAT_BODY_ATTR,
+} from "./propertyHelpEvents";
 import "./PropertyMobileStickyBar.css";
 
 /**
  * TOP10-2026-10-27-01-D: on phones the one Chat button in this bar replaces the floating host
- * WhatsApp bubble, FAQ help button and "Chat with us" pill. It opens the existing support drawer
- * (WhatsApp, call, FAQs) through this window event; SupportWidget listens for it.
+ * WhatsApp bubble, FAQ help button and "Chat with us" pill. It offers a small chooser so the
+ * host stays reachable (the support drawer's WhatsApp/Call are the platform's own contact, not
+ * the host's): message the host, this listing's FAQs, and the existing support drawer.
+ * The names are shared with SupportWidget / GuestAssistant through ./propertyHelpEvents.
  */
-export const OPEN_SUPPORT_EVENT = "atlas:open-support";
-/** Body attribute that lets CSS hide the floaters (phones only) while this bar is mounted. */
-export const STICKY_CHAT_BODY_ATTR = "data-pp-sticky-chat";
 
 type Props = {
   bookable: boolean;
@@ -28,6 +37,13 @@ type Props = {
   summary: BookingStickySummary | null;
   /** Fallback when the date-picker sheet cannot be triggered (scrolls to the booking form). */
   onReserveClick: () => void;
+  /**
+   * wa.me link to the listing's HOST (same builder and number as the desktop host WhatsApp
+   * bubble). Empty when the page has no host number: the chooser then omits the host entry.
+   */
+  hostWhatsAppUrl?: string;
+  /** Listing id for analytics context only. */
+  listingId?: number | string | null;
 };
 
 /** Hero card observed first: the bar appears once the guest scrolls past it. */
@@ -66,8 +82,15 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
   nightlyIsSynthetic,
   summary,
   onReserveClick,
+  hostWhatsAppUrl = "",
+  listingId,
 }) => {
   const bookingContentVisible = useBookingContentVisible();
+  const barRef = React.useRef<HTMLDivElement>(null);
+  const chatButtonRef = React.useRef<HTMLButtonElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [faqAvailable, setFaqAvailable] = React.useState(false);
   // TOP10-2026-10-27-01-C: the bar is visible from the first view (price + next step on phone);
   // it still steps aside while the booking card itself is on screen.
   const isVisible = !bookingContentVisible;
@@ -77,9 +100,116 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
     return () => document.body.removeAttribute(STICKY_CHAT_BODY_ATTR);
   }, [bookable]);
 
-  const handleChat = React.useCallback(() => {
+  // The support drawer sits above this bar (it lifts itself by this live height), and the bar
+  // never reports a height while it is hidden or not shown at this width.
+  React.useEffect(() => {
+    if (!bookable || typeof document === "undefined") return undefined;
+    const body = document.body;
+    const bar = barRef.current;
+    const apply = () => {
+      const height = isVisible && bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+      body.style.setProperty(STICKY_BAR_OFFSET_VAR, `${height}px`);
+    };
+    apply();
+    const observer = typeof ResizeObserver !== "undefined" && bar ? new ResizeObserver(apply) : null;
+    if (observer && bar) observer.observe(bar);
+    return () => {
+      observer?.disconnect();
+      body.style.removeProperty(STICKY_BAR_OFFSET_VAR);
+    };
+  }, [bookable, isVisible]);
+
+  // At 1024px+ the floaters stack in the bottom-left gutter; they step aside while the footer
+  // is within reach of that stack so they never cover footer links (CSS reads the attribute).
+  React.useEffect(() => {
+    if (!bookable || typeof window === "undefined") return undefined;
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const footer = document.querySelector("footer");
+      const near = footer
+        ? footer.getBoundingClientRect().top < window.innerHeight - FLOATER_STACK_CLEARANCE_PX
+        : false;
+      document.body.toggleAttribute(NEAR_FOOTER_BODY_ATTR, near);
+    };
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    const pageResize = typeof ResizeObserver !== "undefined" ? new ResizeObserver(schedule) : null;
+    pageResize?.observe(document.documentElement);
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      pageResize?.disconnect();
+      if (frame) window.cancelAnimationFrame(frame);
+      document.body.removeAttribute(NEAR_FOOTER_BODY_ATTR);
+    };
+  }, [bookable]);
+
+  const closeMenu = React.useCallback((restoreFocus: boolean) => {
+    setMenuOpen(false);
+    if (restoreFocus) chatButtonRef.current?.focus();
+  }, []);
+
+  // The chooser closes on outside tap, Escape, and whenever the bar steps aside.
+  React.useEffect(() => {
+    if (!menuOpen) return undefined;
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const onPointerDown = (event: Event) => {
+      const target = event.target as Node | null;
+      if (target && (menuRef.current?.contains(target) || chatButtonRef.current?.contains(target))) return;
+      setMenuOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMenu(true);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen, closeMenu]);
+  React.useEffect(() => {
+    if (!isVisible) setMenuOpen(false);
+  }, [isVisible]);
+
+  const openSupportDrawer = React.useCallback(() => {
     window.dispatchEvent(new CustomEvent(OPEN_SUPPORT_EVENT));
   }, []);
+
+  const handleChat = React.useCallback(() => {
+    const hasListingFaq = document.body.hasAttribute(LISTING_FAQ_BODY_ATTR);
+    // Nothing to choose between: open the support drawer straight away, as before.
+    if (!hostWhatsAppUrl && !hasListingFaq) {
+      openSupportDrawer();
+      return;
+    }
+    setFaqAvailable(hasListingFaq);
+    setMenuOpen((open) => !open);
+  }, [hostWhatsAppUrl, openSupportDrawer]);
+
+  // Focus goes back to the Chat button first, so the drawer / FAQ panel (which return focus to
+  // whatever held it when they opened) hand it back to a control that still exists.
+  const handleMenuSupport = React.useCallback(() => {
+    chatButtonRef.current?.focus();
+    setMenuOpen(false);
+    openSupportDrawer();
+  }, [openSupportDrawer]);
+  const handleMenuFaq = React.useCallback(() => {
+    chatButtonRef.current?.focus();
+    setMenuOpen(false);
+    window.dispatchEvent(new CustomEvent(OPEN_LISTING_FAQ_EVENT));
+  }, []);
+  const handleMenuHost = React.useCallback(() => {
+    setMenuOpen(false);
+    trackEvent("whatsapp_cta_click", { surface: "sticky_bar", listingId: listingId ?? undefined });
+  }, [listingId]);
 
   const canReviewBooking = Boolean(summary?.canReviewBooking && summary.hasCompleteDates && !summary.datesUnavailable && !summary.pricingPending && summary.totalAmount != null && summary.totalAmount > 0);
 
@@ -152,6 +282,7 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
 
   return (
     <div
+      ref={barRef}
       className="pp-m-sticky"
       aria-label="Book this property"
       aria-hidden={!isVisible}
@@ -233,17 +364,72 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
         )}
       </div>
       <button
+        ref={chatButtonRef}
         type="button"
         className="pp-m-sticky-chat"
         data-testid="mobile-sticky-chat"
         onClick={handleChat}
         tabIndex={isVisible ? 0 : -1}
         aria-label="Chat with us: WhatsApp, call, FAQs"
+        aria-haspopup={hostWhatsAppUrl ? "menu" : undefined}
+        aria-expanded={hostWhatsAppUrl ? menuOpen : undefined}
       >
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.6A8.4 8.4 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5Z" />
         </svg>
       </button>
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          className="pp-m-chat-menu"
+          role="menu"
+          aria-label="Contact options"
+          data-testid="mobile-sticky-chat-menu"
+        >
+          {hostWhatsAppUrl && (
+            <a
+              className="pp-m-chat-menu-item"
+              role="menuitem"
+              href={hostWhatsAppUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="mobile-sticky-chat-host"
+              onClick={handleMenuHost}
+            >
+              <span>
+                <b>Message the host</b>
+                <small>WhatsApp about this property</small>
+              </span>
+            </a>
+          )}
+          {faqAvailable && (
+            <button
+              type="button"
+              className="pp-m-chat-menu-item"
+              role="menuitem"
+              data-testid="mobile-sticky-chat-faq"
+              onClick={handleMenuFaq}
+            >
+              <span>
+                <b>Questions about this stay</b>
+                <small>Answers the host added for this listing</small>
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="pp-m-chat-menu-item"
+            role="menuitem"
+            data-testid="mobile-sticky-chat-support"
+            onClick={handleMenuSupport}
+          >
+            <span>
+              <b>Booking and payment help</b>
+              <small>WhatsApp, call or callback</small>
+            </span>
+          </button>
+        </div>
+      )}
       <button
         type="button"
         className="pp-btn pp-btn-primary pp-m-sticky-cta"

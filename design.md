@@ -108,3 +108,15 @@ This supersedes only those four disclosed behaviors in r1. Earlier held work is 
 
 
 27 October 2026 implementation-review refinement (06-A only): keep the unchanged Pending helper immediately before the grouped WhatsApp/Google Calendar/ICS/Print actions. Inserting it between controls expanded the flex wrapping and newly obscured native keyboard focus at true 200% zoom; the compact original action group is restored while retaining the helper, all four actions, colors and existing floating widgets. This bounded preservation repair remains within r1 implementation authority and still requires refreshed native evidence, independent review and exact-head final approval.
+
+## Worst-10 review fixes — 28 October 2026 (guest #661, founder: "keep merging everything to dev")
+
+Independent review of the merged property-page change (private `atlas-ux-evidence/docs/ux/top-ten-weekly/2026-10-27/review/code-review-guest-landing.md` G1-G7 and `checks/verify-report.md` checks 5-6) found defects; this supersedes only the points below, nothing else in the approved 01-A to 01-E scope.
+
+- Gallery fit: `object-fit: contain` is forced only for the two-photo layout (01-B). One photo keeps its contained image; three or more photos return to `cover`, as before #661. Do not add a rule that forces image fit for every gallery.
+- Phone Chat button (01-D): the host stays one tap away. The button opens a small chooser: Message the host (WhatsApp, the same number and message as the desktop host bubble; only when the page has a host number), Questions about this stay (the listing's own FAQ panel, only when the listing has FAQs), and Booking and payment help (the existing support drawer, which reaches the platform's contact). With nothing to choose between it opens the drawer directly. The button uses fixed light colours because the bar's own surface is a fixed light palette in every theme.
+- Layering: the support drawer opens above the sticky bar (the bar publishes its live height as `--pp-sticky-bar-offset` on `<body>`); the listing FAQ sheet and its backdrop stack above the bar.
+- Virtual tours: the listing's 360 embed and the 3D tour section sit in the left column beside the booking card at 1024px and up, and the card spans down to the long left column so it keeps following the page.
+- Booking card order at 1024px and up with the card beside the gallery: price, dates and guests, price lines, Reserve, then the reassurance blocks, then the listing preview photo (it repeats the gallery beside it). Nothing is removed; the pinned card now shows Reserve at 1280x720. This replaces the 01-E order only for the preview photo's position. Phone and tablet keep the established order.
+- Desktop floaters (WhatsApp, FAQs, Chat with us) stack in the left gutter and step aside while the footer is within reach of the stack, so they never cover footer links.
+- Not changed: the heritage layout (its own page, gallery mosaic and card position are as before #661) stays outside the beside-gallery layout until it has its own approval.

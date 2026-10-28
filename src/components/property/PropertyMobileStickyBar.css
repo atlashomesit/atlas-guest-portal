@@ -1,18 +1,41 @@
 /* TOP10-2026-10-27-01-D: one Chat button inside the phone sticky bar; no floating chat controls
-   over the listing content. The Theme preview selector is a separate control and is untouched. */
+   over the listing content. The Theme preview selector is a separate control and is untouched.
+   The bar's own surface is a fixed light palette in every theme (see Homepage_PropertyDetails.css),
+   so the button uses fixed colours too: a theme's dark --bg-surface (noir) must not turn it into
+   a dark square on the cream bar. */
 .pp-m-sticky-chat { display: none; }
+.pp-m-chat-menu { display: none; }
 @media (max-width: 767px) {
   .pp-m-sticky-chat {
     display: inline-flex; align-items: center; justify-content: center;
     flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
-    border: 1px solid var(--border-subtle, #f0ddd0);
-    background: var(--bg-surface, #fff); color: var(--cta-primary, #c04528);
+    border: 1px solid #e3cdbd;
+    background: #fff; color: #3b1f1e;
     cursor: pointer;
   }
-  .pp-m-sticky-chat:focus-visible { outline: 2px solid var(--cta-primary, #c04528); outline-offset: 2px; }
+  .pp-m-sticky-chat:focus-visible { outline: 2px solid #3b1f1e; outline-offset: 2px; }
   body[data-pp-sticky-chat] [data-testid="listing-whatsapp-float"],
   body[data-pp-sticky-chat] [data-testid="support-widget-trigger"],
   body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { display: none !important; }
+
+  /* Chat chooser: the host stays one tap away on phone (the support drawer is the platform's
+     own contact). Opens upward from the bar, inside the viewport at 320px and up. */
+  .pp-m-chat-menu {
+    display: flex; flex-direction: column; gap: 2px;
+    position: absolute; right: 12px; bottom: calc(100% + 8px);
+    width: min(320px, calc(100vw - 24px)); box-sizing: border-box;
+    padding: 6px; background: #fff; border: 1px solid #e3cdbd; border-radius: 16px;
+    box-shadow: 0 12px 32px rgba(26, 26, 46, 0.2);
+  }
+  .pp-m-chat-menu-item {
+    display: flex; align-items: center; box-sizing: border-box; width: 100%; min-height: 52px;
+    padding: 8px 12px; border: 0; border-radius: 12px; background: transparent;
+    color: #3b1f1e; font: inherit; text-align: left; text-decoration: none; cursor: pointer;
+  }
+  .pp-m-chat-menu-item:hover, .pp-m-chat-menu-item:focus-visible { background: #f7ebe0; }
+  .pp-m-chat-menu-item:focus-visible { outline: 2px solid #3b1f1e; outline-offset: -2px; }
+  .pp-m-chat-menu-item b { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; }
+  .pp-m-chat-menu-item small { display: block; margin-top: 1px; font-size: 12px; line-height: 1.3; color: #5f4b46; }
 }
 
 /* TOP10-2026-10-27-01-A: from 1024px the booking card sits in the right column, so the
@@ -40,9 +63,16 @@
 }
 
 /* At 1024px+ the three floaters stack in the left gutter, none over another or over the
-   booking card: Chat with us lowest, FAQ above it, host WhatsApp above that. */
+   booking card: Chat with us lowest, FAQ above it, host WhatsApp above that. Near the footer
+   the stack steps aside (it cannot fit above a footer this tall), so it never covers footer
+   links; the attribute is set from the page's scroll position by PropertyMobileStickyBar. */
 @media (min-width: 1024px) {
   body[data-pp-sticky-chat] [data-testid="support-widget-trigger"] { bottom: 84px !important; }
   body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { bottom: 156px !important; }
   body[data-pp-sticky-chat] [data-testid="listing-whatsapp-float"] { bottom: 212px !important; }
+  body[data-pp-sticky-chat][data-pp-near-footer] [data-testid="support-widget-trigger"],
+  body[data-pp-sticky-chat][data-pp-near-footer] button[aria-label="View frequently asked questions"],
+  body[data-pp-sticky-chat][data-pp-near-footer] [data-testid="listing-whatsapp-float"] {
+    visibility: hidden; pointer-events: none;
+  }
 }
