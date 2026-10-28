@@ -167,7 +167,7 @@ describe("ReviewSubmitPage — Google Review Funnel (REV-021)", () => {
     expect(screen.getByTestId("review-success-google-cta")).toBeInTheDocument();
   });
 
-  it("does NOT render Google review CTA when a 3-star review is submitted", async () => {
+  it("3-star review: the big Google card stays for 4-5 stars only, but the guest still gets a Google link (REV-046)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -206,8 +206,19 @@ describe("ReviewSubmitPage — Google Review Funnel (REV-021)", () => {
     await fillAndSubmitReview(3);
 
     expect(screen.getByText("Thank you for your review!")).toBeInTheDocument();
+    // No promotional Google card for a 3-star review ...
     expect(screen.queryByTestId("review-success-google-cta")).not.toBeInTheDocument();
     expect(screen.queryByText("Share your experience on Google Maps!")).not.toBeInTheDocument();
+    // ... but never a screen with no route to Google: the owner is told, and the link is right there.
+    expect(
+      screen.getByText("Sorry your stay wasn't perfect. The owner has your feedback and will contact you."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/means a lot/)).not.toBeInTheDocument();
+    const link = screen.getByTestId("review-success-google-link");
+    expect(link).toHaveTextContent("Prefer to post publicly? Review us on Google");
+    expect(link).toHaveAttribute("href", "https://maps.google.com/review?id=456");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
   it("does NOT render Google review CTA when hasGoogleReviewLink is false", async () => {
@@ -251,5 +262,153 @@ describe("ReviewSubmitPage — Google Review Funnel (REV-021)", () => {
     expect(screen.getByText("Thank you for your review!")).toBeInTheDocument();
     expect(screen.queryByTestId("review-success-google-cta")).not.toBeInTheDocument();
     expect(screen.queryByText("Share your experience on Google Maps!")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * REV-046 (founder ruling 2026-10-28): catch first, Google open to every guest. A 1-3 star guest on the post-stay
+ * review page sees a readable Google link while rating (before submitting), and again on the thank-you screen.
+ * 4-5 stars keep the big Google card exactly as REV-021 built it.
+ */
+describe("ReviewSubmitPage — low ratings keep a route to Google (REV-046)", () => {
+  const GOOGLE_URL = "https://maps.google.com/review?id=456";
+
+  const stubApi = (funnel: { hasGoogleReviewLink: boolean; googleReviewUrl: string | null }) => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        calls.push(url);
+        const ok = (body: unknown) =>
+          new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
+        if (url.includes("/api/reviews/check/101")) return ok(mockEligibility);
+        if (url.includes("/api/public/review-funnel/456")) return ok(funnel);
+        if (url.includes("/api/reviews")) return ok({ success: true });
+        throw new Error(`Unexpected fetch: ${url}`);
+      }),
+    );
+    return calls;
+  };
+
+  const pickOverall = (value: number) => {
+    const group = screen.getByTestId("overall-rating-stars");
+    fireEvent.click(within(group).getByRole("button", { name: `Overall rating: ${value} of 5 stars` }));
+  };
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it.each([1, 2, 3])(
+    "%i stars selected: a readable Google link is on the form before anything is submitted",
+    async (value) => {
+      const calls = stubApi({ hasGoogleReviewLink: true, googleReviewUrl: GOOGLE_URL });
+      renderPage();
+      await settle();
+
+      expect(screen.queryByTestId("review-low-google-link")).not.toBeInTheDocument();
+      pickOverall(value);
+
+      const link = screen.getByTestId("review-low-google-link");
+      expect(link).toBeVisible();
+      expect(link).toHaveTextContent("Prefer to post publicly? Review us on Google");
+      expect(link).toHaveAttribute("href", GOOGLE_URL);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      expect(link.closest("details")).toBeNull();
+      expect(link.closest("[hidden]")).toBeNull();
+      expect(link.closest("[aria-hidden='true']")).toBeNull();
+
+      // Nothing has been submitted: the link is not behind sending.
+      expect(calls.some((url) => url.endsWith("/api/reviews"))).toBe(false);
+      expect(screen.getByRole("button", { name: /Submit Review/i })).toBeInTheDocument();
+      expect(screen.queryByTestId("review-success-google-link")).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([4, 5])("%i stars selected: no low-rating link (the big card comes after submitting, as before)", async (value) => {
+    stubApi({ hasGoogleReviewLink: true, googleReviewUrl: GOOGLE_URL });
+    renderPage();
+    await settle();
+
+    pickOverall(value);
+
+    expect(screen.queryByTestId("review-low-google-link")).not.toBeInTheDocument();
+  });
+
+  it("follows the star: the link goes when the guest moves up to 4 stars and returns for 3", async () => {
+    stubApi({ hasGoogleReviewLink: true, googleReviewUrl: GOOGLE_URL });
+    renderPage();
+    await settle();
+
+    pickOverall(2);
+    expect(screen.getByTestId("review-low-google-link")).toBeInTheDocument();
+    pickOverall(4);
+    expect(screen.queryByTestId("review-low-google-link")).not.toBeInTheDocument();
+    pickOverall(3);
+    expect(screen.getByTestId("review-low-google-link")).toBeInTheDocument();
+  });
+
+  it("shows no link while the host has not saved a Google review link", async () => {
+    stubApi({ hasGoogleReviewLink: false, googleReviewUrl: null });
+    renderPage();
+    await settle();
+
+    pickOverall(1);
+
+    expect(screen.queryByTestId("review-low-google-link")).not.toBeInTheDocument();
+  });
+
+  it.each([1, 2])(
+    "after submitting %i stars: the owner is told and the same Google link stays on the thank-you screen",
+    async (value) => {
+      stubApi({ hasGoogleReviewLink: true, googleReviewUrl: GOOGLE_URL });
+      renderPage();
+      await settle();
+
+      await fillAndSubmitReview(value);
+
+      expect(screen.getByText("Thank you for your review!")).toBeInTheDocument();
+      expect(
+        screen.getByText("Sorry your stay wasn't perfect. The owner has your feedback and will contact you."),
+      ).toBeInTheDocument();
+      const link = screen.getByTestId("review-success-google-link");
+      expect(link).toBeVisible();
+      expect(link).toHaveTextContent("Prefer to post publicly? Review us on Google");
+      expect(link).toHaveAttribute("href", GOOGLE_URL);
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      expect(screen.queryByTestId("review-success-google-cta")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("review-low-google-link")).not.toBeInTheDocument();
+    },
+  );
+
+  it("after submitting a low rating with no Google link saved: the sentence, no link", async () => {
+    stubApi({ hasGoogleReviewLink: false, googleReviewUrl: null });
+    renderPage();
+    await settle();
+
+    await fillAndSubmitReview(2);
+
+    expect(
+      screen.getByText("Sorry your stay wasn't perfect. The owner has your feedback and will contact you."),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("review-success-google-link")).not.toBeInTheDocument();
+  });
+
+  it("after submitting 4 or 5 stars: the big card as before, and none of the low-rating wording", async () => {
+    stubApi({ hasGoogleReviewLink: true, googleReviewUrl: GOOGLE_URL });
+    renderPage();
+    await settle();
+
+    await fillAndSubmitReview(5);
+
+    expect(screen.getByTestId("review-success-google-cta")).toHaveAttribute("href", GOOGLE_URL);
+    expect(screen.queryByTestId("review-success-google-link")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sorry your stay wasn't perfect/)).not.toBeInTheDocument();
+    expect(screen.getByText(/means a lot/)).toBeInTheDocument();
   });
 });

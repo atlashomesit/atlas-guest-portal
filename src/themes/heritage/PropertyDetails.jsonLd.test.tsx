@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Suspense } from 'react';
@@ -174,6 +174,75 @@ describe('Heritage PropertyDetails listing JSON-LD (REV-013)', () => {
       expect(reviews).toBeDefined();
       expect(reviews).toHaveLength(2);
       expect(reviews.map((r) => (r['author'] as Record<string, unknown>)['name'])).toEqual(['Ananya', 'Rahul']);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('REV-046: shows review-QR "Guest feedback" cards after the reviews and never counts them or puts them in the JSON-LD', async () => {
+    mockResolveListing.mockResolvedValue({ id: 505, propertyId: 505 });
+    const originalFetch = global.fetch;
+    const feedback = [
+      { guestName: 'Priya Nair', rating: 5, comment: 'Garden breakfast was lovely', date: '2026-10-27', label: 'Guest feedback' },
+      { guestName: 'Dev', rating: 4, comment: 'Quiet and clean', date: '2026-10-20', label: 'Guest feedback' },
+    ];
+    const json = (body: unknown) =>
+      Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/public/listings/505') || url.includes('/public/listings/505')) {
+        return json({
+          externalReviews: [
+            { guestName: 'Rahul', rating: 5, body: 'Exceptional heritage architecture and pool!', reviewDate: '2026-10-05', source: 'Google' },
+          ],
+          guestFeedback: feedback,
+        });
+      }
+      if (url.includes('/api/listings/505/reviews') || url.includes('/listings/505/reviews')) {
+        return json({ averageRating: 0, totalCount: 0, reviews: [], guestFeedback: feedback });
+      }
+      return json({});
+    }) as unknown as typeof fetch;
+
+    try {
+      render(
+        <MemoryRouter initialEntries={['/homes/heritagevilla/505']}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/homes/:propertySlug/:unitSlug" element={<HeritagePropertyDetails />} />
+            </Routes>
+          </Suspense>
+        </MemoryRouter>,
+      );
+      await settle();
+      await settle();
+
+      // One real review: the header and the section heading say so, and the notes are not in them.
+      expect(screen.getByTestId('property-header-rating')).toHaveTextContent('(1 review)');
+      const reviewsSection = screen.getByTestId('reviews-section');
+      expect(within(reviewsSection).getByRole('heading', { level: 2 })).toHaveTextContent('★ 5.0 from 1 guest');
+      expect(within(screen.getByTestId('reviews-grid')).getAllByRole('article')).toHaveLength(1);
+      expect(reviewsSection).not.toHaveTextContent('Garden breakfast was lovely');
+
+      const feedbackSection = screen.getByTestId('guest-feedback-section');
+      expect(reviewsSection.compareDocumentPosition(feedbackSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const cards = within(feedbackSection).getAllByTestId('guest-feedback-card');
+      expect(cards).toHaveLength(2);
+      for (const card of cards) {
+        expect(within(card).getByTestId('guest-feedback-label')).toHaveTextContent('Guest feedback');
+        expect(card).not.toHaveTextContent(/verified/i);
+      }
+      expect(within(cards[0]).getByText('Priya')).toBeInTheDocument();
+
+      const nodes = readJsonLd();
+      const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness') as Record<string, unknown>;
+      const aggregateRating = lodging['aggregateRating'] as Record<string, unknown>;
+      expect(aggregateRating['reviewCount']).toBe(1);
+      expect(lodging['review'] as unknown[]).toHaveLength(1);
+      const ld = JSON.stringify(nodes);
+      for (const text of ['Priya', 'Dev', 'Garden breakfast', 'Quiet and clean', 'Guest feedback']) {
+        expect(ld).not.toContain(text);
+      }
     } finally {
       global.fetch = originalFetch;
     }

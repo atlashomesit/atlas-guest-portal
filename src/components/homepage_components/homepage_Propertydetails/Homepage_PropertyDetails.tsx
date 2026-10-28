@@ -475,6 +475,9 @@ import {
     normalizeReviewSource,
     type ExternalReviewRow,
 } from '@/components/property/reviewMerge';
+// REV-046: QR "Guest feedback" notes. Own list, own block, never merged into the reviews above.
+import { normalizeGuestFeedback, type GuestFeedbackItem } from '@/components/property/guestFeedback';
+import GuestFeedbackSection from '@/components/property/GuestFeedbackCards';
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
@@ -661,6 +664,12 @@ const PropertyDetails = () => {
     const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
     /** REV-030: blended star counts from `GET /api/public/listings/{id}`. */
     const [publicRatingStarCounts, setPublicRatingStarCounts] = useState<number[] | null>(null);
+    /**
+     * REV-046: review-QR "Guest feedback" notes (`guestFeedback` on both review endpoints). Kept apart from
+     * `listingReviewsFromApi` / `externalReviewsFromApi` on purpose: nothing derived from this list may feed
+     * `ppMergedReviews`, the combined count or average, the star bars, the filter counts or the JSON-LD.
+     */
+    const [guestFeedbackFromApi, setGuestFeedbackFromApi] = useState<GuestFeedbackItem[]>([]);
 
     // AMN-001: Fetch amenity master list once on mount
     useEffect(() => {
@@ -928,6 +937,7 @@ const PropertyDetails = () => {
         if (lid == null) {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
+            setGuestFeedbackFromApi([]);
             return;
         }
         const num = typeof lid === 'number' ? lid : Number(lid);
@@ -935,12 +945,14 @@ const PropertyDetails = () => {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
             setPublicRatingStarCounts(null);
+            setGuestFeedbackFromApi([]);
             return;
         }
         const ac = new AbortController();
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
         setExternalReviewsFromApi([]);
         setPublicRatingStarCounts(null);
+        setGuestFeedbackFromApi([]);
         void (async () => {
             try {
                 const [nativeRes, publicRes] = await Promise.all([
@@ -962,6 +974,8 @@ const PropertyDetails = () => {
                     averageRating?: number;
                     totalCount?: number;
                     reviews?: ListingReviewRow[];
+                    /** REV-046: not part of totalCount / averageRating. */
+                    guestFeedback?: unknown;
                 };
                 let nativePayload: NativeReviewsPayload | null = null;
                 if (nativeRes.ok) {
@@ -970,12 +984,17 @@ const PropertyDetails = () => {
                     setListingReviewsFromApi(null);
                 }
 
+                // REV-046: the same note list arrives on both endpoints; read either, so one endpoint
+                // failing does not hide the notes. Never merged into the review list below.
+                let publicGuestFeedback: unknown;
                 if (publicRes.ok) {
                     const publicPayload = (await publicRes.json()) as {
                         externalReviews?: ExternalReviewRow[];
                         ratingStarCounts?: number[] | null;
                         RatingStarCounts?: number[] | null;
+                        guestFeedback?: unknown;
                     };
+                    publicGuestFeedback = publicPayload.guestFeedback;
                     if (!ac.signal.aborted) {
                         setExternalReviewsFromApi(
                             Array.isArray(publicPayload.externalReviews) ? publicPayload.externalReviews : [],
@@ -992,6 +1011,10 @@ const PropertyDetails = () => {
                     setPublicRatingStarCounts(null);
                 }
 
+                if (!ac.signal.aborted) {
+                    setGuestFeedbackFromApi(normalizeGuestFeedback(nativePayload?.guestFeedback, publicGuestFeedback));
+                }
+
                 if (nativePayload && !ac.signal.aborted) {
                     setListingReviewsFromApi({
                         loading: false,
@@ -1005,6 +1028,7 @@ const PropertyDetails = () => {
                     setListingReviewsFromApi(null);
                     setExternalReviewsFromApi([]);
                     setPublicRatingStarCounts(null);
+                    setGuestFeedbackFromApi([]);
                 }
             }
         })();
@@ -2723,6 +2747,10 @@ useEffect(() => {
                     </section>
                   );
                 })()}
+
+                {/* REV-046: review-QR "Guest feedback" notes, after the reviews and as a block of their own.
+                    Never part of the count, average, star bars or JSON-LD above (founder ruling 2026-10-28). */}
+                <GuestFeedbackSection items={guestFeedbackFromApi} />
 
                 {/* Cancellation policy */}
                 <section className="pp-section" aria-label="Cancellation policy">

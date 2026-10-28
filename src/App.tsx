@@ -75,6 +75,8 @@ const EmbedPage = React.lazy(() => import("./pages/EmbedPage"))
 // TASK-4017: Guest OTP login
 const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 const QrMenuPage = React.lazy(() => import("./pages/QrMenuPage"))
+// REV-046: the page a guest reaches by scanning the host's review QR code (`/rate/:tenantSlug/:code`).
+const ReviewQrPage = React.lazy(() => import("./pages/ReviewQrPage"))
 
 function LazyFallback() {
   // TASK-7822: 50vh left the site footer in the first desktop viewport. Home then
@@ -162,11 +164,13 @@ function AppWrapper() {
   // TASK-8093: embed widget runs inside an iframe on a host's own site — no Atlas chrome.
   const isEmbedRoute = Boolean(matchPath('/embed/:embedKey', location.pathname));
   const isQrMenuRoute = Boolean(matchPath('/qr-menu/:tenantSlug', location.pathname));
+  // REV-046: the review QR page is a standalone, one-screen page (no navbar, footer, support widget or cookie banner).
+  const isReviewQrRoute = Boolean(matchPath('/rate/:tenantSlug/:code', location.pathname));
 
-  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || hideNavbarRoutes.some((pattern) =>
+  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || hideNavbarRoutes.some((pattern) =>
     Boolean(matchPath(pattern, location.pathname))
   );
-  const shouldHideFooter = isEmbedRoute || isQrMenuRoute;
+  const shouldHideFooter = isEmbedRoute || isQrMenuRoute || isReviewQrRoute;
   // Classic tenant home owns the inline consent region immediately after its search.
   // Other themes/routes keep the global consent banner; no tenant resolution changes.
   const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
@@ -309,6 +313,8 @@ function AppWrapper() {
           <Route path="/book/:propertySlug/:unitSlug/details" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestDetailsPage /></Suspense>, "guest-details-route")} />
           {/* TASK-10298855: Guest Room & Table QR Self-Ordering Web App */}
           <Route path="/qr-menu/:tenantSlug" element={withBoundary(<Suspense fallback={<LazyFallback />}><QrMenuPage /></Suspense>, "qr-menu-route")} />
+          {/* REV-046: review QR page — MUST be before the /:shortCode catch-all, no navbar/footer */}
+          <Route path="/rate/:tenantSlug/:code" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewQrPage /></Suspense>, "review-qr-route")} />
           {/* TASK-4308: human-readable sitemap page — MUST be before /:shortCode catch-all */}
           <Route path="/sitemap" element={withBoundary(<Suspense fallback={<LazyFallback />}><SitemapPage /></Suspense>, "sitemap-route")} />
           <Route path="/:shortCode" element={withBoundary(<Suspense fallback={<LazyFallback />}><ShortLinkRedirect /></Suspense>, "shortlink-route")} />

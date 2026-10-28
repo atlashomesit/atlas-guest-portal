@@ -5,6 +5,11 @@
  * Filters out reviews with rating < 4 or null, and suppresses reviews with empty or whitespace-only bodies.
  * Preserves '<3' heart emoticons and comparison operators while safely stripping actual HTML tags.
  * Corrects external review attribution (Google, Airbnb, Booking.com).
+ *
+ * REV-046 (founder ruling 2026-10-28): review-QR "Guest feedback" notes are deliberately NOT merged here. They are
+ * not verified stays, so they must never reach the combined count, the average, the star bars, the filter pills or
+ * the JSON-LD that are all derived from this function's output. They have their own list and block
+ * (`guestFeedback.ts`, `GuestFeedbackCards.tsx`).
  */
 
 import { stripHtmlPreservingEmoticons } from '../../utils/sanitizeReviewText';
