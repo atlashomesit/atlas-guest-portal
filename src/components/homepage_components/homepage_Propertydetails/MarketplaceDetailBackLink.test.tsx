@@ -1,17 +1,20 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Homepage_PropertyDetails from './Homepage_PropertyDetails';
 import { settle } from '../../../test/settle';
 import {
   _setListingTenantContextForTests,
   _clearListingTenantCacheForTests,
 } from '@/tenant/tenantContext';
+import { _resetTenantResolutionForTests } from '@/tenant/tenantResolver';
+
+let mockBookingGuests = 2;
 
 const mockUnitBookingWidget = vi.fn();
 vi.mock('@/components/availability/UnitBookingWidget', () => ({
   __esModule: true,
-  default: (props: any) => {
+  default: (props: unknown) => {
     mockUnitBookingWidget(props);
     return <div data-testid="mock-booking-widget">UnitBookingWidget</div>;
   },
@@ -31,7 +34,7 @@ vi.mock('@/utils/pricing', () => ({
 }));
 vi.mock('@/contexts/BookingContext', () => ({
   useBooking: () => ({
-    booking: { propertyId: null, checkIn: null, checkOut: null, guests: 2 },
+    booking: { propertyId: null, checkIn: null, checkOut: null, guests: mockBookingGuests },
     setProperty: vi.fn(),
     setPendingScrollTarget: vi.fn(),
     updateBooking: vi.fn(),
@@ -46,11 +49,13 @@ vi.mock('@fancyapps/ui', () => ({
 }));
 
 const mockFetchListingById = vi.fn();
+const mockFetchSimilarListings = vi.fn();
 vi.mock('@/api/listingClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/listingClient')>();
   return {
     ...actual,
     fetchListingById: (...args: unknown[]) => mockFetchListingById(...args),
+    fetchSimilarListings: (...args: unknown[]) => mockFetchSimilarListings(...args),
     fetchPublicListings: vi.fn().mockResolvedValue([]),
     fetchAllActiveListings: vi.fn().mockResolvedValue([]),
   };
@@ -100,6 +105,7 @@ describe('TASK-1039953 — Safe fallback back navigation on Marketplace Detail P
     mockUseTenantListings.mockReturnValue(listState([LIST_ROW]));
     mockResolveListing.mockReturnValue(LIST_ROW);
     mockFetchListingById.mockResolvedValue(LIST_ROW);
+    mockFetchSimilarListings.mockResolvedValue([]);
   });
 
   it('provides a fallback "Back to all listings" link to / when entering directly without search state', async () => {
@@ -151,5 +157,91 @@ describe('TASK-1039953 — Safe fallback back navigation on Marketplace Detail P
     expect(backBtn).toBeInTheDocument();
     expect(backBtn.getAttribute('href')).toContain('city=Goa');
     expect(backBtn.getAttribute('href')).toContain('category=homes');
+  });
+
+  afterEach(() => {
+    cleanup();
+    mockBookingGuests = 2;
+    _clearListingTenantCacheForTests();
+    _resetTenantResolutionForTests();
+  });
+
+  it('TASK-1040085: preserves ?brand=atlastays and utm_* params on Back to all listings / breadcrumbs even without search filters', async () => {
+    _setListingTenantContextForTests('atlas', {
+      slug: 'atlas',
+      name: 'Atlas Homes',
+      brandName: 'Atlas Homes',
+      bookingMode: 'ONLINE',
+      paymentProvider: 'RAZORPAY',
+      whatsappBookingPhone: '9502244053',
+    });
+
+    const detailUrl = '/homes/comfort-cove/450?tenant=atlas&brand=atlastays&utm_source=ig&utm_campaign=diwali';
+    render(renderPage(detailUrl));
+    await settle();
+
+    for (const testId of ['back-to-results', 'back-to-all-listings', 'back-to-results-btn']) {
+      const link = screen.getByTestId(testId);
+      const href = link.getAttribute('href') ?? '';
+      expect(href).toContain('brand=atlastays');
+      expect(href).toContain('utm_source=ig');
+      expect(href).toContain('utm_campaign=diwali');
+    }
+  });
+
+  it('GUEST-051: displays price per night, max guests, >=4★ rating, and prioritizes party-fitting similar stays', async () => {
+    mockBookingGuests = 5;
+    const siblingSmall = {
+      id: 451,
+      listingId: 451,
+      propertyName: 'Cozy Studio',
+      property_name: 'Cozy Studio',
+      property_location: 'Guwahati, Assam',
+      property_img: ['https://cdn.example.com/studio.jpg'],
+      property_amenities: [],
+      property_description: 'Studio',
+      property_price: 2500,
+      maxGuests: 2,
+      property_rating: 3.6, // sub-4-star -> must be suppressed
+      property_reviews: 4,
+      status: 'Published',
+    };
+    const siblingLarge = {
+      id: 452,
+      listingId: 452,
+      propertyName: 'Grand Family Villa',
+      property_name: 'Grand Family Villa',
+      property_location: 'Guwahati, Assam',
+      property_img: ['https://cdn.example.com/villa.jpg'],
+      property_amenities: [],
+      property_description: 'Family villa',
+      property_price: 6800,
+      maxGuests: 6,
+      property_rating: 4.9,
+      property_reviews: 18,
+      status: 'Published',
+    };
+
+    mockUseTenantListings.mockReturnValue(listState([LIST_ROW, siblingSmall, siblingLarge]));
+    mockFetchSimilarListings.mockResolvedValue([siblingSmall, siblingLarge]);
+
+    render(renderPage('/homes/comfort-cove/450?tenant=atlas&brand=atlastays&guests=5'));
+    await settle();
+
+    const cards = screen.getAllByTestId('similar-stay-price');
+    expect(cards.length).toBe(2);
+    // Party-fitting Grand Family Villa (maxGuests=6 >= 5) must be sorted FIRST ahead of Cozy Studio (maxGuests=2)
+    expect(cards[0].textContent).toContain('from ₹6,800 / night');
+    expect(cards[1].textContent).toContain('from ₹2,500 / night');
+
+    const guestLabels = screen.getAllByTestId('similar-stay-guests');
+    expect(guestLabels[0].textContent).toBe('Up to 6 guests');
+    expect(guestLabels[1].textContent).toBe('Up to 2 guests');
+
+    // Only the >= 4.0 rating renders; 3.6 is suppressed per founder rule
+    const ratings = screen.getAllByTestId('similar-stay-rating');
+    expect(ratings).toHaveLength(1);
+    expect(ratings[0].textContent).toContain('4.9');
+    expect(ratings[0].textContent).toContain('(18)');
   });
 });

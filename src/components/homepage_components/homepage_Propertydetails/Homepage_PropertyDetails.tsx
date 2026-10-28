@@ -46,6 +46,14 @@ import { Button } from '../../ui/Button';
 import Lightbox from '../../ui/Lightbox';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
+import {
+  buildPropertyDetailBackHref,
+  buildSimilarStayHref,
+  extractSimilarStayMeta,
+  formatSimilarStayPrice,
+  hasPropertyDetailSearchFilters,
+  selectSimilarStaysForParty,
+} from '@/utils/marketplaceBackHref';
 import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
@@ -573,10 +581,11 @@ const PropertyDetails = () => {
     const [reviewSort, setReviewSort] = useState<ReviewSortKey>('recent');
     const [stickyBookingSummary, setStickyBookingSummary] = useState<BookingStickySummary | null>(null);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
-    const { setProperty, updateBooking } = useBooking();
+    const { booking, setProperty, updateBooking } = useBooking();
     const [searchParams] = useSearchParams();
     const tenantSlugFromUrl = searchParams.get('tenant')?.trim() || null;
-    const isMarketplaceHost = Boolean(_getTenantCtx()?.isMarketplaceRoot) || isMarketplaceMode() || isMarketplaceHostname() || Boolean(tenantSlugFromUrl);
+    const isBrandAtlastaysParam = searchParams.get('brand')?.trim().toLowerCase() === 'atlastays';
+    const isMarketplaceHost = Boolean(_getTenantCtx()?.isMarketplaceRoot) || isMarketplaceMode() || isMarketplaceHostname() || isBrandAtlastaysParam || Boolean(tenantSlugFromUrl);
     const isMarketplaceDetail = isMarketplaceHost;
     const isNonAtlasMarketplaceListing = Boolean(isMarketplaceHost && tenantSlugFromUrl && tenantSlugFromUrl.toLowerCase() !== 'atlas');
     const listingTenantName = useListingTenantName(isMarketplaceDetail ? tenantSlugFromUrl : null);
@@ -604,24 +613,16 @@ const PropertyDetails = () => {
         active = false;
       };
     }, [isNonAtlasMarketplaceListing, tenantSlugFromUrl]);
-    // TASK-1039953: Build a back-to-results link when the user arrived from /search or marketplace,
-    // or provide a fallback to "/" (marketplace home) when entering directly on marketplace.
-    const hasSearchFilters = useMemo(() => {
-        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "adults", "children", "minPrice", "maxPrice", "category", "amenity", "amenities", "sort", "sortBy"];
-        return searchKeys.some((k) => searchParams.has(k));
-    }, [searchParams]);
+    // TASK-1039953 / TASK-1040085: Build a back-to-results link preserving ?brand=atlastays and utm_* params
+    const hasSearchFilters = useMemo(
+        () => hasPropertyDetailSearchFilters(searchParams),
+        [searchParams],
+    );
 
-    const backToResultsHref = useMemo(() => {
-        if (isMarketplaceDetail) {
-          if (!hasSearchFilters) return "/";
-          const cleanParams = new URLSearchParams(searchParams);
-          cleanParams.delete("tenant");
-          const qs = cleanParams.toString();
-          return qs ? `/?${qs}` : "/";
-        }
-        if (!hasSearchFilters) return "/search";
-        return `/search?${searchParams.toString()}`;
-    }, [searchParams, isMarketplaceDetail, hasSearchFilters]);
+    const backToResultsHref = useMemo(
+        () => buildPropertyDetailBackHref(searchParams, isMarketplaceDetail),
+        [searchParams, isMarketplaceDetail],
+    );
     // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
     // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
     // never render, silently masking the degraded-state UI for a failed listing lookup (the
@@ -1829,7 +1830,7 @@ useEffect(() => {
                     </Link>
                     {isMarketplaceDetail && !hasSearchFilters && (
                       <Link
-                        to="/"
+                        to={backToResultsHref}
                         data-testid="back-to-all-listings"
                         style={{ display: 'none' }}
                         aria-hidden="true"
@@ -1841,9 +1842,9 @@ useEffect(() => {
                   </>
                 ) : (
                   <>
-                    <Link to="/">Home</Link>
+                    <Link to={isMarketplaceDetail ? backToResultsHref : "/"}>Home</Link>
                     <span className="pp-sep" aria-hidden="true">›</span>
-                    <Link to={isMarketplaceDetail ? "/" : "/#our-homes"}>{isMarketplaceDetail ? "All Homes" : "Stays"}</Link>
+                    <Link to={isMarketplaceDetail ? backToResultsHref : "/#our-homes"}>{isMarketplaceDetail ? "All Homes" : "Stays"}</Link>
                     <span className="pp-sep" aria-hidden="true">›</span>
                   </>
                 )}
@@ -2800,11 +2801,14 @@ useEffect(() => {
                     </section>
                   );
                   if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
+                  const urlGuestCount = Number(searchParams.get('guests')) || ((Number(searchParams.get('adults')) || 0) + (Number(searchParams.get('children')) || 0));
+                  const targetPartyGuests = urlGuestCount > 0 ? urlGuestCount : booking?.guests;
+                  const similarItems = selectSimilarStaysForParty(s.items, targetPartyGuests, 4);
                   return (
                     <section className="pp-section" aria-label="Similar stays">
                       <div className="pp-section-head"><h2>Similar stays</h2></div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-                        {s.items.slice(0, 4).map((it: any) => {
+                        {similarItems.map((it: any) => {
                           const id = Number(it.id);
                           const rawName = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
                           const name = getListingDisplayName(id, rawName);
@@ -2818,13 +2822,13 @@ useEffect(() => {
                           const img = rawImg ? toTransformedGuestImageUrl(rawImg, 480) : undefined;
                           const imgSrcSet = rawImg ? buildGuestImageSrcSet(rawImg, GUEST_IMAGE_SRCSET_WIDTHS) : undefined;
                           const basePath = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
-                          const path = tenantSlugFromUrl
-                            ? `${basePath}?tenant=${encodeURIComponent(tenantSlugFromUrl)}`
-                            : basePath;
+                          const path = buildSimilarStayHref(basePath, tenantSlugFromUrl, searchParams);
+                          const meta = extractSimilarStayMeta(it);
                           return (
                             <Link
                               key={String(it.id)}
                               to={path}
+                              data-testid="similar-stay-card"
                               style={{ display: 'block', borderRadius: 16, border: '1px solid var(--border-subtle, #f0ddd0)', overflow: 'hidden', textDecoration: 'none', background: '#fff' }}
                             >
                               {img && (
@@ -2842,7 +2846,27 @@ useEffect(() => {
                               )}
                               <div style={{ padding: '12px 14px' }}>
                                 <p style={{ fontWeight: 600, color: 'var(--text-primary, #4a3535)', fontSize: 14, margin: '0 0 4px' }}>{name}</p>
-                                <p style={{ fontSize: 12.5, color: 'var(--text-muted, #6b5a55)', margin: 0 }}>{String(it.propertyAddress ?? '').slice(0, 60)}</p>
+                                {it.propertyAddress && (
+                                  <p style={{ fontSize: 12.5, color: 'var(--text-muted, #6b5a55)', margin: '0 0 6px' }}>{String(it.propertyAddress).slice(0, 60)}</p>
+                                )}
+                                {(meta.maxGuests != null || meta.rating != null) && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginBottom: meta.nightlyRate != null ? 6 : 0 }}>
+                                    {meta.maxGuests != null && (
+                                      <span data-testid="similar-stay-guests">Up to {meta.maxGuests} {meta.maxGuests === 1 ? 'guest' : 'guests'}</span>
+                                    )}
+                                    {meta.maxGuests != null && meta.rating != null && <span aria-hidden="true">·</span>}
+                                    {meta.rating != null && (
+                                      <span data-testid="similar-stay-rating" style={{ fontWeight: 600, color: 'var(--text-primary, #4a3535)' }}>
+                                        ★ {meta.rating.toFixed(1)}{meta.reviewCount != null ? ` (${meta.reviewCount})` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {meta.nightlyRate != null && (
+                                  <p data-testid="similar-stay-price" style={{ fontWeight: 700, color: 'var(--text-primary, #4a3535)', fontSize: 13.5, margin: 0 }}>
+                                    {formatSimilarStayPrice(meta.nightlyRate, meta.currency)}
+                                  </p>
+                                )}
                               </div>
                             </Link>
                           );

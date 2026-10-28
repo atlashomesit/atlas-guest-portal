@@ -118,6 +118,31 @@ function GuestNativeHooks() {
   return <NativeShellBridge authLoading={isLoading} />;
 }
 
+/** GUEST-043: `/guest/portal` and `/portal` redirect to `/my-bookings` when authenticated, or `/check-in` when unauthenticated. */
+export function GuestPortalAliasRedirect() {
+  const { auth, isLoading } = useGuestAuth();
+  const location = useLocation();
+  if (isLoading) return <LazyFallback />;
+  const target = auth.isAuthenticated ? '/my-bookings' : '/check-in';
+  return <Navigate to={`${target}${location.search}`} replace />;
+}
+
+/** GUEST-052: `/checkin` redirects to `/check-in` preserving query parameters (e.g. `?t=...`). */
+export function CheckinAliasRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/check-in${location.search}`} replace />;
+}
+
+/** GUEST-052: `/checkin/:bookingRef` redirects to `/check-in/:bookingRef` preserving query parameters (e.g. `?t=...`). */
+export function CheckinBookingRefAliasRedirect() {
+  const { bookingRef } = useParams<{ bookingRef: string }>();
+  const location = useLocation();
+  if (!bookingRef) {
+    return <Navigate to={`/check-in${location.search}`} replace />;
+  }
+  return <Navigate to={`/check-in/${encodeURIComponent(bookingRef)}${location.search}`} replace />;
+}
+
 function AppWrapper() {
   const location = useLocation();
   const [, setLanguageVersion] = useState(0);
@@ -257,6 +282,12 @@ function AppWrapper() {
           <Route path="/booking/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><BookingConfirmationPage /></Suspense>, "booking-confirmation-route")} />
           <Route path="/check-in/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-route")} />
           <Route path="/check-in" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-noparam-route")} />
+          {/* GUEST-052: Unhyphenated /checkin aliases preserving query params (?t=...) */}
+          <Route path="/checkin/:bookingRef" element={withBoundary(<CheckinBookingRefAliasRedirect />, "self-checkin-alias-ref-route")} />
+          <Route path="/checkin" element={withBoundary(<CheckinAliasRedirect />, "self-checkin-alias-route")} />
+          {/* GUEST-043: /guest/portal and /portal aliases routing to /my-bookings (authenticated) or /check-in (unauthenticated) */}
+          <Route path="/guest/portal" element={withBoundary(<GuestPortalAliasRedirect />, "guest-portal-alias-route")} />
+          <Route path="/portal" element={withBoundary(<GuestPortalAliasRedirect />, "portal-alias-route")} />
           <Route path="/house-rules/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><HouseRulesAcceptPage /></Suspense>, "house-rules-accept-route")} />
           <Route path="/review/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewSubmitPage /></Suspense>, "review-submit-route")} />
           <Route path="/communication-preferences" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-route")} />

@@ -6,7 +6,8 @@
  * a copy button are always shown, with the live hold countdown. "I have paid" only tells the host: the booking stays
  * unpaid until the host confirms the money arrived (HARD RULE 24 fail-safe), and the panel says so.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { UpiOrder } from '@/utils/upiCheckout';
 
 interface Props {
@@ -39,7 +40,14 @@ export const UpiPaymentPanel: React.FC<Props> = ({
   error = null,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [qrImgFailed, setQrImgFailed] = useState(false);
   const amountLabel = formatInr(amountInr);
+  const trimmedQrUrl = typeof order.qrCodeUrl === 'string' ? order.qrCodeUrl.trim() : '';
+  const trimmedUpiUri = typeof order.upiUri === 'string' ? order.upiUri.trim() : '';
+
+  useEffect(() => {
+    setQrImgFailed(false);
+  }, [trimmedQrUrl]);
 
   const copyAddress = async () => {
     try {
@@ -51,13 +59,30 @@ export const UpiPaymentPanel: React.FC<Props> = ({
     }
   };
 
-  const qr = order.qrCodeUrl ? (
+  // GUEST-044: Render host/server QR image when present and loadable; otherwise fall back
+  // client-side to dynamic SVG QR encoding `order.upiUri` so desktop/cross-device guests are never stranded.
+  const qr = trimmedQrUrl && !qrImgFailed ? (
     <img
-      src={order.qrCodeUrl}
+      src={trimmedQrUrl}
       alt={`UPI QR code to pay ${amountLabel}`}
+      onError={() => setQrImgFailed(true)}
       className="mx-auto h-48 w-48 rounded-md border border-stone-200 bg-white p-2"
       data-testid="upi-pay-qr"
     />
+  ) : trimmedUpiUri ? (
+    <div
+      role="img"
+      aria-label={`UPI QR code to pay ${amountLabel}`}
+      className="mx-auto flex h-52 w-52 items-center justify-center rounded-md border border-stone-200 bg-white p-2"
+      data-testid="upi-pay-qr"
+    >
+      <QRCodeSVG
+        value={trimmedUpiUri}
+        size={192}
+        level="M"
+        data-testid="upi-pay-qr-svg"
+      />
+    </div>
   ) : null;
 
   return (

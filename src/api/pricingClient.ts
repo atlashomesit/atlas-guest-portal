@@ -33,6 +33,9 @@ export type DailyListingPricingDto = {
   convenienceFeePercent: number;
   finalAmount: number;
   globalDiscountPercent: number;
+  originalNightlyRate?: number | null;
+  discountedNightlyRate?: number | null;
+  appliedPromotionLabel?: string | null;
 };
 
 /** Response from GET /pricing/daily-summary. */
@@ -56,6 +59,9 @@ export type TodayBreakdown = {
    * take it back out — nothing on that site charges it.
    */
   convenienceFeePercent?: number;
+  originalNightlyRate?: number | null;
+  discountedNightlyRate?: number | null;
+  appliedPromotionLabel?: string | null;
 };
 
 /** Per-day row from GET /pricing/breakdown (calendar view). */
@@ -116,6 +122,21 @@ export type GuestPriceBreakdown = {
   finalAmount: number | null;
   /** HSL-010: HostelDorm stay price line from the server, e.g. "3 beds x Rs 799 x 2 nights". Absent for every other listing type. */
   priceLine?: string;
+  /** GUEST-049 / CLU-016: Optional per-stay cleaning fee from PriceBreakdownDto. */
+  cleaningFee?: number;
+  /** GUEST-049: Optional extra-guest occupancy fee when itemized by the API. */
+  extraGuestFee?: number;
+  /** GUEST-049: Optional weekend rate differential when itemized by the API. */
+  weekendRateAdjustmentAmount?: number;
+  /** DYN-005 / TASK-1040117: Original pre-promotion nightly rate from PriceBreakdownDto. */
+  originalNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: Discounted post-promotion nightly rate from PriceBreakdownDto. */
+  discountedNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: Genuine server promotion label (e.g. "Last-Minute Deal (10% off)"). */
+  appliedPromotionLabel?: string | null;
+  /** DYN-005 / TASK-1040117: Promotional discount amount & percent. */
+  promotionDiscountAmount?: number;
+  promotionDiscountPercent?: number;
 };
 
 /**
@@ -285,6 +306,29 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
   const priceLineRaw = raw.priceLine ?? raw.PriceLine;
   const priceLine = typeof priceLineRaw === 'string' && priceLineRaw.trim() !== '' ? priceLineRaw.trim() : undefined;
 
+  const cleaningFee = num('cleaningFee', 'CleaningFee');
+  const extraGuestFee = num('extraGuestFee', 'ExtraGuestFee');
+  const weekendRateAdjustmentAmount = num('weekendRateAdjustmentAmount', 'WeekendRateAdjustmentAmount');
+
+  const origNightlyRaw = raw.originalNightlyRate ?? raw.OriginalNightlyRate;
+  const originalNightlyRate =
+    origNightlyRaw !== undefined && origNightlyRaw !== null && Number(origNightlyRaw) > 0
+      ? Number(origNightlyRaw)
+      : undefined;
+
+  const discNightlyRaw = raw.discountedNightlyRate ?? raw.DiscountedNightlyRate;
+  const discountedNightlyRate =
+    discNightlyRaw !== undefined && discNightlyRaw !== null && Number(discNightlyRaw) > 0
+      ? Number(discNightlyRaw)
+      : undefined;
+
+  const promoLabelRaw = raw.appliedPromotionLabel ?? raw.AppliedPromotionLabel;
+  const appliedPromotionLabel =
+    typeof promoLabelRaw === 'string' && promoLabelRaw.trim() !== '' ? promoLabelRaw.trim() : undefined;
+
+  const promotionDiscountAmount = num('promotionDiscountAmount', 'PromotionDiscountAmount');
+  const promotionDiscountPercent = num('promotionDiscountPercent', 'PromotionDiscountPercent');
+
   return {
     baseAmount: num('baseAmount', 'BaseAmount'),
     discountAmount: num('discountAmount', 'DiscountAmount'),
@@ -300,6 +344,14 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
     gstAmount: gstAmount !== undefined && gstAmount !== null ? Number(gstAmount) : null,
     finalAmount: finalAmount !== undefined && finalAmount !== null ? Number(finalAmount) : null,
     ...(priceLine ? { priceLine } : {}),
+    ...(cleaningFee > 0 ? { cleaningFee } : {}),
+    ...(extraGuestFee > 0 ? { extraGuestFee } : {}),
+    ...(weekendRateAdjustmentAmount > 0 ? { weekendRateAdjustmentAmount } : {}),
+    ...(originalNightlyRate !== undefined ? { originalNightlyRate } : {}),
+    ...(discountedNightlyRate !== undefined ? { discountedNightlyRate } : {}),
+    ...(appliedPromotionLabel ? { appliedPromotionLabel } : {}),
+    ...(promotionDiscountAmount > 0 ? { promotionDiscountAmount } : {}),
+    ...(promotionDiscountPercent > 0 ? { promotionDiscountPercent } : {}),
   };
 }
 
@@ -485,6 +537,9 @@ export async function fetchDailySummary(
     const conv = (l.convenienceFeePercent ?? l.ConvenienceFeePercent) as number | undefined;
     const final = (l.finalAmount ?? l.FinalAmount) as number | undefined;
     const global = (l.globalDiscountPercent ?? l.GlobalDiscountPercent) as number | undefined;
+    const origNightly = l.originalNightlyRate ?? l.OriginalNightlyRate;
+    const discNightly = l.discountedNightlyRate ?? l.DiscountedNightlyRate;
+    const promoLabel = l.appliedPromotionLabel ?? l.AppliedPromotionLabel;
     return {
       listingId: Number(l.listingId ?? l.ListingId),
       listingName: String(l.listingName ?? l.ListingName ?? ''),
@@ -493,6 +548,15 @@ export async function fetchDailySummary(
       convenienceFeePercent: Number(conv ?? 0),
       finalAmount: Number(final ?? 0),
       globalDiscountPercent: Number(global ?? 0),
+      ...(origNightly !== undefined && origNightly !== null && Number(origNightly) > 0
+        ? { originalNightlyRate: Number(origNightly) }
+        : {}),
+      ...(discNightly !== undefined && discNightly !== null && Number(discNightly) > 0
+        ? { discountedNightlyRate: Number(discNightly) }
+        : {}),
+      ...(typeof promoLabel === 'string' && promoLabel.trim() !== ''
+        ? { appliedPromotionLabel: promoLabel.trim() }
+        : {}),
     };
   });
   return { date, listings };
@@ -509,5 +573,14 @@ export function getTodayBreakdownFromListing(listing: DailyListingPricingDto): T
     globalDiscountPercent: Number(listing.globalDiscountPercent ?? 0),
     finalAmount: finalAmount > 0 ? finalAmount : actualPrice,
     convenienceFeePercent: Math.max(0, Number(listing.convenienceFeePercent ?? 0) || 0),
+    ...(listing.originalNightlyRate != null && listing.originalNightlyRate > 0
+      ? { originalNightlyRate: listing.originalNightlyRate }
+      : {}),
+    ...(listing.discountedNightlyRate != null && listing.discountedNightlyRate > 0
+      ? { discountedNightlyRate: listing.discountedNightlyRate }
+      : {}),
+    ...(listing.appliedPromotionLabel?.trim()
+      ? { appliedPromotionLabel: listing.appliedPromotionLabel.trim() }
+      : {}),
   };
 }

@@ -15,6 +15,18 @@ export type BookingPriceBreakdown = {
   currency: string;
   /** TASK-5185: tourism tax included in finalAmount; render as its own line, not as GST. */
   touristTaxAmount?: number;
+  /** GUEST-049 / CLU-016: itemized cleaning fee included in finalAmount. */
+  cleaningFee?: number;
+  /** GUEST-049: itemized extra guest fee included in finalAmount. */
+  extraGuestFee?: number;
+  /** GUEST-049: itemized weekend rate differential included in finalAmount. */
+  weekendRateAdjustmentAmount?: number;
+  /** DYN-005 / TASK-1040117: genuine pre-promotion nightly rate from server PriceBreakdownDto. */
+  originalNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: genuine post-promotion nightly rate from server PriceBreakdownDto. */
+  discountedNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: genuine server promotion label (e.g. "Last-Minute Deal (10% off)"). */
+  appliedPromotionLabel?: string | null;
 };
 
 type BookingState = {
@@ -70,6 +82,8 @@ type BookingState = {
   /** TASK-1039948: Selected rate plan meal plan and cancellation policy for direct booking pricing tier display. */
   ratePlanMealPlan?: string | null;
   ratePlanCancellationPolicy?: string | null;
+  /** TASK-1040087: Marketplace booking origin channel ('marketplace') forwarded from UnitBookingWidget. */
+  holdBookingChannel?: 'marketplace' | null;
 };
 
 type BookingContextValue = {
@@ -111,6 +125,7 @@ const defaultState: BookingState = {
   ratePlanName: null,
   ratePlanMealPlan: null,
   ratePlanCancellationPolicy: null,
+  holdBookingChannel: null,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
@@ -155,6 +170,7 @@ const loadState = (): BookingState => {
       ratePlanName: null,
       ratePlanMealPlan: null,
       ratePlanCancellationPolicy: null,
+      holdBookingChannel: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);
