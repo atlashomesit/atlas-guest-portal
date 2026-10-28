@@ -633,6 +633,16 @@ function GuestDetailsForm({
         });
         if (!holdRes.ok) {
           const body = await holdRes.json().catch(() => ({}));
+          const code = String(body.code ?? body.errorCode ?? (body.error?.code ?? '')).trim();
+          const msg = String(body.message ?? body.error ?? '');
+          if (
+            (holdRes.status === 422 || holdRes.status === 503) &&
+            (code.includes('PAYMENT_PROVIDER_NOT_CONFIGURED') || msg.includes('PAYMENT_PROVIDER_NOT_CONFIGURED'))
+          ) {
+            setCheckoutInfo((prev) => (prev ? { ...prev, onlinePaymentsAvailable: false } : null));
+            setError(null);
+            return;
+          }
           // FOUNDER RULED 2026-10-19: the hold starts at Pay, so a lost night is told here, BEFORE any money moves.
           if (holdRes.status === 409 && String(body.code ?? '') === 'AVAILABILITY_CONFLICT') {
             throw new Error('Sorry, these dates were just booked. No payment was taken. Please pick different dates.');
@@ -955,15 +965,47 @@ function GuestDetailsForm({
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted) || (houseRulesRequired && !houseRulesAccepted)}
-        onClick={handleSubmit}
-        className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
-        style={ctaStyle(brand)}
-      >
-        {submitting ? 'Processing...' : 'Pay & book'}
-      </button>
+      {checkoutInfo?.onlinePaymentsAvailable === false ? (
+        <div className="space-y-2" data-testid="embed-offline-section">
+          <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+            <b>Online payment is currently not enabled for this property.</b><br />
+            <span>Contact the host directly to complete your reservation.</span>
+          </div>
+          {checkoutInfo?.hostWhatsAppDigits ? (
+            <a
+              href={`https://wa.me/${checkoutInfo.hostWhatsAppDigits.replace(/\D/g, '').length === 10 ? `91${checkoutInfo.hostWhatsAppDigits.replace(/\D/g, '')}` : checkoutInfo.hostWhatsAppDigits.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi, I'm interested in booking ${listing.name || 'this property'}. Can you help me confirm?`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#075e54] px-4 py-2.5 text-sm font-semibold text-white no-underline"
+              data-testid="embed-whatsapp-cta"
+            >
+              Contact Host via WhatsApp · Request to Book
+            </a>
+          ) : checkoutInfo?.hostPhoneDigits ? (
+            <a
+              href={`tel:+${checkoutInfo.hostPhoneDigits.replace(/\D/g, '')}`}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white no-underline"
+              data-testid="embed-phone-cta"
+            >
+              Contact Host · Request to Book
+            </a>
+          ) : (
+            <div className="text-center text-xs text-text-secondary" data-testid="embed-no-host-number">
+              Please contact the host directly to make a reservation.
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted) || (houseRulesRequired && !houseRulesAccepted)}
+          onClick={handleSubmit}
+          className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
+          style={ctaStyle(brand)}
+        >
+          {submitting ? 'Processing...' : 'Pay & book'}
+        </button>
+      )}
 
       {/* TASK-102074: security/encryption trust badges below the pay CTA. The embed always
           pays through the Razorpay gateway, so the claims hold unconditionally. */}
