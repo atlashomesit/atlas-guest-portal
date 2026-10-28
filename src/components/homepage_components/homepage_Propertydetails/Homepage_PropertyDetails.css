@@ -1123,7 +1123,21 @@
   .pp-book-beside .pp-v2-location { grid-column: 1; margin-top: 0; }
   .pp-book-beside .pp-title-row { margin-bottom: 0; }
   .pp-book-beside:not(.pp-single-photo):not(.pp-two-photo) .pp-gallery { height: 400px; }
+  /* Virtual tours (the listing's own 360 embed and the 3D tour section) are left-column content
+     like the gallery and location: without this they span both columns, find column 2 rows 3-6
+     taken by the booking card, and drop to row 7, leaving a blank gap under the gallery, an empty
+     right column below and a card that stops following the scroll. The card then also spans
+     enough rows to reach the long left column that follows the tours. */
+  .pp-book-beside .pp-tour-block,
+  .pp-book-beside [data-testid="virtual-tour-section"] { grid-column: 1; margin-block: 0; }
+  .pp-book-beside .pp-shell:has(.pp-tour-block, [data-testid="virtual-tour-section"]) .pp-booking-col { grid-row: 3 / span 6; }
+  /* The card is pinned beside the gallery, so Reserve has to sit inside the visible part of it: the
+     listing preview photo (it repeats the gallery next to it) moves below the card's other content.
+     Same elements, nothing removed; phone and tablet keep the established order. */
+  .pp-book-beside .lv-booking { display: flex; flex-direction: column; --lv-preview-mt: 16px; }
+  .pp-book-beside .lv-booking-preview { order: 99; margin-bottom: 0; }
 }
+.pp-tour-block { margin-top: 24px; }
 /* TOP10-2026-10-27-01-B: the two captured photos side by side, whole image visible so the
    captions baked into the photos are never clipped; "View gallery" sits on the main photo. */
 .pp-two-photo .pp-gallery { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; height: 300px; }
@@ -1146,7 +1160,3 @@
   .pp-root .lv-booking[tabindex="-1"] { scroll-margin-top: 96px; }
   .pp-root .lv-booking[tabindex="-1"]:focus { outline: 2px solid var(--cta-primary, #c04528); outline-offset: 3px; }
 }
-
-/* TOP10-2026-10-27-01-B: with the card beside the gallery every tile shows its whole image so
-   captions baked into photos are never clipped (was only true for 1 or 2 photos). */
-.pp-book-beside .pp-gallery-img { object-fit: contain !important; background: var(--bg-muted, #f5ebe0); }

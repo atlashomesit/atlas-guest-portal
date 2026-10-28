@@ -81,7 +81,7 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/gu
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
-import ListingWhatsAppFloat from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
+import ListingWhatsAppFloat, { buildListingWhatsAppUrl } from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
 import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
@@ -2074,7 +2074,7 @@ useEffect(() => {
 
             {/* ---- TASK-1359: Virtual tour ---- */}
             {data.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
-              <div style={{ marginTop: 24, borderRadius: 18, overflow: 'hidden', aspectRatio: '16/9', width: '100%' }}>
+              <div className="pp-tour-block" style={{ borderRadius: 18, overflow: 'hidden', aspectRatio: '16/9', width: '100%' }}>
                 <iframe
                   src={toEmbedUrl(data.virtualTourUrl)!}
                   title="Virtual property tour"
@@ -3075,7 +3075,9 @@ useEffect(() => {
           {/* ===== END pp-shell ===== */}
 
           {/* Mobile sticky CTA — TASK-5192: any non-bookable status (Draft/Archived/Unlisted)
-              shows a notice instead of price + Reserve (sidebar already uses ppIsBookable). */}
+              shows a notice instead of price + Reserve (sidebar already uses ppIsBookable).
+              hostWhatsAppUrl: on phone the bar's Chat chooser keeps the HOST reachable (same number
+              and message as the desktop host WhatsApp bubble below; empty = no host number). */}
           <PropertyMobileStickyBar
             bookable={ppIsBookable}
             nightlyFallback={ppStickyNightly}
@@ -3085,6 +3087,12 @@ useEffect(() => {
               const widget = document.querySelector('[data-testid="guest-booking-form"]');
               widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }}
+            hostWhatsAppUrl={buildListingWhatsAppUrl(
+              ppHostPhone,
+              getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property',
+              ppBrandName,
+            )}
+            listingId={resolvedListingId ?? data.listingId ?? null}
           />
 
         </div>

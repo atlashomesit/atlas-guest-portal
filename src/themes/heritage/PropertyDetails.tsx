@@ -90,7 +90,7 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '@/utils/guestHist
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '@/components/apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
-import ListingWhatsAppFloat from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
+import ListingWhatsAppFloat, { buildListingWhatsAppUrl } from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
 import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
@@ -3049,6 +3049,12 @@ useEffect(() => {
               const widget = document.querySelector('[data-testid="guest-booking-form"]');
               widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }}
+            hostWhatsAppUrl={buildListingWhatsAppUrl(
+              ppHostPhone,
+              getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property',
+              ppBrandName,
+            )}
+            listingId={resolvedListingId ?? data.listingId ?? null}
           />
 
         </div>
