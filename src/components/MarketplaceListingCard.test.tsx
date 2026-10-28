@@ -86,4 +86,33 @@ describe('TASK-10299086 — MarketplaceListingCard & resolveMarketplaceListingDi
     expect(screen.getByTestId('hostel-per-bed-indicator')).toHaveTextContent(/per bed/i);
     expect(screen.getByTestId('marketplace-card-price')).toHaveTextContent(/bed/i);
   });
+
+  it('TASK-10299241: a private room in a Hostel property shows no per-bed wording', () => {
+    render(
+      <MarketplaceListingCard
+        id={302}
+        title="Zostel Private Room"
+        propertyType="Hostel"
+        category="hostel"
+        accommodationType="VacationRental"
+        pricePerNight={1800}
+        city="Jaipur"
+      />,
+    );
+
+    // The property-type badge still names the property, but this room is sold by the room.
+    expect(screen.getByTestId('property-type-badge')).toHaveTextContent('Hostel');
+    expect(screen.queryByTestId('hostel-per-bed-indicator')).toBeNull();
+    expect(screen.getByTestId('marketplace-card-price')).not.toHaveTextContent(/bed/i);
+    expect(screen.getByTestId('marketplace-card-price')).toHaveTextContent('/night');
+  });
+
+  it('TASK-10299241: a title that says "dorm" does not make a listing per-bed without accommodationType', () => {
+    render(
+      <MarketplaceListingCard id={303} title="Backpackers Dorm House" pricePerNight={900} city="Goa" />,
+    );
+
+    expect(screen.queryByTestId('hostel-per-bed-indicator')).toBeNull();
+    expect(screen.getByTestId('marketplace-card-price')).not.toHaveTextContent(/bed/i);
+  });
 });

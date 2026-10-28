@@ -73,7 +73,10 @@ export const MarketplaceListingCard: React.FC<MarketplaceListingCardProps> = ({
     name,
   });
 
-  const isHostel = propertyTypeBadge === 'Hostel' || isHostelDormType(accommodationType);
+  // TASK-10299241: "per bed" keys on the API's own accommodationType === 'HostelDorm' ONLY (same rule as isHostelDorm()).
+  // The property-type badge may say "Hostel" for a private room in a Hostel property, but that room is sold by the room;
+  // a missing accommodationType (older API) is "not a dorm", never a guess from the title or category.
+  const isHostel = isHostelDormType(accommodationType);
 
   const rawAmenities: string[] = [
     ...(Array.isArray(amenityCodes) ? amenityCodes : []),

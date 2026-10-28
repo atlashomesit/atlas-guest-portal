@@ -931,7 +931,11 @@ export default function MarketplaceHomepage() {
                   {/* TASK-1039954: Aligned property type badge and amenity chips */}
                   {(() => {
                     const propertyTypeBadge = resolvePropertyTypeBadge(item);
-                    const isHostel = propertyTypeBadge === 'Hostel' || isHostelDormType(item.accommodationType);
+                    // TASK-10299241: "per bed" keys on the API's own accommodationType === 'HostelDorm' ONLY, the same rule
+                    // isHostelDorm() applies on the listing page. The property-type badge above may still say "Hostel" for a
+                    // private room in a Hostel property, but that room is sold by the room. An older API that does not send
+                    // the field means "not a dorm": no per-bed wording, never a guess from the title or category.
+                    const isHostel = isHostelDormType(item.accommodationType);
                     const rawAmenities: string[] = [
                       ...(Array.isArray(item.amenityCodes) ? item.amenityCodes : []),
                       ...(Array.isArray(item.amenities)
