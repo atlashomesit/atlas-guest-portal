@@ -59,6 +59,16 @@ export function clearAgentCode(): void {
   }
 }
 
+/**
+ * The page-load step: remember the code from the agent's link, then take it out of the address bar before monitoring /
+ * analytics read the URL. Returns true when a code was found. (main.tsx calls this first thing in bootstrap.)
+ */
+export function rememberAgentCodeFromLink(): boolean {
+  if (!captureAgentCodeFromUrl()) return false;
+  stripAgentCodeFromUrl();
+  return true;
+}
+
 /** Removes the agent code from the address bar (history replaced, no navigation) so it is not read by analytics. */
 export function stripAgentCodeFromUrl(): void {
   if (typeof window === 'undefined') return;

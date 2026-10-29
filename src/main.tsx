@@ -5,7 +5,7 @@ import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
 import ApiConfigGuard from './components/ApiConfigGuard'
 import { initMonitoring } from './lib/monitoring'
-import { captureAgentCodeFromUrl, stripAgentCodeFromUrl } from './lib/agentCode'
+import { rememberAgentCodeFromLink } from './lib/agentCode'
 import { initAnalytics, initTenantAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
@@ -84,7 +84,7 @@ const bootstrapApp = async () => {
   applyTheme(DEFAULT_THEME)
   // PRICE-016: remember the travel agent's code from the agent's link (?agent=CODE), then take it out of the
   // address bar before monitoring / analytics read the URL, so the code is never sent to a third party.
-  if (captureAgentCodeFromUrl()) stripAgentCodeFromUrl()
+  rememberAgentCodeFromLink()
   initMonitoring()
   initAnalytics()
   window.addEventListener('atlas:cookie-consent-changed', () => {
