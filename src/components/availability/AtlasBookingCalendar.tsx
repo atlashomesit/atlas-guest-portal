@@ -899,6 +899,14 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
             Your stay
           </div>
         </div>
+        {/* GUEST-048: the per-day figures come from the calendar rates, which do not include every adjustment the
+            checkout quote applies, so say where the real price is. [FG: pricing] wording is the least-surprising
+            neutral line; the founder may reword it. */}
+        {calendarDailyPrices.size > 0 && (
+          <p className="bc-price-note" data-testid="booking-calendar-price-note" style={{ margin: '0 0 8px', fontSize: 11, lineHeight: 1.4, color: 'var(--text-muted, #6b5a55)' }}>
+            Prices per night are a guide. The price you pay is shown in the booking box once you pick your dates.
+          </p>
+        )}
         <div className="bc-footer">
           <button type="button" className="bc-clear" disabled={!value.startDate && !value.endDate} onClick={() => { setActivePreset(null); onChange({ startDate: null, endDate: null }); }}>Clear dates</button>
           <button type="button" className="bc-apply" disabled={!value.startDate || !value.endDate} onClick={onClose}>Use dates</button>

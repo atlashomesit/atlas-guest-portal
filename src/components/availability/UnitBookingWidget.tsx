@@ -2536,7 +2536,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             // that cannot sum to the subtotal read as a hidden fee, so a dorm always uses the single priced line.
             const isBedPricedStay = serverGstMatchesSelection && !!serverPriceBreakdown?.priceLine;
 
-            if (ratesVary && dailyPrices.length > 0 && !isBedPricedStay) {
+            // GUEST-048: the nightly rows come from the CALENDAR endpoint, which knows nothing about the minimum-price
+            // floor, long-stay or last-minute rules the checkout quote applies. When the quote is in and those rows
+            // do not add up to the quote's subtotal, the rows would show pre-adjustment prices above a lower
+            // subtotal (the date sheet and this list said 3,150 while the box charged 2,882) - so fall back to the
+            // quote's own single line, which is the price actually charged.
+            const rowsSum = dailyPrices.reduce((sum, dp) => sum + dp.price, 0);
+            const rowsMatchQuote = serverChargeableBase == null || Math.abs(rowsSum - breakdownPrice) <= Math.max(1, dailyPrices.length);
+
+            if (ratesVary && dailyPrices.length > 0 && !isBedPricedStay && rowsMatchQuote) {
               // Show per-night breakdown
               return (
                 <>
