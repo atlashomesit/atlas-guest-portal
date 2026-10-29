@@ -78,6 +78,7 @@ import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
 import { fetchListingById } from '@/api/listingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
 import { dormNeedsGenderAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
@@ -960,7 +961,9 @@ const GuestDetailsPage: React.FC = () => {
   const checkoutDealBadgeLabel =
     priceBreakdown?.appliedPromotionLabel?.trim() &&
     (originalNightlyRateForStrike != null || (discountRow != null && discountRow.amount > 0))
-      ? priceBreakdown.appliedPromotionLabel.trim()
+      ? originalNightlyRateForStrike != null
+        ? alignPromotionLabelPercent(priceBreakdown.appliedPromotionLabel.trim(), originalNightlyRateForStrike, displayedPerNight)
+        : priceBreakdown.appliedPromotionLabel.trim()
       : null;
 
   // ── Check-in/out display ─────────────────────────────────────────────────
