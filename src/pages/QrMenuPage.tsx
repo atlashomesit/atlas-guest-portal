@@ -92,6 +92,8 @@ export interface OrderStatus {
   gstAmount: number;
   createdAtUtc: string;
   estimatedMinutes: number;
+  /** POS-062: "TAKEAWAY" for a pickup order; absent / null for a table, room or counter order. The API never returns the customer's name or phone. */
+  orderType?: string | null;
   kotNumber?: string;
   kotStatus?: string;
   /** POS-003: UTC serve-at time of a "Schedule for Later" order; absent for as soon as possible. */
@@ -316,6 +318,11 @@ export default function QrMenuPage() {
   const [verificationCode, setVerificationCode] = useState<string>("");
   const [guestName, setGuestName] = useState<string>("");
   const [guestPhone, setGuestPhone] = useState<string>("");
+  // POS-062: takeaway PICKUP is offered on the plain menu link only (no room, no table), where today's order is a counter walk-in. It is paid at the
+  // counter when collecting; delivery is deliberately not offered here (the API refuses it from an anonymous caller).
+  const takeawayOffered = !roomKeyParam && !urlListingId && !tableCode && !listingId;
+  const [takeaway, setTakeaway] = useState<boolean>(false);
+  const takeawayActive = takeawayOffered && takeaway;
   const [whatsAppUpdates, setWhatsAppUpdates] = useState<boolean>(true);
   const [orderNotes, setOrderNotes] = useState<string>("");
   // POS-003: "Fulfill At" - as soon as possible, or a time slot / custom time later (local clock).
@@ -496,6 +503,11 @@ export default function QrMenuPage() {
       setVerificationError("Please pick the time you would like your order served, or choose 'As soon as possible'.");
       return;
     }
+    // POS-062: a pickup order needs a name and a mobile number so the kitchen can call the guest (the API checks again).
+    if (takeawayActive && (!guestName.trim() || guestPhone.replace(/\D/g, "").length < 10)) {
+      setVerificationError("Please enter your name and a 10-digit mobile number so we can call you when your order is ready.");
+      return;
+    }
     setSubmitting(true);
     setAttemptsRemaining(null);
 
@@ -503,7 +515,9 @@ export default function QrMenuPage() {
       const payload = {
         listingId,
         tableCode,
-        settlementMethod,
+        // POS-062: only the choice goes up - the server prices the order and the page never names a fee, a packaging charge or an address.
+        orderType: takeawayActive ? "TAKEAWAY" : undefined,
+        settlementMethod: takeawayActive ? "PAY_ON_DELIVERY" : settlementMethod,
         // POS-011: the room key from the printed QR; only a room charge needs it, and a legacy numeric link has none.
         roomKey: settlementMethod === "POST_TO_ROOM" ? roomKeyParam : undefined,
         verificationCode: settlementMethod === "POST_TO_ROOM" ? verificationCode.trim() : undefined,
@@ -933,7 +947,9 @@ export default function QrMenuPage() {
                 <span style={{ fontWeight: 700 }}>
                   {activeOrder.settlementMethod === "POST_TO_ROOM"
                     ? "Posted to Room Stay Folio"
-                    : activeOrder.settlementMethod}
+                    : activeOrder.orderType === "TAKEAWAY"
+                      ? "Pay at the counter when you collect"
+                      : activeOrder.settlementMethod}
                 </span>
               </div>
             </div>
@@ -1347,7 +1363,55 @@ export default function QrMenuPage() {
               {/* POS-011: room link / lock notice (the cart is open, so the page-top notice is hidden) */}
               {roomNotice}
 
+              {/* POS-062: takeaway pickup (plain menu link only). No delivery, no address, no fee: the order is paid at the counter when collected. */}
+              {takeawayOffered && (
+                <div style={{ marginBottom: "14px" }} data-testid="pos-qr-fulfilment">
+                  <span style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "6px" }}>
+                    HOW WOULD YOU LIKE IT?
+                  </span>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    {[
+                      { value: false, label: "At the restaurant", testId: "fulfil-here" },
+                      { value: true, label: "Takeaway pickup", testId: "fulfil-takeaway" },
+                    ].map((option) => (
+                      <button
+                        key={option.testId}
+                        type="button"
+                        aria-pressed={takeaway === option.value}
+                        onClick={() => setTakeaway(option.value)}
+                        style={{
+                          padding: "10px 8px",
+                          borderRadius: "10px",
+                          border: "1.5px solid",
+                          borderColor: takeaway === option.value ? "#9e402a" : "#e2e8f0",
+                          backgroundColor: takeaway === option.value ? "#fff5f2" : "#fff",
+                          color: takeaway === option.value ? "#9e402a" : "#475569",
+                          fontWeight: 700,
+                          fontSize: "12px",
+                          cursor: "pointer",
+                        }}
+                        data-testid={option.testId}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {takeawayActive && (
+                <div
+                  style={{ marginBottom: "14px", padding: "10px 12px", borderRadius: "10px", backgroundColor: "#fffbeb", border: "1px solid #fde68a", color: "#92400e", fontSize: "12px" }}
+                  role="note"
+                  data-testid="pos-qr-takeaway-note"
+                >
+                  You will pay at the counter when you collect your order. Please give your name and mobile number so we can call you when it is ready.
+                  Delivery is not available from this menu.
+                </div>
+              )}
+
               {/* Settlement Options (Done When #2 & #3) */}
+              {!takeawayActive && (
               <div style={{ marginBottom: "14px" }}>
                 <span style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#64748b", marginBottom: "6px" }}>
                   HOW WOULD YOU LIKE TO PAY?
@@ -1435,6 +1499,7 @@ export default function QrMenuPage() {
                   )}
                 </div>
               </div>
+              )}
 
               {/* Room Charge Anti-Abuse Guardrail Field (Done When #2) */}
               {settlementMethod === "POST_TO_ROOM" && roomChargeAvailable && (
@@ -1504,7 +1569,8 @@ export default function QrMenuPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
                   <input
                     type="text"
-                    placeholder="Your Name (Optional)"
+                    placeholder={takeawayActive ? "Your Name" : "Your Name (Optional)"}
+                    aria-required={takeawayActive}
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
                     style={{
@@ -1518,7 +1584,8 @@ export default function QrMenuPage() {
                   />
                   <input
                     type="tel"
-                    placeholder="Mobile Number (Optional)"
+                    placeholder={takeawayActive ? "Mobile Number" : "Mobile Number (Optional)"}
+                    aria-required={takeawayActive}
                     value={guestPhone}
                     onChange={(e) => setGuestPhone(e.target.value)}
                     style={{
@@ -1655,7 +1722,7 @@ export default function QrMenuPage() {
                 }}
                 data-testid="pos-qr-submit-btn"
               >
-                {submitting ? "Placing Order..." : settlementMethod === "POST_TO_ROOM" ? `Charge to Room • ₹${cartSubtotal.toLocaleString("en-IN")}` : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
+                {submitting ? "Placing Order..." : takeawayActive ? `Place Takeaway Order • ₹${cartSubtotal.toLocaleString("en-IN")}` : settlementMethod === "POST_TO_ROOM" ? `Charge to Room • ₹${cartSubtotal.toLocaleString("en-IN")}` : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
                 <ArrowRight size={18} />
               </button>
             </div>
