@@ -87,15 +87,18 @@ describe('Razorpay checkout amount unit boundary — every call site', () => {
       //       Razorpay order from `amountInr * 100` and echoes that same figure back as
       //       `AmountPaise`). Converting that again would be a 100x overstatement, so the
       //       conversion helper must NOT be required there (TASK-10299239 SecurityDepositPage).
+      //       POS-067: the QR "Pay now" create-payment-order response likewise carries a native
+      //       PAISE field, `amountInPaise` (the server's rupee balance x 100, next to the rupee
+      //       `amount`), so components/qrmenu/payNow.ts feeds `order.amountInPaise` unconverted.
       const convertsRupees =
         content.includes("from '@/utils/razorpayOrderAmount'") &&
         /razorpayOrderAmountInrToPaise\(/.test(content);
-      const feedsNativePaise = /amount:\s*[A-Za-z_$][\w$]*\.amountPaise\b/.test(content);
+      const feedsNativePaise = /amount:\s*[A-Za-z_$][\w$]*\.amount(?:In)?Paise\b/.test(content);
 
       expect(
         convertsRupees || feedsNativePaise,
         `${relPath} constructs a Razorpay checkout but neither converts the API amount with ` +
-          'razorpayOrderAmountInrToPaise nor passes an API field named `amountPaise`. ' +
+          'razorpayOrderAmountInrToPaise nor passes an API field named `amountPaise` / `amountInPaise`. ' +
           'The order response `amount` is RUPEES; Razorpay checkout options are PAISE.',
       ).toBe(true);
 
