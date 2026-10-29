@@ -2,14 +2,25 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { UpiPaymentPanel } from '../components/checkout/UpiPaymentPanel';
-import { createPayLinkOrder, getPayLink, PayLinkError, type PayLinkOrder, type PayLinkSummary } from '../api/payLink';
+import {
+  createPayLinkOrder,
+  getPayLink,
+  PayLinkError,
+  verifyPayLinkPayment,
+  type PayLinkOrder,
+  type PayLinkSummary,
+  type RazorpayCheckoutResult,
+} from '../api/payLink';
+import { openPayLinkCheckout, PayLinkCheckoutError } from '../utils/payLinkCheckout';
 import { reportUpiPaid } from '../api/payment';
 import { isUpiProvider, type UpiOrder } from '../utils/upiCheckout';
 
 /**
  * PAY-016: the first-party pay page a host shares as `/pay/:token` (walk-in payment, deposit, balance). It shows the stay, the host and the amount, then:
  *  - UPI host (UPI_QR / UPI_DEEPLINK): the one-tap UPI intent + QR, and "I have paid" (tells the host; the booking stays unpaid until the host confirms),
- *  - Razorpay host: "Pay securely" -> Razorpay's checkout for exactly this amount.
+ *  - Razorpay host: "Pay securely" opens Razorpay Checkout IN this page for the order the API created for exactly this amount; what Checkout returns goes to the
+ *    API, which verifies the signature and the captured payment before anything is marked paid, and then the guest lands on the booking confirmation. Any refusal
+ *    leaves the booking unpaid with a plain sentence. Razorpay's own hosted link is only the fallback when the checkout window cannot open.
  * The amount is the API's current balance; this page never computes money.
  */
 function formatInr(amount: number, currency = 'INR'): string {
@@ -49,6 +60,9 @@ export default function PayLinkPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [upi, setUpi] = useState<{ order: UpiOrder; raw: PayLinkOrder } | null>(null);
   const [reporting, setReporting] = useState(false);
+  /** Razorpay Checkout returned but the API has not confirmed it yet: kept so "check again" never makes the guest pay twice. */
+  const [unconfirmed, setUnconfirmed] = useState<RazorpayCheckoutResult | null>(null);
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +74,23 @@ export default function PayLinkPage() {
     return () => { cancelled = true; };
   }, [token]);
 
+  /** Asks the API to verify what Checkout returned; on success opens the booking confirmation. Never throws. */
+  const confirmPayment = useCallback(
+    async (result: RazorpayCheckoutResult, bookingId: number): Promise<void> => {
+      try {
+        const verified = await verifyPayLinkPayment(token, result);
+        setUnconfirmed(null);
+        const id = verified.bookingId || bookingId;
+        const t = verified.bookingToken;
+        navigate(t ? `/booking/${id}?t=${encodeURIComponent(t)}` : `/booking/${id}`, { replace: true });
+      } catch (e) {
+        setUnconfirmed(result);
+        setActionError(e instanceof Error ? e.message : 'We could not confirm your payment, so it is not marked paid. If money was taken, do not pay again - contact your host.');
+      }
+    },
+    [token, navigate],
+  );
+
   const startPayment = useCallback(async () => {
     setBusy(true);
     setActionError(null);
@@ -68,6 +99,25 @@ export default function PayLinkPage() {
       const upiOrder = toUpiOrder(order);
       if (upiOrder) {
         setUpi({ order: upiOrder, raw: order });
+      } else if (order.razorpayOrderId && order.razorpayKeyId && typeof order.amountPaise === 'number' && order.amountPaise > 0) {
+        // In-page Razorpay Checkout for the server-created order.
+        const hostName = summary?.hostName || summary?.propertyName || 'Your stay';
+        let result: RazorpayCheckoutResult;
+        try {
+          result = await openPayLinkCheckout(
+            { keyId: order.razorpayKeyId, orderId: order.razorpayOrderId, amountPaise: order.amountPaise },
+            hostName,
+            `Booking #${order.bookingId}`,
+          );
+        } catch (e) {
+          if (e instanceof PayLinkCheckoutError && e.code === 'UNAVAILABLE' && order.paymentUrl) {
+            window.location.assign(order.paymentUrl); // the checkout window cannot open here: Razorpay's hosted link still works
+            return;
+          }
+          setActionError(e instanceof Error ? e.message : 'The payment did not go through. You have not been charged. Please try again.');
+          return;
+        }
+        await confirmPayment(result, order.bookingId);
       } else if (order.paymentUrl) {
         window.location.assign(order.paymentUrl);
       } else {
@@ -78,7 +128,18 @@ export default function PayLinkPage() {
     } finally {
       setBusy(false);
     }
-  }, [token]);
+  }, [token, summary, confirmPayment]);
+
+  const checkAgain = useCallback(async () => {
+    if (!unconfirmed) return;
+    setChecking(true);
+    setActionError(null);
+    try {
+      await confirmPayment(unconfirmed, summary?.bookingId ?? 0);
+    } finally {
+      setChecking(false);
+    }
+  }, [unconfirmed, summary, confirmPayment]);
 
   const iHavePaid = useCallback(async () => {
     if (!upi) return;
@@ -136,7 +197,7 @@ export default function PayLinkPage() {
             </p>
           )}
 
-          {!summary.alreadyPaid && summary.mode === 'RAZORPAY' && (
+          {!summary.alreadyPaid && summary.mode === 'RAZORPAY' && !unconfirmed && (
             <button
               type="button"
               onClick={() => void startPayment()}
@@ -173,6 +234,18 @@ export default function PayLinkPage() {
               busy={reporting}
               error={actionError}
             />
+          )}
+
+          {unconfirmed && (
+            <button
+              type="button"
+              onClick={() => void checkAgain()}
+              disabled={checking}
+              className="mt-3 w-full rounded-lg border border-emerald-700 px-4 py-3 text-base font-semibold text-emerald-800 disabled:opacity-60"
+              data-testid="pay-link-check-again"
+            >
+              {checking ? 'Checking your payment…' : 'Check my payment again'}
+            </button>
           )}
 
           {actionError && !upi && (
