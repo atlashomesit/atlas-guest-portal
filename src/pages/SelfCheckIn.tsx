@@ -7,6 +7,7 @@ import { getTenantBrandName } from "../tenant/displayBrand";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
+import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
 
 interface CheckinDetails {
   /** BNB-009: lets the page reach the booking-link-token guest endpoints (meal preferences). */
@@ -1048,11 +1049,9 @@ export default function SelfCheckIn() {
             <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
               <InfoRow label="Check-in" value={`${details.checkinDate} at ${details.checkinTime}`} />
               <InfoRow label="Check-out" value={`${details.checkoutDate} at ${details.checkoutTime}`} />
-              {details.wifiName && <InfoRow label="WiFi" value={details.wifiName} />}
-              {details.wifiPassword && <InfoRow label="WiFi password" value={details.wifiPassword} />}
-              {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
               {details.emergencyContactPhone && <InfoRow label="Emergency" value={details.emergencyContactPhone} />}
             </div>
+            <StayAccessBlock wifiName={details.wifiName} wifiPass={details.wifiPassword} doorCode={details.doorCode} />
 
             {/* TASK-102915: split-stay legs in date order. Rendered only when the
                 API returns more than one leg; single-room bookings (no `stays`)
@@ -1924,9 +1923,7 @@ export default function SelfCheckIn() {
             )}
 
             <div className="rounded-xl bg-bg-page border border-border-subtle p-4 text-left text-sm mb-6">
-              {details.wifiName && <InfoRow label="WiFi" value={details.wifiName} />}
-              {details.wifiPassword && <InfoRow label="WiFi password" value={details.wifiPassword} />}
-              {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
+              <StayAccessBlock wifiName={details.wifiName} wifiPass={details.wifiPassword} doorCode={details.doorCode} />
               {details.emergencyContactPhone && <InfoRow label="Emergency contact" value={details.emergencyContactPhone} />}
             </div>
 
@@ -1965,6 +1962,29 @@ export default function SelfCheckIn() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** GUEST-039: Wi-Fi + door code with 1-tap Copy, and a scan-to-connect Wi-Fi QR. Renders nothing when there is nothing to show. */
+function StayAccessBlock({ wifiName, wifiPass, doorCode }: { wifiName?: string | null; wifiPass?: string | null; doorCode?: string | null }) {
+  if (!wifiName && !wifiPass && !doorCode) return null;
+  return (
+    <div className="mb-5" data-testid="stay-access-block">
+      {wifiName && <CopyableInfoRow label="WiFi" value={wifiName} copyAriaLabel="Copy Wi-Fi network name" copyTestId="copy-wifi-name-btn" />}
+      {wifiPass && <CopyableInfoRow label="WiFi password" value={wifiPass} mono copyAriaLabel="Copy Wi-Fi password" copyTestId="copy-wifi-password-btn" />}
+      {wifiName && <WifiScanToConnect ssid={wifiName} passphrase={wifiPass} />}
+      {doorCode && (
+        <CopyableInfoRow
+          label="Door code"
+          value={doorCode}
+          mono
+          copyLabel="Copy Code"
+          copyAriaLabel="Copy door code"
+          copyTestId="copy-door-code-btn"
+          valueTestId="door-code-value"
+        />
+      )}
     </div>
   );
 }

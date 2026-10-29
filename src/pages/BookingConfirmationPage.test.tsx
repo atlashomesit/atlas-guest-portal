@@ -267,3 +267,58 @@ describe("BookingConfirmationPage door code access & key card (GUEST-053)", () =
     expect(screen.getByText("Complete Web Check-In")).toBeInTheDocument();
   });
 });
+
+describe("BookingConfirmationPage Wi-Fi copy + scan-to-connect (GUEST-039)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  test("Wi-Fi card has Copy for network and password, and a Scan to Connect QR with the WIFI: payload", async () => {
+    window.sessionStorage.setItem("booking_101_payment_status", "success");
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: writeTextMock } });
+    vi.mocked(global.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/guest/bookings/101/summary")) {
+        return jsonResponse({ ...summaryBody, bookingRef: "ATL-101", wifiVisible: true, wifiName: "LakeLoft-Guest", wifiPassword: "pass-1234" });
+      }
+      if (url.includes("/api/public/bookings/101/modification-requests")) return jsonResponse([]);
+      if (url.includes("/listings/777/add-ons")) return jsonResponse([]);
+      if (url.includes("/bookings/101/payment-status")) return jsonResponse({ status: "Paid" });
+      return jsonResponse({});
+    });
+
+    renderPage("/booking/101?t=tok-wifi");
+    await settle();
+
+    fireEvent.click(screen.getByTestId("copy-wifi-password-btn"));
+    await settle();
+    expect(writeTextMock).toHaveBeenCalledWith("pass-1234");
+    expect(screen.getByTestId("copy-wifi-password-btn")).toHaveTextContent("Copied! ✓");
+
+    fireEvent.click(screen.getByTestId("copy-wifi-name-btn"));
+    await settle();
+    expect(writeTextMock).toHaveBeenCalledWith("LakeLoft-Guest");
+
+    expect(screen.queryByTestId("wifi-qr-card")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("wifi-scan-to-connect-btn"));
+    expect(screen.getByTestId("wifi-qr-payload")).toHaveAttribute("data-payload", "WIFI:S:LakeLoft-Guest;T:WPA;P:pass-1234;;");
+  });
+
+  test("no Wi-Fi Copy or QR while the details are not visible yet", async () => {
+    window.sessionStorage.setItem("booking_101_payment_status", "success");
+    vi.mocked(global.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/guest/bookings/101/summary")) return jsonResponse({ ...summaryBody, bookingRef: "ATL-101", wifiVisible: false, wifiName: "Hidden", wifiPassword: "hidden" });
+      if (url.includes("/api/public/bookings/101/modification-requests")) return jsonResponse([]);
+      if (url.includes("/listings/777/add-ons")) return jsonResponse([]);
+      if (url.includes("/bookings/101/payment-status")) return jsonResponse({ status: "Paid" });
+      return jsonResponse({});
+    });
+    renderPage("/booking/101?t=tok-wifi");
+    await settle();
+    expect(screen.queryByTestId("copy-wifi-password-btn")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("wifi-scan-to-connect-btn")).not.toBeInTheDocument();
+  });
+});

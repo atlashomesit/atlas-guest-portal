@@ -5,6 +5,7 @@ import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantListingAddress, getTenantOverrides } from "../tenant/tenantOverrides";
 import { useLocation, useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
+import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
 import SEO from "../components/SEO";
 import WeatherWidget from "../components/WeatherWidget";
 import ErrorDisplay, { type ErrorResponse as ApiErrorResponse, type RecoveryAction as ApiRecoveryAction } from "../components/ErrorDisplay";
@@ -1629,9 +1630,15 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-3">📶 WiFi</h2>
             <div className="space-y-0">
-              {booking.wifiName && <InfoRow label="Network" value={booking.wifiName} />}
-              {booking.wifiPassword && <InfoRow label="Password" value={booking.wifiPassword} mono />}
+              {booking.wifiName && (
+                <CopyableInfoRow label="Network" value={booking.wifiName} copyAriaLabel="Copy Wi-Fi network name" copyTestId="copy-wifi-name-btn" />
+              )}
+              {booking.wifiPassword && (
+                <CopyableInfoRow label="Password" value={booking.wifiPassword} mono copyAriaLabel="Copy Wi-Fi password" copyTestId="copy-wifi-password-btn" />
+              )}
             </div>
+            {/* GUEST-039: standard WIFI: QR so a phone camera joins in one tap */}
+            {booking.wifiName && <WifiScanToConnect ssid={booking.wifiName} passphrase={booking.wifiPassword} />}
           </div>
         )}
 
