@@ -57,7 +57,7 @@ import {
 import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
-import { previewListingDescription } from '../../../utils/listingDescription';
+import { previewListingDescription, withoutInternalCodeDescription } from '../../../utils/listingDescription';
 import { repairMojibake } from '../../../utils/textUtils';
 import {
   buildGuestImageSrcSet,
@@ -1776,7 +1776,7 @@ useEffect(() => {
     // "About this home": the host's own description wins; the "Ask them" empty state only shows
     // once GET /listings/{id} has confirmed there is none (no flash before the detail lands).
     // GUEST-038: pass descriptions through repairMojibake to fix double-encoded UTF-8 sequences.
-    const ppAboutText = repairMojibake(hostDescription.text || data.property_description?.trim() || '');
+    const ppAboutText = repairMojibake(hostDescription.text || withoutInternalCodeDescription(data.property_description) || '');
     const ppAboutPreview = previewListingDescription(ppAboutText);
     const ppShowAboutAskHost = !ppAboutText && !!ppWaAskUrl && hostDescription.loaded;
     const ppShowRegRow = (ppTenantOverrides.gstin != null) ||

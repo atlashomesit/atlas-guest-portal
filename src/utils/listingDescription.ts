@@ -1,6 +1,25 @@
 import { repairMojibake } from './textUtils';
 
 /**
+ * TASK-10299260: true when a "description" is only an internal listing code ("Atlas301", "Atlas501_PH", "FF101")
+ * - one token of letters then digits with no sentence around it. That is the host's channel-manager room code,
+ * not a description, so the page treats it as no description (neutral "ask the host" line) instead of printing
+ * the code under "About this home". Real prose has spaces; a bare "Atlas 301" counts too.
+ */
+export function isInternalCodeOnlyDescription(text: string | null | undefined): boolean {
+  const t = (text ?? '').trim();
+  if (!t) return false;
+  if (/^atlas\s*\d+[A-Za-z0-9_-]*$/i.test(t)) return true;
+  return /^[A-Za-z]{2,}[-_]?\d+[A-Za-z0-9_-]*$/.test(t);
+}
+
+/** `text` unchanged, or '' when it is only an internal listing code (see isInternalCodeOnlyDescription). */
+export function withoutInternalCodeDescription(text: string | null | undefined): string {
+  const t = (text ?? '').trim();
+  return isInternalCodeOnlyDescription(t) ? '' : t;
+}
+
+/**
  * Resolves the "About this home" copy for the listing page.
  *
  * Requirement: show the description the host entered in the admin portal under
@@ -24,7 +43,7 @@ export function resolveHostListingDescription(
     payload.ShortDescription,
   ];
   for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0 && !isInternalCodeOnlyDescription(candidate)) {
       return repairMojibake(candidate.trim());
     }
   }
