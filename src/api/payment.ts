@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from './client';
+import { getAgentCode } from '@/lib/agentCode';
 
 export interface CreateOrderPayload {
   holdId?: number;
@@ -9,6 +10,8 @@ export interface CreateOrderPayload {
     checkoutDate: string;
     guests: number;
     listingRatePlanId?: number | null;
+    /** PRICE-016: the travel agent's access code, sent only with a chosen rate plan. */
+    agentAccessCode?: string;
   };
   currency?: string;
   amount?: number;
@@ -47,10 +50,16 @@ export async function createOrder(
 ): Promise<Response> {
   const url = buildApiUrl('/api/Razorpay/order');
   const headers = getOrderRequestHeaders(idempotencyKey, tenantSlug);
+  // PRICE-016: an order that names a rate plan carries the agent's code (if the guest came through an agent's
+  // link) so the server can honour an agent-only plan; a wrong or missing code books the public rate.
+  const agentCode = payload.bookingDraft?.listingRatePlanId != null ? getAgentCode() : null;
+  const body = agentCode && payload.bookingDraft
+    ? { ...payload, bookingDraft: { ...payload.bookingDraft, agentAccessCode: agentCode } }
+    : payload;
   return fetch(url, {
     method: 'POST',
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
 }
 
