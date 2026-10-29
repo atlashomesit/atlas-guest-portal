@@ -322,3 +322,38 @@ describe("BookingConfirmationPage Wi-Fi copy + scan-to-connect (GUEST-039)", () 
     expect(screen.queryByTestId("wifi-scan-to-connect-btn")).not.toBeInTheDocument();
   });
 });
+
+describe("BookingConfirmationPage security-deposit hold status (PAY-006)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  const mockSummary = (extra: Record<string, unknown>) =>
+    vi.mocked(global.fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/api/guest/bookings/101/summary")) return jsonResponse({ ...summaryBody, bookingRef: "ATL-101", ...extra });
+      if (url.includes("/api/public/bookings/101/modification-requests")) return jsonResponse([]);
+      if (url.includes("/listings/777/add-ons")) return jsonResponse([]);
+      if (url.includes("/bookings/101/payment-status")) return jsonResponse({ status: "Paid" });
+      return jsonResponse({});
+    });
+
+  test("shows the hold status, amount and bank-authorization countdown when the summary carries a hold", async () => {
+    window.sessionStorage.setItem("booking_101_payment_status", "success");
+    mockSummary({ depositHold: { status: "Authorized", amountInr: 5000, holdExpiresAtUtc: new Date(Date.now() + 3 * 86400000 + 3600000).toISOString() } });
+    renderPage("/booking/101?t=tok-dep");
+    await settle();
+    expect(screen.getByTestId("guest-deposit-hold-status")).toHaveTextContent("Held on your card");
+    expect(screen.getByTestId("guest-deposit-hold-detail")).toHaveTextContent("₹5,000");
+    expect(screen.getByTestId("guest-deposit-hold-countdown")).toHaveTextContent(/3 days/);
+  });
+
+  test("shows no deposit card when the booking has no hold", async () => {
+    window.sessionStorage.setItem("booking_101_payment_status", "success");
+    mockSummary({});
+    renderPage("/booking/101?t=tok-dep");
+    await settle();
+    expect(screen.queryByTestId("guest-deposit-hold-card")).not.toBeInTheDocument();
+  });
+});

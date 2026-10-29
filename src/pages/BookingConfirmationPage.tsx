@@ -6,6 +6,7 @@ import { getTenantListingAddress, getTenantOverrides } from "../tenant/tenantOve
 import { useLocation, useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
 import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
+import GuestDepositHoldCard, { type GuestDepositHold } from "@/components/stay/GuestDepositHoldCard"; // PAY-006
 import SEO from "../components/SEO";
 import WeatherWidget from "../components/WeatherWidget";
 import ErrorDisplay, { type ErrorResponse as ApiErrorResponse, type RecoveryAction as ApiRecoveryAction } from "../components/ErrorDisplay";
@@ -229,6 +230,8 @@ interface BookingSummary {
   mealPreferences?: GuestMealPreferences | null;
   /** PAY-009: refunds on this booking (newest first); empty/absent = no tracker. */
   refunds?: GuestRefund[];
+  /** PAY-006: the refundable security-deposit card hold on this booking (status, amount, expiry); absent = no hold, no card. */
+  depositHold?: GuestDepositHold | null;
   /** PAY-010: the guest said they paid the host's UPI link / QR; the host has not confirmed yet. NOT paid. */
   awaitingHostPaymentConfirmation?: boolean;
   /** TASK-1296: guest referral code (e.g. FRIEND42) for the WhatsApp share button. */
@@ -1624,6 +1627,9 @@ export default function BookingConfirmationPage() {
             />
           </Suspense>
         )}
+
+        {/* PAY-006: security-deposit card-hold status (Authorized / Captured / Released) with the bank-authorization countdown */}
+        {!isCancelled && <GuestDepositHoldCard hold={booking.depositHold} bookingId={booking.bookingId ?? bookingId ?? ''} token={token} />}
 
         {/* WiFi */}
         {!isCancelled && booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
