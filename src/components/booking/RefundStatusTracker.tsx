@@ -89,6 +89,8 @@ export default function RefundStatusTracker({ refunds, currency = 'INR' }: Refun
         const initiated = formatIstDate(r.initiatedAtUtc);
         const processed = r.status === 'processed' ? formatIstDate(r.processedAtUtc) : null;
         const reference = r.status === 'processed' && r.bankReference ? r.bankReference : null;
+        // PAY-017: a refund the host recorded by hand (UPI / bank transfer) carries the UTR the host typed - shown as the host's reference, never as a bank confirmation.
+        const hostReference = r.status === 'recorded_by_host' && r.bankReference ? r.bankReference : null;
         return (
           <div key={i} className="space-y-1.5" data-testid="refund-status-item" data-status={r.status}>
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -121,6 +123,14 @@ export default function RefundStatusTracker({ refunds, currency = 'INR' }: Refun
                   <dt>Bank reference (ARN)</dt>
                   <dd data-testid="refund-bank-reference" className="font-mono text-text-primary break-all">
                     {reference ?? 'Not available yet'}
+                  </dd>
+                </>
+              )}
+              {hostReference && (
+                <>
+                  <dt>Transfer reference (UTR)</dt>
+                  <dd data-testid="refund-host-reference" className="font-mono text-text-primary break-all">
+                    {hostReference}
                   </dd>
                 </>
               )}
