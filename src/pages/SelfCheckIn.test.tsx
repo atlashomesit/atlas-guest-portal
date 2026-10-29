@@ -277,3 +277,48 @@ describe("SelfCheckIn FRRO Form C nationality & stay-date validation (GUEST-041)
     expect(screen.queryByTestId("checkin-passport-expiry-error")).not.toBeInTheDocument();
   });
 });
+
+describe("SelfCheckIn Wi-Fi and door code Copy + scan-to-connect (GUEST-039)", () => {
+  test("completed stay screen: Copy on network, password and door code, and a QR with the WIFI: payload", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    fetchMock().mockResolvedValueOnce(
+      json({
+        ...details,
+        wifiName: "LakeLoft-Guest",
+        wifiPassword: "pass-1234",
+        doorCode: "5678",
+        checkInSubmittedAtUtc: "2026-10-25T14:30:00Z",
+        isCompleted: true,
+      }),
+    );
+
+    renderAt("/check-in/ATL-4242?t=tok-123");
+    await settle();
+
+    fireEvent.click(screen.getByTestId("copy-door-code-btn"));
+    await settle();
+    expect(writeText).toHaveBeenCalledWith("5678");
+    expect(screen.getByTestId("copy-door-code-btn")).toHaveTextContent("Copied! ✓");
+
+    fireEvent.click(screen.getByTestId("copy-wifi-password-btn"));
+    await settle();
+    expect(writeText).toHaveBeenCalledWith("pass-1234");
+
+    fireEvent.click(screen.getByTestId("wifi-scan-to-connect-btn"));
+    expect(screen.getByTestId("wifi-qr-payload")).toHaveAttribute("data-payload", "WIFI:S:LakeLoft-Guest;T:WPA;P:pass-1234;;");
+  });
+
+  test("summary step shows the same Copy buttons; nothing renders when there is no Wi-Fi or door code", async () => {
+    fetchMock().mockResolvedValueOnce(json({ ...details, wifiName: "LakeLoft-Guest", wifiPassword: "pass-1234", doorCode: "5678" }));
+    renderAt("/check-in/ATL-4242?t=tok-123");
+    await settle();
+    expect(screen.getByTestId("copy-door-code-btn")).toBeInTheDocument();
+    cleanup();
+
+    fetchMock().mockResolvedValueOnce(json(details));
+    renderAt("/check-in/ATL-4242?t=tok-123");
+    await settle();
+    expect(screen.queryByTestId("stay-access-block")).not.toBeInTheDocument();
+  });
+});

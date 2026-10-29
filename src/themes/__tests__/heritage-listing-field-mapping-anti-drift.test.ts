@@ -3,8 +3,8 @@
  * `property_reviews` / `property_price` in snake_case only. The API (`PublicListingDto`, no
  * `JsonNamingPolicy` override in `Program.cs`) emits camelCase — `propertyRating` /
  * `reviewCount` / `baseNightlyRate` — so every real DB-backed listing collapsed all three to 0.
- * That silently killed the TASK-4015 "Save ~₹X by booking directly" conversion banner
- * (`data.property_price > 0` gate) on every heritage tenant.
+ * That silently zeroed `property_price` on every heritage tenant (GUEST-037 later removed the TASK-4015
+ * "Save ~₹X by booking directly" banner that read it, because its figure was invented).
  *
  * TASK-5196 fixed the identical bug in the classic sibling (`Homepage_PropertyDetails.tsx`),
  * which reads camelCase first with snake_case kept only as a `??` fallback. This test doesn't
@@ -145,34 +145,27 @@ describe("TASK-8221: heritage/default listing field mapping reads camelCase with
   });
 });
 
-describe("TASK-8221: TASK-4015 'Save ~₹X by booking directly' banner renders once property_price is mapped", () => {
+describe("GUEST-037: the fixed-15.5% 'Save ~₹X by booking directly' banner (TASK-4015) is gone from both surfaces", () => {
+  // TASK-8221 originally guarded that this banner renders once property_price is mapped. GUEST-037 (P0 copy honesty)
+  // removed the banner itself: Atlas holds no real OTA price for a stay, so any saving figure was invented.
+  // The property_price mapping above is still guarded because other surfaces read it.
   const contents = Object.fromEntries(
     SURFACES.map(({ label, path }) => [label, readFileSync(path, "utf-8")]),
   );
 
   for (const { label } of SURFACES) {
-    it(`${label}: banner gate is 'data.property_price > 0'`, () => {
-      expect(contents[label]).toContain("data.property_price && data.property_price > 0 && (");
+    it(`${label}: renders no fixed-percentage saving banner`, () => {
+      expect(contents[label]).not.toContain("save-vs-ota-delta");
+      expect(contents[label]).not.toContain("saveVsOtaAmount");
+      expect(contents[label]).not.toMatch(/Save ~/);
+      expect(contents[label]).not.toMatch(/by booking directly/);
+      expect(contents[label]).not.toMatch(/OTA platforms that charge/);
     });
 
-    it(`${label}: banner formula computes the expected savings figure`, () => {
-      const m = contents[label].match(/Math\.round\((data\.property_price \* [\d.]+ \* [\d.]+)\)/);
-      expect(m, "Math.round(...) savings formula not found").not.toBeNull();
-      const fn = new Function("data", `return Math.round(${m![1]});`);
-
-      // Using the TASK-8221 fixture: baseNightlyRate 4200 -> property_price 4200 once mapped.
+    it(`${label}: property_price is still mapped (camelCase first) for the other readers`, () => {
       const { evaluable } = extractMappingExpr(contents[label], "property_price");
-      const property_price = evalMapping(evaluable, { baseNightlyRate: 4200 });
-      expect(property_price).toBe(4200);
-      expect(fn({ property_price })).toBe(1302);
-    });
-
-    it(`${label}: banner does not render when property_price is 0 (pre-fix behaviour)`, () => {
-      const { evaluable } = extractMappingExpr(contents[label], "property_price");
-      const property_price = evalMapping(evaluable, {});
-      expect(property_price).toBe(0);
-      // gate is `data.property_price && ...` — 0 is falsy, so the banner block is skipped.
-      expect(Boolean(property_price)).toBe(false);
+      expect(evalMapping(evaluable, { baseNightlyRate: 4200 })).toBe(4200);
+      expect(evalMapping(evaluable, {})).toBe(0);
     });
   }
 });

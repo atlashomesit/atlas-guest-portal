@@ -179,8 +179,8 @@ describe("PropertyMobileStickyBar", () => {
   });
 });
 
-describe("approved booking review shortcut (UXV-2026-10-18-04)", () => {
-  it("focuses the ready booking form without submitting, then returns to dates as readiness changes", () => {
+describe("one-tap reserve from the sticky bar (GUEST-040, supersedes the UXV-2026-10-18-04 scroll-only shortcut)", () => {
+  it("presses the form Reserve button directly when ready, then returns to dates as readiness changes", () => {
     const trigger = document.createElement("button"); trigger.id = "unit-booking-dates";
     const openDates = vi.fn(); trigger.addEventListener("click", openDates);
     const form = document.createElement("form"); form.dataset.testid = "guest-booking-form"; form.tabIndex = -1; form.dataset.canReviewBooking = "true";
@@ -193,11 +193,12 @@ describe("approved booking review shortcut (UXV-2026-10-18-04)", () => {
     const props = { bookable: true, nightlyFallback: 3500, nightlyIsSynthetic: false, onReserveClick: vi.fn() };
     const view = render(<PropertyMobileStickyBar {...props} summary={ready} />);
     fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
-    expect(screen.getByTestId("mobile-sticky-book-now")).toHaveTextContent("Review booking");
-    expect(form).toHaveFocus();
-    expect(form.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
-    expect(reserveClick).not.toHaveBeenCalled();
-    expect(submit).not.toHaveBeenCalled();
+    // GUEST-040: the CTA names the total and one tap goes straight to the form's own Reserve handler (no scroll back up).
+    expect(screen.getByTestId("mobile-sticky-book-now")).toHaveTextContent(/^Reserve — ₹10,605$/);
+    expect(screen.getByTestId("mobile-sticky-book-now")).not.toHaveTextContent("Review booking");
+    expect(reserveClick).toHaveBeenCalledTimes(1);
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(form.scrollIntoView).not.toHaveBeenCalled();
     expect(openDates).not.toHaveBeenCalled();
     // A child render can invalidate readiness before the summary effect reaches the bar.
     form.dataset.canReviewBooking = "false";
@@ -215,13 +216,29 @@ describe("approved booking review shortcut (UXV-2026-10-18-04)", () => {
       { ...ready, canReviewBooking: false },
     ]) {
       view.rerender(<PropertyMobileStickyBar {...props} summary={summary} />);
-      expect(screen.getByTestId("mobile-sticky-book-now")).not.toHaveTextContent("Review booking");
+      expect(screen.getByTestId("mobile-sticky-book-now")).not.toHaveTextContent(/^Reserve — /);
       fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
     }
     expect(openDates).toHaveBeenCalledTimes(6);
-    expect(reserveClick).not.toHaveBeenCalled();
-    expect(submit).not.toHaveBeenCalled();
+    // Only the first, ready tap pressed Reserve; every not-ready state kept the guest on the date sheet.
+    expect(reserveClick).toHaveBeenCalledTimes(1);
+    expect(submit).toHaveBeenCalledTimes(1);
     view.unmount(); form.remove(); trigger.remove();
+  });
+
+  it("brings an unfulfilled required control into view instead of opening dates (GUEST-040 done-when 3)", () => {
+    const trigger = document.createElement("button"); trigger.id = "unit-booking-dates";
+    const openDates = vi.fn(); trigger.addEventListener("click", openDates);
+    const form = document.createElement("form"); form.dataset.testid = "guest-booking-form"; form.dataset.canReviewBooking = "false";
+    const missing = document.createElement("input"); missing.setAttribute("aria-invalid", "true"); missing.scrollIntoView = vi.fn();
+    form.append(missing);
+    document.body.append(trigger, form);
+    render(<PropertyMobileStickyBar bookable nightlyFallback={3500} nightlyIsSynthetic={false} onReserveClick={vi.fn()} summary={{ hasCompleteDates: true, totalAmount: 9000, pricingPending: false, freeCancelUntil: null, canReviewBooking: false }} />);
+    fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
+    expect(missing.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    expect(missing).toHaveFocus();
+    expect(openDates).not.toHaveBeenCalled();
+    form.remove(); trigger.remove();
   });
 
   it("renders selected rate plan & meal badge and scrolls to widget on 'Change plan / details' when multiple rate plans exist (GUEST-022)", () => {

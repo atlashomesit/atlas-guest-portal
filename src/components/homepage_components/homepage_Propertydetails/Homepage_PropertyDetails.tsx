@@ -1,5 +1,4 @@
 import MarketplaceHostIdentity from '@/components/property/MarketplaceHostIdentity';
-import { saveVsOtaAmount } from '@/utils/guestCopy';
 import './Homepage_PropertyDetails.css';
 import RatingDistribution from '../../property/RatingDistribution';
 import { starDistribution } from '../../property/starDistribution';
@@ -2986,24 +2985,6 @@ useEffect(() => {
                       />
                     </Suspense>
 
-                    {/* TASK-4015: Save vs OTA delta */}
-                    {saveVsOtaAmount(data.property_price) != null && (
-                      <div style={{
-                        marginTop: 16,
-                        padding: '12px 14px',
-                        borderRadius: 8,
-                        background: '#e9f5ef',
-                        border: '1px solid #d2ebde',
-                      }} data-testid="save-vs-ota-delta">
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#157046', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span>💰</span>
-                          <span>Save ~₹{(saveVsOtaAmount(data.property_price) ?? 0).toLocaleString('en-IN')} by booking directly</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: '#157046', marginTop: 4 }}>
-                          vs OTA platforms that charge 15–18%
-                        </div>
-                      </div>
-                    )}
                   </>
                 )}
 

@@ -214,17 +214,27 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
   const canReviewBooking = Boolean(summary?.canReviewBooking && summary.hasCompleteDates && !summary.datesUnavailable && !summary.pricingPending && summary.totalAmount != null && summary.totalAmount > 0);
 
   const handleReserve = React.useCallback(() => {
+    const form =
+      document.querySelector<HTMLElement>(STICKY_BAR_BOOKING_FORM_SELECTOR) ??
+      document.querySelector<HTMLElement>("[data-booking-widget]");
     if (canReviewBooking) {
-      const form =
-        document.querySelector<HTMLElement>(STICKY_BAR_BOOKING_FORM_SELECTOR) ??
-        document.querySelector<HTMLElement>("[data-booking-widget]");
       const submit = form?.querySelector<HTMLButtonElement>('[data-testid="guest-booking-submit"]');
-      // The form reflects the current widget render even before its summary effect propagates.
+      // GUEST-040: one tap goes straight to checkout. The form's own Reserve handler hands the stay to the details page
+      // (dates, guests, rate plan, quote, add-ons) with no network call, so the sticky bar presses that same button
+      // instead of scrolling the guest back up to find it. The form reflects the current widget render even before
+      // its summary effect propagates, so readiness is re-read from it.
       if (form?.dataset.canReviewBooking === "true" && submit && !submit.disabled) {
-        form.scrollIntoView({ behavior: "smooth", block: "start" });
-        form.focus({ preventScroll: true });
+        submit.click();
         return;
       }
+    }
+    // GUEST-040: a required control the guest has not filled in is brought into view (and focused) instead of
+    // leaving them on a bar that does nothing.
+    const unfulfilled = form?.querySelector<HTMLElement>('[aria-invalid="true"], [data-required-missing="true"]');
+    if (unfulfilled) {
+      unfulfilled.scrollIntoView({ behavior: "smooth", block: "center" });
+      unfulfilled.focus({ preventScroll: true });
+      return;
     }
     // Primary: open the existing date-picker bottom sheet directly. It renders
     // fixed on mobile, so no scroll is needed. Fallback: scroll to the form.
@@ -436,9 +446,9 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
         data-testid="mobile-sticky-book-now"
         onClick={handleReserve}
         tabIndex={isVisible ? 0 : -1}
-        aria-label={canReviewBooking ? "Review selected dates and price" : datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
+        aria-label={canReviewBooking ? `Reserve and continue to checkout, ${formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })} total` : datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
       >
-        {canReviewBooking ? "Review booking" : datesUnavailable ? "Change dates" : "Reserve"}
+        {canReviewBooking ? `Reserve — ${formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })}` : datesUnavailable ? "Change dates" : "Reserve"}
       </button>
     </div>
   );
