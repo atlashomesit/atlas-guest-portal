@@ -149,6 +149,10 @@ export type BookingStickySummary = {
   stayLabel?: string | null;
 };
 
+/** One quiet automatic re-fetch after a real pricing failure (a dropped connection, a busy API), then the guest's own "Try again". */
+const PRICING_AUTO_RETRIES = 1;
+const PRICING_AUTO_RETRY_DELAY_MS = 1500;
+
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
 /**
  * GUEST-048: the cover preview above the date fields. Until the picture has really loaded - and for good
@@ -324,6 +328,33 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // a genuine failure on the other.
   const [shownMonthPricingFailed, setShownMonthPricingFailed] = useState(false);
   const [selectedRangePricingFailed, setSelectedRangePricingFailed] = useState(false);
+  // A pricing fetch that failed for a transient reason (dropped connection, a busy API) used to strand the guest on
+  // "Couldn't load prices" with a disabled Reserve and no way forward except re-picking the dates. The nonce re-runs
+  // BOTH pricing effects: once by itself shortly after the first failure, and on the guest's "Try again" tap.
+  const [pricingRetryNonce, setPricingRetryNonce] = useState(0);
+  // One automatic re-fetch PER pricing effect (shown month / selected range): a success on the other effect must not hand a
+  // failing one a fresh allowance, or a stay that keeps failing would re-fetch every 1.5 s for ever.
+  const pricingAutoRetriesRef = useRef({ month: 0, range: 0 });
+  const pricingAutoRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryPricing = useCallback(() => {
+    if (pricingAutoRetryTimerRef.current) {
+      clearTimeout(pricingAutoRetryTimerRef.current);
+      pricingAutoRetryTimerRef.current = null;
+    }
+    setPricingRetryNonce((n) => n + 1);
+  }, []);
+  /** Called by a pricing effect when its fetch failed for real (not an abort): one quiet automatic retry, then the guest decides. */
+  const scheduleAutomaticPricingRetry = useCallback((which: 'month' | 'range') => {
+    if (pricingAutoRetriesRef.current[which] >= PRICING_AUTO_RETRIES || pricingAutoRetryTimerRef.current) return;
+    pricingAutoRetriesRef.current[which] += 1;
+    pricingAutoRetryTimerRef.current = setTimeout(() => {
+      pricingAutoRetryTimerRef.current = null;
+      setPricingRetryNonce((n) => n + 1);
+    }, PRICING_AUTO_RETRY_DELAY_MS);
+  }, []);
+  useEffect(() => () => {
+    if (pricingAutoRetryTimerRef.current) clearTimeout(pricingAutoRetryTimerRef.current);
+  }, []);
   // TASK-4331 / TASK-7016: authoritative server quote (charge engine, not calendar display engine).
   const [serverPriceBreakdown, setServerPriceBreakdown] = useState<GuestPriceBreakdown | null>(null);
   // GUEST-048: which stay (dates | rate plan | guests) the quote above was fetched for, and which stay's fetch has finished (answered OR failed).
@@ -956,6 +987,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
         setShownMonthPricingFailed(false);
+        pricingAutoRetriesRef.current.month = 0;
       })
       .catch((error: unknown) => {
         // Fetch failure: leave any already-merged prices in place rather than clearing the
@@ -964,14 +996,19 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // TASK-4303: flag a genuine failure (not an unmount/StrictMode abort) so the
         // pricing-pending gate below can degrade to the fallback estimate instead of
         // holding the skeleton forever.
-        if ((error as Error)?.name !== 'AbortError') setShownMonthPricingFailed(true);
+        // A fetch that was superseded (the effect re-ran, or unmounted) says nothing about the CURRENT stay: it must neither
+        // raise the failure flag a newer fetch just cleared nor spend the automatic retry.
+        if ((error as Error)?.name !== 'AbortError' && !controller.signal.aborted) {
+          setShownMonthPricingFailed(true);
+          scheduleAutomaticPricingRetry('month');
+        }
       })
       .finally(() => {
         setCalendarPricingLoading(false);
         if (trackOpen) endCalendarOpenPricingFetch(gen);
       });
     return () => controller.abort();
-  }, [listingId, shownMonthIso, verifiedTenantSlug]);
+  }, [listingId, shownMonthIso, verifiedTenantSlug, pricingRetryNonce, scheduleAutomaticPricingRetry]);
 
   // TASK-4327: when a range is selected, ensure ITS months are (re-)fetched on calendar
   // open — not just the 3 months from `shownMonthIso` (which resets to today's month on
@@ -1042,12 +1079,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
         setSelectedRangePricingFailed(false);
+        pricingAutoRetriesRef.current.range = 0;
       })
       .catch((error: unknown) => {
-        if ((error as Error)?.name !== 'AbortError') setSelectedRangePricingFailed(true);
+        if ((error as Error)?.name !== 'AbortError' && !controller.signal.aborted) {
+          setSelectedRangePricingFailed(true);
+          scheduleAutomaticPricingRetry('range');
+        }
       });
     return () => controller.abort();
-  }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso, verifiedTenantSlug]);
+  }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso, verifiedTenantSlug, pricingRetryNonce, scheduleAutomaticPricingRetry]);
 
   // TASK-7491: fetch per-day `bookable` (rate-sync-authority opt-out) so the calendar can fail
   // closed on a date with no usable inbound rate — never a guessed price. Three effects mirror
@@ -1775,6 +1816,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     (hasSelectedRange && !rangePricingPending && isNaN(finalTotal));
   const canReviewBooking = hasSelectedRange && !reserveDisabled && !calendarOpenPricingPending && displayFinalTotal > 0;
 
+  // A disabled Reserve must always say why. Every other blocker already speaks for itself (availability failed -> alert + Retry;
+  // dates unavailable -> headline + alert; pricing pending -> status; pricing failed -> alert + Try again; service down -> banner;
+  // a past-dated or too-short range from a link -> the dateError alert set while hydrating). The one that used to leave a grey
+  // button and nothing else: a quote that came back as not-a-number (TASK-4729 disables Reserve for it).
+  const reserveBlockedNotice: string | null =
+    hasSelectedRange && !isSubmitting && !isBookingDisabled && !invalidIstStayRange && !datesUnavailable
+      && !rangePricingPending && !calendarPricingFailed && isNaN(finalTotal)
+      ? "We couldn't work out the price for these dates. Please pick them again or try again in a moment."
+      : null;
+
   const stickyStayLabel =
     hasSelectedRange && dateRange.startDate && dateRange.endDate
       ? `${format(dateRange.startDate, format(dateRange.startDate, 'MMM') === format(dateRange.endDate, 'MMM') ? 'd' : 'd MMM')}–${format(dateRange.endDate, 'd MMM')} · ${guests} guest${guests === 1 ? '' : 's'}`
@@ -2135,14 +2186,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <p className="lv-booking-sub" role="status">Fetching latest prices…</p>
           </>
         ) : hasSelectedRange && !invalidIstStayRange && calendarPricingFailed ? (
-          <>
+          <div role="alert" data-testid="bw-pricing-error-alert">
             <div className="lv-booking-total">
               <span className="text-sm text-text-warning" data-testid="bw-pricing-error">
                 Couldn't load prices
               </span>
             </div>
-            <p className="lv-booking-sub">Please try selecting dates again</p>
-          </>
+            <p className="lv-booking-sub">
+              Reserve is paused until the price loads.{' '}
+              <button
+                type="button"
+                onClick={retryPricing}
+                data-testid="bw-pricing-retry"
+                style={{ background: 'transparent', color: '#c2410c', border: '1px solid #c2410c', borderRadius: 8, padding: '2px 10px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
+              >
+                Try again
+              </button>
+            </p>
+          </div>
         ) : hasSelectedRange && !invalidIstStayRange && displayFinalTotal > 0 ? (
           <>
             {headlineDirectPrice && headlineDirectPrice.standardNightly != null && (
@@ -2748,6 +2809,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {formError && (
         <p className="text-sm text-support-error" role="alert" style={{ marginTop: 4 }}>
           {formError}
+        </p>
+      )}
+
+      {reserveBlockedNotice && (
+        <p className="text-sm text-support-error" role="alert" data-testid="bw-reserve-blocked-notice" style={{ marginTop: 4 }}>
+          {reserveBlockedNotice}
         </p>
       )}
 
