@@ -294,6 +294,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const [selectedRangePricingFailed, setSelectedRangePricingFailed] = useState(false);
   // TASK-4331 / TASK-7016: authoritative server quote (charge engine, not calendar display engine).
   const [serverPriceBreakdown, setServerPriceBreakdown] = useState<GuestPriceBreakdown | null>(null);
+  // GUEST-048: which stay (dates | rate plan | guests) the quote above was fetched for, and which stay's fetch has finished (answered OR failed).
+  // Without these the quote of the PREVIOUS dates was shown as the quote of the new ones until the new fetch landed.
+  const [serverPriceBreakdownKey, setServerPriceBreakdownKey] = useState<string | null>(null);
+  const [quoteSettledKey, setQuoteSettledKey] = useState<string | null>(null);
   // MRP-002: Public rate plans for this listing & selected rate plan ID.
   const [publicRatePlans, setPublicRatePlans] = useState<PublicListingRatePlanDto[]>([]);
   const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
@@ -1097,6 +1101,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   const gstRangeStartIso = dateRange?.startDate ? toCalendarISO(dateRange.startDate) : null;
   const gstRangeEndIso = dateRange?.endDate ? toCalendarISO(dateRange.endDate) : null;
+  const quoteKey = gstRangeStartIso && gstRangeEndIso ? `${gstRangeStartIso}|${gstRangeEndIso}|${selectedRatePlanId ?? ''}|${guests}` : null;
 
   // TASK-4331: fetch the server's own GST slab/amount for the selected range instead of
   // re-deriving 5%/18% client-side from a pre-adjustment per-night rate. The calendar
@@ -1140,10 +1145,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') {
       setServerPriceBreakdown(null);
+      setServerPriceBreakdownKey(null);
       return;
     }
     if (!gstRangeStartIso || !gstRangeEndIso) {
       setServerPriceBreakdown(null);
+      setServerPriceBreakdownKey(null);
       return;
     }
     const controller = new AbortController();
@@ -1157,13 +1164,19 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       verifiedTenantSlug,
     )
       .then((b) => {
+        if (controller.signal.aborted) return;
         setServerPriceBreakdown(b);
+        setServerPriceBreakdownKey(quoteKey);
+        setQuoteSettledKey(quoteKey);
       })
       .catch(() => {
+        if (controller.signal.aborted) return; // superseded by a newer stay: its own answer decides
         setServerPriceBreakdown(null);
+        setServerPriceBreakdownKey(null);
+        setQuoteSettledKey(quoteKey);
       });
     return () => controller.abort();
-  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests, verifiedTenantSlug]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests, verifiedTenantSlug, quoteKey]);
 
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
@@ -1530,10 +1543,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // of the provisional base-rate/₹0-fee number that would otherwise silently jump ~12% once
   // the pricing API responds. Only a terminal fetch failure degrades to the old fallback
   // estimate (graceful offline UX) — matching the widget's existing degradation pattern.
+  // GUEST-048: the server quote for THIS stay has not answered yet (after a date / guest / plan change): hold the skeleton instead of showing the previous stay's total.
+  const serverQuotePending =
+    hasSelectedRange && !invalidIstStayRange && Boolean(listingId && String(listingId).trim() !== '') && quoteKey != null && quoteSettledKey !== quoteKey;
   const rangePricingPending =
-    hasSelectedRange && !invalidIstStayRange && !selectedRangeNightsPriced && !calendarPricingFailed;
-  const serverGstMatchesSelection =
-    hasSelectedRange && gstRangeStartIso === toCalendarISO(dateRange.startDate!) && gstRangeEndIso === toCalendarISO(dateRange.endDate!);
+    hasSelectedRange && !invalidIstStayRange && ((!selectedRangeNightsPriced && !calendarPricingFailed) || serverQuotePending);
+  // GUEST-048: a quote counts only for the stay it was fetched for (this used to compare the selection with itself, so it was always true).
+  const serverGstMatchesSelection = hasSelectedRange && quoteKey != null && serverPriceBreakdownKey === quoteKey;
 
   const serverGstPercent =
     serverGstMatchesSelection && serverPriceBreakdown ? serverPriceBreakdown.gstPercent : null;
