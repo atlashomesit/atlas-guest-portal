@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import {
   Utensils,
@@ -509,6 +509,25 @@ export default function QrMenuPage() {
     [cartLines]
   );
 
+  // The order sheet is fixed to the bottom of the screen and can take most of it. The page reserves exactly its height below the menu, so a
+  // guest can always scroll the next dish (or the last one) up into the strip above the sheet and add another line.
+  const orderSheetRef = useRef<HTMLFormElement | null>(null);
+  const [orderSheetHeight, setOrderSheetHeight] = useState(0);
+  const orderSheetOpen = cartCount > 0;
+  useEffect(() => {
+    const sheet = orderSheetRef.current;
+    if (!orderSheetOpen || !sheet) {
+      setOrderSheetHeight(0);
+      return undefined;
+    }
+    const measure = () => setOrderSheetHeight(sheet.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(sheet);
+    return () => observer.disconnect();
+  }, [orderSheetOpen]);
+
   // Submit Order
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -698,7 +717,7 @@ export default function QrMenuPage() {
         backgroundColor: "#fdfbf7",
         fontFamily: "inherit",
         color: "#2d2a26",
-        paddingBottom: "120px",
+        paddingBottom: `${Math.max(120, orderSheetHeight + 24)}px`,
       }}
       data-testid="pos-qr-menu-page"
     >
@@ -1319,6 +1338,7 @@ export default function QrMenuPage() {
         {/* Floating Cart / Checkout Drawer */}
         {cartCount > 0 && (
           <form
+            ref={orderSheetRef}
             onSubmit={handlePlaceOrder}
             style={{
               position: "fixed",
