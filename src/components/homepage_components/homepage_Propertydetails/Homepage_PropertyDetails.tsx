@@ -1,4 +1,5 @@
 import MarketplaceHostIdentity from '@/components/property/MarketplaceHostIdentity';
+import { saveVsOtaAmount } from '@/utils/guestCopy';
 import './Homepage_PropertyDetails.css';
 import RatingDistribution from '../../property/RatingDistribution';
 import { starDistribution } from '../../property/starDistribution';
@@ -2986,7 +2987,7 @@ useEffect(() => {
                     </Suspense>
 
                     {/* TASK-4015: Save vs OTA delta */}
-                    {data.property_price && data.property_price > 0 && (
+                    {saveVsOtaAmount(data.property_price) != null && (
                       <div style={{
                         marginTop: 16,
                         padding: '12px 14px',
@@ -2996,7 +2997,7 @@ useEffect(() => {
                       }} data-testid="save-vs-ota-delta">
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#157046', display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span>💰</span>
-                          <span>Save ~₹{Math.round(data.property_price * 2 * 0.155).toLocaleString('en-IN')} by booking directly</span>
+                          <span>Save ~₹{(saveVsOtaAmount(data.property_price) ?? 0).toLocaleString('en-IN')} by booking directly</span>
                         </div>
                         <div style={{ fontSize: 12, color: '#157046', marginTop: 4 }}>
                           vs OTA platforms that charge 15–18%
@@ -3021,8 +3022,8 @@ useEffect(() => {
                   <div className="pp-trust-row">
                     <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
                     <div>
+                      {/* GUEST-048: headline only here; the full policy sentence is printed once, under "Things to know", and the booking box carries the date-specific line. */}
                       <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
-                      <div className="pp-trust-s">{ppCancellationInfo.description}</div>
                     </div>
                   </div>
                   <div className="pp-trust-row">
