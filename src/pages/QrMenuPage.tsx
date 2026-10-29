@@ -19,6 +19,16 @@ import {
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import ModifierPicker from "../components/qrmenu/ModifierPicker";
+import OptimizedImage from "../components/ui/OptimizedImage";
+import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
+import {
+  DIETARY_FILTER_CHIPS,
+  dietaryMarkColor,
+  dietaryMarkLabel,
+  hasClassifiedDishes,
+  matchesDietaryFilter,
+  type DietaryFilterKey,
+} from "../components/qrmenu/dietary";
 import QrPayNow from "../components/qrmenu/QrPayNow";
 import { canPayNow } from "../components/qrmenu/payNow";
 import {
@@ -43,12 +53,16 @@ export interface MenuItem {
   priceType?: string;
   category?: string;
   outletCategory?: string;
-  dietary?: "VEG" | "NON_VEG" | "NA";
+  /** POS-013: the host's classification; "NA" = not classified (no mark is shown). */
+  dietary?: "VEG" | "NON_VEG" | "EGG" | "VEGAN" | "JAIN" | "NA";
+  /** POS-013: allergens the host declared for the dish (free text). */
+  allergens?: string | null;
   sacCode?: string;
   gstRatePercent?: number;
   isTaxInclusive?: boolean;
   isSoldOut86?: boolean;
-  imageUrl?: string;
+  /** POS-014: the dish photo (https). */
+  imageUrl?: string | null;
   /** POS-017: modifier groups the guest can pick from (the API sends only the available options). Read through parseModifierGroups. */
   modifierGroups?: unknown;
 }
@@ -300,6 +314,8 @@ export default function QrMenuPage() {
 
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  // POS-013: dietary chip (All / Pure Veg / Jain / Non-Veg). Narrows what is shown; the order cart is untouched.
+  const [dietaryFilter, setDietaryFilter] = useState<DietaryFilterKey>("ALL");
 
   // Cart: line key (item id, plus the chosen modifiers when it has any) -> line
   const [cart, setCart] = useState<{ [lineKey: string]: CartLine }>({});
@@ -635,6 +651,11 @@ export default function QrMenuPage() {
     if (selectedCategory === "ALL") return allCategories;
     return allCategories.filter((c) => c.categoryKey === selectedCategory);
   }, [allCategories, selectedCategory]);
+
+  const showDietaryChips = useMemo(
+    () => hasClassifiedDishes(allCategories.flatMap((c) => c.items.filter((i) => !i.isSoldOut86))),
+    [allCategories],
+  );
 
   const targetHeading =
     menu?.roomLabel || (listingId ? `Room ${listingId}` : tableCode ? `Table ${tableCode}` : "Digital Self-Order Menu");
@@ -1127,11 +1148,53 @@ export default function QrMenuPage() {
           ))}
         </nav>
 
+        {/* POS-013: dietary filter chips, shown only when the host has classified at least one dish */}
+        {showDietaryChips && (
+          <div
+            role="group"
+            aria-label="Dietary filter"
+            data-testid="qr-dietary-chips"
+            style={{ display: "flex", gap: "8px", flexWrap: "wrap", margin: "0 0 14px 0" }}
+          >
+            {DIETARY_FILTER_CHIPS.map((chip) => {
+              const active = dietaryFilter === chip.key;
+              return (
+                <button
+                  key={chip.key}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setDietaryFilter(chip.key)}
+                  data-testid={`qr-dietary-chip-${chip.key}`}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "16px",
+                    border: "1px solid",
+                    borderColor: active ? "#16a34a" : "#d8c7b8",
+                    backgroundColor: active ? "#16a34a" : "#fff",
+                    color: active ? "#fff" : "#4a3e39",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Items List */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {dietaryFilter !== "ALL" &&
+            visibleCategories.every((c) => c.items.every((i) => i.isSoldOut86 || !matchesDietaryFilter(i.dietary, dietaryFilter))) && (
+              <p data-testid="qr-dietary-empty" style={{ margin: 0, fontSize: "13px", color: "#786a63" }}>
+                No dishes are marked for this filter yet. Choose All to see the full menu.
+              </p>
+            )}
           {visibleCategories.map((cat) => {
             // Filter out items marked IsSoldOut86 (Done When #1)
-            const availableItems = cat.items.filter((item) => !item.isSoldOut86);
+            const availableItems = cat.items.filter((item) => !item.isSoldOut86 && matchesDietaryFilter(item.dietary, dietaryFilter));
             if (availableItems.length === 0) return null;
 
             return (
@@ -1177,15 +1240,21 @@ export default function QrMenuPage() {
                       >
                         <div style={{ flex: 1, paddingRight: "16px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                            {item.dietary === "VEG" && (
+                            {dietaryMarkColor(item.dietary) && (
                               <span
+                                role="img"
+                                aria-label={dietaryMarkLabel(item.dietary)}
+                                title={dietaryMarkLabel(item.dietary)}
+                                data-testid={`menu-item-dietary-${item.id}`}
+                                data-dietary={item.dietary}
                                 style={{
                                   display: "inline-block",
                                   width: "12px",
                                   height: "12px",
-                                  border: "2px solid #16a34a",
+                                  border: `2px solid ${dietaryMarkColor(item.dietary)}`,
                                   padding: "1px",
                                   borderRadius: "2px",
+                                  flex: "0 0 auto",
                                 }}
                               >
                                 <span
@@ -1194,29 +1263,7 @@ export default function QrMenuPage() {
                                     width: "6px",
                                     height: "6px",
                                     borderRadius: "50%",
-                                    backgroundColor: "#16a34a",
-                                  }}
-                                />
-                              </span>
-                            )}
-                            {item.dietary === "NON_VEG" && (
-                              <span
-                                style={{
-                                  display: "inline-block",
-                                  width: "12px",
-                                  height: "12px",
-                                  border: "2px solid #dc2626",
-                                  padding: "1px",
-                                  borderRadius: "2px",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    display: "block",
-                                    width: "6px",
-                                    height: "6px",
-                                    borderRadius: "50%",
-                                    backgroundColor: "#dc2626",
+                                    backgroundColor: dietaryMarkColor(item.dietary) ?? undefined,
                                   }}
                                 />
                               </span>
@@ -1239,10 +1286,35 @@ export default function QrMenuPage() {
                             </p>
                           )}
 
+                          {item.allergens && (
+                            <p
+                              data-testid={`menu-item-allergens-${item.id}`}
+                              style={{ margin: "0 0 6px 0", fontSize: "11px", fontWeight: 700, color: "#92400e" }}
+                            >
+                              Contains: {item.allergens}
+                            </p>
+                          )}
+
                           <span style={{ fontSize: "14px", fontWeight: 800, color: "#9e402a" }}>
                             ₹{item.price.toLocaleString("en-IN")}
                           </span>
                         </div>
+
+                        {/* POS-014: dish photo, lazy-loaded at a fixed size so the list does not jump */}
+                        {sanitizeGuestImageUrl(item.imageUrl) && (
+                          <div style={{ width: "72px", height: "72px", marginRight: "12px", flex: "0 0 auto" }} data-testid={`menu-item-photo-${item.id}`}>
+                            <OptimizedImage
+                              src={item.imageUrl as string}
+                              alt={item.name}
+                              width={72}
+                              height={72}
+                              sizes="72px"
+                              loading="lazy"
+                              wrapperClassName="rounded-[10px]"
+                              className="h-[72px] w-[72px] rounded-[10px] object-cover"
+                            />
+                          </div>
+                        )}
 
                         {/* Add / Quantity selector */}
                         <div>
