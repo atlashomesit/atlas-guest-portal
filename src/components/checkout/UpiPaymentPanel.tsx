@@ -20,6 +20,8 @@ interface Props {
   holdActive: boolean;
   isMobile: boolean;
   onIHavePaid: () => void;
+  /** PAY-016: false on the first-party pay link, where there is no checkout hold to count down. */
+  showHold?: boolean;
   busy?: boolean;
   error?: string | null;
 }
@@ -36,6 +38,7 @@ export const UpiPaymentPanel: React.FC<Props> = ({
   holdActive,
   isMobile,
   onIHavePaid,
+  showHold = true,
   busy = false,
   error = null,
 }) => {
@@ -97,11 +100,13 @@ export const UpiPaymentPanel: React.FC<Props> = ({
       <p className="mt-1 text-stone-700">
         Your payment goes straight to {payeeName ? <b>{payeeName}</b> : 'the host'}. Pay exactly {amountLabel}.
       </p>
-      <p className="mt-1 font-medium" data-testid="upi-pay-hold-line" aria-live="polite">
-        {holdActive && countdown && countdown !== '0:00'
-          ? `Your dates are held for ${countdown}.`
-          : 'Your 10 minutes are over. If you already paid, tap "I have paid" so the host can check.'}
-      </p>
+      {showHold && (
+        <p className="mt-1 font-medium" data-testid="upi-pay-hold-line" aria-live="polite">
+          {holdActive && countdown && countdown !== '0:00'
+            ? `Your dates are held for ${countdown}.`
+            : 'Your 10 minutes are over. If you already paid, tap "I have paid" so the host can check.'}
+        </p>
+      )}
 
       {isMobile ? (
         <div className="mt-3">
