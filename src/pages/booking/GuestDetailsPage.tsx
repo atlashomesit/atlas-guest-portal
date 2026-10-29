@@ -672,6 +672,8 @@ const GuestDetailsPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
+  /** One plain sentence naming everything that stopped Pay (set by the failed validation in handleSubmit; shown while any inline error remains). */
+  const [validationSummary, setValidationSummary] = useState('');
   const [consentFlash, setConsentFlash] = useState(false);
   const consentRowRef = useRef<HTMLDivElement>(null);
 
@@ -1112,7 +1114,19 @@ const GuestDetailsPage: React.FC = () => {
     else { setDepositError(''); }
 
     setFormErrors(errors);
-    if (!valid) {
+    if (valid) {
+      setValidationSummary('');
+    } else {
+      const problems: string[] = [];
+      if (errors.name) problems.push('your name');
+      if (errors.email) problems.push('a valid email address');
+      if (errors.phone) problems.push('a valid phone number');
+      if (dormAckRequired && !dormAckAccepted) problems.push('the dorm rule');
+      if (depositRequired && !depositAccepted) problems.push('the security deposit terms');
+      if (houseRulesRequired && !houseRulesAccepted) problems.push('the house rules');
+      if (!consentAccepted) problems.push('the booking consent');
+      const list = problems.length > 1 ? `${problems.slice(0, -1).join(', ')} and ${problems[problems.length - 1]}` : problems[0];
+      setValidationSummary(`Payment has not started. Please check ${list} above, then tap Pay again.`);
       requestAnimationFrame(() => {
         // Focus and scroll to first failing field (WCAG 3.3 error identification)
         if (errors.name) {
@@ -2977,6 +2991,15 @@ const GuestDetailsPage: React.FC = () => {
                 {displayPrice(displayTotal)}). Tap <b>Pay</b> again to confirm and open payment.
               </div>
             )}
+            {validationSummary && (formErrors.name || formErrors.email || formErrors.phone || consentError || houseRulesError || dormAckError || depositError) && (
+              <div className="gd-banner" role="alert" data-testid="guest-checkout-validation-summary">
+                <IconAlert size={16}/>
+                <div>
+                  <b>Almost there.</b><br/>
+                  <span>{validationSummary}</span>
+                </div>
+              </div>
+            )}
             {orderError && !orderErrorIs409 && (
               <div className="gd-banner" role="alert" data-testid="guest-checkout-order-error">
                 <IconAlert size={16}/>
@@ -3388,7 +3411,7 @@ const GuestDetailsPage: React.FC = () => {
             </>
           ) : (
             <>
-              <div className="gd-banner" role="status" data-testid="guest-booking-offline-notice">
+              <div className="gd-banner" role={hostOffline ? 'alert' : 'status'} data-testid="guest-booking-offline-notice">
                 <IconWhatsApp size={16}/>
                 <div>
                   <b>Online payment is not available for this property.</b><br/>
@@ -4332,9 +4355,15 @@ const gdStyles = `
   padding: 22px;
   box-shadow: 0 12px 28px rgba(26,26,46,0.07), 0 4px 12px rgba(26,26,46,0.04);
   position: sticky;
-  top: 24px;
+  /* The site navbar is position:fixed (116px, measured live into --measured-nav-height). A bare 24px stuck the aside UNDER it,
+     so the Pay button could sit behind the navbar where a tap landed on the navbar and did nothing. */
+  top: calc(var(--measured-nav-height, var(--nav-height, 116px)) + 16px);
 }
 @media (min-width: 1024px) { .gd-aside { display: block; } }
+/* Anything the page scrolls or focuses (keyboard Tab, scrollIntoView after a failed check) lands BELOW the fixed navbar, never behind it. */
+.gd-page :is(.gd-pay, .gd-consent-row, input, select, textarea, button, [tabindex="-1"]) {
+  scroll-margin-top: calc(var(--measured-nav-height, var(--nav-height, 116px)) + 16px);
+}
 
 .gd-aside-recap {
   display: grid;
