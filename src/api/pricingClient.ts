@@ -1,5 +1,6 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
+import { getAgentCode } from '@/lib/agentCode';
 
 export type PricingBreakdown = {
   baseAmount?: number;
@@ -200,6 +201,10 @@ export type PublicListingRatePlanDto = {
    * GET /api/pricing/guest-breakdown). Null without dates or from an API that predates the field.
    */
   guestQuote: GuestPriceBreakdown | null;
+  /** PRICE-016: true for an agent-only net rate the guest unlocked with the agent's link. */
+  isAgentRate?: boolean;
+  /** PRICE-016: the agent / company the unlocked rate belongs to. */
+  agentName?: string | null;
 };
 
 /**
@@ -217,6 +222,9 @@ export async function fetchPublicListingRatePlans(
   if (checkIn) url.searchParams.set('checkIn', checkIn);
   if (checkOut) url.searchParams.set('checkOut', checkOut);
   if (guests != null && guests > 0) url.searchParams.set('guests', String(guests));
+  // PRICE-016: the agent's link code unlocks the agent-only rate; absent for every ordinary guest.
+  const agentCode = getAgentCode();
+  if (agentCode) url.searchParams.set('agentCode', agentCode);
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
   if (!response.ok) {
@@ -250,6 +258,11 @@ export async function fetchPublicListingRatePlans(
       mealPlanCode: typeof mealCodeRaw === 'string' && mealCodeRaw.trim() ? mealCodeRaw : null,
       mealPlanLabel: typeof mealLabelRaw === 'string' && mealLabelRaw.trim() ? mealLabelRaw : null,
       isDerived: Boolean(r.isDerived ?? r.IsDerived),
+      isAgentRate: Boolean(r.isAgentRate ?? r.IsAgentRate),
+      agentName: (() => {
+        const n = r.agentName ?? r.AgentName;
+        return typeof n === 'string' && n.trim() ? n.trim() : null;
+      })(),
       guestQuote: (() => {
         const q = r.guestQuote ?? r.GuestQuote;
         return q && typeof q === 'object' ? mapGuestPriceBreakdown(q as Record<string, unknown>) : null;
@@ -279,6 +292,9 @@ export async function fetchGuestPriceBreakdown(
   url.searchParams.set('checkOut', checkOut);
   if (listingRatePlanId != null && Number.isFinite(listingRatePlanId) && listingRatePlanId > 0) {
     url.searchParams.set('listingRatePlanId', String(listingRatePlanId));
+    // PRICE-016: an agent-only plan is priced only with the agent's code; the API ignores it for any other plan.
+    const agentCode = getAgentCode();
+    if (agentCode) url.searchParams.set('agentCode', agentCode);
   }
   if (guests != null && Number.isFinite(guests) && guests > 0) {
     url.searchParams.set('guests', String(Math.floor(guests)));

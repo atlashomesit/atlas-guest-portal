@@ -1132,6 +1132,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         setPublicRatePlans(plans);
         setSelectedRatePlanId((prev) => {
           if (prev != null && plans.some((p) => p.id === prev)) return prev;
+          // PRICE-016: a guest who arrived through a travel agent's link starts on the agent's rate.
+          const agentRate = plans.find((p) => p.isAgentRate);
+          if (agentRate) return agentRate.id;
           const def = plans.find((p) => p.isDefault) ?? plans[0];
           return def ? def.id : null;
         });
@@ -2429,6 +2432,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     >
                       {plainMealLabel(plan.mealPlanLabel)}
                     </div>
+                    {plan.isAgentRate && (
+                      <div
+                        data-testid={`rate-plan-agent-badge-${plan.id}`}
+                        style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-primary, #0f172a)' }}
+                      >
+                        {plan.agentName ? `Special rate from ${plan.agentName}` : 'Travel agent rate'}
+                      </div>
+                    )}
                     <div style={{ fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
                       {plan.cancellationSummary}
                     </div>
