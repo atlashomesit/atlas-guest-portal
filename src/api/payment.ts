@@ -26,6 +26,11 @@ export interface CreateOrderPayload {
 
 export interface UpiDeeplinkInitiatePayload {
   bookingId: number;
+  /**
+   * The booking's guest-link token (the order response's `bookingToken`). Required since 2026-10-29: the API answers 404 to an
+   * initiate without it, so an anonymous caller can no longer probe any booking id for its amount and the host's UPI id.
+   */
+  bookingToken: string | null;
   amountInr?: number;
 }
 
