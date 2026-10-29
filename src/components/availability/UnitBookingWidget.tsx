@@ -150,6 +150,38 @@ export type BookingStickySummary = {
 };
 
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
+/**
+ * GUEST-048: the cover preview above the date fields. Until the picture has really loaded - and for good
+ * when it fails - nothing is painted: the old block showed OptimizedImage's empty pink placeholder (a
+ * 144px tinted box with a tiny icon) above the dates, which read as a broken element.
+ */
+export const BookingCoverPreview: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setLoaded(false);
+    setFailed(false);
+  }, [src]);
+  if (failed) return null;
+  return (
+    <div
+      className="lv-booking-preview overflow-hidden rounded-xl border border-border-subtle mb-2"
+      style={{ marginTop: 'var(--lv-preview-mt, -4px)', display: loaded ? undefined : 'none' }}
+      data-testid="bw-cover-preview"
+    >
+      <OptimizedImage
+        src={src}
+        alt={alt}
+        className="w-full h-36 sm:h-40 object-cover"
+        loading="eager"
+        showSkeleton={false}
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+};
+
 function isNetworkError(error: unknown): boolean {
   const err = error as { code?: string; message?: string; response?: { status?: number } };
   const msg = (err?.message ?? '').toLowerCase();
@@ -2160,14 +2192,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       </div>
 
       {displayCoverUrl && (
-        <div className="lv-booking-preview overflow-hidden rounded-xl border border-border-subtle mb-2" style={{ marginTop: 'var(--lv-preview-mt, -4px)' }}>
-          <OptimizedImage
-            src={displayCoverUrl}
-            alt={listingName ? `${listingName} — preview` : 'Listing preview'}
-            className="w-full h-36 sm:h-40 object-cover"
-            loading="lazy"
-          />
-        </div>
+        <BookingCoverPreview
+          src={displayCoverUrl}
+          alt={listingName ? `${listingName} — preview` : 'Listing preview'}
+        />
       )}
 
       {isBookingDisabled && (
