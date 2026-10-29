@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { UpiPaymentPanel } from '../components/checkout/UpiPaymentPanel';
