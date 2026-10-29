@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { propertySlugMatchesListing } from "./propertySlugMatch";
 import { getPropertySlug, buildHomeUnitPath } from "./navigation";
+import { getListingDisplayName } from "../lib/listingDisplayName";
 
 /**
  * TASK-7448 (P0 regression): every listing detail page on every tenant rendered "Home not found"
@@ -84,5 +85,40 @@ describe("TASK-7448: the canonical URL a link builder emits must resolve, not 40
 
   it("does not match on a mere substring of the property name", () => {
     expect(propertySlugMatchesListing("stay", asRecord(STAYBYCF_185))).toBe(false);
+  });
+});
+
+/**
+ * TASK-10299259: every Atlas Homes "View home" link on atlastays.com answered "Home not found". The marketplace card
+ * linked with the humanised display name ("suite-202") while the detail page only knew the listing's own name
+ * ("atlas202"). The detail page now accepts both, so whichever link builder produced the URL (marketplace card =
+ * raw listing name, marketplace search result / saved search = display name) opens the home. This pins all seven.
+ */
+describe("TASK-10299259: all seven Atlas homes open from a marketplace link (raw-name and display-name slugs)", () => {
+  const ATLAS_HOMES = [
+    { id: 1, name: "Atlas101" },
+    { id: 2, name: "Atlas102" },
+    { id: 3, name: "Atlas201" },
+    { id: 4, name: "Atlas202" },
+    { id: 5, name: "Atlas301" },
+    { id: 6, name: "Atlas302" },
+    { id: 7, name: "Atlas501_PH" },
+  ].map((h) => ({ ...h, propertyName: "Atlas Homes" }));
+
+  for (const home of ATLAS_HOMES) {
+    it(`${home.name} (#${home.id}): the card slug and the search-result slug both resolve`, () => {
+      const rawNameSlug = getPropertySlug({ property_name: home.name });
+      const displayName = getListingDisplayName(home.id, home.name, undefined);
+      const displayNameSlug = getPropertySlug({ property_name: displayName });
+
+      expect(propertySlugMatchesListing(rawNameSlug, asRecord(home))).toBe(true);
+      expect(propertySlugMatchesListing(displayNameSlug, asRecord(home))).toBe(true);
+      // The path a guest lands on is /homes/<slug>/<id>; the id segment is what the API looks up.
+      expect(buildHomeUnitPath(displayNameSlug, home.id)).toBe(`/homes/${displayNameSlug}/${home.id}`);
+    });
+  }
+
+  it("a slug of another home still does not match (the guard is not switched off)", () => {
+    expect(propertySlugMatchesListing("suite-202", asRecord(ATLAS_HOMES[0]))).toBe(false);
   });
 });

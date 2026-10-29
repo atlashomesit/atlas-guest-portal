@@ -181,6 +181,18 @@ describe('Listing page "About this home" shows the host description from Rooms &
     expect(screen.queryByTestId('property-about-description')).not.toBeInTheDocument();
   });
 
+  it('TASK-10299260: a description that is only the internal room code ("Atlas301") shows the neutral ask-host line, not the code', async () => {
+    mockUseTenantListings.mockReturnValue(listState([{ ...LIST_ROW, property_description: 'Atlas301' }]));
+    mockFetchListingById.mockResolvedValue({ id: 637, longDescription: 'Atlas301', shortDescription: '' });
+
+    render(page());
+
+    await settle();
+    expect(screen.queryByTestId('property-about-description')).not.toBeInTheDocument();
+    expect(screen.getByTestId('property-about-ask-host')).toHaveTextContent(/hasn.t added a description yet/i);
+    expect(screen.queryByText('Atlas301')).not.toBeInTheDocument();
+  });
+
   it('keeps the description when the list re-resolve replaces the page row', async () => {
     // Direct load: the list has not landed, so the page resolves through GET /listings/{id} first…
     mockUseTenantListings.mockReturnValue(listState([]));
