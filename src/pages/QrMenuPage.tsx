@@ -19,6 +19,8 @@ import {
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import ModifierPicker from "../components/qrmenu/ModifierPicker";
+import QrPayNow from "../components/qrmenu/QrPayNow";
+import { canPayNow } from "../components/qrmenu/payNow";
 import {
   buildLineKey,
   describeModifiers,
@@ -90,6 +92,8 @@ export interface OrderStatus {
   settlementMethod: string;
   totalAmount: number;
   gstAmount: number;
+  /** POS-067: what the guest still owes on the order (the API's figure). Pay now is offered only while it is above 0. */
+  amountDue?: number;
   createdAtUtc: string;
   estimatedMinutes: number;
   /** POS-062: "TAKEAWAY" for a pickup order; absent / null for a table, room or counter order. The API never returns the customer's name or phone. */
@@ -334,6 +338,8 @@ export default function QrMenuPage() {
 
   // Live order tracker
   const [activeOrder, setActiveOrder] = useState<OrderStatus | null>(null);
+  // POS-067: set when verify-payment settled the order, so the "Payment received" note stays after the reloaded order no longer owes anything.
+  const [paidNow, setPaidNow] = useState(false);
 
   // Fetch menu on load
   useEffect(() => {
@@ -408,6 +414,17 @@ export default function QrMenuPage() {
       cancelled = true;
     };
   }, [tenantSlug, orderParam]);
+
+  // POS-067: after a verified payment, re-read the order so the tracker shows it as paid.
+  const reloadActiveOrder = async () => {
+    if (!activeOrder) return;
+    try {
+      const res = await fetch(buildApiUrl(`/api/public/qr-menu/${encodeURIComponent(tenantSlug)}/order/${encodeURIComponent(activeOrder.orderNumber)}`), { headers: getApiHeaders(tenantSlug) });
+      if (res.ok) setActiveOrder(await res.json());
+    } catch {
+      /* the next poll picks it up */
+    }
+  };
 
   // Polling tracker for active order
   useEffect(() => {
@@ -985,6 +1002,17 @@ export default function QrMenuPage() {
                 <span>Order total</span>
                 <span>₹{formatRupees(activeOrder.totalAmount)}</span>
               </div>
+            )}
+
+            {/* POS-067: Pay now for an unsettled order - Razorpay Checkout with the order the API created, settled only by verify-payment */}
+            {(canPayNow(activeOrder) || paidNow) && (
+              <QrPayNow
+                tenantSlug={tenantSlug}
+                tenantName={menu?.tenantName ?? "Atlas"}
+                orderNumber={activeOrder.orderNumber}
+                amountDue={activeOrder.amountDue ?? 0}
+                onPaid={() => { setPaidNow(true); void reloadActiveOrder(); }}
+              />
             )}
 
             {activeOrder.whatsAppUpdates && (
