@@ -557,6 +557,33 @@ function GuestDetailsForm({
     return () => window.clearInterval(id);
   }, [heldHold?.holdExpiresAt]);
 
+  // Auto-polling for YouPI PG real-time observer settlement
+  useEffect(() => {
+    if (!upiCheckout || !upiCheckout.bookingId || !upiCheckout.bookingToken) return;
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const token = upiCheckout.bookingToken;
+        const res = await fetch(
+          buildApiUrl(`/bookings/${upiCheckout.bookingId}/payment-status?t=${encodeURIComponent(token || '')}`),
+          { headers: getOrderRequestHeaders(crypto.randomUUID(), config.tenantSlug) }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { status?: string; bookingStatus?: string };
+        if (active && (data?.status === 'Paid' || data?.bookingStatus === 'Confirmed')) {
+          clearInterval(interval);
+          onBook({ bookingId: upiCheckout.bookingId, bookingToken: upiCheckout.bookingToken });
+        }
+      } catch {
+        // ignore network error
+      }
+    }, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [upiCheckout, config.tenantSlug, onBook]);
+
   const handleClearPrefilled = () => {
     setName('');
     setEmail('');

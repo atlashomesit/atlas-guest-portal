@@ -1338,6 +1338,53 @@ const GuestDetailsPage: React.FC = () => {
     }
   }, [upiCheckout, upiReportBusy, effectiveTenantSlug, updateBooking, navigate]);
 
+  // Real-time observer verification polling: when YouPI PG observer verifies the UPI deposit,
+  // the booking transitions to Paid automatically without requiring manual action.
+  useEffect(() => {
+    if (!upiCheckout || !upiCheckout.bookingId || !upiCheckout.bookingToken) return;
+
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const token = upiCheckout.bookingToken;
+        const res = await fetch(
+          buildApiUrl(`/bookings/${upiCheckout.bookingId}/payment-status?t=${encodeURIComponent(token || '')}`),
+          { headers: getApiHeaders(effectiveTenantSlug) }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { status?: string; bookingStatus?: string };
+        if (active && (data?.status === 'Paid' || data?.bookingStatus === 'Confirmed')) {
+          clearInterval(interval);
+          try {
+            sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+            sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+          } catch { /* ignore */ }
+          updateBooking({
+            holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+            holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
+            holdListingName: null, holdCancellationTier: null,
+            holdCancellationWindowHours: null, holdGraceHours: null,
+            holdSecurityDepositAmount: null,
+            paymentHoldBookingId: null, paymentHoldToken: null,
+          });
+          navigate(
+            token
+              ? `/booking/${upiCheckout.bookingId}?t=${encodeURIComponent(token)}`
+              : `/booking/${upiCheckout.bookingId}`,
+            { replace: true }
+          );
+        }
+      } catch {
+        // ignore network error during polling
+      }
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [upiCheckout, effectiveTenantSlug, updateBooking, navigate]);
+
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {

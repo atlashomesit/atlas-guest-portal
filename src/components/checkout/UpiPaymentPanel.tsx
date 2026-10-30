@@ -149,11 +149,16 @@ export const UpiPaymentPanel: React.FC<Props> = ({
         </p>
       )}
 
+      <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-emerald-100/70 py-2 px-3 text-xs text-emerald-900 font-medium" data-testid="upi-live-observer-badge">
+        <span className="inline-block h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+        <span>Direct Bank Settlement &bull; Auto-verifying in real time</span>
+      </div>
+
       <button
         type="button"
         onClick={onIHavePaid}
         disabled={busy}
-        className="mt-4 w-full rounded-lg border border-emerald-700 bg-white px-4 py-3 text-base font-semibold text-emerald-800 disabled:opacity-60"
+        className="mt-3 w-full rounded-lg border border-emerald-700 bg-white px-4 py-3 text-base font-semibold text-emerald-800 disabled:opacity-60"
         data-testid="upi-pay-i-have-paid"
       >
         {busy ? 'Telling the host…' : 'I have paid'}
