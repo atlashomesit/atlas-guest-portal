@@ -323,6 +323,8 @@ export default function QrMenuPage() {
   const [pickerItemId, setPickerItemId] = useState<number | null>(null);
 
   // Checkout Form State
+  // POS-047 L3: an optional host promo code typed on the order. The server checks it and takes the amount off the food bill before GST.
+  const [promoCode, setPromoCode] = useState("");
   const [settlementMethod, setSettlementMethod] = useState<"POST_TO_ROOM" | "PAY_NOW_UPI" | "PAY_ON_DELIVERY">(
     listingId ? "POST_TO_ROOM" : "PAY_NOW_UPI"
   );
@@ -573,6 +575,8 @@ export default function QrMenuPage() {
         // POS-011: the room key from the printed QR; only a room charge needs it, and a legacy numeric link has none.
         roomKey: settlementMethod === "POST_TO_ROOM" ? roomKeyParam : undefined,
         verificationCode: settlementMethod === "POST_TO_ROOM" ? verificationCode.trim() : undefined,
+        // POS-047 L3: only the code goes up; a room charge refuses a promo code on the server, so none is sent with one.
+        promoCode: settlementMethod !== "POST_TO_ROOM" && promoCode.trim() ? promoCode.trim().toUpperCase() : undefined,
         guestName: guestName.trim() || undefined,
         guestPhone: guestPhone.trim() || undefined,
         whatsAppUpdates,
@@ -633,6 +637,7 @@ export default function QrMenuPage() {
 
       const orderData: OrderStatus = await res.json();
       setActiveOrder(orderData);
+      setPromoCode("");
       setCart({});
       setFulfillAt("NOW");
       setCustomFulfillTime("");
@@ -1717,6 +1722,38 @@ export default function QrMenuPage() {
                     }}
                     data-testid="pos-qr-guest-phone"
                   />
+                </div>
+              )}
+
+              {/* POS-047 L3: optional promo code (not offered on a room charge, which the server refuses a code on) */}
+              {settlementMethod !== "POST_TO_ROOM" && (
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ display: "block", fontSize: "12px", color: "#475569", marginBottom: "4px" }} htmlFor="pos-qr-promo-code">
+                    Promo code (optional)
+                  </label>
+                  <input
+                    id="pos-qr-promo-code"
+                    type="text"
+                    autoCapitalize="characters"
+                    autoComplete="off"
+                    maxLength={32}
+                    placeholder="Have a code from the restaurant?"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    style={{
+                      width: "100%",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid #cbd5e1",
+                      fontSize: "13px",
+                      boxSizing: "border-box",
+                      textTransform: "uppercase",
+                    }}
+                    data-testid="pos-qr-promo-code"
+                  />
+                  <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>
+                    The discount comes off the food total before GST. You will see the final total once the order is placed.
+                  </div>
                 </div>
               )}
 
