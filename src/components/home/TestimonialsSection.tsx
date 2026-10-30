@@ -19,6 +19,9 @@ import {
 /* Kind-words band — light peach wash from the Stay by City Focus mockups
    (dark navy band replaced 2026-07: cards are white with alternating
    coral/lavender hairline borders, coral stars, gradient initial avatars). */
+/* REV-046: the band's own supporting lines bind to --text-secondary, not --text-muted. Several presets
+   (auroraChampagne, jetsetPearl, loversRetreatBlush) tune --text-muted for their own white/ivory
+   surfaces but inherit default.css's peach --bg-secondary here, where muted text measured 4.13-4.41:1. */
 const testimonialsBandStyle: CSSProperties = {
   backgroundColor: "var(--bg-secondary, #fdf2e9)",
 };
@@ -94,7 +97,7 @@ const KindWordsHeader = ({
         {ratingLine}
       </p>
     ) : (
-      <p className="mt-4 text-text-muted text-base md:text-lg">{supportingLine ?? testimonialsCopy.supporting}</p>
+      <p className="mt-4 text-text-secondary text-base md:text-lg">{supportingLine ?? testimonialsCopy.supporting}</p>
     )}
   </div>
 );
@@ -313,7 +316,7 @@ const TestimonialsSection = () => {
             <h3 id="guest-feedback-heading" className="text-center text-lg md:text-xl font-semibold text-text-primary">
               {GUEST_FEEDBACK_LABEL}
             </h3>
-            <p className="mt-1 mb-6 text-center text-sm text-text-muted">
+            <p className="mt-1 mb-6 text-center text-sm text-text-secondary">
               Notes shared by guests. These are not part of the star rating.
             </p>
             <GuestFeedbackGrid items={guestFeedback} />
