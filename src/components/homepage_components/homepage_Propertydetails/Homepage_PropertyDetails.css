@@ -42,6 +42,10 @@
   --bg-card: #ffffff;
   --bg-surface: #ffffff;
   --bg-muted: #f5ebe0;
+  /* REV-046: the "Guest feedback" label pill (and the draft badge) paint --text-primary on --brand-soft;
+     --brand-soft was not pinned, so the dark noir value (#161922 / #112d1e) sat under the pinned
+     dark-brown ink, 1.17:1 / 1.01:1. default.css's value keeps the pill light like the rest of this page. */
+  --brand-soft: #fde0c8;
   --text-primary: #3b1f1e;
   --text-secondary: #706060;
   --text-muted: #6b5a55;
