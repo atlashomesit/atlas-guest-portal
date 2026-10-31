@@ -1,7 +1,6 @@
 export interface PriceDisplayConfig {
   discount: {
     primaryBadgeLabel: string;
-    secondaryBadgeLabel: string;
     reasonLabel: string;
     savingsPrefix: string;
   };
@@ -12,7 +11,6 @@ export interface PriceDisplayConfig {
 export const priceDisplayConfig: PriceDisplayConfig = {
   discount: {
     primaryBadgeLabel: "Best price on our website",
-    secondaryBadgeLabel: "Limited-time deal",
     reasonLabel: "Direct booking savings",
     savingsPrefix: "Save",
   },
