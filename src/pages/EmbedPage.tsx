@@ -566,7 +566,7 @@ function GuestDetailsForm({
         const token = upiCheckout.bookingToken;
         const res = await fetch(
           buildApiUrl(`/bookings/${upiCheckout.bookingId}/payment-status?t=${encodeURIComponent(token || '')}`),
-          { headers: getOrderRequestHeaders(crypto.randomUUID(), config.tenantSlug) }
+          { headers: getOrderRequestHeaders(crypto.randomUUID(), tenantSlug) }
         );
         if (!res.ok) return;
         const data = (await res.json()) as { status?: string; bookingStatus?: string };
@@ -582,7 +582,7 @@ function GuestDetailsForm({
       active = false;
       clearInterval(interval);
     };
-  }, [upiCheckout, config.tenantSlug, onBook]);
+  }, [upiCheckout, tenantSlug, onBook]);
 
   const handleClearPrefilled = () => {
     setName('');

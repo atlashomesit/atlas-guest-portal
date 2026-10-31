@@ -12,17 +12,14 @@
  * booking/payment/listing-data logic into the theme package.
  */
 import HomePage from "@/pages/home/Home";
-import PropertyDetailsPage from "@/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails";
-import AboutPageComponent from "@/pages/AboutPage";
-import GalleryPageComponent from "@/pages/GalleryPage";
-import ContactUsPage from "@/pages/contactus/ContactUs";
+import React from "react";
 import type { LayoutThemeModule } from "../types";
 
 export const Home = HomePage;
-export const PropertyDetails = PropertyDetailsPage;
-export const About = AboutPageComponent;
-export const Gallery = GalleryPageComponent;
-export const Contact = ContactUsPage;
+export const PropertyDetails = React.lazy(() => import("@/components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails"));
+export const About = React.lazy(() => import("@/pages/AboutPage"));
+export const Gallery = React.lazy(() => import("@/pages/GalleryPage"));
+export const Contact = React.lazy(() => import("@/pages/contactus/ContactUs"));
 
 // Compile-time-only check that this module's exports satisfy LayoutThemeModule's shape.
 const _classicShapeCheck: LayoutThemeModule = { Home, PropertyDetails, About, Gallery, Contact };
