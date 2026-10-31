@@ -6,6 +6,7 @@ import {
   estTotalInclGst,
   computeCheckoutTotal,
   formatEstTotalInclGst,
+  resolveCheckoutChargeReconciliation,
 } from './guestPriceEstimate';
 
 describe('guestPriceEstimate GST slab (TASK-2870/2871)', () => {
@@ -291,5 +292,28 @@ describe('discountPlugRow — TASK-102392 lines sum exactly to the Total', () =>
 
   it('negative plug flags a Total carrying what rows do not show', () => {
     expect(discountPlugRow(10_000, 0, 10_500)).toBe(-500);
+  });
+
+  it('CFB-006 & CFB-009: resolveCheckoutChargeReconciliation keeps cleaningFeeAmount and breakfastExtraAmount as separate rows without inflating accommodation or discount plug', () => {
+    const rec = resolveCheckoutChargeReconciliation({
+      baseAmount: 10_000,
+      extraGuestCharge: 0,
+      cleaningFeeAmount: 1_500,
+      breakfastExtraAmount: 1_000,
+      serviceFeeAmount: 0,
+      securityDepositAmount: 0,
+      touristTaxAmount: 0,
+      convenienceFeeAmount: 0,
+      gstLineAmount: 0,
+      addOnsTotal: 0,
+      promoDiscountAmount: 0,
+      referralDiscountAmount: 0,
+      displayTotal: 12_500,
+      globalDiscountPercent: 0,
+      globalDiscountAmount: 0,
+    });
+    expect(rec.accommodationRowAmount).toBe(10_000);
+    expect(rec.discountRowAmount).toBe(0);
+    expect(rec.grossRowsTotal).toBe(12_500);
   });
 });

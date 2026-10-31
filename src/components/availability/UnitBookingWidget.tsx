@@ -364,6 +364,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // MRP-002: Public rate plans for this listing & selected rate plan ID.
   const [publicRatePlans, setPublicRatePlans] = useState<PublicListingRatePlanDto[]>([]);
   const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
+  // CFB-009 / BNB-009 / BNB-010: Optional "Add breakfast" toggle on Room-Only (EP) direct bookings.
+  const [includeBreakfast, setIncludeBreakfast] = useState(false);
   const [guests, setGuests] = useState(2);
   const [guestsOpen, setGuestsOpen] = useState(false);
 
@@ -1715,20 +1717,51 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? Math.round(serverPriceBreakdown.touristTaxAmount)
       : 0;
 
-  // TASK-4322 / TASK-102037: Total = discount-net base + Service Fee + tourist tax (zero GST on top).
-  // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
+  // CFB-006 / CLU-016: Cleaning fee shown honestly as its own line item on the first screen before payment.
+  const cleaningFeeLineAmount =
+    serverGstMatchesSelection && serverPriceBreakdown?.cleaningFee && serverPriceBreakdown.cleaningFee > 0
+      ? Math.round(serverPriceBreakdown.cleaningFee)
+      : 0;
+
+  // CFB-009 / BNB-009 / BNB-010: Breakfast as a paid extra on Room-Only (EP) direct bookings.
+  const selectedMealCode = (selectedRatePlan?.mealPlanCode ?? '').trim().toUpperCase();
+  const isRoomOnlyRatePlan =
+    !selectedMealCode || selectedMealCode === 'EP' || selectedMealCode === 'RO' || selectedMealCode === 'NONE';
+  const breakfastPricePerPerson =
+    isRoomOnlyRatePlan &&
+    serverGstMatchesSelection &&
+    serverPriceBreakdown?.breakfastPricePerPerson &&
+    serverPriceBreakdown.breakfastPricePerPerson > 0
+      ? Math.round(serverPriceBreakdown.breakfastPricePerPerson)
+      : 0;
+  const breakfastExtraLineAmount =
+    includeBreakfast && breakfastPricePerPerson > 0 && priceDetails.nights > 0
+      ? serverPriceBreakdown?.includeBreakfast &&
+        serverPriceBreakdown?.breakfastExtraAmount &&
+        serverPriceBreakdown.breakfastExtraAmount > 0
+        ? Math.round(serverPriceBreakdown.breakfastExtraAmount)
+        : Math.round(breakfastPricePerPerson * guests * priceDetails.nights)
+      : 0;
+
+  // TASK-4322 / TASK-102037: Total = discount-net base + Service Fee + tourist tax + cleaning fee + breakfast extra (zero GST on top).
+  // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax & cleaning fee).
   // TASK-7428: when online payment is off, never fold a server FinalAmount that still includes the gateway fee.
   const breakdownFinalTotal = Math.max(
     1,
-    taxableBase + breakdownConvenienceFee + touristTaxLineAmount,
+    taxableBase + breakdownConvenienceFee + touristTaxLineAmount + cleaningFeeLineAmount + breakfastExtraLineAmount,
   );
+
+  const effectiveServerFinalAmount =
+    typeof serverFinalAmount === 'number' && serverFinalAmount > 0
+      ? serverFinalAmount + (serverPriceBreakdown?.includeBreakfast ? 0 : breakfastExtraLineAmount)
+      : null;
 
   const finalTotal =
     showOnlinePaymentProcessing &&
     serverGstMatchesSelection &&
-    typeof serverFinalAmount === 'number' &&
-    serverFinalAmount > 0
-      ? serverFinalAmount
+    typeof effectiveServerFinalAmount === 'number' &&
+    effectiveServerFinalAmount > 0
+      ? effectiveServerFinalAmount
       : hasSelectedRange && selectedRangeTotalFromCalendar != null
         ? breakdownFinalTotal
         : effectiveDailyPricing != null
@@ -2055,8 +2088,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           nights: stayNights,
           currency: 'INR',
           touristTaxAmount: touristTaxLineAmount,
-          ...(serverGstMatchesSelection && serverPriceBreakdown?.cleaningFee && serverPriceBreakdown.cleaningFee > 0
-            ? { cleaningFee: Math.round(serverPriceBreakdown.cleaningFee) }
+          ...(cleaningFeeLineAmount > 0 ? { cleaningFee: cleaningFeeLineAmount } : {}),
+          ...(breakfastPricePerPerson > 0 ? { breakfastPricePerPerson } : {}),
+          ...(includeBreakfast && breakfastExtraLineAmount > 0
+            ? { includeBreakfast: true, breakfastExtraAmount: breakfastExtraLineAmount }
             : {}),
           ...(serverGstMatchesSelection && serverPriceBreakdown?.extraGuestFee && serverPriceBreakdown.extraGuestFee > 0
             ? { extraGuestFee: Math.round(serverPriceBreakdown.extraGuestFee) }
@@ -2701,6 +2736,62 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           })()}
 
 
+
+          {/* CFB-009 / BNB-009 / BNB-010: Optional "Add breakfast" toggle for Room-Only (EP) direct bookings */}
+          {breakfastPricePerPerson > 0 && priceDetails.nights > 0 && (
+            <label
+              className="lv-price-row"
+              data-testid="bw-add-breakfast-toggle"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                padding: '8px 10px',
+                margin: '4px 0',
+                borderRadius: 8,
+                border: '1px solid var(--border-subtle, #e2e8f0)',
+                background: includeBreakfast ? 'var(--bg-muted, #f8fafc)' : 'transparent',
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={includeBreakfast}
+                  onChange={(e) => setIncludeBreakfast(e.target.checked)}
+                  data-testid="bw-add-breakfast-checkbox"
+                />
+                <span>
+                  Add breakfast ({displayPrice(breakfastPricePerPerson)}/person/night)
+                </span>
+              </span>
+              <span className="lv-num" style={{ fontSize: 13, fontWeight: 600 }}>
+                +{displayPrice(Math.round(breakfastPricePerPerson * guests * priceDetails.nights))}
+              </span>
+            </label>
+          )}
+
+          {/* CFB-006 / CLU-016: Cleaning fee shown honestly as its own line item on the first screen before payment. */}
+          {cleaningFeeLineAmount > 0 && (
+            <div className="lv-price-row" data-testid="bw-bd-cleaning-fee-row">
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                Cleaning fee
+                <FeeInfoTip fee="cleaning" label="Cleaning fee" testId="fee-info-cleaning" />
+              </span>
+              <span className="lv-num">{displayPrice(cleaningFeeLineAmount)}</span>
+            </div>
+          )}
+
+          {/* CFB-009 / BNB-009 / BNB-010: Breakfast extra line item when guest ticks "Add breakfast". */}
+          {breakfastExtraLineAmount > 0 && (
+            <div className="lv-price-row" data-testid="bw-bd-breakfast-extra-row">
+              <span>
+                Breakfast ({displayPrice(breakfastPricePerPerson)} × {guests} {guests === 1 ? 'guest' : 'guests'} × {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'})
+              </span>
+              <span className="lv-num">{displayPrice(breakfastExtraLineAmount)}</span>
+            </div>
+          )}
 
           {/* TASK-8293: tourist tax is inside the server FinalAmount the Total prefers, so it
               must appear as its own line or the breakdown does not sum to its own Total. */}

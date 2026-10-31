@@ -138,6 +138,12 @@ export type GuestPriceBreakdown = {
   /** DYN-005 / TASK-1040117: Promotional discount amount & percent. */
   promotionDiscountAmount?: number;
   promotionDiscountPercent?: number;
+  /** CFB-009 / BNB-009 / BNB-010: Per-person, per-night breakfast add-on rate when room is Room-Only (EP). */
+  breakfastPricePerPerson?: number;
+  /** CFB-009 / BNB-009 / BNB-010: True when the guest ticked "Add breakfast" on a Room-Only rate. */
+  includeBreakfast?: boolean;
+  /** CFB-009 / BNB-009 / BNB-010: Breakfast extra amount included in finalAmount (BreakfastPricePerPerson * guests * nights). */
+  breakfastExtraAmount?: number;
 };
 
 /**
@@ -285,6 +291,7 @@ export async function fetchGuestPriceBreakdown(
   listingRatePlanId?: number | null,
   guests?: number | null,
   tenantSlug?: string | null,
+  includeBreakfast?: boolean | null,
 ): Promise<GuestPriceBreakdown> {
   const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(listingId));
@@ -298,6 +305,9 @@ export async function fetchGuestPriceBreakdown(
   }
   if (guests != null && Number.isFinite(guests) && guests > 0) {
     url.searchParams.set('guests', String(Math.floor(guests)));
+  }
+  if (includeBreakfast === true) {
+    url.searchParams.set('includeBreakfast', 'true');
   }
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
@@ -325,6 +335,10 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
   const cleaningFee = num('cleaningFee', 'CleaningFee');
   const extraGuestFee = num('extraGuestFee', 'ExtraGuestFee');
   const weekendRateAdjustmentAmount = num('weekendRateAdjustmentAmount', 'WeekendRateAdjustmentAmount');
+  const breakfastPricePerPerson = num('breakfastPricePerPerson', 'BreakfastPricePerPerson');
+  const breakfastExtraAmount = num('breakfastExtraAmount', 'BreakfastExtraAmount');
+  const includeBreakfastRaw = raw.includeBreakfast ?? raw.IncludeBreakfast;
+  const includeBreakfast = includeBreakfastRaw === true ? true : undefined;
 
   const origNightlyRaw = raw.originalNightlyRate ?? raw.OriginalNightlyRate;
   const originalNightlyRate =
@@ -363,6 +377,9 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
     ...(cleaningFee > 0 ? { cleaningFee } : {}),
     ...(extraGuestFee > 0 ? { extraGuestFee } : {}),
     ...(weekendRateAdjustmentAmount > 0 ? { weekendRateAdjustmentAmount } : {}),
+    ...(breakfastPricePerPerson > 0 ? { breakfastPricePerPerson } : {}),
+    ...(includeBreakfast ? { includeBreakfast } : {}),
+    ...(breakfastExtraAmount > 0 ? { breakfastExtraAmount } : {}),
     ...(originalNightlyRate !== undefined ? { originalNightlyRate } : {}),
     ...(discountedNightlyRate !== undefined ? { discountedNightlyRate } : {}),
     ...(appliedPromotionLabel ? { appliedPromotionLabel } : {}),

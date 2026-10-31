@@ -203,6 +203,7 @@ export function discountPlugRow(grossRows: number, netAdjustRows: number, displa
 export type CheckoutChargeReconciliationInput = {
   baseAmount: number;
   cleaningFeeAmount: number;
+  breakfastExtraAmount?: number;
   extraGuestFeeAmount?: number;
   weekendRateAdjustmentAmount?: number;
   touristTaxAmount: number;
@@ -264,6 +265,7 @@ export function resolveCheckoutChargeReconciliation(
     };
   }
   const cleaning = Math.max(0, Math.round(Number(input.cleaningFeeAmount) || 0));
+  const breakfastExtra = Math.max(0, Math.round(Number(input.breakfastExtraAmount) || 0));
   const extraGuest = Math.max(0, Math.round(Number(input.extraGuestFeeAmount) || 0));
   const explicitWeekend = Math.max(0, Math.round(Number(input.weekendRateAdjustmentAmount) || 0));
   const touristTax = Math.max(0, Math.round(Number(input.touristTaxAmount) || 0));
@@ -281,7 +283,7 @@ export function resolveCheckoutChargeReconciliation(
         }
       : null;
 
-  const grossRows = base + cleaning + extraGuest + explicitWeekend + touristTax + fee;
+  const grossRows = base + cleaning + breakfastExtra + extraGuest + explicitWeekend + touristTax + fee;
   const plug = discountPlugRow(grossRows, netAdjust, input.displayTotal);
 
   let effectiveBaseAmount = base;

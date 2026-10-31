@@ -871,6 +871,9 @@ const GuestDetailsPage: React.FC = () => {
   );
   // GUEST-049: honor itemized cleaning fee from server/hold breakdown when present
   const cleaningFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.cleaningFee) || 0));
+  // CFB-009 / BNB-009 / BNB-010: honor breakfast extra when guest opted in on Room-Only booking
+  const includeBreakfast = Boolean(priceBreakdown?.includeBreakfast);
+  const breakfastExtraAmount = Math.max(0, Math.round(Number(priceBreakdown?.breakfastExtraAmount) || 0));
   const extraGuestFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.extraGuestFee) || 0));
   const weekendRateAdjustmentAmount = Math.max(0, Math.round(Number(priceBreakdown?.weekendRateAdjustmentAmount) || 0));
 
@@ -926,6 +929,7 @@ const GuestDetailsPage: React.FC = () => {
   } = resolveCheckoutChargeReconciliation({
     baseAmount,
     cleaningFeeAmount,
+    breakfastExtraAmount,
     extraGuestFeeAmount,
     weekendRateAdjustmentAmount,
     touristTaxAmount,
@@ -1267,6 +1271,7 @@ const GuestDetailsPage: React.FC = () => {
           checkinDate,
           checkoutDate,
           guests: booking.guests ?? 1,
+          ...(includeBreakfast ? { includeBreakfast: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         },
@@ -1293,7 +1298,7 @@ const GuestDetailsPage: React.FC = () => {
     };
     updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
     return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
-  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, isMarketplaceCheckout, effectiveTenantSlug, updateBooking]);
+  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, includeBreakfast, isMarketplaceCheckout, effectiveTenantSlug, updateBooking]);
 
   // ── PAY-010: UPI_QR / UPI_DEEPLINK checkout ──────────────────────────────────
   const [upiCheckout, setUpiCheckout] = useState<{
@@ -1462,6 +1467,7 @@ const GuestDetailsPage: React.FC = () => {
           notes: formData.notes.trim().slice(0, 500) || undefined,
           guestNationality: formData.nationality || 'India',
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
+          ...(includeBreakfast ? { includeBreakfast: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         },
@@ -3253,6 +3259,14 @@ const GuestDetailsPage: React.FC = () => {
                   <FeeInfoTip fee="cleaning" label="Cleaning fee" testId="fee-info-cleaning" />
                 </span>
                 <span className="num">{displayPrice(cleaningFeeAmount)}</span>
+              </div>
+            )}
+            {breakfastExtraAmount > 0 && (
+              <div className="gd-price-row" data-testid="breakfast-extra-row">
+                <span>
+                  Breakfast ({stayGuestCount} {stayGuestCount === 1 ? 'guest' : 'guests'} × {nights} {nights === 1 ? 'night' : 'nights'})
+                </span>
+                <span className="num">{displayPrice(breakfastExtraAmount)}</span>
               </div>
             )}
             {extraGuestFeeRow && (

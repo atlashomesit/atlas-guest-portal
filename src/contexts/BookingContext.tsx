@@ -27,6 +27,12 @@ export type BookingPriceBreakdown = {
   discountedNightlyRate?: number | null;
   /** DYN-005 / TASK-1040117: genuine server promotion label (e.g. "Last-Minute Deal (10% off)"). */
   appliedPromotionLabel?: string | null;
+  /** CFB-009 / BNB-009 / BNB-010: Per-person, per-night breakfast rate when Room-Only. */
+  breakfastPricePerPerson?: number;
+  /** CFB-009 / BNB-009 / BNB-010: True when guest opted in to breakfast add-on on Room-Only rate. */
+  includeBreakfast?: boolean;
+  /** CFB-009 / BNB-009 / BNB-010: Total breakfast extra amount included in finalAmount. */
+  breakfastExtraAmount?: number;
 };
 
 type BookingState = {
