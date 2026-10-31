@@ -312,8 +312,12 @@ describe('discountPlugRow — TASK-102392 lines sum exactly to the Total', () =>
       globalDiscountPercent: 0,
       globalDiscountAmount: 0,
     });
+    expect(rec.effectiveBaseAmount).toBe(10_000);
     expect(rec.accommodationRowAmount).toBe(10_000);
+    expect(rec.reconciledIntoBaseAmount).toBe(0);
+    expect(rec.discountRow).toBeNull();
     expect(rec.discountRowAmount).toBe(0);
     expect(rec.grossRowsTotal).toBe(12_500);
+    expect(rec.effectiveBaseAmount + 1_500 + 1_000).toBe(12_500);
   });
 });

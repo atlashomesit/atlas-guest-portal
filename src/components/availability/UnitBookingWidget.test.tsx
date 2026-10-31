@@ -341,7 +341,7 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
   it('finalTotal prefers server FinalAmount when it matches the current selection (TASK-5184)', () => {
     const content = readFileSync(filePath, 'utf-8');
     expect(content).toMatch(
-      /const finalTotal =\s*\n\s*showOnlinePaymentProcessing &&\s*\n\s*serverGstMatchesSelection &&\s*\n\s*typeof serverFinalAmount === 'number' &&\s*\n\s*serverFinalAmount > 0/,
+      /const finalTotal =\s*\n\s*showOnlinePaymentProcessing &&\s*\n\s*serverGstMatchesSelection &&\s*\n\s*typeof (?:effectiveServerFinalAmount|serverFinalAmount) === 'number' &&\s*\n\s*(?:effectiveServerFinalAmount|serverFinalAmount) > 0/,
     );
   });
 });

@@ -208,15 +208,23 @@ export type CheckoutChargeReconciliationInput = {
   extraGuestFeeAmount?: number;
   weekendRateAdjustmentAmount?: number;
   touristTaxAmount: number;
-  displayedFeeAmount: number;
-  addOnsTotal: number;
-  confirmedPromoDiscount: number;
-  referralDiscountAmount: number;
+  displayedFeeAmount?: number;
+  addOnsTotal?: number;
+  confirmedPromoDiscount?: number;
+  referralDiscountAmount?: number;
   displayTotal: number;
-  nights: number;
-  stayGuestCount: number;
+  nights?: number;
+  stayGuestCount?: number;
   hasWeekendNight?: boolean;
   appliedPromotionLabel?: string | null;
+  serviceFeeAmount?: number;
+  convenienceFeeAmount?: number;
+  gstLineAmount?: number;
+  promoDiscountAmount?: number;
+  extraGuestCharge?: number;
+  securityDepositAmount?: number;
+  globalDiscountPercent?: number;
+  globalDiscountAmount?: number;
 };
 
 export type CheckoutChargeReconciliationResult = {
@@ -227,6 +235,9 @@ export type CheckoutChargeReconciliationResult = {
   weekendAdjustmentRow: { label: string; amount: number } | null;
   discountRow: { label: string; amount: number } | null;
   reconciledIntoBaseAmount: number;
+  accommodationRowAmount: number;
+  discountRowAmount: number;
+  grossRowsTotal: number;
 };
 
 /** Returns true when [checkInIso, checkOutIso) includes a Friday (5) or Saturday (6) night. */
@@ -265,18 +276,22 @@ export function resolveCheckoutChargeReconciliation(
       weekendAdjustmentRow: null,
       discountRow: null,
       reconciledIntoBaseAmount: 0,
+      accommodationRowAmount: 0,
+      discountRowAmount: 0,
+      grossRowsTotal: 0,
     };
   }
   const cleaning = Math.max(0, Math.round(Number(input.cleaningFeeAmount) || 0));
   const breakfastExtra = Math.max(0, Math.round(Number(input.breakfastExtraAmount) || 0));
   const petFee = Math.max(0, Math.round(Number(input.petFeeAmount) || 0));
-  const extraGuest = Math.max(0, Math.round(Number(input.extraGuestFeeAmount) || 0));
+  const extraGuest = Math.max(0, Math.round(Number(input.extraGuestFeeAmount ?? input.extraGuestCharge) || 0));
   const explicitWeekend = Math.max(0, Math.round(Number(input.weekendRateAdjustmentAmount) || 0));
   const touristTax = Math.max(0, Math.round(Number(input.touristTaxAmount) || 0));
-  const fee = Math.max(0, Number(input.displayedFeeAmount) || 0);
+  const fee = Math.max(0, Number(input.displayedFeeAmount ?? input.serviceFeeAmount ?? input.convenienceFeeAmount) || 0);
+  const confirmedPromo = Number(input.confirmedPromoDiscount ?? input.promoDiscountAmount) || 0;
   const netAdjust =
     (Number(input.addOnsTotal) || 0) -
-    (Number(input.confirmedPromoDiscount) || 0) -
+    confirmedPromo -
     (Number(input.referralDiscountAmount) || 0);
 
   const petFeeRow =
@@ -287,10 +302,11 @@ export function resolveCheckoutChargeReconciliation(
         }
       : null;
 
+  const stayGuests = input.stayGuestCount ?? 2;
   const extraGuestFeeRow =
     extraGuest > 0
       ? {
-          label: `Extra guest fee (${input.stayGuestCount} ${input.stayGuestCount === 1 ? 'guest' : 'guests'})`,
+          label: `Extra guest fee (${stayGuests} ${stayGuests === 1 ? 'guest' : 'guests'})`,
           amount: extraGuest,
         }
       : null;
@@ -324,7 +340,7 @@ export function resolveCheckoutChargeReconciliation(
   }
 
   const effectivePerNight =
-    input.nights > 0 ? Math.round(effectiveBaseAmount / input.nights) : 0;
+    input.nights && input.nights > 0 ? Math.round(effectiveBaseAmount / input.nights) : 0;
 
   return {
     effectiveBaseAmount,
@@ -334,6 +350,9 @@ export function resolveCheckoutChargeReconciliation(
     weekendAdjustmentRow,
     discountRow,
     reconciledIntoBaseAmount,
+    accommodationRowAmount: effectiveBaseAmount,
+    discountRowAmount: discountRow?.amount ?? 0,
+    grossRowsTotal: grossRows,
   };
 }
 
