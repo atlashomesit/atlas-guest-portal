@@ -17,6 +17,8 @@ export type BookingPriceBreakdown = {
   touristTaxAmount?: number;
   /** GUEST-049 / CLU-016: itemized cleaning fee included in finalAmount. */
   cleaningFee?: number;
+  /** TASK-10299273: itemized pet fee included in finalAmount when guest brings a pet. */
+  petFee?: number;
   /** GUEST-049: itemized extra guest fee included in finalAmount. */
   extraGuestFee?: number;
   /** GUEST-049: itemized weekend rate differential included in finalAmount. */

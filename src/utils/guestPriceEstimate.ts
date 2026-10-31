@@ -204,6 +204,7 @@ export type CheckoutChargeReconciliationInput = {
   baseAmount: number;
   cleaningFeeAmount: number;
   breakfastExtraAmount?: number;
+  petFeeAmount?: number;
   extraGuestFeeAmount?: number;
   weekendRateAdjustmentAmount?: number;
   touristTaxAmount: number;
@@ -221,6 +222,7 @@ export type CheckoutChargeReconciliationInput = {
 export type CheckoutChargeReconciliationResult = {
   effectiveBaseAmount: number;
   effectivePerNight: number;
+  petFeeRow: { label: string; amount: number } | null;
   extraGuestFeeRow: { label: string; amount: number } | null;
   weekendAdjustmentRow: { label: string; amount: number } | null;
   discountRow: { label: string; amount: number } | null;
@@ -258,6 +260,7 @@ export function resolveCheckoutChargeReconciliation(
     return {
       effectiveBaseAmount: 0,
       effectivePerNight: 0,
+      petFeeRow: null,
       extraGuestFeeRow: null,
       weekendAdjustmentRow: null,
       discountRow: null,
@@ -266,6 +269,7 @@ export function resolveCheckoutChargeReconciliation(
   }
   const cleaning = Math.max(0, Math.round(Number(input.cleaningFeeAmount) || 0));
   const breakfastExtra = Math.max(0, Math.round(Number(input.breakfastExtraAmount) || 0));
+  const petFee = Math.max(0, Math.round(Number(input.petFeeAmount) || 0));
   const extraGuest = Math.max(0, Math.round(Number(input.extraGuestFeeAmount) || 0));
   const explicitWeekend = Math.max(0, Math.round(Number(input.weekendRateAdjustmentAmount) || 0));
   const touristTax = Math.max(0, Math.round(Number(input.touristTaxAmount) || 0));
@@ -275,6 +279,14 @@ export function resolveCheckoutChargeReconciliation(
     (Number(input.confirmedPromoDiscount) || 0) -
     (Number(input.referralDiscountAmount) || 0);
 
+  const petFeeRow =
+    petFee > 0
+      ? {
+          label: 'Pet fee',
+          amount: petFee,
+        }
+      : null;
+
   const extraGuestFeeRow =
     extraGuest > 0
       ? {
@@ -283,7 +295,7 @@ export function resolveCheckoutChargeReconciliation(
         }
       : null;
 
-  const grossRows = base + cleaning + breakfastExtra + extraGuest + explicitWeekend + touristTax + fee;
+  const grossRows = base + cleaning + breakfastExtra + petFee + extraGuest + explicitWeekend + touristTax + fee;
   const plug = discountPlugRow(grossRows, netAdjust, input.displayTotal);
 
   let effectiveBaseAmount = base;
@@ -317,6 +329,7 @@ export function resolveCheckoutChargeReconciliation(
   return {
     effectiveBaseAmount,
     effectivePerNight,
+    petFeeRow,
     extraGuestFeeRow,
     weekendAdjustmentRow,
     discountRow,

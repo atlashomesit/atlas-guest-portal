@@ -125,6 +125,8 @@ export type GuestPriceBreakdown = {
   priceLine?: string;
   /** GUEST-049 / CLU-016: Optional per-stay cleaning fee from PriceBreakdownDto. */
   cleaningFee?: number;
+  /** TASK-10299273: Optional per-stay pet fee from PriceBreakdownDto when guest brings a pet. */
+  petFee?: number;
   /** GUEST-049: Optional extra-guest occupancy fee when itemized by the API. */
   extraGuestFee?: number;
   /** GUEST-049: Optional weekend rate differential when itemized by the API. */
@@ -292,6 +294,7 @@ export async function fetchGuestPriceBreakdown(
   guests?: number | null,
   tenantSlug?: string | null,
   includeBreakfast?: boolean | null,
+  pets?: number | null,
 ): Promise<GuestPriceBreakdown> {
   const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(listingId));
@@ -308,6 +311,9 @@ export async function fetchGuestPriceBreakdown(
   }
   if (includeBreakfast === true) {
     url.searchParams.set('includeBreakfast', 'true');
+  }
+  if (pets != null && Number.isFinite(pets) && pets > 0) {
+    url.searchParams.set('pets', String(Math.floor(pets)));
   }
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
@@ -333,6 +339,7 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
   const priceLine = typeof priceLineRaw === 'string' && priceLineRaw.trim() !== '' ? priceLineRaw.trim() : undefined;
 
   const cleaningFee = num('cleaningFee', 'CleaningFee');
+  const petFee = num('petFee', 'PetFee');
   const extraGuestFee = num('extraGuestFee', 'ExtraGuestFee');
   const weekendRateAdjustmentAmount = num('weekendRateAdjustmentAmount', 'WeekendRateAdjustmentAmount');
   const breakfastPricePerPerson = num('breakfastPricePerPerson', 'BreakfastPricePerPerson');
@@ -375,6 +382,7 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
     finalAmount: finalAmount !== undefined && finalAmount !== null ? Number(finalAmount) : null,
     ...(priceLine ? { priceLine } : {}),
     ...(cleaningFee > 0 ? { cleaningFee } : {}),
+    ...(petFee > 0 ? { petFee } : {}),
     ...(extraGuestFee > 0 ? { extraGuestFee } : {}),
     ...(weekendRateAdjustmentAmount > 0 ? { weekendRateAdjustmentAmount } : {}),
     ...(breakfastPricePerPerson > 0 ? { breakfastPricePerPerson } : {}),

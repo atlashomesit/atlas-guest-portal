@@ -738,6 +738,11 @@ const GuestDetailsPage: React.FC = () => {
 
   const [depositAccepted, setDepositAccepted] = useState(false);
   const [depositError, setDepositError] = useState('');
+
+  // TASK-10299273: Pet policy + direct booking pet fee per stay
+  const [bringingPet, setBringingPet] = useState<boolean>(() => (booking.pets ?? 0) > 0);
+  const petsAllowedOnListing = Boolean(checkoutInfo?.petsAllowed);
+  const configuredPetFeePerStay = Math.max(0, Math.round(Number(checkoutInfo?.petFeePerStay) || 0));
   const depositRowRef = useRef<HTMLDivElement>(null);
   // TASK-10050 (DPDP guarded consent): transactional WhatsApp must NOT be pre-checked.
   // The previous `true` default meant consent was assumed unless the guest actively
@@ -874,6 +879,15 @@ const GuestDetailsPage: React.FC = () => {
   // CFB-009 / BNB-009 / BNB-010: honor breakfast extra when guest opted in on Room-Only booking
   const includeBreakfast = Boolean(priceBreakdown?.includeBreakfast);
   const breakfastExtraAmount = Math.max(0, Math.round(Number(priceBreakdown?.breakfastExtraAmount) || 0));
+  const quotedPetFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.petFee) || 0));
+  const petFeeAmount =
+    quotedPetFeeAmount > 0
+      ? quotedPetFeeAmount
+      : petsAllowedOnListing && bringingPet
+        ? configuredPetFeePerStay
+        : 0;
+  const unquotedPetFeeAmount =
+    quotedPetFeeAmount === 0 && petsAllowedOnListing && bringingPet ? configuredPetFeePerStay : 0;
   const extraGuestFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.extraGuestFee) || 0));
   const weekendRateAdjustmentAmount = Math.max(0, Math.round(Number(priceBreakdown?.weekendRateAdjustmentAmount) || 0));
 
@@ -888,7 +902,7 @@ const GuestDetailsPage: React.FC = () => {
   // TASK-4421: global discount still applies before GST; the slab decision uses the post-discount base.
   const serverFinalAmount =
     typeof priceBreakdown?.finalAmount === 'number' && priceBreakdown.finalAmount > 0
-      ? priceBreakdown.finalAmount
+      ? priceBreakdown.finalAmount + unquotedPetFeeAmount
       : null;
   const touristTaxAmount =
     typeof priceBreakdown?.touristTaxAmount === 'number' && priceBreakdown.touristTaxAmount > 0
@@ -900,7 +914,7 @@ const GuestDetailsPage: React.FC = () => {
 
   const { perNight, displayTotal } =
     computeCheckoutTotal({
-      baseAmount,
+      baseAmount: serverFinalAmount == null ? baseAmount + unquotedPetFeeAmount : baseAmount,
       globalDiscountAmount,
       convenienceFeeAmount,
       nights,
@@ -922,6 +936,7 @@ const GuestDetailsPage: React.FC = () => {
   const {
     effectiveBaseAmount,
     effectivePerNight,
+    petFeeRow,
     extraGuestFeeRow,
     weekendAdjustmentRow,
     discountRow,
@@ -930,6 +945,7 @@ const GuestDetailsPage: React.FC = () => {
     baseAmount,
     cleaningFeeAmount,
     breakfastExtraAmount,
+    petFeeAmount,
     extraGuestFeeAmount,
     weekendRateAdjustmentAmount,
     touristTaxAmount,
@@ -1272,6 +1288,7 @@ const GuestDetailsPage: React.FC = () => {
           checkoutDate,
           guests: booking.guests ?? 1,
           ...(includeBreakfast ? { includeBreakfast: true } : {}),
+          ...(bringingPet ? { pets: 1, hasPets: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         },
@@ -1298,7 +1315,7 @@ const GuestDetailsPage: React.FC = () => {
     };
     updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
     return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
-  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, includeBreakfast, isMarketplaceCheckout, effectiveTenantSlug, updateBooking]);
+  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, includeBreakfast, bringingPet, isMarketplaceCheckout, effectiveTenantSlug, updateBooking]);
 
   // ── PAY-010: UPI_QR / UPI_DEEPLINK checkout ──────────────────────────────────
   const [upiCheckout, setUpiCheckout] = useState<{
@@ -1468,6 +1485,7 @@ const GuestDetailsPage: React.FC = () => {
           guestNationality: formData.nationality || 'India',
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
           ...(includeBreakfast ? { includeBreakfast: true } : {}),
+          ...(bringingPet ? { pets: 1, hasPets: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         },
@@ -2903,6 +2921,50 @@ const GuestDetailsPage: React.FC = () => {
               />
             </div>
 
+            {/* TASK-10299273: Pet policy & per-stay pet fee toggle on direct website bookings */}
+            {petsAllowedOnListing && (
+              <div
+                className="gd-pet-policy-section"
+                data-testid="checkout-pet-policy-section"
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--gd-line-strong, #e2e8f0)',
+                  background: 'var(--gd-surface-muted, #f8fafc)',
+                }}
+              >
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 500 }}>
+                    <input
+                      type="checkbox"
+                      checked={bringingPet}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setBringingPet(next);
+                        updateBooking({ pets: next ? 1 : 0 });
+                      }}
+                      data-testid="checkout-bringing-pet-checkbox"
+                    />
+                    Bringing a pet?
+                  </span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--gd-ink-soft, #475569)' }} data-testid="checkout-pet-fee-label">
+                    {configuredPetFeePerStay > 0
+                      ? `+${displayPrice(configuredPetFeePerStay)} pet fee per stay`
+                      : 'Pets stay free'}
+                  </span>
+                </label>
+              </div>
+            )}
+
             {/* PAY-006 / TASK-1039977: Refundable security deposit disclosure banner & consent */}
             {depositRequired && (
               <div
@@ -3267,6 +3329,12 @@ const GuestDetailsPage: React.FC = () => {
                   Breakfast ({stayGuestCount} {stayGuestCount === 1 ? 'guest' : 'guests'} × {nights} {nights === 1 ? 'night' : 'nights'})
                 </span>
                 <span className="num">{displayPrice(breakfastExtraAmount)}</span>
+              </div>
+            )}
+            {petFeeRow && (
+              <div className="gd-price-row" data-testid="price-breakdown-pet-fee">
+                <span>{petFeeRow.label}</span>
+                <span className="num">{displayPrice(petFeeRow.amount)}</span>
               </div>
             )}
             {extraGuestFeeRow && (
