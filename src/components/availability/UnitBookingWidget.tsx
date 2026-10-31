@@ -2093,6 +2093,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           ...(includeBreakfast && breakfastExtraLineAmount > 0
             ? { includeBreakfast: true, breakfastExtraAmount: breakfastExtraLineAmount }
             : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.petFee && serverPriceBreakdown.petFee > 0
+            ? { petFee: Math.round(serverPriceBreakdown.petFee) }
+            : {}),
           ...(serverGstMatchesSelection && serverPriceBreakdown?.extraGuestFee && serverPriceBreakdown.extraGuestFee > 0
             ? { extraGuestFee: Math.round(serverPriceBreakdown.extraGuestFee) }
             : {}),
