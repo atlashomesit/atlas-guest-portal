@@ -3,11 +3,12 @@
  * PAY-016: the first-party pay page `/pay/:token`. A UPI host's guest gets the one-tap UPI intent + QR and "I have paid" (which only tells the host);
  * a Razorpay host's guest is sent to Razorpay checkout for the API's amount; a paid-up, unavailable or invalid link says so in words.
  */
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import PayLinkPage from './PayLinkPage';
+import { settle } from '../test/settle';
 
 vi.mock('../components/SEO', () => ({ default: () => null }));
 vi.mock('qrcode.react', () => ({ QRCodeSVG: () => <svg data-testid="qr-svg" /> }));
@@ -57,13 +58,15 @@ describe('PayLinkPage (PAY-016)', () => {
     fetchMock.mockImplementation((url: string, init?: RequestInit) =>
       init?.method === 'POST' ? json(200, UPI_ORDER) : json(200, SUMMARY));
     renderPage();
+    await settle();
 
-    expect(await screen.findByTestId('pay-link-title')).toHaveTextContent('Hi Asha, pay for your stay at Hill Stay');
+    expect(screen.getByTestId('pay-link-title')).toHaveTextContent('Hi Asha, pay for your stay at Hill Stay');
     expect(screen.getByTestId('pay-link-summary')).toHaveTextContent('Hill Stay Villa - Garden Room');
     expect(screen.getByTestId('pay-link-amount')).toHaveTextContent('5,000');
 
     fireEvent.click(screen.getByTestId('pay-link-upi-start'));
-    expect(await screen.findByTestId('upi-pay-panel')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId('upi-pay-panel')).toBeInTheDocument();
     expect(screen.getByTestId('upi-pay-vpa')).toHaveTextContent('host@upi');
     expect(screen.queryByTestId('upi-pay-hold-line')).not.toBeInTheDocument();
     expect(calls()).toEqual([
@@ -78,11 +81,14 @@ describe('PayLinkPage (PAY-016)', () => {
       return init?.method === 'POST' ? json(200, UPI_ORDER) : json(200, SUMMARY);
     });
     renderPage();
+    await settle();
 
-    fireEvent.click(await screen.findByTestId('pay-link-upi-start'));
-    fireEvent.click(await screen.findByTestId('upi-pay-i-have-paid'));
+    fireEvent.click(screen.getByTestId('pay-link-upi-start'));
+    await settle();
+    fireEvent.click(screen.getByTestId('upi-pay-i-have-paid'));
+    await settle();
 
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/booking/77?t=tok123'));
+    expect(screen.getByTestId('location')).toHaveTextContent('/booking/77?t=tok123');
     const report = fetchMock.mock.calls.find((c) => String(c[0]).includes('guest-reported-paid'))!;
     expect(JSON.parse((report[1] as RequestInit).body as string)).toEqual({ bookingId: 77, bookingToken: 'tok123' });
   });
@@ -95,17 +101,20 @@ describe('PayLinkPage (PAY-016)', () => {
         ? json(200, { mode: 'RAZORPAY', bookingId: 77, amountInr: 5000, paymentUrl: 'https://rzp.io/i/abc' })
         : json(200, { ...SUMMARY, mode: 'RAZORPAY', upiVpa: null }));
     renderPage();
+    await settle();
 
-    fireEvent.click(await screen.findByTestId('pay-link-razorpay-pay'));
+    fireEvent.click(screen.getByTestId('pay-link-razorpay-pay'));
+    await settle();
 
-    await waitFor(() => expect(assign).toHaveBeenCalledWith('https://rzp.io/i/abc'));
+    expect(assign).toHaveBeenCalledWith('https://rzp.io/i/abc');
   });
 
   it('a paid-up booking says nothing is left to pay and offers no payment', async () => {
     fetchMock.mockImplementation(() => json(200, { ...SUMMARY, amountDueInr: 0, alreadyPaid: true, mode: 'NONE' }));
     renderPage();
+    await settle();
 
-    expect(await screen.findByTestId('pay-link-paid')).toBeInTheDocument();
+    expect(screen.getByTestId('pay-link-paid')).toBeInTheDocument();
     expect(screen.getByTestId('pay-link-amount')).toHaveTextContent('Nothing left to pay');
     expect(screen.queryByTestId('pay-link-upi-start')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pay-link-razorpay-pay')).not.toBeInTheDocument();
@@ -114,22 +123,26 @@ describe('PayLinkPage (PAY-016)', () => {
   it('a host with no online rail is told to contact the host', async () => {
     fetchMock.mockImplementation(() => json(200, { ...SUMMARY, mode: 'UNAVAILABLE' }));
     renderPage();
-    expect(await screen.findByTestId('pay-link-unavailable')).toHaveTextContent('contact your host');
+    await settle();
+    expect(screen.getByTestId('pay-link-unavailable')).toHaveTextContent('contact your host');
   });
 
   it('an invalid or expired link is a plain sentence, not a blank page', async () => {
     fetchMock.mockImplementation(() => json(404, { error: 'PAY_LINK_INVALID' }));
     renderPage();
-    expect(await screen.findByTestId('pay-link-error')).toHaveTextContent('not valid any more');
+    await settle();
+    expect(screen.getByTestId('pay-link-error')).toHaveTextContent('not valid any more');
   });
 
   it('a refused order start shows the API sentence and stays on the page', async () => {
     fetchMock.mockImplementation((url: string, init?: RequestInit) =>
       init?.method === 'POST' ? json(502, { message: 'We could not start the payment. Please try again in a minute.' }) : json(200, SUMMARY));
     renderPage();
+    await settle();
 
-    fireEvent.click(await screen.findByTestId('pay-link-upi-start'));
+    fireEvent.click(screen.getByTestId('pay-link-upi-start'));
+    await settle();
 
-    expect(await screen.findByTestId('pay-link-action-error')).toHaveTextContent('try again in a minute');
+    expect(screen.getByTestId('pay-link-action-error')).toHaveTextContent('try again in a minute');
   });
 });

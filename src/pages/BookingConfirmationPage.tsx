@@ -1643,7 +1643,7 @@ export default function BookingConfirmationPage() {
                 <CopyableInfoRow label="Password" value={booking.wifiPassword} mono copyAriaLabel="Copy Wi-Fi password" copyTestId="copy-wifi-password-btn" />
               )}
             </div>
-            {/* GUEST-039: standard WIFI: QR so a phone camera joins in one tap */}
+            {/* GUEST-039: standard WIFI: QR so a phone camera joins with one scan */}
             {booking.wifiName && <WifiScanToConnect ssid={booking.wifiName} passphrase={booking.wifiPassword} />}
           </div>
         )}
