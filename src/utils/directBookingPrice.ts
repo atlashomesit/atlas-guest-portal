@@ -110,15 +110,21 @@ export function alignPromotionLabelPercent(
   struckNightly: number | null | undefined,
   chargedNightly: number | null | undefined,
 ): string {
-  const PERCENT_PART = /\s*\(\s*\d+(?:\.\d+)?\s*%\s*off\s*\)/i;
-  if (!label || !PERCENT_PART.test(label)) return label;
+  const PAREN_PERCENT_PART = /\s*\(\s*\d+(?:\.\d+)?\s*%\s*off\s*\)/i;
+  const BARE_PERCENT_PART = /\s+\b\d+(?:\.\d+)?\s*%\s*off\b/i;
+  const hasParen = Boolean(label) && PAREN_PERCENT_PART.test(label);
+  const hasBare = Boolean(label) && !hasParen && BARE_PERCENT_PART.test(label);
+  if (!label || (!hasParen && !hasBare)) return label;
   const struck = Number(struckNightly);
   const charged = Number(chargedNightly);
   const pct =
     Number.isFinite(struck) && Number.isFinite(charged) && struck > 0 && charged < struck
       ? Math.round(((struck - charged) / struck) * 100)
       : 0;
-  return pct > 0 ? label.replace(PERCENT_PART, ` (${pct}% off)`) : label.replace(PERCENT_PART, '').trim();
+  if (hasParen) {
+    return pct > 0 ? label.replace(PAREN_PERCENT_PART, ` (${pct}% off)`) : label.replace(PAREN_PERCENT_PART, '').trim();
+  }
+  return pct > 0 ? label.replace(BARE_PERCENT_PART, ` ${pct}% off`) : label.replace(BARE_PERCENT_PART, '').trim();
 }
 
 /** "25% off — booked direct" — the one wording every surface uses for the saving. */
@@ -133,14 +139,15 @@ export function allInTotalLabel(totalFormatted: string, nights: number): string 
 
 /**
  * Plain words for a plan's meals (founder ruling 2026-10-21: no "Room Only" / "CP" / "MAP" jargon).
- * Takes the API's MealPlanLabel ("Room Only", "Breakfast Included", "Half Board (Breakfast & Dinner)", …).
+ * Takes the API's MealPlanLabel ("Room Only", "Breakfast Included", "Half Board (Breakfast & Dinner)", …)
+ * or raw MealPlanCode ("RO", "EP", "CP", "BB", "MAP", "HB", "AP", "FB", "AI").
  */
 export function plainMealLabel(label: string | null | undefined): string {
   const l = (label ?? '').trim().toLowerCase();
-  if (!l || l === 'room only') return 'Room only, no meals';
-  if (l.startsWith('breakfast')) return 'Breakfast included';
-  if (l.startsWith('half board')) return 'Breakfast and dinner included';
-  if (l.startsWith('full board')) return 'All meals included';
-  if (l.startsWith('all inclusive')) return 'All meals and drinks included';
+  if (!l || l === 'room only' || l === 'ro' || l === 'ep' || l === 'none') return 'Room only, no meals';
+  if (l === 'cp' || l === 'bb' || l.startsWith('breakfast') || l.startsWith('continental')) return 'Breakfast included';
+  if (l === 'map' || l === 'hb' || l.startsWith('half board')) return 'Breakfast and dinner included';
+  if (l === 'ap' || l === 'fb' || l.startsWith('full board')) return 'All meals included';
+  if (l === 'ai' || l.startsWith('all inclusive') || l.startsWith('all-inclusive')) return 'All meals and drinks included';
   return (label ?? '').trim();
 }
