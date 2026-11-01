@@ -1,4 +1,5 @@
 import { feePercent } from './paymentFeeCopy';
+import { alignPromotionLabelPercent } from './directBookingPrice';
 /** TASK-2903 / TASK-2870: shared GST + est-total for guest pricing surfaces. */
 
 export const ACCOMMODATION_GST_THRESHOLD_INR = 7500;
@@ -321,7 +322,10 @@ export function resolveCheckoutChargeReconciliation(
   let reconciledIntoBaseAmount = 0;
 
   if (plug > 0) {
-    const promoLabel = input.appliedPromotionLabel?.trim();
+    const rawPromoLabel = input.appliedPromotionLabel?.trim();
+    const promoLabel = rawPromoLabel
+      ? alignPromotionLabelPercent(rawPromoLabel, base, Math.max(0, base - plug))
+      : '';
     discountRow = {
       label: promoLabel || 'Discount',
       amount: plug,
