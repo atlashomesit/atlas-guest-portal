@@ -87,6 +87,9 @@ export async function fetchMarketplaceCardPrice(
       nights,
       paymentFeeCharged,
       paymentFeeAmount: quote.convenienceFeeAmount,
+      originalNightlyRate: quote.originalNightlyRate,
+      discountedNightlyRate: quote.discountedNightlyRate,
+      appliedPromotionLabel: quote.appliedPromotionLabel,
     });
   }
 
@@ -101,6 +104,9 @@ export async function fetchMarketplaceCardPrice(
     nights: 1,
     paymentFeeCharged,
     paymentFeeAmount: (today.actualPrice * (today.convenienceFeePercent ?? 0)) / 100,
+    originalNightlyRate: today.originalNightlyRate,
+    discountedNightlyRate: today.discountedNightlyRate,
+    appliedPromotionLabel: today.appliedPromotionLabel,
   });
 }
 

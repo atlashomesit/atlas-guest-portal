@@ -109,6 +109,50 @@ describe('HSL-011: ListingCard dorm badge reads the gender rule from the API onl
     renderDorm('Bed in Dormitory Villa', {});
     expect(screen.queryByTestId('hostel-dorm-container')).toBeNull();
   });
+
+  // TASK-10299109: the badge says "Sold by the Bed", so it may only sit on a listing that really sells beds
+  // (Listing.AccommodationType === "HostelDorm"). A private room of a Hostel PROPERTY is sold by the room.
+  it('TASK-10299109: a private room of a Hostel property shows no dorm badge and no per-bed wording', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    render(
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingCard
+            id="11" name="Private Double Room" location="Goa" image="" price={1800} rating={0} reviews={0}
+            propertyType="Hostel" accommodationType="PrivateRoom" guests={2} petFriendly={false}
+          />
+        </BookingProvider>
+      </CurrencyProvider>,
+    );
+    expect(screen.queryByTestId('hostel-dorm-container')).toBeNull();
+    expect(screen.queryByTestId('hostel-dorm-base-badge')).toBeNull();
+    expect(screen.queryByTestId('hostel-per-bed-indicator')).toBeNull();
+    expect(screen.getByTestId('price-unit-label')).toHaveTextContent('/ night');
+    expect(screen.getByTestId('price-unit-label')).not.toHaveTextContent(/bed/i);
+  });
+
+  it('TASK-10299109: a Hostel-property listing with no accommodationType at all is not a dorm either', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    render(
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingCard
+            id="12" name="Twin Room" location="Goa" image="" price={1500} rating={0} reviews={0}
+            propertyType="Hostel" guests={2} petFriendly={false}
+          />
+        </BookingProvider>
+      </CurrencyProvider>,
+    );
+    expect(screen.queryByTestId('hostel-dorm-container')).toBeNull();
+    expect(screen.queryByTestId('hostel-per-bed-indicator')).toBeNull();
+  });
+
+  it('TASK-10299109: the real HostelDorm listing of the same Hostel property keeps the badge and per-bed wording', () => {
+    renderDorm('6-Bed Mixed Dorm', { accommodationType: 'HostelDorm', dormGenderPolicy: 'Mixed' });
+    expect(screen.getByTestId('hostel-dorm-base-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('hostel-per-bed-indicator')).toBeInTheDocument();
+    expect(screen.getByTestId('price-unit-label')).toHaveTextContent('per bed / night');
+  });
 });
 
 describe('ListingCard independent controls', () => {

@@ -33,6 +33,24 @@ export default function DirectSavingRow({
       <span data-testid="bw-saving-label" style={{ fontWeight: 600, color: '#b8472f' }}>
         {directSavingsLabel(display.savingsPercent)}
       </span>
+      {display.appliedPromotionLabel && (
+        <span
+          data-testid="merchandising-deal-badge"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            padding: '2px 8px',
+            borderRadius: 999,
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            color: '#065f46',
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          {display.appliedPromotionLabel}
+        </span>
+      )}
     </div>
   );
 }

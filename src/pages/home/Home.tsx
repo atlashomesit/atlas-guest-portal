@@ -1,4 +1,5 @@
 import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
+import { brandNameForSentence } from '@/utils/guestCopy';
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { lazy, Suspense, useEffect, useMemo } from "react";
@@ -189,7 +190,7 @@ const Home = () => {
                             style={{ fontFamily: 'var(--font-family-display)' }}
                         >
                             {hideAtlasBranding
-                                ? `"Welcome to ${schemaBrandName}. Arrive, settle in, and let us take care of the rest — reach out any time if you need us."`
+                                ? `"Welcome to ${brandNameForSentence(schemaBrandName)}. Arrive, settle in, and let us take care of the rest — reach out any time if you need us."`
                                 : `"Every home on this page is one we clean, restock, and hand over ourselves. Arrive, settle in, and let us take care of the rest — we're just down the street if you need us."`}
                         </blockquote>
                         {/* TASK-4923 pattern — bound to the panel's own lavender text role, not

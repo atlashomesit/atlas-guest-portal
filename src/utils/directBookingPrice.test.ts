@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allInTotalLabel, directPriceDisplay, directSavingsLabel } from './directBookingPrice';
+import { alignPromotionLabelPercent, allInTotalLabel, directPriceDisplay, directSavingsLabel } from './directBookingPrice';
 
 // Founder ruling 2026-10-21. Numbers are the live Penthouse 501 quote measured on prod that day
 // (2 Nov, 1 night): baseAmount 5998, discountAmount 1499.5 (25%), finalAmount 4633.46 (incl. 3% fee).
@@ -78,5 +78,38 @@ describe('labels', () => {
     expect(directSavingsLabel(25)).toBe('25% off — booked direct');
     expect(allInTotalLabel('₹4,633', 1)).toBe('₹4,633 total · 1 night · all fees included');
     expect(allInTotalLabel('₹13,905', 3)).toBe('₹13,905 total · 3 nights · all fees included');
+  });
+});
+
+// TASK-10299258: the guest-journey check saw "Direct Booking Special (25% off)" next to a real 8% saving and
+// "Last-Minute Deal (25% off)" next to ~6%. The percent in a label is always the saving on screen.
+describe('promotion label percent equals the real saving (TASK-10299258)', () => {
+  it('rewrites a configured 25% to the real saving (3,785 -> 3,480 is 8%)', () => {
+    expect(alignPromotionLabelPercent('Direct Booking Special (25% off)', 3785, 3480)).toBe('Direct Booking Special (8% off)');
+    expect(alignPromotionLabelPercent('Last-Minute Deal (25% off)', 3785, 3560)).toBe('Last-Minute Deal (6% off)');
+  });
+
+  it('keeps a label whose percent is already the real one', () => {
+    expect(alignPromotionLabelPercent('Direct Booking Special (25% off)', 3785, 2839)).toBe('Direct Booking Special (25% off)');
+  });
+
+  it('drops the percent, keeps the name, when there is no genuine saving; leaves percent-less labels alone', () => {
+    expect(alignPromotionLabelPercent('Direct Booking Special (25% off)', 3785, 3785)).toBe('Direct Booking Special');
+    expect(alignPromotionLabelPercent('Monsoon Special', 3785, 3000)).toBe('Monsoon Special');
+    expect(alignPromotionLabelPercent('', 3785, 3000)).toBe('');
+  });
+
+  it('directPriceDisplay: the badge percent equals savingsPercent for the quote on screen', () => {
+    // 2 nights, base 7,570, floor-clamped discount 605.6 -> real saving 8%, but the API label still says 25%.
+    const d = directPriceDisplay({
+      baseAmount: 7570,
+      discountAmount: 605.6,
+      finalAmount: 7171,
+      nights: 2,
+      appliedPromotionLabel: 'Direct Booking Special (25% off)',
+    });
+    expect(d?.savingsPercent).toBe(8);
+    expect(d?.appliedPromotionLabel).toBe('Direct Booking Special (8% off)');
+    expect(d?.appliedPromotionLabel).toContain(`${d?.savingsPercent}% off`);
   });
 });

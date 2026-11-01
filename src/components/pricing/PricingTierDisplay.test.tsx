@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import PricingTierDisplay from './PricingTierDisplay';
+import PricingTierDisplay, { isInternalOrDefaultRatePlanName } from './PricingTierDisplay';
 
 describe('PricingTierDisplay', () => {
   it('renders nothing when no tier information is provided', () => {
@@ -9,11 +9,39 @@ describe('PricingTierDisplay', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders selected rate plan badge when ratePlanName is provided', () => {
+  it('renders selected rate plan badge when ratePlanName is a non-internal label', () => {
     render(<PricingTierDisplay ratePlanName="Member Early Bird Rate" />);
     const badge = screen.getByTestId('selected-rate-plan-badge');
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveTextContent('Member Early Bird Rate');
+  });
+
+  it('TASK-10299208: suppresses internal, occupancy, BAR, Standard Rate, Default, and SKU plan names', () => {
+    const internalNames = [
+      'Atlas101 . Double',
+      'Atlas102 . Double',
+      'Atlas201 . Double',
+      'Atlas501_PH . Double',
+      'Atlas201 · Triple',
+      'Standard Rate',
+      'Standard',
+      'Default',
+      'Default Rate',
+      'BAR',
+      'Single Occupancy',
+      'Double',
+      'Triple',
+      'Quadruple',
+      'Sextuple',
+      'Atlas302',
+    ];
+
+    for (const name of internalNames) {
+      expect(isInternalOrDefaultRatePlanName(name)).toBe(true);
+      const { unmount } = render(<PricingTierDisplay ratePlanName={name} />);
+      expect(screen.queryByTestId('selected-rate-plan-badge')).toBeNull();
+      unmount();
+    }
   });
 
   it('renders meal plan badge using label and code mapping', () => {

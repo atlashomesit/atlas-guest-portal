@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { previewListingDescription, resolveHostListingDescription } from './listingDescription';
+import {
+  isInternalCodeOnlyDescription,
+  previewListingDescription,
+  resolveHostListingDescription,
+  withoutInternalCodeDescription,
+} from './listingDescription';
 
 describe('resolveHostListingDescription', () => {
   it('returns the Full description (longDescription) when the host filled it in', () => {
@@ -27,6 +32,14 @@ describe('resolveHostListingDescription', () => {
     expect(resolveHostListingDescription({ longDescription: '\n  Line one\n\nLine two  \n' })).toBe(
       'Line one\n\nLine two',
     );
+  });
+
+  it('repairs double-encoded mojibake in host descriptions (GUEST-038)', () => {
+    expect(
+      resolveHostListingDescription({
+        longDescription: 'â€¢ Deluxe Stay âœ” WiFiÂ included\r\nVistaraâ€™s Villa â€“ Goa',
+      }),
+    ).toBe('• Deluxe Stay ✔ WiFi included\nVistara’s Villa – Goa');
   });
 
   it('never uses SEO/meta copy or the tagline — returns empty so the page keeps its "Ask the host" state', () => {
@@ -67,5 +80,40 @@ describe('previewListingDescription', () => {
 
   it('does not leave the ellipsis dangling after a trailing line break', () => {
     expect(previewListingDescription('Intro\n\nMore text here', 7).preview).toBe('Intro…');
+  });
+
+  it('repairs mojibake before generating preview (GUEST-038)', () => {
+    expect(previewListingDescription('â€¢ Cozy room âœ” AC', 11)).toEqual({
+      preview: '• Cozy room…',
+      truncated: true,
+    });
+  });
+});
+
+// TASK-10299260: "About this home" must never print an internal room code ("Atlas301").
+describe('internal code-only descriptions', () => {
+  it('flags single-token listing codes', () => {
+    for (const code of ['Atlas301', 'atlas101', 'Atlas 302', 'Atlas501_PH', 'FF101', ' Atlas301 ']) {
+      expect(isInternalCodeOnlyDescription(code), code).toBe(true);
+    }
+  });
+
+  it('keeps real prose, including prose that mentions a room number', () => {
+    for (const text of ['Cozy studio near the metro', 'Atlas 301 is a bright studio with a balcony', 'Cozy', '2BHK', '']) {
+      expect(isInternalCodeOnlyDescription(text), text).toBe(false);
+    }
+  });
+
+  it('withoutInternalCodeDescription blanks a code and passes prose through trimmed', () => {
+    expect(withoutInternalCodeDescription('Atlas301')).toBe('');
+    expect(withoutInternalCodeDescription(null)).toBe('');
+    expect(withoutInternalCodeDescription('  A bright studio  ')).toBe('A bright studio');
+  });
+
+  it('resolveHostListingDescription skips a code-only long description and falls back to the short one, else empty', () => {
+    expect(resolveHostListingDescription({ longDescription: 'Atlas301', shortDescription: 'Bright studio with a balcony' })).toBe(
+      'Bright studio with a balcony',
+    );
+    expect(resolveHostListingDescription({ longDescription: 'Atlas301' })).toBe('');
   });
 });

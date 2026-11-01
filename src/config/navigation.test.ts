@@ -4,6 +4,7 @@ import {
   primaryNav,
   footerLegalNav,
   menuNav,
+  resolveNavTo,
 } from './navigation';
 
 describe('TASK-10299142: navigation items have valid hrefs pointing to /terms, /privacy, and /contact', () => {
@@ -42,5 +43,32 @@ describe('TASK-10299142: navigation items have valid hrefs pointing to /terms, /
     expect(hrefs).toContain('/terms');
     expect(hrefs).toContain('/privacy');
     expect(hrefs).toContain('/contact');
+  });
+});
+
+describe('TASK-10299142: marketplace Stays link goes to a real anchor and keeps the active search', () => {
+  const stays = primaryNav.find((item) => item.label === 'Stays')!;
+  const search = '?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2';
+
+  it('marketplace mode: Stays keeps the whole query and targets the #our-homes grid anchor', () => {
+    expect(resolveNavTo(stays, { marketplace: true, search })).toBe(
+      '/?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2#our-homes',
+    );
+  });
+
+  it('marketplace mode without a brand param in the URL still names the marketplace brand', () => {
+    expect(resolveNavTo(stays, { marketplace: true, search: '' })).toBe('/?brand=atlastays#our-homes');
+    expect(resolveNavTo(stays, { marketplace: true, search: '?guests=3' })).toBe('/?guests=3&brand=atlastays#our-homes');
+  });
+
+  it('tenant storefront: Stays is untouched', () => {
+    expect(resolveNavTo(stays, { marketplace: false, search })).toBe('/#our-homes');
+  });
+
+  it('every other item is untouched in both modes', () => {
+    for (const item of primaryNav.filter((i) => i.label !== 'Stays')) {
+      expect(resolveNavTo(item, { marketplace: true, search })).toBe(item.to);
+      expect(resolveNavTo(item, { marketplace: false, search })).toBe(item.to);
+    }
   });
 });

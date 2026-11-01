@@ -87,3 +87,36 @@ This supersedes only the identified placement/presentation/navigation decisions.
 The founder's approval of the proposals presented during 18–22 October includes [21 October r2](https://github.com/atlashomesit/atlas-ux-evidence/blob/main/docs/ux/daily-five/2026-10-21/r2/index.html#guest-property): WIDE-PROPERTY-SINGLE-R2-A places the existing booking column beside the single-photo gallery at desktop widths. UXV-2026-10-18-04 restores the ready phone shortcut's focus-only behavior without submitting. Existing pricing/availability guards, calendar fallback, rate-plan badge and Change plan control, imagery, colors, fees and checkout remain intact. Zero/multiple-photo layouts are outside this single-photo CSS rule.
 
 This is implementation authorization only. The actual comparison bundle and independent per-ID verdicts remain required; hold the draft PR with auto-merge disabled until Sreekar explicitly approves the exact final head.
+
+
+## Daily ten — 23 October r5 implementation approval, 24 October 2026
+
+Sreekar said **“I approve all”** while viewing the immutable [r5 gallery](https://github.com/atlashomesit/atlas-ux-evidence/blob/77e5808e5a9c258b973b73d59d08478b8805c2c1/docs/ux/daily-five/2026-10-23/r5/index.html). Binding approval is private `2026-10-23/implemented-r1/APPROVAL.json`; gallery SHA-256 is `2107458bc5f0cdf0d56e9cc54cbfebd65ebdab232d08bec9ed7d98e3093ddf01`.
+
+UXD-2026-10-23-08-A names each required rating group and star choice, exposes exactly the selected value with aria-pressed and persistent selected-value text, and retains existing hover/rating colors and submission validation. UXD-2026-10-23-09-A adds arrival/contact/count correction within the ID step with separate drafts, validation, Cancel/focus return and explicit confirmation before removing trailing guests. Keep retained guest objects, ID files, verification state, nationality, house rules and downstream payload semantics; adding a guest creates only a blank new record. No verification or payment service contract changes. This supersedes only those disclosed scopes. Preserve current colors, useful features, imagery, status/financial meanings, permissions and service contracts. Actual baseline / approved / implemented comparisons and independent per-ID review belong in `2026-10-23/implemented-r1/`. Keep draft PRs held with auto-merge off until Sreekar separately approves the actual result and exact final heads. No merge, direct dev push, release or deployment is authorized.
+
+**27 October 2026:** Sreekar approved merging this batch to dev ("Yes, merge all three batches into dev"). No deployment, release cut or held-test activation was approved with it.
+
+
+## Daily ten - 27 October 2026 implementation approval
+
+Sreekar approved immutable private `docs/ux/daily-five/2026-10-27/r1` (archive commit `04fcfb9cbc600d41716a011fda249a4e1d8380d5`): "I approve all 10 proposals for 27 October. Implement them and show me the actual before and after on mobile and wide screens for final approval before merging." Receipt: `2026-10-27/implemented-r1/APPROVAL.json`.
+
+This portal implements UXD-2026-10-27-01-A, 05-A, 06-A and 10-A only: gate unknown optional preferences after failed initial GET with read-only Retry and recovery focus; associate the existing correction labels; make the Pending host WhatsApp draft and helper factual using current booking identity; report upload uncertainty for a valid-photo HTTP 503. Preserve separately loaded consent/Withdraw, required transactional messages, preference and correction payloads, export/erasure, Confirmed wording and all other status eligibility, host destination, check-in/Google Calendar/ICS/Print, photo validation/auth/success/removal, profile drafts and deliberate file reselection. Existing colors and useful features remain.
+
+This supersedes only those four disclosed behaviors in r1. Earlier held work is unchanged. Actual four-viewport comparisons, native interactions and independent per-ID review remain required. Hold for Sreekar's separate final approval of the actual results and exact heads before any merge; no direct dev push, deployment or activation of held E2E tests.
+
+
+27 October 2026 implementation-review refinement (06-A only): keep the unchanged Pending helper immediately before the grouped WhatsApp/Google Calendar/ICS/Print actions. Inserting it between controls expanded the flex wrapping and newly obscured native keyboard focus at true 200% zoom; the compact original action group is restored while retaining the helper, all four actions, colors and existing floating widgets. This bounded preservation repair remains within r1 implementation authority and still requires refreshed native evidence, independent review and exact-head final approval.
+
+## Worst-10 review fixes — 28 October 2026 (guest #661, founder: "keep merging everything to dev")
+
+Independent review of the merged property-page change (private `atlas-ux-evidence/docs/ux/top-ten-weekly/2026-10-27/review/code-review-guest-landing.md` G1-G7 and `checks/verify-report.md` checks 5-6) found defects; this supersedes only the points below, nothing else in the approved 01-A to 01-E scope.
+
+- Gallery fit: `object-fit: contain` is forced only for the two-photo layout (01-B). One photo keeps its contained image; three or more photos return to `cover`, as before #661. Do not add a rule that forces image fit for every gallery.
+- Phone Chat button (01-D): the host stays one tap away. The button opens a small chooser: Message the host (WhatsApp, the same number and message as the desktop host bubble; only when the page has a host number), Questions about this stay (the listing's own FAQ panel, only when the listing has FAQs), and Booking and payment help (the existing support drawer, which reaches the platform's contact). With nothing to choose between it opens the drawer directly. The button uses fixed light colours because the bar's own surface is a fixed light palette in every theme.
+- Layering: the support drawer opens above the sticky bar (the bar publishes its live height as `--pp-sticky-bar-offset` on `<body>`); the listing FAQ sheet and its backdrop stack above the bar.
+- Virtual tours: the listing's 360 embed and the 3D tour section sit in the left column beside the booking card at 1024px and up, and the card spans down to the long left column so it keeps following the page.
+- Booking card order at 1024px and up with the card beside the gallery: price, dates and guests, price lines, Reserve, then the reassurance blocks, then the listing preview photo (it repeats the gallery beside it). Nothing is removed; the pinned card now shows Reserve at 1280x720. This replaces the 01-E order only for the preview photo's position. Phone and tablet keep the established order.
+- Desktop floaters (WhatsApp, FAQs, Chat with us) stack in the left gutter and step aside while the footer is within reach of the stack, so they never cover footer links.
+- Not changed: the heritage layout (its own page, gallery mosaic and card position are as before #661) stays outside the beside-gallery layout until it has its own approval.

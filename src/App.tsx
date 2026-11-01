@@ -56,8 +56,10 @@ const SupportWidget = React.lazy(() => import("./components/support/SupportWidge
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
+const SecurityDepositPage = React.lazy(() => import("./pages/SecurityDepositPage")) // TASK-10299239
 const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
 const HouseRulesAcceptPage = React.lazy(() => import("./pages/HouseRulesAcceptPage")) // TASK-guest-automation-phase3
+const PayLinkPage = React.lazy(() => import("./pages/PayLinkPage")) // PAY-016
 const ReviewSubmitPage = React.lazy(() => import("./pages/ReviewSubmitPage"))
 const CommunicationPreferences = React.lazy(() => import("./pages/CommunicationPreferences"))
 const MyDataPage = React.lazy(() => import("./pages/MyDataPage"))
@@ -68,6 +70,8 @@ const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage")
 const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 const AtlasOnlyCityLanding = React.lazy(() => import("./pages/AtlasOnlyCityLanding"))
+const DestinationsPage = React.lazy(() => import("./pages/DestinationsPage"))
+const CityVanityRedirect = React.lazy(() => import("./components/CityVanityRedirect"))
 // TASK-2612: Two-step booking flow — guest details step after Reserve
 const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
 // TASK-8093: Embeddable booking widget (iframe entry)
@@ -75,6 +79,8 @@ const EmbedPage = React.lazy(() => import("./pages/EmbedPage"))
 // TASK-4017: Guest OTP login
 const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 const QrMenuPage = React.lazy(() => import("./pages/QrMenuPage"))
+// REV-046: the page a guest reaches by scanning the host's review QR code (`/rate/:tenantSlug/:code`).
+const ReviewQrPage = React.lazy(() => import("./pages/ReviewQrPage"))
 
 function LazyFallback() {
   // TASK-7822: 50vh left the site footer in the first desktop viewport. Home then
@@ -118,6 +124,31 @@ function GuestNativeHooks() {
   return <NativeShellBridge authLoading={isLoading} />;
 }
 
+/** GUEST-043: `/guest/portal` and `/portal` redirect to `/my-bookings` when authenticated, or `/check-in` when unauthenticated. */
+export function GuestPortalAliasRedirect() {
+  const { auth, isLoading } = useGuestAuth();
+  const location = useLocation();
+  if (isLoading) return <LazyFallback />;
+  const target = auth.isAuthenticated ? '/my-bookings' : '/check-in';
+  return <Navigate to={`${target}${location.search}`} replace />;
+}
+
+/** GUEST-052: `/checkin` redirects to `/check-in` preserving query parameters (e.g. `?t=...`). */
+export function CheckinAliasRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/check-in${location.search}`} replace />;
+}
+
+/** GUEST-052: `/checkin/:bookingRef` redirects to `/check-in/:bookingRef` preserving query parameters (e.g. `?t=...`). */
+export function CheckinBookingRefAliasRedirect() {
+  const { bookingRef } = useParams<{ bookingRef: string }>();
+  const location = useLocation();
+  if (!bookingRef) {
+    return <Navigate to={`/check-in${location.search}`} replace />;
+  }
+  return <Navigate to={`/check-in/${encodeURIComponent(bookingRef)}${location.search}`} replace />;
+}
+
 function AppWrapper() {
   const location = useLocation();
   const [, setLanguageVersion] = useState(0);
@@ -137,11 +168,13 @@ function AppWrapper() {
   // TASK-8093: embed widget runs inside an iframe on a host's own site — no Atlas chrome.
   const isEmbedRoute = Boolean(matchPath('/embed/:embedKey', location.pathname));
   const isQrMenuRoute = Boolean(matchPath('/qr-menu/:tenantSlug', location.pathname));
+  // REV-046: the review QR page is a standalone, one-screen page (no navbar, footer, support widget or cookie banner).
+  const isReviewQrRoute = Boolean(matchPath('/rate/:tenantSlug/:code', location.pathname));
 
-  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || hideNavbarRoutes.some((pattern) =>
+  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || hideNavbarRoutes.some((pattern) =>
     Boolean(matchPath(pattern, location.pathname))
   );
-  const shouldHideFooter = isEmbedRoute || isQrMenuRoute;
+  const shouldHideFooter = isEmbedRoute || isQrMenuRoute || isReviewQrRoute;
   // Classic tenant home owns the inline consent region immediately after its search.
   // Other themes/routes keep the global consent banner; no tenant resolution changes.
   const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
@@ -237,6 +270,23 @@ function AppWrapper() {
               )}
             />
           ))}
+          {/* MKT-034: city directory hub. /explore is an alias of /destinations. Both MUST stay before /:shortCode. */}
+          <Route path="/destinations" element={withBoundary(<Suspense fallback={<LazyFallback />}><DestinationsPage /></Suspense>, "destinations-route")} />
+          <Route path="/explore" element={withBoundary(<Suspense fallback={<LazyFallback />}><DestinationsPage /></Suspense>, "explore-route")} />
+          {/* MKT-034: naked city slugs (/coorg) redirect to /homestays-in-coorg on the marketplace surface. MUST stay before /:shortCode.
+              No static short link (shortLinkMap) shares a slug with a city (pinned in cityVanityRoutes.test.tsx). */}
+          {CITY_LANDING_SLUGS.map((citySlug) => (
+            <Route
+              key={`vanity-${citySlug}`}
+              path={`/${citySlug}`}
+              element={withBoundary(
+                <Suspense fallback={<LazyFallback />}>
+                  <CityVanityRedirect citySlug={citySlug} />
+                </Suspense>,
+                `city-vanity-${citySlug}-route`,
+              )}
+            />
+          ))}
           <Route path="/search" element={withBoundary(<Suspense fallback={<LazyFallback />}><SearchPage /></Suspense>, "search-route")} />
           <Route path="/blog" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogHome /></Suspense>, "blog-home-route")} />
           {/* TASK-4307: single-segment /blog/:segment is handled by BlogCategory, which
@@ -255,8 +305,17 @@ function AppWrapper() {
           <Route path="/properties/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-modern-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Suspense fallback={<LazyFallback />}><Reserve /></Suspense>, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><BookingConfirmationPage /></Suspense>, "booking-confirmation-route")} />
+          {/* TASK-10299239: security-deposit hold page, reached from the pre-arrival message; authorised by the same booking-link token (?t=). */}
+          <Route path="/booking/:bookingId/deposit" element={withBoundary(<Suspense fallback={<LazyFallback />}><SecurityDepositPage /></Suspense>, "security-deposit-route")} />
           <Route path="/check-in/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-route")} />
           <Route path="/check-in" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-noparam-route")} />
+          {/* GUEST-052: Unhyphenated /checkin aliases preserving query params (?t=...) */}
+          <Route path="/checkin/:bookingRef" element={withBoundary(<CheckinBookingRefAliasRedirect />, "self-checkin-alias-ref-route")} />
+          <Route path="/checkin" element={withBoundary(<CheckinAliasRedirect />, "self-checkin-alias-route")} />
+          {/* GUEST-043: /guest/portal and /portal aliases routing to /my-bookings (authenticated) or /check-in (unauthenticated) */}
+          <Route path="/guest/portal" element={withBoundary(<GuestPortalAliasRedirect />, "guest-portal-alias-route")} />
+          <Route path="/portal" element={withBoundary(<GuestPortalAliasRedirect />, "portal-alias-route")} />
+          <Route path="/pay/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><PayLinkPage /></Suspense>, "pay-link-route")} />
           <Route path="/house-rules/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><HouseRulesAcceptPage /></Suspense>, "house-rules-accept-route")} />
           <Route path="/review/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewSubmitPage /></Suspense>, "review-submit-route")} />
           <Route path="/communication-preferences" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-route")} />
@@ -278,6 +337,8 @@ function AppWrapper() {
           <Route path="/book/:propertySlug/:unitSlug/details" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestDetailsPage /></Suspense>, "guest-details-route")} />
           {/* TASK-10298855: Guest Room & Table QR Self-Ordering Web App */}
           <Route path="/qr-menu/:tenantSlug" element={withBoundary(<Suspense fallback={<LazyFallback />}><QrMenuPage /></Suspense>, "qr-menu-route")} />
+          {/* REV-046: review QR page — MUST be before the /:shortCode catch-all, no navbar/footer */}
+          <Route path="/rate/:tenantSlug/:code" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewQrPage /></Suspense>, "review-qr-route")} />
           {/* TASK-4308: human-readable sitemap page — MUST be before /:shortCode catch-all */}
           <Route path="/sitemap" element={withBoundary(<Suspense fallback={<LazyFallback />}><SitemapPage /></Suspense>, "sitemap-route")} />
           <Route path="/:shortCode" element={withBoundary(<Suspense fallback={<LazyFallback />}><ShortLinkRedirect /></Suspense>, "shortlink-route")} />

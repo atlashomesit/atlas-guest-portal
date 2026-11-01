@@ -160,10 +160,10 @@ export default function MyDataPage() {
       <section className="rounded border p-4 bg-white" data-testid="my-data-correction-form">
         <h2 className="font-semibold mb-2">Request a correction</h2>
         <p className="text-sm text-gray-600 mb-3">Describe what should be updated. A host will review before changes are applied.</p>
-        <label className="block text-sm font-medium mb-1">Your email</label>
-        <input className="w-full border rounded px-3 py-2 mb-3" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <label className="block text-sm font-medium mb-1">Correction details</label>
-        <textarea className="w-full border rounded px-3 py-2 mb-3 min-h-[100px]" value={correctionText} onChange={(e) => setCorrectionText(e.target.value)} />
+        <label htmlFor="correction-email" className="block text-sm font-medium mb-1">Your email</label>
+        <input id="correction-email" className="w-full border rounded px-3 py-2 mb-3" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <label htmlFor="correction-details" className="block text-sm font-medium mb-1">Correction details</label>
+        <textarea id="correction-details" className="w-full border rounded px-3 py-2 mb-3 min-h-[100px]" value={correctionText} onChange={(e) => setCorrectionText(e.target.value)} />
         <button type="button" className="bg-primary text-white px-4 py-2 rounded font-semibold disabled:opacity-50" disabled={submitting} onClick={() => void submitCorrection()}>
           {submitting ? "Submitting…" : "Submit correction request"}
         </button>

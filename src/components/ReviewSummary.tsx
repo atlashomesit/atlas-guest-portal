@@ -13,8 +13,12 @@
  * the chip renders only if the summary's verified-stay count agrees. A mismatch means the card
  * and the chip describe different verified review sets — rendering either label would be
  * unverified proof — so the chip hides. Surfaces that pass no expectation keep the historical behaviour.
+ *
+ * TASK-1039954: a card grid mounts one ReviewSummary per card, which used to be 14-20 summary requests at the
+ * moment the grid rendered (and 20+ net::ERR_ABORTED when the guest left). `lazy` makes a card ask only once it is
+ * near the viewport. Without `lazy`, or where IntersectionObserver does not exist, it fetches at mount as before.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 
 interface ReviewSummaryData {
@@ -37,6 +41,8 @@ interface ReviewSummaryProps {
    * is absent (older API, non-marketplace surface) the chip renders as before.
    */
   verifiedStayCount?: number | null;
+  /** TASK-1039954: defer the request until the card is near the viewport (card grids). Default: fetch at mount. */
+  lazy?: boolean;
 }
 
 const SENTIMENT_STYLES: Record<string, { bg: string; text: string; emoji: string }> = {
@@ -71,11 +77,37 @@ function fetchReviewSummary(listingId: number): Promise<ReviewSummaryData | null
   return promise;
 }
 
-export default function ReviewSummary({ listingId, verifiedStayCount }: ReviewSummaryProps) {
+/** How close to the viewport (px) a lazy card must be before it asks, so the chip is usually there as it scrolls in. */
+const LAZY_ROOT_MARGIN = "300px 0px";
+
+export default function ReviewSummary({ listingId, verifiedStayCount, lazy = false }: ReviewSummaryProps) {
   const [data, setData] = useState<ReviewSummaryData | null>(null);
+  // Fetch at mount unless the card asked to be lazy AND the browser can tell us when it is near the viewport.
+  const [shouldFetch, setShouldFetch] = useState<boolean>(() => !lazy || typeof IntersectionObserver === "undefined");
+  const sentinelRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
-    if (!listingId) return;
+    if (shouldFetch) return;
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setShouldFetch(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldFetch(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: LAZY_ROOT_MARGIN },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shouldFetch]);
+
+  useEffect(() => {
+    if (!listingId || !shouldFetch) return;
     let active = true;
 
     void fetchReviewSummary(listingId).then((json) => {
@@ -85,7 +117,19 @@ export default function ReviewSummary({ listingId, verifiedStayCount }: ReviewSu
     return () => {
       active = false;
     };
-  }, [listingId]);
+  }, [listingId, shouldFetch]);
+
+  // Out of the layout flow (absolute) so a not-yet-asked card gets no extra gap from its flex parent.
+  if (!shouldFetch) {
+    return (
+      <span
+        ref={sentinelRef}
+        aria-hidden="true"
+        data-testid="review-summary-sentinel"
+        className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
+      />
+    );
+  }
 
   if (!data || !Array.isArray(data.topKeywords) || data.topKeywords.length === 0) return null;
 

@@ -856,6 +856,8 @@
   overflow: hidden;
 }
 .pp-root .lv-date-cell {
+  /* GUEST-048: the global button rule gives every button a pill radius, which bent the cell's right border into an arc. */
+  border-radius: 0;
   padding: 10px 13px;
   background: #fff;
   cursor: pointer;

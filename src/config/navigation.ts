@@ -54,3 +54,25 @@ export const menuNav: NavItem[] = [
 ];
 
 export const ctaNav: NavItem = { label: 'Book Now', to: '/search', href: '/search' };
+
+/** The in-page grid anchor: the tenant storefront's "Our homes" section and the marketplace grid both carry it. */
+export const OUR_HOMES_ANCHOR_ID = 'our-homes';
+
+/**
+ * TASK-10299142: where a nav/footer link really points.
+ *
+ * "Stays" is `/#our-homes`. On the tenant storefront that is the right target. In marketplace mode a bare
+ * `/#our-homes` drops the whole query (?brand, checkIn, checkOut, guests ...), so the grid reloaded without the
+ * guest's dates. There the link keeps the current query (adding `brand=atlastays` when the URL does not already
+ * name it, like the `/search` links do) and lands on the marketplace grid, which carries the same anchor id.
+ * Every other item, and every item off the marketplace, is returned unchanged.
+ */
+export function resolveNavTo(
+    item: NavItem,
+    ctx: { marketplace: boolean; search: string },
+): string {
+    if (!ctx.marketplace || item.to !== `/#${OUR_HOMES_ANCHOR_ID}`) return item.to;
+    const params = new URLSearchParams(ctx.search);
+    if (!params.has('brand')) params.set('brand', 'atlastays');
+    return `/?${params.toString()}#${OUR_HOMES_ANCHOR_ID}`;
+}

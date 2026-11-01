@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 
-import { normalizeReviewSource } from "@/components/property/reviewMerge";
+import { normalizeReviewLocale, normalizeReviewSource, resolveReviewerName } from "@/components/property/reviewMerge";
+import { normalizeGuestFeedback, type GuestFeedbackItem } from "@/components/property/guestFeedback";
 import { stripHtmlPreservingEmoticons } from "@/utils/sanitizeReviewText";
 
 /**
@@ -15,6 +16,10 @@ import { stripHtmlPreservingEmoticons } from "@/utils/sanitizeReviewText";
  * Keeps only verified reviews (rating >= 4, non-empty text), and returns
  * the most recent few. Returns an EMPTY array when there are no real reviews —
  * the section then renders nothing. This never fabricates reviewers.
+ *
+ * REV-046 (founder ruling 2026-10-28): the same two responses also carry `guestFeedback`, the 4-5 star notes
+ * guests leave through the host's review QR. They come back as a SEPARATE list and are never put into
+ * `reviews`, so they cannot change the "N verified reviews" line, the average or any other count.
  */
 export type VerifiedReview = {
   id: number;
@@ -23,6 +28,8 @@ export type VerifiedReview = {
   text: string;
   createdAt: string;
   source?: string;
+  /** REV-041: validated locale of an imported review ("fr-FR"), absent for native reviews. */
+  locale?: string | null;
 };
 
 type ReviewDto = {
@@ -37,6 +44,10 @@ type ReviewDto = {
 
 type ExternalReviewDto = {
   guestName?: string | null;
+  /** REV-041 */
+  authorName?: string | null;
+  /** REV-041 */
+  locale?: string | null;
   rating?: number | null;
   body?: string | null;
   reviewDate?: string | null;
@@ -56,7 +67,12 @@ const MAX_LISTINGS_QUERIED = 2;
 type ListingReviewBatch = {
   nativeReviews: ReviewDto[];
   externalReviews: ExternalReviewDto[];
+  /** REV-046: raw `guestFeedback` rows from both endpoints; the hook normalises them once across listings. */
+  guestFeedbackRaw: unknown[];
 };
+
+/** REV-046: how many guest-feedback cards the homepage shows (one row of the three-column grid). */
+const MAX_GUEST_FEEDBACK = 3;
 
 const verifiedReviewsCache = new Map<number, { promise: Promise<ListingReviewBatch>; expiresAt: number }>();
 
@@ -81,6 +97,10 @@ function fetchListingReviewBatch(id: number): Promise<ListingReviewBatch> {
   ]).then(([nativeRes, publicRes]) => ({
     nativeReviews: (nativeRes?.reviews ?? []) as ReviewDto[],
     externalReviews: (publicRes?.externalReviews ?? []) as ExternalReviewDto[],
+    guestFeedbackRaw: [
+      ...(Array.isArray(nativeRes?.guestFeedback) ? nativeRes.guestFeedback : []),
+      ...(Array.isArray(publicRes?.guestFeedback) ? publicRes.guestFeedback : []),
+    ] as unknown[],
   }));
 
   verifiedReviewsCache.set(id, { promise, expiresAt: now + 5 * 60 * 1000 });
@@ -90,8 +110,9 @@ function fetchListingReviewBatch(id: number): Promise<ListingReviewBatch> {
 export function useVerifiedReviews(
   listingIds: number[],
   max = 3,
-): { reviews: VerifiedReview[]; loading: boolean } {
+): { reviews: VerifiedReview[]; guestFeedback: GuestFeedbackItem[]; loading: boolean } {
   const [reviews, setReviews] = useState<VerifiedReview[]>([]);
+  const [guestFeedback, setGuestFeedback] = useState<GuestFeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Stable dependency so the effect only re-runs when the set of ids actually changes.
@@ -105,6 +126,7 @@ export function useVerifiedReviews(
     const ids = idsKey ? idsKey.split(",").map(Number) : [];
     if (ids.length === 0) {
       setReviews([]);
+      setGuestFeedback([]);
       setLoading(false);
       return;
     }
@@ -116,10 +138,12 @@ export function useVerifiedReviews(
 
     (async () => {
       const collected: VerifiedReview[] = [];
+      const guestFeedbackRaw: unknown[] = [];
 
       for (const id of targetIds) {
         if (!active) return;
         const res = await fetchListingReviewBatch(id);
+        guestFeedbackRaw.push(...res.guestFeedbackRaw);
 
         // Native completed stays — TASK-10299093 / TASK-10299094: suppress empty body and preserve emoticons
         for (const r of res.nativeReviews) {
@@ -143,11 +167,12 @@ export function useVerifiedReviews(
             const cleanSource = normalizeReviewSource(ext.source) ?? (ext.sourceUrl?.includes("google") ? "Google" : undefined);
             collected.push({
               id: -(collected.length + 1),
-              firstName: firstNameOnly(ext.guestName),
+              firstName: firstNameOnly(resolveReviewerName(ext.guestName, ext.authorName)),
               rating,
               text,
               createdAt: ext.reviewDate ? `${ext.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
               source: cleanSource,
+              locale: normalizeReviewLocale(ext.locale),
             });
           }
         }
@@ -161,6 +186,9 @@ export function useVerifiedReviews(
       if (!active) return;
       collected.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
       setReviews(collected.slice(0, max));
+      // REV-046: one normalisation across every queried listing, so a property-level note that two listings
+      // both return shows once. Deliberately kept out of `collected` above.
+      setGuestFeedback(normalizeGuestFeedback(guestFeedbackRaw).slice(0, MAX_GUEST_FEEDBACK));
       setLoading(false);
     })();
 
@@ -169,5 +197,5 @@ export function useVerifiedReviews(
     };
   }, [idsKey, max]);
 
-  return { reviews, loading };
+  return { reviews, guestFeedback, loading };
 }

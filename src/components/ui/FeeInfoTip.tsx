@@ -24,6 +24,12 @@ export const FEE_INFO_COPY = {
     'Optional extras you selected for this stay, charged in addition to the room fare.',
   securityDeposit:
     'Refundable deposit collected by the host to cover potential incidental damages. Refunded after checkout inspection according to host policy.',
+  extraGuest:
+    'Additional guest occupancy charge set by the host for parties above the base occupancy included in the room rate.',
+  weekendAdjustment:
+    'Host weekend nightly rate differential applied for Friday or Saturday nights included in your stay.',
+  rateAdjustment:
+    'Includes date-specific or occupancy-based rate adjustments from the host’s live rate calendar.',
 } as const;
 
 export type FeeInfoKey = keyof typeof FEE_INFO_COPY;

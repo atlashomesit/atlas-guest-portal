@@ -377,7 +377,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             <span className="ahv2-price-amt" data-testid="home-card-real-price">
               {formatCurrency(display.realNightly)}
             </span>
-            <span className="ahv2-price-meta">/ night</span>
+            {/* GUEST-048: this card is today's price (no dates picked); the booking box prices the chosen dates, so a weekend
+                rate there can differ. Say "tonight" instead of leaving a bare nightly figure. [FG: pricing] wording. */}
+            <span className="ahv2-price-meta" data-testid="home-card-night-label">/ night tonight</span>
           </div>
           {display.savingsPercent > 0 && (
             <span className="ahv2-price-save" data-testid="home-card-saving">

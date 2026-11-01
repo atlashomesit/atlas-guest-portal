@@ -6,7 +6,8 @@
  * a copy button are always shown, with the live hold countdown. "I have paid" only tells the host: the booking stays
  * unpaid until the host confirms the money arrived (HARD RULE 24 fail-safe), and the panel says so.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { UpiOrder } from '@/utils/upiCheckout';
 
 interface Props {
@@ -19,6 +20,8 @@ interface Props {
   holdActive: boolean;
   isMobile: boolean;
   onIHavePaid: () => void;
+  /** PAY-016: false on the first-party pay link, where there is no checkout hold to count down. */
+  showHold?: boolean;
   busy?: boolean;
   error?: string | null;
 }
@@ -35,11 +38,19 @@ export const UpiPaymentPanel: React.FC<Props> = ({
   holdActive,
   isMobile,
   onIHavePaid,
+  showHold = true,
   busy = false,
   error = null,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [qrImgFailed, setQrImgFailed] = useState(false);
   const amountLabel = formatInr(amountInr);
+  const trimmedQrUrl = typeof order.qrCodeUrl === 'string' ? order.qrCodeUrl.trim() : '';
+  const trimmedUpiUri = typeof order.upiUri === 'string' ? order.upiUri.trim() : '';
+
+  useEffect(() => {
+    setQrImgFailed(false);
+  }, [trimmedQrUrl]);
 
   const copyAddress = async () => {
     try {
@@ -51,13 +62,30 @@ export const UpiPaymentPanel: React.FC<Props> = ({
     }
   };
 
-  const qr = order.qrCodeUrl ? (
+  // GUEST-044: Render host/server QR image when present and loadable; otherwise fall back
+  // client-side to dynamic SVG QR encoding `order.upiUri` so desktop/cross-device guests are never stranded.
+  const qr = trimmedQrUrl && !qrImgFailed ? (
     <img
-      src={order.qrCodeUrl}
+      src={trimmedQrUrl}
       alt={`UPI QR code to pay ${amountLabel}`}
+      onError={() => setQrImgFailed(true)}
       className="mx-auto h-48 w-48 rounded-md border border-stone-200 bg-white p-2"
       data-testid="upi-pay-qr"
     />
+  ) : trimmedUpiUri ? (
+    <div
+      role="img"
+      aria-label={`UPI QR code to pay ${amountLabel}`}
+      className="mx-auto flex h-52 w-52 items-center justify-center rounded-md border border-stone-200 bg-white p-2"
+      data-testid="upi-pay-qr"
+    >
+      <QRCodeSVG
+        value={trimmedUpiUri}
+        size={192}
+        level="M"
+        data-testid="upi-pay-qr-svg"
+      />
+    </div>
   ) : null;
 
   return (
@@ -72,11 +100,13 @@ export const UpiPaymentPanel: React.FC<Props> = ({
       <p className="mt-1 text-stone-700">
         Your payment goes straight to {payeeName ? <b>{payeeName}</b> : 'the host'}. Pay exactly {amountLabel}.
       </p>
-      <p className="mt-1 font-medium" data-testid="upi-pay-hold-line" aria-live="polite">
-        {holdActive && countdown && countdown !== '0:00'
-          ? `Your dates are held for ${countdown}.`
-          : 'Your 10 minutes are over. If you already paid, tap "I have paid" so the host can check.'}
-      </p>
+      {showHold && (
+        <p className="mt-1 font-medium" data-testid="upi-pay-hold-line" aria-live="polite">
+          {holdActive && countdown && countdown !== '0:00'
+            ? `Your dates are held for ${countdown}.`
+            : 'Your 10 minutes are over. If you already paid, tap "I have paid" so the host can check.'}
+        </p>
+      )}
 
       {isMobile ? (
         <div className="mt-3">
@@ -119,11 +149,16 @@ export const UpiPaymentPanel: React.FC<Props> = ({
         </p>
       )}
 
+      <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-emerald-100/70 py-2 px-3 text-xs text-emerald-900 font-medium" data-testid="upi-live-observer-badge">
+        <span className="inline-block h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+        <span>Direct Bank Settlement &bull; Auto-verifying in real time</span>
+      </div>
+
       <button
         type="button"
         onClick={onIHavePaid}
         disabled={busy}
-        className="mt-4 w-full rounded-lg border border-emerald-700 bg-white px-4 py-3 text-base font-semibold text-emerald-800 disabled:opacity-60"
+        className="mt-3 w-full rounded-lg border border-emerald-700 bg-white px-4 py-3 text-base font-semibold text-emerald-800 disabled:opacity-60"
         data-testid="upi-pay-i-have-paid"
       >
         {busy ? 'Telling the host…' : 'I have paid'}

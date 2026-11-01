@@ -14,6 +14,7 @@ import { useMarketplaceCardPrices, type MarketplaceCardPrice } from '@/hooks/use
 import { sizedForPartyFirst } from '@/utils/smallParty'; // GUEST-033
 import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
+import ExploreDestinationsStrip from '@/components/marketplace/ExploreDestinationsStrip'; // MKT-034
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
@@ -27,6 +28,8 @@ import { isHostelDormType } from '@/utils/dormListing';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
 import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
+import { OUR_HOMES_ANCHOR_ID } from '@/config/navigation'; // TASK-10299142
+import { useScrollToHash } from '@/hooks/useScrollToHash'; // TASK-10299142
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -74,6 +77,10 @@ type MarketplaceItem = {
   // Missing metadata must remain unknown, without a platform-wide percentage fallback.
   chargesOnlinePaymentFee?: boolean;
   convenienceFeePercent?: number;
+  // MKT-029: true only when the booking auto-confirms on payment with no host approval (Razorpay, Stripe or
+  // Atlas-managed routing). UPI hosts need to confirm the payment first, so the API sends false for them.
+  // Missing metadata (an older API) is "unknown": no chip, never a guess.
+  isInstantBookable?: boolean;
   // TASK-10298932: Amenity filtering support
   amenityCodes?: string[];
   amenities?: (string | { code?: string; name?: string; title?: string })[];
@@ -135,7 +142,7 @@ export function resolveMarketplaceListingDisplayName(item: {
   return resolved || candidate || 'Listing';
 }
 
-function marketplaceListingPath(
+export function marketplaceListingPath(
   item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'> & {
     displayName?: string | null;
     publicTitle?: string | null;
@@ -145,8 +152,12 @@ function marketplaceListingPath(
   },
   searchSuffix = '',
 ): string {
-  const displayTitle = resolveMarketplaceListingDisplayName(item);
-  const propertySlug = getPropertySlug({ property_name: displayTitle || item.title });
+  // TASK-10299207: build the route slug from the raw listing name (`item.title` / `item.name`),
+  // never the humanised display name ("Suite 202"), so the link matches `acceptablePropertySlugs`
+  // and `functions/sitemap.xml.ts` (`/homes/atlas202/4?tenant=atlas`).
+  const rawSlugSource =
+    item.title?.trim() || item.name?.trim() || resolveMarketplaceListingDisplayName(item);
+  const propertySlug = getPropertySlug({ property_name: rawSlugSource });
   const base = buildHomeUnitPath(propertySlug, item.id);
   // TASK-102058: carry the active search criteria forward into the details URL
   // (mirrors SearchPage's querySuffix). Without this the details page hydrates
@@ -234,6 +245,8 @@ export default function MarketplaceHomepage() {
   const [marketplaceProperties, setMarketplaceProperties] = useState<MarketplacePropertyApi[]>([]);
   // TASK-4413: read dates and guest count from URL params (from AirbnbSearchBar)
   const [searchParams, setSearchParams] = useSearchParams();
+  // TASK-10299142: an in-app click on "Stays" (/?...#our-homes) does not make the browser scroll; do it once the grid is in the DOM.
+  useScrollToHash();
 
   // TASK-1039950: sync category and amenity filter pills with URL query parameters
   const categoryParam = searchParams.get('category')?.toLowerCase();
@@ -718,6 +731,10 @@ export default function MarketplaceHomepage() {
         <AirbnbSearchBar />
       </div>
 
+      {/* MKT-034: one-click city directory under the hero. Thumbnails borrow a real photo from the listings already loaded;
+          no stay counts here (one loaded page would under-report) - /destinations carries those. */}
+      <ExploreDestinationsStrip listings={items} />
+
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <input
           data-testid="marketplace-search"
@@ -824,7 +841,8 @@ export default function MarketplaceHomepage() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketplace-grid">
+      {/* TASK-10299142: the header/footer "Stays" link targets #our-homes; on the marketplace that is this grid. */}
+      <div id={OUR_HOMES_ANCHOR_ID} className="mt-8 grid scroll-mt-28 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketplace-grid">
         {/* TASK-1875: skeleton cards while loading */}
         {loading && Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
 
@@ -887,6 +905,18 @@ export default function MarketplaceHomepage() {
                   </h2>
                   <HostIdentityLabel marketplace verified={item.hostIdentityVerified} />
 
+                  {/* MKT-029: only an explicit `true` from the API earns the chip; a missing field is unknown. */}
+                  {item.isInstantBookable === true && (
+                    <span
+                      data-testid="marketplace-instant-book-chip"
+                      title="Pay online and your booking is confirmed straight away, with no host approval"
+                      className="inline-flex items-center gap-1 self-start rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800"
+                    >
+                      <span aria-hidden>⚡</span>
+                      Instant Book
+                    </span>
+                  )}
+
                   {/* TASK-4511: Trust signal badges */}
                   {(item.hasVerifiedPhotos || item.isGstRegistered) && (
                     <div className="flex flex-wrap gap-1">
@@ -906,7 +936,11 @@ export default function MarketplaceHomepage() {
                   {/* TASK-1039954: Aligned property type badge and amenity chips */}
                   {(() => {
                     const propertyTypeBadge = resolvePropertyTypeBadge(item);
-                    const isHostel = propertyTypeBadge === 'Hostel' || isHostelDormType(item.accommodationType);
+                    // TASK-10299241: "per bed" keys on the API's own accommodationType === 'HostelDorm' ONLY, the same rule
+                    // isHostelDorm() applies on the listing page. The property-type badge above may still say "Hostel" for a
+                    // private room in a Hostel property, but that room is sold by the room. An older API that does not send
+                    // the field means "not a dorm": no per-bed wording, never a guess from the title or category.
+                    const isHostel = isHostelDormType(item.accommodationType);
                     const rawAmenities: string[] = [
                       ...(Array.isArray(item.amenityCodes) ? item.amenityCodes : []),
                       ...(Array.isArray(item.amenities)
@@ -1013,7 +1047,7 @@ export default function MarketplaceHomepage() {
                   {/* TASK-4511: keyword-bucketed sentiment chip — matches SearchPage.tsx card treatment.
                       TASK-10089: gated on provenance agreement — the chip (native reviews only)
                       renders only when the summary's verified-stay count agrees with the card. */}
-                  <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} />
+                  <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} lazy />
 
                   {/* TASK-10298999 (founder ruling 2026-10-21: price shown = price charged): the card reads the
                       same checkout quote as the listing page and the booking box — never the listing's
@@ -1133,6 +1167,14 @@ function MarketplaceCardPriceBlock({ price }: { price: MarketplaceCardPrice | un
   const { display } = price;
   return (
     <div data-testid="marketplace-card-price">
+      {display.appliedPromotionLabel && display.savingsPercent > 0 && (
+        <span
+          className="mb-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
+          data-testid="marketplace-card-deal-badge"
+        >
+          {display.appliedPromotionLabel}
+        </span>
+      )}
       <p className="text-xl font-bold text-text-primary">
         {display.standardNightly != null && (
           <span

@@ -42,6 +42,10 @@
   --bg-card: #ffffff;
   --bg-surface: #ffffff;
   --bg-muted: #f5ebe0;
+  /* REV-046: the "Guest feedback" label pill (and the draft badge) paint --text-primary on --brand-soft;
+     --brand-soft was not pinned, so the dark noir value (#161922 / #112d1e) sat under the pinned
+     dark-brown ink, 1.17:1 / 1.01:1. default.css's value keeps the pill light like the rest of this page. */
+  --brand-soft: #fde0c8;
   --text-primary: #3b1f1e;
   --text-secondary: #706060;
   --text-muted: #6b5a55;
@@ -947,6 +951,8 @@
   overflow: hidden;
 }
 .pp-root .lv-date-cell {
+  /* GUEST-048: the global button rule gives every button a pill radius, which bent the cell's right border into an arc. */
+  border-radius: 0;
   padding: 10px 13px;
   background: #fff;
   cursor: pointer;
@@ -1111,15 +1117,47 @@
 .pp-single-photo .pp-gallery { grid-template-columns: 1fr; grid-template-rows: 1fr; height: 320px; }
 .pp-single-photo .pp-cell-hero { grid-column: 1; grid-row: 1; }
 .pp-single-photo .pp-gallery-img { object-fit: contain; }
+/* TOP10-2026-10-27-01-A: with any photos, the existing booking card sits beside the gallery
+   from 1024px so price, dates and Reserve are in the first view. Same markup, no new data. */
 @media (min-width: 1024px) {
-  .pp-single-photo .pp-shell { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px 28px; align-items: start; }
-  .pp-single-photo .pp-shell > * { grid-column: 1 / -1; }
-  .pp-single-photo .pp-gallery { grid-column: 1; grid-row: 3; }
-  .pp-single-photo .pp-main { display: contents; }
-  .pp-single-photo .pp-main > div { grid-column: 1; }
-  .pp-single-photo .pp-booking-col { grid-column: 2; grid-row: 3 / span 4; margin-top: 0; }
-  .pp-single-photo .pp-v2-location { grid-column: 1; margin-top: 0; }
-  .pp-single-photo .pp-title-row { margin-bottom: 0; }
+  .pp-book-beside .pp-shell { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px 28px; align-items: start; }
+  .pp-book-beside .pp-shell > * { grid-column: 1 / -1; }
+  .pp-book-beside .pp-gallery { grid-column: 1; grid-row: 3; }
+  .pp-book-beside .pp-main { display: contents; }
+  .pp-book-beside .pp-main > div { grid-column: 1; }
+  .pp-book-beside .pp-booking-col { grid-column: 2; grid-row: 3 / span 4; margin-top: 0; }
+  .pp-book-beside .pp-v2-location { grid-column: 1; margin-top: 0; }
+  .pp-book-beside .pp-title-row { margin-bottom: 0; }
+  .pp-book-beside:not(.pp-single-photo):not(.pp-two-photo) .pp-gallery { height: 400px; }
+  /* Virtual tours (the listing's own 360 embed and the 3D tour section) are left-column content
+     like the gallery and location: without this they span both columns, find column 2 rows 3-6
+     taken by the booking card, and drop to row 7, leaving a blank gap under the gallery, an empty
+     right column below and a card that stops following the scroll. The card then also spans
+     enough rows to reach the long left column that follows the tours. */
+  .pp-book-beside .pp-tour-block,
+  .pp-book-beside [data-testid="virtual-tour-section"] { grid-column: 1; margin-block: 0; }
+  .pp-book-beside .pp-shell:has(.pp-tour-block, [data-testid="virtual-tour-section"]) .pp-booking-col { grid-row: 3 / span 6; }
+  /* The card is pinned beside the gallery, so Reserve has to sit inside the visible part of it: the
+     listing preview photo (it repeats the gallery next to it) moves below the card's other content.
+     Same elements, nothing removed; phone and tablet keep the established order. */
+  .pp-book-beside .lv-booking { display: flex; flex-direction: column; --lv-preview-mt: 16px; }
+  .pp-book-beside .lv-booking-preview { order: 99; margin-bottom: 0; }
+}
+.pp-tour-block { margin-top: 24px; }
+/* TOP10-2026-10-27-01-B: the two captured photos side by side, whole image visible so the
+   captions baked into the photos are never clipped; "View gallery" sits on the main photo. */
+.pp-two-photo .pp-gallery { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; height: 300px; }
+.pp-two-photo .pp-cell-hero { grid-column: 1; grid-row: 1; }
+.pp-two-photo .pp-cell-2 { grid-column: 2; grid-row: 1; }
+.pp-two-photo .pp-gallery-img { object-fit: contain !important; background: var(--bg-muted, #f5ebe0); }
+.pp-two-photo .pp-gallery-more {
+  position: relative; right: auto; bottom: auto; top: auto;
+  grid-column: 1; grid-row: 1; align-self: end; justify-self: end; margin: 12px;
+}
+@media (max-width: 767px) {
+  .pp-two-photo .pp-gallery { grid-template-columns: 1fr; height: 240px; }
+  .pp-two-photo .pp-cell-2 { display: none; }
+  .pp-two-photo .pp-gallery-more { top: auto; }
 }
 @media (max-width: 640px) { .pp-single-photo .pp-gallery { height: 240px; } }
 

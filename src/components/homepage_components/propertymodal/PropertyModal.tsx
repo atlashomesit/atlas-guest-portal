@@ -4,6 +4,7 @@ import { IoMdClose } from "react-icons/io";
 import { Button } from "../../ui/Button";
 import OptimizedImage from "../../ui/OptimizedImage";
 import { useFocusTrap } from "../../../hooks/useFocusTrap";
+import { repairMojibake } from "../../../utils/textUtils";
 // Define the types for the property amenities
 interface Amenity {
     amenities_type: string;
@@ -104,7 +105,7 @@ const PropertyModal: React.FC<PropertyModalProps> = ({ property, onClose, handle
                     <hr />
                     {/* description  */}
                     <div className="flex flex-col gap-4">
-                        <p className="text-text-muted mb-4 text-justify text-sm md:text-base tracking-wide">{property.property_description} </p>
+                        <p className="text-text-muted mb-4 text-justify text-sm md:text-base tracking-wide">{repairMojibake(property.property_description)} </p>
                         <hr />
                         <div className="flex flex-row gap-1 md:gap-3">
                             <h3 className="font-semibold">Location </h3>

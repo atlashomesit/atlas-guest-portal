@@ -62,6 +62,14 @@ import { Button } from '@/components/ui/Button';
 import Lightbox from '@/components/ui/Lightbox';
 import { calculateNightlyPrice, inferUnitType } from '@/utils/pricing';
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
+import {
+  buildPropertyDetailBackHref,
+  buildSimilarStayHref,
+  extractSimilarStayMeta,
+  formatSimilarStayPrice,
+  hasPropertyDetailSearchFilters,
+  selectSimilarStaysForParty,
+} from '@/utils/marketplaceBackHref';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
 import { centroidForCity } from '@/utils/mapCoords';
 import { readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
@@ -69,7 +77,8 @@ import { readClusterListingFields } from '@/utils/clusterListing';
 import { useBooking } from '@/contexts/BookingContext';
 import { resolveListing } from '@/utils/listingResolver';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
-import { previewListingDescription } from '@/utils/listingDescription';
+import { previewListingDescription, withoutInternalCodeDescription } from '@/utils/listingDescription';
+import { repairMojibake } from '@/utils/textUtils';
 import { buildGuestImageSrcSet, filterGuestImageUrls, GUEST_IMAGE_SRCSET_WIDTHS, sanitizeGuestImageUrl, toTransformedGuestImageUrl } from '@/utils/guestImageUrl';
 import type { ListingDetail, PublicListing } from '@/api/listingClient';
 import {
@@ -90,7 +99,7 @@ import { addRecentlyViewed, isFavorite, toggleFavorite } from '@/utils/guestHist
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '@/components/apartments/SkeletonCard';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
-import ListingWhatsAppFloat from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
+import ListingWhatsAppFloat, { buildListingWhatsAppUrl } from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
 import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
@@ -473,6 +482,10 @@ import {
     normalizeReviewSource,
     type ExternalReviewRow,
 } from '@/components/property/reviewMerge';
+// REV-046: QR "Guest feedback" notes. Own list, own block, never merged into the reviews above.
+import { normalizeGuestFeedback, type GuestFeedbackItem } from '@/components/property/guestFeedback';
+import GuestFeedbackSection from '@/components/property/GuestFeedbackCards';
+import ReviewLocaleChip from '@/components/property/ReviewLocaleChip'; // REV-041
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
@@ -580,10 +593,11 @@ const PropertyDetails = () => {
     const [reviewSort, setReviewSort] = useState<ReviewSortKey>('recent');
     const [stickyBookingSummary, setStickyBookingSummary] = useState<BookingStickySummary | null>(null);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
-    const { setProperty, updateBooking } = useBooking();
+    const { booking, setProperty, updateBooking } = useBooking();
     const [searchParams] = useSearchParams();
     const tenantSlugFromUrl = searchParams.get('tenant')?.trim() || null;
-    const isMarketplaceHost = Boolean(_getTenantCtx()?.isMarketplaceRoot) || isMarketplaceMode() || isMarketplaceHostname() || Boolean(tenantSlugFromUrl);
+    const isBrandAtlastaysParam = searchParams.get('brand')?.trim().toLowerCase() === 'atlastays';
+    const isMarketplaceHost = Boolean(_getTenantCtx()?.isMarketplaceRoot) || isMarketplaceMode() || isMarketplaceHostname() || isBrandAtlastaysParam || Boolean(tenantSlugFromUrl);
     const isNonAtlasMarketplaceListing = Boolean(isMarketplaceHost && tenantSlugFromUrl && tenantSlugFromUrl.toLowerCase() !== 'atlas');
 
     const [listingTenantCtx, setListingTenantCtx] = useState<TenantInfo | null>(() => {
@@ -609,24 +623,16 @@ const PropertyDetails = () => {
         active = false;
       };
     }, [isNonAtlasMarketplaceListing, tenantSlugFromUrl]);
-    // TASK-1039953: Build a back-to-results link when the user arrived from /search or marketplace,
-    // or provide a fallback to "/" (marketplace home) when entering directly on marketplace.
-    const hasSearchFilters = useMemo(() => {
-        const searchKeys = ["city", "destination", "checkIn", "checkOut", "guests", "adults", "children", "minPrice", "maxPrice", "category", "amenity", "amenities", "sort", "sortBy"];
-        return searchKeys.some((k) => searchParams.has(k));
-    }, [searchParams]);
+    // TASK-1039953 / TASK-1040085: Build a back-to-results link preserving ?brand=atlastays and utm_* params
+    const hasSearchFilters = useMemo(
+        () => hasPropertyDetailSearchFilters(searchParams),
+        [searchParams],
+    );
 
-    const backToResultsHref = useMemo(() => {
-        if (isMarketplaceHost) {
-          if (!hasSearchFilters) return "/";
-          const cleanParams = new URLSearchParams(searchParams);
-          cleanParams.delete("tenant");
-          const qs = cleanParams.toString();
-          return qs ? `/?${qs}` : "/";
-        }
-        if (!hasSearchFilters) return "/search";
-        return `/search?${searchParams.toString()}`;
-    }, [searchParams, isMarketplaceHost, hasSearchFilters]);
+    const backToResultsHref = useMemo(
+        () => buildPropertyDetailBackHref(searchParams, isMarketplaceHost),
+        [searchParams, isMarketplaceHost],
+    );
     // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
     // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
     // never render, silently masking the degraded-state UI for a failed listing lookup (the
@@ -664,6 +670,12 @@ const PropertyDetails = () => {
     const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
     /** REV-030: blended star counts from `GET /api/public/listings/{id}`. */
     const [publicRatingStarCounts, setPublicRatingStarCounts] = useState<number[] | null>(null);
+    /**
+     * REV-046: review-QR "Guest feedback" notes (`guestFeedback` on both review endpoints). Kept apart from
+     * `listingReviewsFromApi` / `externalReviewsFromApi` on purpose: nothing derived from this list may feed
+     * `ppMergedReviews`, the combined count or average, the star bars, the filter counts or the JSON-LD.
+     */
+    const [guestFeedbackFromApi, setGuestFeedbackFromApi] = useState<GuestFeedbackItem[]>([]);
 
     // AMN-001: Fetch amenity master list once on mount
     useEffect(() => {
@@ -930,6 +942,7 @@ const PropertyDetails = () => {
         if (lid == null) {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
+            setGuestFeedbackFromApi([]);
             return;
         }
         const num = typeof lid === 'number' ? lid : Number(lid);
@@ -937,12 +950,14 @@ const PropertyDetails = () => {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
             setPublicRatingStarCounts(null);
+            setGuestFeedbackFromApi([]);
             return;
         }
         const ac = new AbortController();
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
         setExternalReviewsFromApi([]);
         setPublicRatingStarCounts(null);
+        setGuestFeedbackFromApi([]);
         void (async () => {
             try {
                 const [nativeRes, publicRes] = await Promise.all([
@@ -961,6 +976,8 @@ const PropertyDetails = () => {
                     averageRating?: number;
                     totalCount?: number;
                     reviews?: ListingReviewRow[];
+                    /** REV-046: not part of totalCount / averageRating. */
+                    guestFeedback?: unknown;
                 };
                 let nativePayload: NativeReviewsPayload | null = null;
                 if (nativeRes.ok) {
@@ -969,12 +986,17 @@ const PropertyDetails = () => {
                     setListingReviewsFromApi(null);
                 }
 
+                // REV-046: the same note list arrives on both endpoints; read either, so one endpoint
+                // failing does not hide the notes. Never merged into the review list below.
+                let publicGuestFeedback: unknown;
                 if (publicRes.ok) {
                     const publicPayload = (await publicRes.json()) as {
                         externalReviews?: ExternalReviewRow[];
                         ratingStarCounts?: number[] | null;
                         RatingStarCounts?: number[] | null;
+                        guestFeedback?: unknown;
                     };
+                    publicGuestFeedback = publicPayload.guestFeedback;
                     if (!ac.signal.aborted) {
                         setExternalReviewsFromApi(
                             Array.isArray(publicPayload.externalReviews) ? publicPayload.externalReviews : [],
@@ -991,6 +1013,10 @@ const PropertyDetails = () => {
                     setPublicRatingStarCounts(null);
                 }
 
+                if (!ac.signal.aborted) {
+                    setGuestFeedbackFromApi(normalizeGuestFeedback(nativePayload?.guestFeedback, publicGuestFeedback));
+                }
+
                 if (nativePayload && !ac.signal.aborted) {
                     setListingReviewsFromApi({
                         loading: false,
@@ -1004,6 +1030,7 @@ const PropertyDetails = () => {
                     setListingReviewsFromApi(null);
                     setExternalReviewsFromApi([]);
                     setPublicRatingStarCounts(null);
+                    setGuestFeedbackFromApi([]);
                 }
             }
         })();
@@ -1493,7 +1520,7 @@ useEffect(() => {
                 '@context': 'https://schema.org',
                 '@type': 'LodgingBusiness',
                 name: getListingDisplayName(data.id, data.property_name),
-                description: (hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
+                description: repairMojibake(hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
                 image: primaryImageForLd,
                 url: pageUrlForLd,
                 address: {
@@ -1546,7 +1573,7 @@ useEffect(() => {
                           '@context': 'https://schema.org',
                           '@type': 'Place',
                           name: getListingDisplayName(data.id, data.property_name),
-                          description: (hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
+                          description: repairMojibake(hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
                           url: pageUrlForLd,
                       },
                   ]
@@ -1727,7 +1754,8 @@ useEffect(() => {
     const ppWaAskUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}` : '';
     // "About this home": the host's own description wins; the "Ask them" empty state only shows
     // once GET /listings/{id} has confirmed there is none (no flash before the detail lands).
-    const ppAboutText = hostDescription.text || data.property_description?.trim() || '';
+    // GUEST-038: pass descriptions through repairMojibake to fix double-encoded UTF-8 sequences.
+    const ppAboutText = repairMojibake(hostDescription.text || withoutInternalCodeDescription(data.property_description) || '');
     const ppAboutPreview = previewListingDescription(ppAboutText);
     const ppShowAboutAskHost = !ppAboutText && !!ppWaAskUrl && hostDescription.loaded;
     const ppShowRegRow = (ppTenantOverrides.gstin != null) ||
@@ -1808,7 +1836,7 @@ useEffect(() => {
                     </Link>
                     {isMarketplaceHost && !hasSearchFilters && (
                       <Link
-                        to="/"
+                        to={backToResultsHref}
                         data-testid="back-to-all-listings"
                         style={{ display: 'none' }}
                         aria-hidden="true"
@@ -1820,9 +1848,9 @@ useEffect(() => {
                   </>
                 ) : (
                   <>
-                    <Link to="/">Home</Link>
+                    <Link to={isMarketplaceHost ? backToResultsHref : "/"}>Home</Link>
                     <span className="pp-sep" aria-hidden="true">›</span>
-                    <Link to={isMarketplaceHost ? "/" : "/#our-homes"}>{isMarketplaceHost ? "All Homes" : "Stays"}</Link>
+                    <Link to={isMarketplaceHost ? backToResultsHref : "/#our-homes"}>{isMarketplaceHost ? "All Homes" : "Stays"}</Link>
                     <span className="pp-sep" aria-hidden="true">›</span>
                   </>
                 )}
@@ -2439,12 +2467,12 @@ useEffect(() => {
                           </div>
                         </div>
                         <div className="pp-v2-reviews-detail">
-                        {/* TASK-101380 / REV-030: per-star distribution from blended ratingStarCounts if available. */}
+                        {/* TASK-101380 / REV-030 / TASK-1040056: per-star distribution from blended ratingStarCounts or merged reviews. */}
                         <RatingDistribution
-                          ratings={api.reviews.map((r) => Number(r.rating))}
-                          totalCount={api.totalCount}
+                          ratings={ppMergedReviews.map((r) => Math.round(Number(r.rating)))}
+                          totalCount={ppCombinedReviewCount}
                           starCounts={publicRatingStarCounts}
-                          otherSourcesCount={publicRatingStarCounts ? 0 : externalReviewsFromApi.length}
+                          otherSourcesCount={publicRatingStarCounts ? 0 : 0}
                         />
                         {/* Sub-rating bars derived from API reviews if available */}
                         {api.reviews.length > 0 && (() => {
@@ -2465,7 +2493,7 @@ useEffect(() => {
                           ].filter(b => b.v != null);
                           if (bars.length === 0) {
                             // The distribution already states the count and source; do not repeat it.
-                            if (publicRatingStarCounts || starDistribution(api.reviews.map((r) => Number(r.rating)), api.totalCount)) return null;
+                            if (publicRatingStarCounts || starDistribution(ppMergedReviews.map((r) => Math.round(Number(r.rating))), ppCombinedReviewCount)) return null;
                             return (
                               <div style={{ fontSize: 14, color: '#475569', lineHeight: 1.6 }}>
                                 <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#1a1a2e' }}>Overall rating</p>
@@ -2632,6 +2660,7 @@ useEffect(() => {
                                     <div className="pp-v2-review-date">
                                       {new Date(r.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
                                     </div>
+                                    <ReviewLocaleChip locale={r.locale} />
                                   </div>
                                 </div>
                                 {r.hostResponse && (
@@ -2685,6 +2714,10 @@ useEffect(() => {
                     </section>
                   );
                 })()}
+
+                {/* REV-046: review-QR "Guest feedback" notes, after the reviews and as a block of their own.
+                    Never part of the count, average, star bars or JSON-LD above (founder ruling 2026-10-28). */}
+                <GuestFeedbackSection items={guestFeedbackFromApi} />
 
                 {/* Cancellation policy */}
                 <section className="pp-section" aria-label="Cancellation policy">
@@ -2765,11 +2798,14 @@ useEffect(() => {
                     </section>
                   );
                   if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
+                  const urlGuestCount = Number(searchParams.get('guests')) || ((Number(searchParams.get('adults')) || 0) + (Number(searchParams.get('children')) || 0));
+                  const targetPartyGuests = urlGuestCount > 0 ? urlGuestCount : booking?.guests;
+                  const similarItems = selectSimilarStaysForParty(s.items, targetPartyGuests, 4);
                   return (
                     <section className="pp-section" aria-label="Similar stays">
                       <div className="pp-section-head"><h2>Similar stays</h2></div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-                        {s.items.slice(0, 4).map((it: any) => {
+                        {similarItems.map((it: any) => {
                           const id = Number(it.id);
                           const rawName = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
                           const name = getListingDisplayName(id, rawName);
@@ -2783,13 +2819,13 @@ useEffect(() => {
                           const img = rawImg ? toTransformedGuestImageUrl(rawImg, 480) : undefined;
                           const imgSrcSet = rawImg ? buildGuestImageSrcSet(rawImg, GUEST_IMAGE_SRCSET_WIDTHS) : undefined;
                           const basePath = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
-                          const path = tenantSlugFromUrl
-                            ? `${basePath}?tenant=${encodeURIComponent(tenantSlugFromUrl)}`
-                            : basePath;
+                          const path = buildSimilarStayHref(basePath, tenantSlugFromUrl, searchParams);
+                          const meta = extractSimilarStayMeta(it);
                           return (
                             <Link
                               key={String(it.id)}
                               to={path}
+                              data-testid="similar-stay-card"
                               style={{ display: 'block', borderRadius: 16, border: '1px solid #f0e6dc', overflow: 'hidden', textDecoration: 'none', background: '#fff' }}
                             >
                               {img && (
@@ -2807,7 +2843,27 @@ useEffect(() => {
                               )}
                               <div style={{ padding: '12px 14px' }}>
                                 <p style={{ fontWeight: 600, color: '#1a1a2e', fontSize: 14, margin: '0 0 4px' }}>{name}</p>
-                                <p style={{ fontSize: 12.5, color: '#64748b', margin: 0 }}>{String(it.propertyAddress ?? '').slice(0, 60)}</p>
+                                {it.propertyAddress && (
+                                  <p style={{ fontSize: 12.5, color: '#64748b', margin: '0 0 6px' }}>{String(it.propertyAddress).slice(0, 60)}</p>
+                                )}
+                                {(meta.maxGuests != null || meta.rating != null) && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b', marginBottom: meta.nightlyRate != null ? 6 : 0 }}>
+                                    {meta.maxGuests != null && (
+                                      <span data-testid="similar-stay-guests">Up to {meta.maxGuests} {meta.maxGuests === 1 ? 'guest' : 'guests'}</span>
+                                    )}
+                                    {meta.maxGuests != null && meta.rating != null && <span aria-hidden="true">·</span>}
+                                    {meta.rating != null && (
+                                      <span data-testid="similar-stay-rating" style={{ fontWeight: 600, color: '#1a1a2e' }}>
+                                        ★ {meta.rating.toFixed(1)}{meta.reviewCount != null ? ` (${meta.reviewCount})` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                {meta.nightlyRate != null && (
+                                  <p data-testid="similar-stay-price" style={{ fontWeight: 700, color: '#1a1a2e', fontSize: 13.5, margin: 0 }}>
+                                    {formatSimilarStayPrice(meta.nightlyRate, meta.currency)}
+                                  </p>
+                                )}
                               </div>
                             </Link>
                           );
@@ -2894,24 +2950,6 @@ useEffect(() => {
                       />
                     </Suspense>
 
-                    {/* TASK-4015: Save vs OTA delta */}
-                    {data.property_price && data.property_price > 0 && (
-                      <div style={{
-                        marginTop: 16,
-                        padding: '12px 14px',
-                        borderRadius: 8,
-                        background: '#dcfce7',
-                        border: '1px solid #86efac',
-                      }} data-testid="save-vs-ota-delta">
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span>💰</span>
-                          <span>Save ~₹{Math.round(data.property_price * 2 * 0.155).toLocaleString('en-IN')} by booking directly</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: '#15803d', marginTop: 4 }}>
-                          vs OTA platforms that charge 15–18%
-                        </div>
-                      </div>
-                    )}
                   </>
                 )}
 
@@ -2930,8 +2968,8 @@ useEffect(() => {
                   <div className="pp-trust-row">
                     <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
                     <div>
+                      {/* GUEST-048: headline only here; the full policy sentence is printed once, under "Things to know", and the booking box carries the date-specific line. */}
                       <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
-                      <div className="pp-trust-s">{ppCancellationInfo.description}</div>
                     </div>
                   </div>
                   <div className="pp-trust-row">
@@ -3049,6 +3087,12 @@ useEffect(() => {
               const widget = document.querySelector('[data-testid="guest-booking-form"]');
               widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }}
+            hostWhatsAppUrl={buildListingWhatsAppUrl(
+              ppHostPhone,
+              getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property',
+              ppBrandName,
+            )}
+            listingId={resolvedListingId ?? data.listingId ?? null}
           />
 
         </div>

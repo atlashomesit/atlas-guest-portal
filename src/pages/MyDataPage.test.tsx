@@ -36,6 +36,7 @@ describe("MyDataPage — TASK-7204 DPDP export categories", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   test("renders all four export categories, download, and erasure guidance", async () => {
@@ -53,6 +54,7 @@ describe("MyDataPage — TASK-7204 DPDP export categories", () => {
     const revokeObjectURL = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
 
     renderPage();
+    await settle();
 
     await settle();
     expect(screen.getByTestId("my-data-export")).toBeInTheDocument();
@@ -70,8 +72,45 @@ describe("MyDataPage — TASK-7204 DPDP export categories", () => {
     });
 
     fireEvent.click(screen.getByTestId("my-data-download"));
+    await settle();
     expect(createObjectURL).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalled();
+  });
+});
+
+// UXD-2026-10-27-05-A: accessible fields preserve the existing correction contract.
+describe("MyDataPage correction labels", () => {
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+  test.each([200, 503])("named fields preserve trimmed payload and draft on HTTP %i", async (status) => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+      new Response(JSON.stringify(init?.method === "POST"
+        ? status === 200 ? { ticketReference: "COR-27" } : { message: "Correction unavailable" }
+        : payload), { status: init?.method === "POST" ? status : 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    renderPage();
+    await settle();
+    const email = screen.getByRole("textbox", { name: "Your email", exact: true });
+    const details = screen.getByRole("textbox", { name: "Correction details", exact: true });
+    expect(screen.getByLabelText("Your email")).toBe(email);
+    expect(screen.getByLabelText("Correction details")).toBe(details);
+    fireEvent.change(email, { target: { value: "  ada@example.test  " } });
+    await settle();
+    fireEvent.change(details, { target: { value: "  Correct my surname.  " } });
+    await settle();
+    fireEvent.click(screen.getByRole("button", { name: "Submit correction request" }));
+    await settle();
+    if (status === 200) expect(screen.getByText("Ticket reference: COR-27")).toBeInTheDocument();
+    else expect(screen.getByRole("alert")).toHaveTextContent("Correction unavailable");
+    const writes = fetchMock.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(writes).toHaveLength(1);
+    expect(String(writes[0][0])).toBe("https://api.test/api/public/guest-data/tok-123/correction");
+    expect(JSON.parse(writes[0][1]!.body as string)).toEqual({ submitterEmail: "ada@example.test", correctionText: "Correct my surname." });
+    expect(email).toHaveValue("  ada@example.test  ");
+    expect(details).toHaveValue("  Correct my surname.  ");
+    expect(screen.getByTestId("my-data-download")).toBeEnabled();
+    expect(screen.getByTestId("my-data-erasure")).toHaveTextContent("privacy@example.com");
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
   });
 });

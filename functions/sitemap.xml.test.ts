@@ -179,4 +179,76 @@ describe('sitemap.xml', () => {
       vi.unstubAllGlobals();
     }
   });
+
+  // MKT-040: the /destinations hub (MKT-034) is Atlas marketplace content, so the Atlas sitemaps list it and a white-label tenant
+  // sitemap never does (the page itself sends a white-label domain home).
+  it('MKT-040: the full Atlas sitemap lists /destinations and every city guide; the shared (tenant) paths list neither', () => {
+    expect(SITEMAP_PATHS).toContain('/destinations');
+    expect(SHARED_SITEMAP_PATHS).not.toContain('/destinations');
+    for (const slug of ['goa', 'coorg', 'hyderabad', 'manali', 'bengaluru', 'gurugram', 'nashik', 'guwahati', 'jalandhar']) {
+      expect(SITEMAP_PATHS).toContain(`/homestays-in-${slug}`);
+    }
+    // /explore is an alias of /destinations; one canonical URL per page.
+    expect(SITEMAP_PATHS).not.toContain('/explore');
+    expect(buildSitemapXml('https://atlastays.com', SITEMAP_PATHS)).toContain('<loc>https://atlastays.com/destinations</loc>');
+  });
+
+  it('MKT-040: the marketplace host sitemap lists /destinations, with supply known and with the supply lookup failing', async () => {
+    const listingsOk = vi.fn(async (url: string) =>
+      String(url).includes('/marketplace/listings')
+        ? new Response(
+            JSON.stringify({
+              items: [{ id: 2, tenantSlug: 'sahil-goyal', title: 'Calangute Beach Villa', city: 'Goa' }],
+              total: 1,
+            }),
+            { status: 200 },
+          )
+        : new Response('not found', { status: 404 }),
+    );
+    vi.stubGlobal('fetch', listingsOk);
+    try {
+      const res = await onRequestGet({
+        request: new Request('https://atlastays.com/sitemap.xml'),
+        env: { ATLAS_API_BASE_URL: 'https://api.example.com' },
+      });
+      const xml = await res.text();
+      expect(xml).toContain('<loc>https://atlastays.com/destinations</loc>');
+      expect(xml).toContain('<loc>https://atlastays.com/homestays-in-goa</loc>');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    // Supply unknown (the listings call throws): no city guide is advertised (unchanged), but the hub does not depend on supply.
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
+    try {
+      const res = await onRequestGet({
+        request: new Request('https://atlastays.com/sitemap.xml'),
+        env: { ATLAS_API_BASE_URL: 'https://api.example.com' },
+      });
+      const xml = await res.text();
+      expect(xml).toContain('<loc>https://atlastays.com/destinations</loc>');
+      expect(xml).not.toContain('/homestays-in-');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('MKT-040: a white-label tenant host sitemap does not list /destinations', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      String(url).includes('/tenants/from-domain')
+        ? new Response(JSON.stringify({ tenantSlug: 'sunrise' }), { status: 200 })
+        : new Response('[]', { status: 200 }),
+    ));
+    try {
+      const res = await onRequestGet({
+        request: new Request('https://stay.sunrise.example/sitemap.xml'),
+        env: { ATLAS_API_BASE_URL: 'https://api.example.com' },
+      });
+      const xml = await res.text();
+      expect(xml).not.toContain('/destinations');
+      expect(xml).not.toContain('/homestays-in-');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

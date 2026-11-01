@@ -41,10 +41,10 @@ const summaryBody = {
   cancellationPolicy: "Moderate",
 };
 
-function mockFetch() {
+function mockFetch(overrides: Partial<typeof summaryBody> = {}) {
   vi.mocked(global.fetch).mockImplementation(async (input) => {
     const url = String(input);
-    if (url.includes("/api/guest/bookings/101/summary")) return jsonResponse(summaryBody);
+    if (url.includes("/api/guest/bookings/101/summary")) return jsonResponse({ ...summaryBody, ...overrides });
     if (url.includes("/api/public/bookings/101/modification-requests")) return jsonResponse([]);
     if (url.includes("/listings/777/add-ons")) return jsonResponse([]);
     if (url.includes("/bookings/101/payment-status")) return jsonResponse({ status: "Paid" });
@@ -97,5 +97,59 @@ describe("BookingConfirmationPage GUEST-031 Stay & Arrival Hub", () => {
 
     // GUEST-029 plan terms untouched
     expect(screen.getByTestId("confirmation-plan-terms")).toBeInTheDocument();
+  });
+});
+
+// UXD-2026-10-27-06-A: only Pending changes draft wording, never action eligibility.
+describe("BookingConfirmationPage Pending host message", () => {
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); window.sessionStorage.clear(); });
+
+  async function renderBooking(overrides: Partial<typeof summaryBody> = {}) {
+    window.sessionStorage.setItem("booking_101_payment_status", "success");
+    mockFetch(overrides);
+    render(<MemoryRouter initialEntries={["/booking/101?t=tok-abc"]}><Routes><Route path="/booking/:bookingId" element={<BookingConfirmationPage />} /></Routes></MemoryRouter>);
+    await settle();
+  }
+
+  test("Pending draft uses current booking identity/status, host number and all hub actions", async () => {
+    await renderBooking({ status: "Pending", guestName: "Different Guest", propertyName: "Coastal Cottage" });
+    const link = screen.getByTestId("stay-hub-whatsapp") as HTMLAnchorElement;
+    const url = new URL(link.href);
+    expect(url.hostname).toBe("wa.me");
+    expect(url.pathname).toBe("/919999999999");
+    expect(url.searchParams.get("text")).toBe("Hi, I have a question about booking #101 under Different Guest at Coastal Cottage. Its current status is Pending. Please help me check the booking status.");
+    expect(screen.getByTestId("stay-hub-whatsapp-status")).toHaveTextContent("Your message includes booking #101 and its Pending status.");
+    const hub = within(screen.getByTestId("stay-arrival-hub"));
+    expect(hub.getByTestId("stay-hub-checkin")).toHaveAttribute("href", "/check-in/ATL-101?t=tok-abc");
+    for (const id of ["confirmation-add-google-calendar", "confirmation-download-ics", "download-stay-guide-btn"]) {
+      expect(hub.getByTestId(id)).toBeInTheDocument();
+    }
+  });
+
+  test("Pending without guest name does not invent an identity", async () => {
+    await renderBooking({ status: "Pending", guestName: "" });
+    const url = new URL((screen.getByTestId("stay-hub-whatsapp") as HTMLAnchorElement).href);
+    expect(url.searchParams.get("text")).toBe("Hi, I have a question about booking #101 at Atlas Stay. Its current status is Pending. Please help me check the booking status.");
+  });
+
+  test.each(["Confirmed", "CheckedIn", "CheckedOut", "Expired"])("%s retains the existing wording and hub eligibility", async (status) => {
+    await renderBooking({ status });
+    const url = new URL((screen.getByTestId("stay-hub-whatsapp") as HTMLAnchorElement).href);
+    expect(url.searchParams.get("text")).toBe("Hi, I have a confirmed booking (#101) under Test Guest at Atlas Stay. Looking forward to my stay!");
+    expect(screen.queryByTestId("stay-hub-whatsapp-status")).not.toBeInTheDocument();
+    expect(screen.getByTestId("stay-arrival-hub")).toBeInTheDocument();
+  });
+
+  test("Cancelled still has no arrival hub", async () => {
+    await renderBooking({ status: "Cancelled" });
+    expect(screen.queryByTestId("stay-arrival-hub")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("stay-hub-whatsapp")).not.toBeInTheDocument();
+  });
+
+  test("Pending without a configured host number exposes no WhatsApp action or draft helper", async () => {
+    await renderBooking({ status: "Pending", propertyPhone: "" });
+    expect(screen.queryByTestId("stay-hub-whatsapp")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("stay-hub-whatsapp-status")).not.toBeInTheDocument();
+    expect(screen.getByTestId("confirmation-download-ics")).toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import { getPropertySlug } from './navigation';
+import { getListingDisplayName } from '../lib/listingDisplayName';
 
 /**
  * TASK-7448 (P0): decide whether the `:propertySlug` segment of `/homes/:propertySlug/:unitSlug`
@@ -42,6 +43,8 @@ export type PropertySlugCandidate = {
   propertyName?: string | null;
   /** Unit/listing name (`dto.name`), stored as `property_name` on TenantPropertyRecord. */
   property_name?: string | null;
+  /** Guest-facing display name (e.g. "Suite 202" for "Atlas202"). */
+  displayName?: string | null;
   id?: string | number | null;
 };
 
@@ -50,7 +53,11 @@ export type PropertySlugCandidate = {
  * Exported for testing.
  */
 export function acceptablePropertySlugs(item: PropertySlugCandidate): string[] {
-  const sources = [item.propertyName, item.property_name];
+  const displayTitle =
+    typeof item.property_name === 'string' && item.property_name.trim()
+      ? getListingDisplayName(item.id, item.property_name, item.displayName)
+      : item.displayName;
+  const sources = [item.propertyName, item.property_name, item.displayName, displayTitle];
   const slugs = new Set<string>();
 
   for (const source of sources) {

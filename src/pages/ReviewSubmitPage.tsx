@@ -23,14 +23,15 @@ interface ReviewFunnelConfig {
   googleReviewUrl?: string | null;
 }
 
-function StarButton({ value, selected, hovered, onHover, onClick }: {
-  value: number; selected: boolean; hovered: boolean;
+function StarButton({ value, selected, hovered, category, pressed, onHover, onClick }: {
+  value: number; selected: boolean; hovered: boolean; category: string; pressed: boolean;
   onHover: (v: number) => void; onClick: (v: number) => void;
 }) {
   return (
     <button
       type="button"
-      aria-label={`${value} star${value !== 1 ? "s" : ""}`}
+      aria-label={`${category}: ${value} of 5 stars`}
+      aria-pressed={pressed}
       onClick={() => onClick(value)}
       onMouseEnter={() => onHover(value)}
       onMouseLeave={() => onHover(0)}
@@ -76,12 +77,14 @@ function SubcategoryStars({
   const active = hover || value;
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-text-primary">{label}</p>
-      <div className="flex gap-1" data-testid={rowKey ? `subrating-${rowKey}` : undefined}>
+      <p className="text-sm font-medium text-text-primary">{label} *</p>
+      <div className="flex gap-1" role="group" aria-label={`${label} (required)`} data-testid={rowKey ? `subrating-${rowKey}` : undefined}>
         {[1, 2, 3, 4, 5].map((v) => (
           <StarButton
             key={v}
             value={v}
+            category={label}
+            pressed={v === value}
             selected={v <= value}
             hovered={v <= hover}
             onHover={onHover}
@@ -89,6 +92,7 @@ function SubcategoryStars({
           />
         ))}
       </div>
+      <p className="text-xs mt-1.5" aria-live="polite">{value ? `Selected: ${value} of 5` : "No rating selected"}</p>
       {active > 0 && <p className="text-xs font-semibold text-amber-600">{ratingLabels[active]}</p>}
     </div>
   );
@@ -214,6 +218,13 @@ export default function ReviewSubmitPage() {
   const bodyLen = body.trim().length;
   const bodyTooShort = useMemo(() => bodyLen > 0 && bodyLen < 20, [bodyLen]);
 
+  // REV-046 (founder ruling 2026-10-28): catch first, Google open to every guest. The host's Google review link
+  // is offered to a 1-3 star guest too, before and after they submit. Only the order differs from 4-5 stars,
+  // whose Google call to action stays the big card on the thank-you screen. Never gate a low rating away from Google.
+  const googleReviewUrl =
+    funnelConfig?.hasGoogleReviewLink && funnelConfig.googleReviewUrl ? funnelConfig.googleReviewUrl : null;
+  const isLowRating = rating >= 1 && rating <= 3;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) { setSubmitError("Please select a star rating."); return; }
@@ -310,9 +321,23 @@ export default function ReviewSubmitPage() {
           </h1>
           <p className="text-sm text-text-secondary">
             {submitted
-              ? `Your feedback about ${eligibility.propertyName} means a lot. We hope to welcome you back soon!`
+              ? isLowRating
+                ? "Sorry your stay wasn't perfect. The owner has your feedback and will contact you."
+                : `Your feedback about ${eligibility.propertyName} means a lot. We hope to welcome you back soon!`
               : "You have already submitted a review for this stay. Thank you!"}
           </p>
+          {submitted && isLowRating && googleReviewUrl && (
+            // REV-046: the same readable Google link the guest saw while rating. Not a promo card, not greyed out.
+            <a
+              href={googleReviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="review-success-google-link"
+              className="inline-flex min-h-11 items-center justify-center text-base font-medium text-text-primary underline underline-offset-4"
+            >
+              Prefer to post publicly? Review us on Google
+            </a>
+          )}
           {submitted && rating >= 4 && funnelConfig?.hasGoogleReviewLink && funnelConfig.googleReviewUrl && (
             <div className="w-full text-left rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm space-y-3 mt-4">
               <div className="flex items-center gap-2">
@@ -399,11 +424,13 @@ export default function ReviewSubmitPage() {
 
           {/* Star rating */}
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <p className="text-sm font-medium text-text-primary">Overall rating</p>
-            <div className="flex gap-1" data-testid="overall-rating-stars">
+            <p className="text-sm font-medium text-text-primary">Overall rating *</p>
+            <div className="flex gap-1" role="group" aria-label="Overall rating (required)" data-testid="overall-rating-stars">
               {[1, 2, 3, 4, 5].map((v) => (
                 <StarButton
                   key={v} value={v}
+                  category="Overall rating"
+                  pressed={v === rating}
                   selected={v <= rating}
                   hovered={v <= hoveredRating}
                   onHover={setHoveredRating}
@@ -411,8 +438,22 @@ export default function ReviewSubmitPage() {
                 />
               ))}
             </div>
+            <p className="text-xs mt-1.5" aria-live="polite">{rating ? `Selected: ${rating} of 5` : "No rating selected"}</p>
             {activeRating > 0 && (
               <p className="text-sm font-semibold text-amber-600">{ratingLabels[activeRating]}</p>
+            )}
+            {isLowRating && googleReviewUrl && (
+              // REV-046: visible the moment a 1-3 star rating is chosen, before anything is submitted.
+              // Readable text, in the open: not greyed out, not behind a toggle, not behind sending.
+              <a
+                href={googleReviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="review-low-google-link"
+                className="inline-flex min-h-11 items-center text-base font-medium text-text-primary underline underline-offset-4"
+              >
+                Prefer to post publicly? Review us on Google
+              </a>
             )}
           </div>
 

@@ -26,6 +26,10 @@ export interface ListingCheckoutInfo {
   onlinePaymentsAvailable: boolean;
   /** TASK-1039977 / PAY-006: Refundable security deposit configured on the listing (null/0 = none). */
   securityDepositAmount?: number | null;
+  /** TASK-10299273: True when the host allows pets on this listing. */
+  petsAllowed?: boolean;
+  /** TASK-10299273: Optional per-stay pet fee configured by the host (null/0 = free). */
+  petFeePerStay?: number | null;
 }
 
 const asString = (v: unknown): string | null => (typeof v === 'string' && v.trim().length > 0 ? v : null);
@@ -61,6 +65,13 @@ export async function fetchListingCheckoutInfo(
         if (raw == null || raw === '') return null;
         const n = Number(raw);
         return Number.isFinite(n) && n > 0 ? n : null;
+      })(),
+      petsAllowed: Boolean(data.petsAllowed ?? data.PetsAllowed),
+      petFeePerStay: (() => {
+        const raw = data.petFeePerStay ?? data.PetFeePerStay;
+        if (raw == null || raw === '') return null;
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 0 ? n : null;
       })(),
     };
   } catch {

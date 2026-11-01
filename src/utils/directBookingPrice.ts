@@ -20,6 +20,8 @@ export type DirectPriceDisplay = {
   /** All-in total the guest is charged for the stay (payment fee and any tourist tax included). */
   total: number;
   nights: number;
+  /** DYN-005 / TASK-1040117: Genuine server/rule-set promotion label when active (e.g. "Last-Minute Deal (10% off)"). */
+  appliedPromotionLabel?: string;
 };
 
 export type DirectPriceQuote = {
@@ -39,6 +41,12 @@ export type DirectPriceQuote = {
   paymentFeeCharged?: boolean;
   /** The payment fee inside `finalAmount` (the quote's ConvenienceFeeAmount); removed when `paymentFeeCharged` is false. */
   paymentFeeAmount?: number | null;
+  /** DYN-005 / TASK-1040117: Pre-rule/pre-promotion nightly rate from server PriceBreakdownDto. */
+  originalNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: Post-promotion nightly rate from server PriceBreakdownDto. */
+  discountedNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: Genuine promotion label from server PriceBreakdownDto. */
+  appliedPromotionLabel?: string | null;
 };
 
 export function directPriceDisplay(quote: DirectPriceQuote | null | undefined): DirectPriceDisplay | null {
@@ -56,14 +64,61 @@ export function directPriceDisplay(quote: DirectPriceQuote | null | undefined): 
     quote.paymentFeeCharged === false && Number.isFinite(final) && final > 0
       ? Math.max(net, final - fee)
       : quotedTotal;
-  const savingsPercent = discount > 0 ? Math.round((discount / base) * 100) : 0;
+  const realNightly = Math.round(net / nights);
+  let savingsPercent = discount > 0 ? Math.round((discount / base) * 100) : 0;
+  let standardNightly: number | null = savingsPercent > 0 ? Math.round(base / nights) : null;
+
+  // DYN-005 / TASK-1040117: Surface genuine rule-set / LOS / last-minute / promotional strike-through rate
+  // when server `originalNightlyRate` exceeds `realNightly` (pre-BaseAmount rules aren't in `discountAmount`).
+  const origNightly = Number(quote.originalNightlyRate);
+  if (Number.isFinite(origNightly) && Math.round(origNightly) > realNightly && realNightly > 0) {
+    const candidateStandard = Math.max(standardNightly ?? 0, Math.round(origNightly));
+    const candidatePct = Math.round(((candidateStandard - realNightly) / candidateStandard) * 100);
+    if (candidatePct > 0) {
+      standardNightly = candidateStandard;
+      savingsPercent = candidatePct;
+    }
+  }
+
+  // TASK-10299258: the label's "(N% off)" is always the saving this same display shows, never a configured rule percent.
+  const trimmedPromo = alignPromotionLabelPercent(
+    typeof quote.appliedPromotionLabel === 'string' ? quote.appliedPromotionLabel.trim() : '',
+    standardNightly,
+    realNightly,
+  );
+  const hasGenuineSaving = standardNightly != null && standardNightly > realNightly && savingsPercent > 0;
+
   return {
-    standardNightly: savingsPercent > 0 ? Math.round(base / nights) : null,
-    realNightly: Math.round(net / nights),
+    standardNightly,
+    realNightly,
     savingsPercent,
     total: Math.round(total),
     nights,
+    ...(trimmedPromo && hasGenuineSaving ? { appliedPromotionLabel: trimmedPromo } : {}),
   };
+}
+
+/**
+ * TASK-10299258: a discount label states the percentage that the struck and charged prices really give.
+ * The API names the promotion ("Direct Booking Special (25% off)"); this rewrites the "(N% off)" part to
+ * round((struck - charged) / struck) of the quote on screen, so a stale or rule-configured percent can never
+ * be shown next to a different real saving (25% label, 8% saving). With no genuine saving the percent is
+ * dropped and only the promotion name remains. Labels without a percent are returned unchanged.
+ */
+export function alignPromotionLabelPercent(
+  label: string,
+  struckNightly: number | null | undefined,
+  chargedNightly: number | null | undefined,
+): string {
+  const PERCENT_PART = /\s*\(\s*\d+(?:\.\d+)?\s*%\s*off\s*\)/i;
+  if (!label || !PERCENT_PART.test(label)) return label;
+  const struck = Number(struckNightly);
+  const charged = Number(chargedNightly);
+  const pct =
+    Number.isFinite(struck) && Number.isFinite(charged) && struck > 0 && charged < struck
+      ? Math.round(((struck - charged) / struck) * 100)
+      : 0;
+  return pct > 0 ? label.replace(PERCENT_PART, ` (${pct}% off)`) : label.replace(PERCENT_PART, '').trim();
 }
 
 /** "25% off — booked direct" — the one wording every surface uses for the saving. */

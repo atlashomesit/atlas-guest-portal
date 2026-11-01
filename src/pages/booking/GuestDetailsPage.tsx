@@ -57,7 +57,11 @@ import {
   razorpayOrderAmountInrToPaise,
 } from '@/utils/razorpayOrderAmount';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
-import { computeCheckoutTotal, discountPlugRow } from '@/utils/guestPriceEstimate';
+import {
+  computeCheckoutTotal,
+  resolveCheckoutChargeReconciliation,
+  stayIncludesWeekendNight,
+} from '@/utils/guestPriceEstimate';
 import {
   buildRazorpayCheckoutDisplayConfig,
   isMobileCheckoutUserAgent,
@@ -74,8 +78,11 @@ import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
 import { fetchListingById } from '@/api/listingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
+import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
 import { dormNeedsGenderAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
+import { hostCallDigits } from '@/utils/hostCallDigits';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
 import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
 import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
@@ -83,8 +90,9 @@ import { reportUpiPaid } from '@/api/payment';
 import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
 import { getIstCalendarDate, toCalendarISO, istInstantFromCalendarDate } from '@/utils/date';
 import { resolveListing } from '@/utils/listingResolver';
-import { isMarketplaceMode } from '@/tenant/tenantResolver';
+import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
+import { ADS_MEASUREMENT_CONSENT_SEGMENTS, resolveAdsMeasurementWho } from '@/content/consent/adsMeasurementConsent';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
 function abandonPaymentPendingCheckout(
@@ -162,6 +170,9 @@ const IconCheck = ({ size = 14 }: { size?: number }) => (
 const IconWhatsApp = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.6.1-.2.3-.7.9-.9 1-.2.2-.3.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.9-.7-1.4-1.7-1.6-2-.2-.3 0-.4.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.1c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2 0 1.3.9 2.5 1.1 2.7.1.2 1.8 2.8 4.5 3.9.6.3 1.1.4 1.5.5.6.2 1.2.2 1.7.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 0 0-8.6 15.1L2 22l4.9-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-2.9-.4-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3a8.3 8.3 0 1 1 6.9 3.7z"/></svg>
 );
+const IconPhone = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+);
 const IconAlert = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
 );
@@ -220,6 +231,8 @@ type CheckoutHoldCache = {
   holdDormGenderPolicy?: DormGenderPolicy | null;
   /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
   holdSecurityDepositAmount?: number | null;
+  /** TASK-1040087: marketplace booking origin channel preserved across refreshes. */
+  holdBookingChannel?: 'marketplace' | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
@@ -370,6 +383,8 @@ const GuestDetailsPage: React.FC = () => {
     const rawGuests = sp.get('guests');
     const rawListingId = sp.get('listingId') || sp.get('listing_id');
     const rawRatePlanId = sp.get('ratePlanId') || sp.get('listingRatePlanId');
+    const rawBrand = sp.get('brand')?.trim().toLowerCase() ?? '';
+    const isMarketplaceBrand = rawBrand === 'atlastays' || rawBrand === 'marketplace';
     return {
       checkIn: normalizeDateParam(rawCheckIn),
       checkOut: normalizeDateParam(rawCheckOut),
@@ -377,6 +392,7 @@ const GuestDetailsPage: React.FC = () => {
       tenant: sp.get('tenant')?.trim() || null,
       listingId: rawListingId && !isNaN(Number(rawListingId)) ? Number(rawListingId) : null,
       ratePlanId: rawRatePlanId && !isNaN(Number(rawRatePlanId)) ? Number(rawRatePlanId) : null,
+      isMarketplaceBrand,
     };
   }, [location.search]);
 
@@ -405,6 +421,7 @@ const GuestDetailsPage: React.FC = () => {
         holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
+        holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
       });
 
       if (!effectiveListingId && unitSlug) {
@@ -437,6 +454,7 @@ const GuestDetailsPage: React.FC = () => {
           holdGraceHours: cached.holdGraceHours ?? booking.holdGraceHours ?? null,
           holdDormGenderPolicy: cached.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
           holdSecurityDepositAmount: cached.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
+          holdBookingChannel: cached.holdBookingChannel ?? booking.holdBookingChannel ?? null,
           checkIn: cached.checkIn ?? booking.checkIn ?? null,
           checkOut: cached.checkOut ?? booking.checkOut ?? null,
           guests: cached.guests ?? booking.guests,
@@ -469,6 +487,14 @@ const GuestDetailsPage: React.FC = () => {
 
   // TASK-102017: derive effective tenant slug from BookingContext hold state or URL search params
   const effectiveTenantSlug = booking.holdTenantSlug || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tenant') : null);
+
+  // TASK-1040087: attribute checkout to 'marketplace' ONLY when originated on Atlastays marketplace
+  // (never on direct tenant / white-label sites even if ?tenant=<slug> is present).
+  const isMarketplaceCheckout =
+    booking.holdBookingChannel === 'marketplace' ||
+    urlParams.isMarketplaceBrand ||
+    isMarketplaceMode() ||
+    isMarketplaceHostname();
 
   // Synchronize BookingContext and window.location query string if one was populated and the other missing
   useEffect(() => {
@@ -647,6 +673,8 @@ const GuestDetailsPage: React.FC = () => {
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
+  /** One plain sentence naming everything that stopped Pay (set by the failed validation in handleSubmit; shown while any inline error remains). */
+  const [validationSummary, setValidationSummary] = useState('');
   const [consentFlash, setConsentFlash] = useState(false);
   const consentRowRef = useRef<HTMLDivElement>(null);
 
@@ -710,6 +738,11 @@ const GuestDetailsPage: React.FC = () => {
 
   const [depositAccepted, setDepositAccepted] = useState(false);
   const [depositError, setDepositError] = useState('');
+
+  // TASK-10299273: Pet policy + direct booking pet fee per stay
+  const [bringingPet, setBringingPet] = useState<boolean>(() => (booking.pets ?? 0) > 0);
+  const petsAllowedOnListing = Boolean(checkoutInfo?.petsAllowed);
+  const configuredPetFeePerStay = Math.max(0, Math.round(Number(checkoutInfo?.petFeePerStay) || 0));
   const depositRowRef = useRef<HTMLDivElement>(null);
   // TASK-10050 (DPDP guarded consent): transactional WhatsApp must NOT be pre-checked.
   // The previous `true` default meant consent was assumed unless the guest actively
@@ -718,6 +751,8 @@ const GuestDetailsPage: React.FC = () => {
   // guest must explicitly check the box to opt in.
   const [whatsappOptIn, setWhatsappOptIn] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  // TASK-1039907 (Meta CAPI): optional, UNticked, never persisted. Sent only when ticked (see guestPurposeConsents below).
+  const [adsMeasurementOptIn, setAdsMeasurementOptIn] = useState(false);
 
   // Persist guest PII to sessionStorage so a hard reload / Back nav doesn't lose it.
   // Consent is intentionally NOT persisted — DPDP consent must be actively given each session.
@@ -752,6 +787,7 @@ const GuestDetailsPage: React.FC = () => {
       holdGraceHours: booking.holdGraceHours ?? null,
       holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
       holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
+      holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : (booking.holdBookingChannel ?? null),
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
@@ -765,7 +801,9 @@ const GuestDetailsPage: React.FC = () => {
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
     booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
-    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount, booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
+    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount,
+    booking.holdBookingChannel, isMarketplaceCheckout,
+    booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
@@ -836,8 +874,22 @@ const GuestDetailsPage: React.FC = () => {
       }, 0),
     [availableAddOns, selectedAddOns, nights, stayGuestCount],
   );
-  // cleaningFeeAmount not in BookingPriceBreakdown — convenienceFee covers cleaning + service combined
-  const cleaningFeeAmount = 0;
+  // GUEST-049: honor itemized cleaning fee from server/hold breakdown when present
+  const cleaningFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.cleaningFee) || 0));
+  // CFB-009 / BNB-009 / BNB-010: honor breakfast extra when guest opted in on Room-Only booking
+  const includeBreakfast = Boolean(priceBreakdown?.includeBreakfast);
+  const breakfastExtraAmount = Math.max(0, Math.round(Number(priceBreakdown?.breakfastExtraAmount) || 0));
+  const quotedPetFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.petFee) || 0));
+  const petFeeAmount =
+    quotedPetFeeAmount > 0
+      ? quotedPetFeeAmount
+      : petsAllowedOnListing && bringingPet
+        ? configuredPetFeePerStay
+        : 0;
+  const unquotedPetFeeAmount =
+    quotedPetFeeAmount === 0 && petsAllowedOnListing && bringingPet ? configuredPetFeePerStay : 0;
+  const extraGuestFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.extraGuestFee) || 0));
+  const weekendRateAdjustmentAmount = Math.max(0, Math.round(Number(priceBreakdown?.weekendRateAdjustmentAmount) || 0));
 
   const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
 
@@ -850,7 +902,7 @@ const GuestDetailsPage: React.FC = () => {
   // TASK-4421: global discount still applies before GST; the slab decision uses the post-discount base.
   const serverFinalAmount =
     typeof priceBreakdown?.finalAmount === 'number' && priceBreakdown.finalAmount > 0
-      ? priceBreakdown.finalAmount
+      ? priceBreakdown.finalAmount + unquotedPetFeeAmount
       : null;
   const touristTaxAmount =
     typeof priceBreakdown?.touristTaxAmount === 'number' && priceBreakdown.touristTaxAmount > 0
@@ -862,7 +914,7 @@ const GuestDetailsPage: React.FC = () => {
 
   const { perNight, displayTotal } =
     computeCheckoutTotal({
-      baseAmount,
+      baseAmount: serverFinalAmount == null ? baseAmount + unquotedPetFeeAmount : baseAmount,
       globalDiscountAmount,
       convenienceFeeAmount,
       nights,
@@ -873,15 +925,66 @@ const GuestDetailsPage: React.FC = () => {
       referralDiscountAmount,
     });
 
-  // TASK-102392: the base row renders pre-discount `baseAmount` while the Total
-  // nets the global discount, so lines and Total disagree whenever a discount
-  // applies. Plug row reconciles them by construction (positive = discount,
-  // negative = Total carries what rows do not show).
-  const discountPlug = discountPlugRow(
-    baseAmount + cleaningFeeAmount + touristTaxAmount + displayedFeeAmount,
-    addOnsTotal - confirmedPromoDiscount - referralDiscountAmount,
-    displayTotal,
+  // GUEST-049 / TASK-102392: itemize known fee components (Cleaning fee, Extra guest fee,
+  // Weekend rate adjustment) and reconcile any residual server differential into the base
+  // accommodation row with an explanatory tooltip so "Other charges" never appears to guests
+  // while visible lines always sum 100% to `displayTotal`.
+  const hasWeekendNight = useMemo(
+    () => stayIncludesWeekendNight(booking.checkIn, booking.checkOut),
+    [booking.checkIn, booking.checkOut],
   );
+  const {
+    effectiveBaseAmount,
+    effectivePerNight,
+    petFeeRow,
+    extraGuestFeeRow,
+    weekendAdjustmentRow,
+    discountRow,
+    reconciledIntoBaseAmount,
+  } = resolveCheckoutChargeReconciliation({
+    baseAmount,
+    cleaningFeeAmount,
+    breakfastExtraAmount,
+    petFeeAmount,
+    extraGuestFeeAmount,
+    weekendRateAdjustmentAmount,
+    touristTaxAmount,
+    displayedFeeAmount,
+    addOnsTotal,
+    confirmedPromoDiscount,
+    referralDiscountAmount,
+    displayTotal,
+    nights,
+    stayGuestCount,
+    hasWeekendNight,
+    appliedPromotionLabel: priceBreakdown?.appliedPromotionLabel ?? null,
+  });
+
+  useEffect(() => {
+    if (reconciledIntoBaseAmount > 0) {
+      console.warn('[GuestDetailsPage] Reconciled unitemized server rate differential into base accommodation row', {
+        reconciledIntoBaseAmount,
+        baseAmount,
+        displayTotal,
+      });
+    }
+  }, [reconciledIntoBaseAmount, baseAmount, displayTotal]);
+
+  const displayedPerNight = effectiveBaseAmount !== baseAmount ? effectivePerNight : perNight;
+  const originalNightlyRateForStrike =
+    typeof priceBreakdown?.originalNightlyRate === 'number' &&
+    Math.round(priceBreakdown.originalNightlyRate) > displayedPerNight &&
+    displayedPerNight > 0 &&
+    nights > 0
+      ? Math.round(priceBreakdown.originalNightlyRate)
+      : null;
+  const checkoutDealBadgeLabel =
+    priceBreakdown?.appliedPromotionLabel?.trim() &&
+    (originalNightlyRateForStrike != null || (discountRow != null && discountRow.amount > 0))
+      ? originalNightlyRateForStrike != null
+        ? alignPromotionLabelPercent(priceBreakdown.appliedPromotionLabel.trim(), originalNightlyRateForStrike, displayedPerNight)
+        : priceBreakdown.appliedPromotionLabel.trim()
+      : null;
 
   // ── Check-in/out display ─────────────────────────────────────────────────
   const checkInDisplay = booking.checkIn
@@ -1034,7 +1137,19 @@ const GuestDetailsPage: React.FC = () => {
     else { setDepositError(''); }
 
     setFormErrors(errors);
-    if (!valid) {
+    if (valid) {
+      setValidationSummary('');
+    } else {
+      const problems: string[] = [];
+      if (errors.name) problems.push('your name');
+      if (errors.email) problems.push('a valid email address');
+      if (errors.phone) problems.push('a valid phone number');
+      if (dormAckRequired && !dormAckAccepted) problems.push('the dorm rule');
+      if (depositRequired && !depositAccepted) problems.push('the security deposit terms');
+      if (houseRulesRequired && !houseRulesAccepted) problems.push('the house rules');
+      if (!consentAccepted) problems.push('the booking consent');
+      const list = problems.length > 1 ? `${problems.slice(0, -1).join(', ')} and ${problems[problems.length - 1]}` : problems[0];
+      setValidationSummary(`Payment has not started. Please check ${list} above, then tap Pay again.`);
       requestAnimationFrame(() => {
         // Focus and scroll to first failing field (WCAG 3.3 error identification)
         if (errors.name) {
@@ -1172,8 +1287,12 @@ const GuestDetailsPage: React.FC = () => {
           checkinDate,
           checkoutDate,
           guests: booking.guests ?? 1,
+          ...(includeBreakfast ? { includeBreakfast: true } : {}),
+          ...(bringingPet ? { pets: 1, hasPets: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         },
+        ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         currency: 'INR',
         // GuestInfo absent => init-hold mode on the API (it creates the hold; no Razorpay order yet).
         guestConsentAccepted: false,
@@ -1196,7 +1315,7 @@ const GuestDetailsPage: React.FC = () => {
     };
     updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
     return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
-  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, effectiveTenantSlug, updateBooking]);
+  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, includeBreakfast, bringingPet, isMarketplaceCheckout, effectiveTenantSlug, updateBooking]);
 
   // ── PAY-010: UPI_QR / UPI_DEEPLINK checkout ──────────────────────────────────
   const [upiCheckout, setUpiCheckout] = useState<{
@@ -1224,7 +1343,7 @@ const GuestDetailsPage: React.FC = () => {
         holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
         holdListingName: null, holdCancellationTier: null,
         holdCancellationWindowHours: null, holdGraceHours: null,
-        holdSecurityDepositAmount: null,
+        holdSecurityDepositAmount: null, holdBookingChannel: null,
         paymentHoldBookingId: null, paymentHoldToken: null,
       });
       const token = upiCheckout.bookingToken;
@@ -1241,6 +1360,53 @@ const GuestDetailsPage: React.FC = () => {
     }
   }, [upiCheckout, upiReportBusy, effectiveTenantSlug, updateBooking, navigate]);
 
+  // Real-time observer verification polling: when YouPI PG observer verifies the UPI deposit,
+  // the booking transitions to Paid automatically without requiring manual action.
+  useEffect(() => {
+    if (!upiCheckout || !upiCheckout.bookingId || !upiCheckout.bookingToken) return;
+
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const token = upiCheckout.bookingToken;
+        const res = await fetch(
+          buildApiUrl(`/bookings/${upiCheckout.bookingId}/payment-status?t=${encodeURIComponent(token || '')}`),
+          { headers: getApiHeaders(effectiveTenantSlug) }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { status?: string; bookingStatus?: string };
+        if (active && (data?.status === 'Paid' || data?.bookingStatus === 'Confirmed')) {
+          clearInterval(interval);
+          try {
+            sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+            sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+          } catch { /* ignore */ }
+          updateBooking({
+            holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+            holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
+            holdListingName: null, holdCancellationTier: null,
+            holdCancellationWindowHours: null, holdGraceHours: null,
+            holdSecurityDepositAmount: null,
+            paymentHoldBookingId: null, paymentHoldToken: null,
+          });
+          navigate(
+            token
+              ? `/booking/${upiCheckout.bookingId}?t=${encodeURIComponent(token)}`
+              : `/booking/${upiCheckout.bookingId}`,
+            { replace: true }
+          );
+        }
+      } catch {
+        // ignore network error during polling
+      }
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [upiCheckout, effectiveTenantSlug, updateBooking, navigate]);
+
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -1252,11 +1418,12 @@ const GuestDetailsPage: React.FC = () => {
         return;
       }
       if (!validateForm()) return;
-      // TASK-8048: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
+      // TASK-8048 / TASK-10298848: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
       // 2026-10-19: also fail closed on the LISTING OWNER's own answer (checkout-info) — on the atlastays.com marketplace the
       // site's tenant is the platform, so a host with no payment provider looked payable and a guest reached the order API.
       if (!hasOnlinePaymentRail(getTenantContext()) || checkoutInfo?.onlinePaymentsAvailable === false) {
-        setOrderError('Online payment is not available for this property. Please contact the host on WhatsApp to complete your booking.');
+        setHostOffline(true);
+        setOrderError(null);
         return;
       }
 
@@ -1290,6 +1457,7 @@ const GuestDetailsPage: React.FC = () => {
         // TASK-4354: prove ownership of the hold — server rejects a guessed holdId without this token.
         holdToken: activeHoldToken ?? undefined,
         currency: 'INR',
+        ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         guestConsentAccepted: consentAccepted,
         // FOUNDER RULED 2026-10-19: the server re-checks this when the listing has house rules.
         houseRulesAccepted,
@@ -1300,6 +1468,8 @@ const GuestDetailsPage: React.FC = () => {
           booking_contact: consentAccepted,
           transactional_whatsapp: whatsappOptIn,
           marketing: marketingOptIn,
+          // TASK-1039907: only a TICKED box is sent. The API reads `false` as a withdrawal, so an unticked box must send nothing.
+          ...(adsMeasurementOptIn ? { ads_measurement: true } : {}),
         },
         securityDepositAccepted: depositRequired ? depositAccepted : false,
         guestInfo: {
@@ -1314,7 +1484,10 @@ const GuestDetailsPage: React.FC = () => {
           notes: formData.notes.trim().slice(0, 500) || undefined,
           guestNationality: formData.nationality || 'India',
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
+          ...(includeBreakfast ? { includeBreakfast: true } : {}),
+          ...(bringingPet ? { pets: 1, hasPets: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         },
       });
 
@@ -1601,7 +1774,7 @@ const GuestDetailsPage: React.FC = () => {
                         holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
                         holdListingName: null, holdCancellationTier: null,
                         holdCancellationWindowHours: null, holdGraceHours: null,
-                        holdSecurityDepositAmount: null,
+                        holdSecurityDepositAmount: null, holdBookingChannel: null,
                         paymentHoldBookingId: null, paymentHoldToken: null,
                       });
                       const token = pendingBookingTokenRef.current;
@@ -1803,14 +1976,44 @@ const GuestDetailsPage: React.FC = () => {
 
         // Detect timeout errors
         const isTimeout = axiosErr?.code === 'ECONNABORTED' || axiosErr?.message?.includes('timeout');
-        const apiCode = typeof data?.code === 'string' ? data.code : '';
+        const apiCode = typeof data?.code === 'string'
+          ? data.code
+          : typeof (data as { errorCode?: string })?.errorCode === 'string'
+            ? (data as { errorCode: string }).errorCode
+            : typeof (data as { error?: { code?: string } })?.error?.code === 'string'
+              ? (data as { error: { code: string } }).error.code
+              : '';
+
+        const isProviderNotConfigured =
+          isProviderNotConfiguredError(err) ||
+          ((status === 422 || status === 503) && (
+            apiCode === 'PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT' ||
+            apiCode === 'PAYMENT_PROVIDER_NOT_CONFIGURED' ||
+            serverMessage.includes('PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT') ||
+            serverMessage.includes('PAYMENT_PROVIDER_NOT_CONFIGURED')
+          ));
 
         if (isTimeout) {
           setOrderError('Payment initialization timed out. Please check your connection and try again.');
-        } else if (isProviderNotConfiguredError(err)) {
-          // The host cannot take an online payment (the API checks this BEFORE it holds the nights): hand the guest to the host.
+        } else if (isProviderNotConfigured) {
+          // TASK-10298848: The host cannot take an online payment (PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT):
+          // Immediately hide online pay and gracefully display the WhatsApp / Request to Book fallback CTA.
           setHostOffline(true);
           setOrderError(null);
+          setPaymentCancelled(false);
+          setPaymentFailure(null);
+          setCheckoutInfo((prev) => (prev ? { ...prev, onlinePaymentsAvailable: false } : {
+            listingId: Number(holdListingId) || 0,
+            hostName: null,
+            hasHouseRules: false,
+            houseRulesText: null,
+            houseRulesPdfUrl: null,
+            houseRulesStructuredJson: null,
+            hostWhatsAppDigits: null,
+            hostPhoneDigits: null,
+            bookingMode: 'WHATSAPP',
+            onlinePaymentsAvailable: false,
+          }));
         } else if (status === 409 && apiCode === 'CHECKOUT_HOLD_EXPIRED') {
           // The 10 minutes ended before this call: the nights were released. Drop the lapsed hold; the next Pay tap re-checks the
           // dates and starts a fresh one. No money moved.
@@ -1870,9 +2073,10 @@ const GuestDetailsPage: React.FC = () => {
     },
     [
       isSubmitting, validateForm, holdId, holdToken, holdExpiresAt, phoneDialCode, formData,
-      availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
+      availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, adsMeasurementOptIn, consentAccepted,
       houseRulesAccepted, dormAckAccepted, depositRequired, depositAccepted, checkoutInfo, hasDraft, startHoldAtPay,
-      holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
+      holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, booking.listingRatePlanId,
+      isMarketplaceCheckout, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
     ],
   );
@@ -2104,6 +2308,11 @@ const GuestDetailsPage: React.FC = () => {
     const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
     return `https://wa.me/${fullDigits}?text=${encodeURIComponent(text)}`;
   })();
+  // The site tenant's own number is the host's profile phone (`legalContactPack.contactPhone`); TenantInfo has no top-level `phone`.
+  // Never on the marketplace (the site tenant is the platform there), never Atlas's default number.
+  const siteHostPhoneDigits = isMarketplaceMode() ? null : hostCallDigits(tenantCtx?.legalContactPack?.contactPhone);
+  const hostDirectPhoneDigits = checkoutInfo ? checkoutInfo.hostPhoneDigits : siteHostPhoneDigits;
+  const hostDirectPhoneLink = hostDirectPhoneDigits ? `tel:+${hostDirectPhoneDigits.replace(/^\+/, '')}` : null;
   // FOUNDER RULED 2026-10-19: the failed-payment contact is the HOST's WhatsApp (pre-written with the room, dates, guests,
   // amount and the guest's name; the guest only taps Send), else a call link to the host's phone, else nothing.
   const failedPaymentContact = buildHostFailureContact({
@@ -2712,6 +2921,50 @@ const GuestDetailsPage: React.FC = () => {
               />
             </div>
 
+            {/* TASK-10299273: Pet policy & per-stay pet fee toggle on direct website bookings */}
+            {petsAllowedOnListing && (
+              <div
+                className="gd-pet-policy-section"
+                data-testid="checkout-pet-policy-section"
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--gd-line-strong, #e2e8f0)',
+                  background: 'var(--gd-surface-muted, #f8fafc)',
+                }}
+              >
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 500 }}>
+                    <input
+                      type="checkbox"
+                      checked={bringingPet}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setBringingPet(next);
+                        updateBooking({ pets: next ? 1 : 0 });
+                      }}
+                      data-testid="checkout-bringing-pet-checkbox"
+                    />
+                    Bringing a pet?
+                  </span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--gd-ink-soft, #475569)' }} data-testid="checkout-pet-fee-label">
+                    {configuredPetFeePerStay > 0
+                      ? `+${displayPrice(configuredPetFeePerStay)} pet fee per stay`
+                      : 'Pets stay free'}
+                  </span>
+                </label>
+              </div>
+            )}
+
             {/* PAY-006 / TASK-1039977: Refundable security deposit disclosure banner & consent */}
             {depositRequired && (
               <div
@@ -2799,6 +3052,16 @@ const GuestDetailsPage: React.FC = () => {
                   <span style={{ color: 'var(--gd-faint)' }}>(Optional — you can withdraw anytime from your preferences link.)</span>
                 </label>
               </div>
+              {/* TASK-1039907: optional ads measurement (Meta). Unticked by default; the label is the API's versioned consent text, word for word. */}
+              <div className={`gd-consent-row${adsMeasurementOptIn ? ' checked' : ''}`} data-testid="guest-booking-ads-measurement-consent-row">
+                <input id="gd-ads-measurement-consent" type="checkbox" checked={adsMeasurementOptIn} onChange={(e) => setAdsMeasurementOptIn(e.target.checked)} data-testid="guest-booking-ads-measurement-consent" />
+                <div className="gd-consent-body">
+                  <label htmlFor="gd-ads-measurement-consent" data-testid="guest-booking-ads-measurement-consent-text">
+                    {ADS_MEASUREMENT_CONSENT_SEGMENTS.beforeFirstWho}<b>{resolveAdsMeasurementWho(consentEntityName)}</b>{ADS_MEASUREMENT_CONSENT_SEGMENTS.beforeSecondWho}<b>{resolveAdsMeasurementWho(consentEntityName)}</b>{ADS_MEASUREMENT_CONSENT_SEGMENTS.afterSecondWho}
+                  </label>{' '}
+                  <span style={{ color: 'var(--gd-faint)' }}>(Optional — you can withdraw anytime from your preferences link.)</span>
+                </div>
+              </div>
             </div>
 
             {/* PAY-010: UPI_QR / UPI_DEEPLINK host — pay by UPI link / QR, then "I have paid" (host confirms). */}
@@ -2844,6 +3107,15 @@ const GuestDetailsPage: React.FC = () => {
                 <b>Total updated.</b> Final price from our server is{' '}
                 <b>{displayPrice(razorpayAmountPaise / 100)}</b> (your estimate was{' '}
                 {displayPrice(displayTotal)}). Tap <b>Pay</b> again to confirm and open payment.
+              </div>
+            )}
+            {validationSummary && (formErrors.name || formErrors.email || formErrors.phone || consentError || houseRulesError || dormAckError || depositError) && (
+              <div className="gd-banner" role="alert" data-testid="guest-checkout-validation-summary">
+                <IconAlert size={16}/>
+                <div>
+                  <b>Almost there.</b><br/>
+                  <span>{validationSummary}</span>
+                </div>
               </div>
             )}
             {orderError && !orderErrorIs409 && (
@@ -2928,15 +3200,11 @@ const GuestDetailsPage: React.FC = () => {
             )}
           </form>
 
-          {/* Pay rail (mobile only — desktop in aside) */}
-          <div className="gd-pay-rail gd-pay-rail--mobile">
-            <span className="gd-pay-rail-label">Pay with</span>
-            <span className="gd-pay-mark">UPI</span>
-            <span className="gd-pay-mark">VISA</span>
-            <span className="gd-pay-mark">RuPay</span>
-            <span className="gd-pay-mark">Net banking</span>
-            <span className="gd-pay-mark razorpay">Razorpay</span>
-          </div>
+          {/* Pay rail (mobile only — desktop in aside). Gated on the online rail:
+              never on the TASK-8048 WhatsApp-handoff branch. */}
+          {hasOnlineRail && (
+            <GuestCheckoutPaymentBadges className="gd-pay-rail--mobile" />
+          )}
 
           {/* Security badges (mobile only — desktop in aside). Gated on the online rail:
               never on the TASK-8048 WhatsApp-handoff branch. */}
@@ -2987,11 +3255,11 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Price block */}
           <div className="gd-price-rows">
-            {/* TASK-1039948: Direct booking pricing tier public display */}
-            {(booking.ratePlanName || booking.ratePlanMealPlan || booking.ratePlanCancellationPolicy || freeCancellationCopy) && (
+            {/* TASK-1039948 / TASK-10299208: Direct booking pricing tier public display (plain words only, never internal plan names) */}
+            {(booking.ratePlanMealPlan || booking.ratePlanCancellationPolicy) && (
               <div style={{ marginBottom: 6 }}>
                 <PricingTierDisplay
-                  ratePlanName={booking.ratePlanName}
+                  ratePlanName={null}
                   mealPlanLabel={booking.ratePlanMealPlan}
                   cancellationPolicy={booking.ratePlanCancellationPolicy || freeCancellationCopy?.deadlineFormatted}
                   isCompact
@@ -3000,13 +3268,50 @@ const GuestDetailsPage: React.FC = () => {
             )}
             <div className="gd-price-row" data-testid="price-line-base">
               <div className="desc">
-                <span>
-                  {nights > 0 && perNight > 0
-                    ? `${displayPrice(perNight)} × ${nights} ${nights === 1 ? 'night' : 'nights'}`
-                    : 'Accommodation'}
+                <span style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                  {originalNightlyRateForStrike != null && (
+                    <del
+                      data-testid="checkout-original-nightly-rate"
+                      style={{ color: 'var(--gd-faint, #8b7b70)', fontWeight: 400 }}
+                    >
+                      {displayPrice(originalNightlyRateForStrike)}
+                    </del>
+                  )}
+                  <span>
+                    {nights > 0 && displayedPerNight > 0
+                      ? `${displayPrice(displayedPerNight)} × ${nights} ${nights === 1 ? 'night' : 'nights'}`
+                      : 'Accommodation'}
+                  </span>
+                  {reconciledIntoBaseAmount > 0 && (
+                    <FeeInfoTip
+                      fee="rateAdjustment"
+                      label="Accommodation rate details"
+                      testId="fee-info-rate-adjustment"
+                    />
+                  )}
                 </span>
+                {checkoutDealBadgeLabel && (
+                  <small>
+                    <span
+                      data-testid="checkout-deal-badge"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        marginTop: 2,
+                        padding: '1px 7px',
+                        borderRadius: 999,
+                        background: 'var(--gd-success-bg, #ecfdf5)',
+                        color: 'var(--gd-success, #047857)',
+                        fontWeight: 600,
+                        fontSize: 11,
+                      }}
+                    >
+                      {checkoutDealBadgeLabel}
+                    </span>
+                  </small>
+                )}
               </div>
-              <span className="num">{displayPrice(baseAmount)}</span>
+              <span className="num">{displayPrice(effectiveBaseAmount)}</span>
             </div>
             {cleaningFeeAmount > 0 && (
               <div className="gd-price-row" data-testid="cleaning-fee-row">
@@ -3016,6 +3321,42 @@ const GuestDetailsPage: React.FC = () => {
                   <FeeInfoTip fee="cleaning" label="Cleaning fee" testId="fee-info-cleaning" />
                 </span>
                 <span className="num">{displayPrice(cleaningFeeAmount)}</span>
+              </div>
+            )}
+            {breakfastExtraAmount > 0 && (
+              <div className="gd-price-row" data-testid="breakfast-extra-row">
+                <span>
+                  Breakfast ({stayGuestCount} {stayGuestCount === 1 ? 'guest' : 'guests'} × {nights} {nights === 1 ? 'night' : 'nights'})
+                </span>
+                <span className="num">{displayPrice(breakfastExtraAmount)}</span>
+              </div>
+            )}
+            {petFeeRow && (
+              <div className="gd-price-row" data-testid="price-breakdown-pet-fee">
+                <span>{petFeeRow.label}</span>
+                <span className="num">{displayPrice(petFeeRow.amount)}</span>
+              </div>
+            )}
+            {extraGuestFeeRow && (
+              <div className="gd-price-row" data-testid="extra-guest-fee-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {extraGuestFeeRow.label}
+                  <FeeInfoTip fee="extraGuest" label={extraGuestFeeRow.label} testId="fee-info-extra-guest" />
+                </span>
+                <span className="num">{displayPrice(extraGuestFeeRow.amount)}</span>
+              </div>
+            )}
+            {weekendAdjustmentRow && (
+              <div className="gd-price-row" data-testid="weekend-adjustment-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {weekendAdjustmentRow.label}
+                  <FeeInfoTip
+                    fee="weekendAdjustment"
+                    label={weekendAdjustmentRow.label}
+                    testId="fee-info-weekend-adjustment"
+                  />
+                </span>
+                <span className="num">{displayPrice(weekendAdjustmentRow.amount)}</span>
               </div>
             )}
             {addOnsTotal > 0 && (
@@ -3061,13 +3402,12 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="num">{displayPrice(displayedFeeAmount)}</span>
               </div>
             )}
-            {/* TASK-102392: plug row so the visible lines sum exactly to the Total.
-                Positive = a global discount the base row already netted out; negative
-                = the Total carries an amount not shown by any row above. */}
-            {discountPlug !== 0 && (
-              <div className={`gd-price-row${discountPlug > 0 ? ' save' : ''}`} data-testid="price-line-discount-plug">
-                <span>{discountPlug > 0 ? 'Discount' : 'Other charges'}</span>
-                <span className="num">{discountPlug > 0 ? '−' : ''}{displayPrice(Math.abs(discountPlug))}</span>
+            {/* GUEST-049 / TASK-102392: positive discount row only — negative variances are itemized
+                above or reconciled into the accommodation rate so "Other charges" never appears. */}
+            {discountRow && (
+              <div className="gd-price-row save" data-testid="price-line-discount-plug">
+                <span>{discountRow.label}</span>
+                <span className="num">−{displayPrice(discountRow.amount)}</span>
               </div>
             )}
           </div>
@@ -3177,14 +3517,7 @@ const GuestDetailsPage: React.FC = () => {
               )}
 
               {/* Pay rail (desktop) */}
-              <div className="gd-pay-rail">
-                <span className="gd-pay-rail-label">Pay with</span>
-                <span className="gd-pay-mark">UPI</span>
-                <span className="gd-pay-mark">VISA</span>
-                <span className="gd-pay-mark">RuPay</span>
-                <span className="gd-pay-mark">Net banking</span>
-                <span className="gd-pay-mark razorpay">Razorpay</span>
-              </div>
+              <GuestCheckoutPaymentBadges />
 
               {/* Security badges — gated on the online rail: never rendered on the
                   TASK-8048 WhatsApp-handoff branch where there is no gateway to claim. */}
@@ -3210,14 +3543,17 @@ const GuestDetailsPage: React.FC = () => {
             </>
           ) : (
             <>
-              <div className="gd-banner" role="status" data-testid="guest-booking-offline-notice">
+              <div className="gd-banner" role={hostOffline ? 'alert' : 'status'} data-testid="guest-booking-offline-notice">
                 <IconWhatsApp size={16}/>
                 <div>
                   <b>Online payment is not available for this property.</b><br/>
                   <span>
+                    Online payment is currently not enabled for this property.{' '}
                     {whatsappHandoffUrl
                       ? 'Contact the host on WhatsApp to confirm your dates.'
-                      : 'Please contact the host directly to make a reservation.'}
+                      : hostDirectPhoneLink
+                        ? 'Contact the host directly by phone to confirm your dates.'
+                        : 'Please contact the host directly to make a reservation.'}
                   </span>
                   {trialPayAtProperty && (
                     <div data-testid="guest-trial-pay-at-property-notice" style={{ marginTop: 4 }}>
@@ -3235,15 +3571,43 @@ const GuestDetailsPage: React.FC = () => {
                     className="gd-pay"
                     style={{ textDecoration: 'none' }}
                     data-testid="guest-booking-whatsapp-cta"
+                    aria-label="Contact Host via WhatsApp / Request to Book"
                   >
-                    <IconWhatsApp size={16}/> WhatsApp host to confirm
+                    <IconWhatsApp size={16}/> Contact Host via WhatsApp · Request to Book
+                    <span className="sr-only"> (WhatsApp host to confirm)</span>
                   </a>
                   <div className="gd-pay-microcopy">You'll be connected directly to the host — no payment taken on this site.</div>
                 </>
+              ) : hostDirectPhoneLink ? (
+                <>
+                  <a
+                    href={hostDirectPhoneLink}
+                    className="gd-pay"
+                    style={{ textDecoration: 'none' }}
+                    data-testid="guest-booking-phone-cta"
+                    aria-label="Contact Host / Request to Book"
+                  >
+                    <IconPhone size={16}/> Contact Host (Call) · Request to Book
+                  </a>
+                  <div className="gd-pay-microcopy">
+                    Call the host directly to request your booking — no online payment required.
+                  </div>
+                </>
               ) : (
-                <div className="gd-pay-microcopy" data-testid="guest-booking-no-host-number">
-                  Please contact the host directly to make a reservation.
-                </div>
+                <>
+                  <a
+                    href={getContactEmail() ? `mailto:${getContactEmail()}?subject=${encodeURIComponent(`Request to Book: ${propertyName || 'Property'}`)}` : '/contact'}
+                    className="gd-pay"
+                    style={{ textDecoration: 'none' }}
+                    data-testid="guest-booking-request-cta"
+                    aria-label="Request to Book"
+                  >
+                    Request to Book
+                  </a>
+                  <div className="gd-pay-microcopy" data-testid="guest-booking-no-host-number">
+                    Please contact the host directly to make a reservation.
+                  </div>
+                </>
               )}
             </>
           )}
@@ -3308,13 +3672,30 @@ const GuestDetailsPage: React.FC = () => {
             className="gd-mobile-bar-cta"
             style={{ textDecoration: 'none' }}
             data-testid="guest-booking-whatsapp-cta-mobile"
+            aria-label="Contact Host via WhatsApp / Request to Book"
           >
-            <IconWhatsApp size={14}/> WhatsApp host
+            <IconWhatsApp size={14}/> Contact Host via WhatsApp · Request to Book
+          </a>
+        ) : hostDirectPhoneLink ? (
+          <a
+            href={hostDirectPhoneLink}
+            className="gd-mobile-bar-cta"
+            style={{ textDecoration: 'none' }}
+            data-testid="guest-booking-phone-cta-mobile"
+            aria-label="Contact Host / Request to Book"
+          >
+            <IconPhone size={14}/> Request to Book (Call)
           </a>
         ) : (
-          <button type="button" className="gd-mobile-bar-cta" disabled data-testid="guest-booking-no-host-number-mobile">
-            Contact the host directly
-          </button>
+          <a
+            href={getContactEmail() ? `mailto:${getContactEmail()}?subject=${encodeURIComponent(`Request to Book: ${propertyName || 'Property'}`)}` : '/contact'}
+            className="gd-mobile-bar-cta"
+            style={{ textDecoration: 'none' }}
+            data-testid="guest-booking-no-host-number-mobile"
+            aria-label="Request to Book"
+          >
+            Request to Book
+          </a>
         )}
       </div>
 
@@ -4106,9 +4487,15 @@ const gdStyles = `
   padding: 22px;
   box-shadow: 0 12px 28px rgba(26,26,46,0.07), 0 4px 12px rgba(26,26,46,0.04);
   position: sticky;
-  top: 24px;
+  /* The site navbar is position:fixed (116px, measured live into --measured-nav-height). A bare 24px stuck the aside UNDER it,
+     so the Pay button could sit behind the navbar where a tap landed on the navbar and did nothing. */
+  top: calc(var(--measured-nav-height, var(--nav-height, 116px)) + 16px);
 }
 @media (min-width: 1024px) { .gd-aside { display: block; } }
+/* Anything the page scrolls or focuses (keyboard Tab, scrollIntoView after a failed check) lands BELOW the fixed navbar, never behind it. */
+.gd-page :is(.gd-pay, .gd-consent-row, input, select, textarea, button, [tabindex="-1"]) {
+  scroll-margin-top: calc(var(--measured-nav-height, var(--nav-height, 116px)) + 16px);
+}
 
 .gd-aside-recap {
   display: grid;
@@ -4309,6 +4696,12 @@ const gdStyles = `
   text-transform: uppercase;
   color: #765b45;
 }
+.gd-pay-rail-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
 .gd-pay-mark {
   display: inline-flex;
   align-items: center;
@@ -4323,6 +4716,16 @@ const gdStyles = `
   letter-spacing: 0.04em;
 }
 .gd-pay-mark.razorpay { color: #072654; }
+.gd-pay-mark--upi { color: #5f259f; font-weight: 800; }
+.gd-pay-mark--gpay { color: #1a73e8; }
+.gd-pay-mark--phonepe { color: #5f259f; }
+.gd-pay-mark--paytm { color: #002e6e; }
+.gd-pay-mark--bhim { color: #00796b; }
+.gd-pay-mark--cards { color: #4a5568; }
+.gd-pay-mark--visa { color: #1a1f71; }
+.gd-pay-mark--mastercard { color: #eb001b; }
+.gd-pay-mark--rupay { color: #097939; }
+.gd-pay-mark--netbanking { color: #2d3748; }
 .gd-pay-rail--mobile { display: flex; }
 @media (min-width: 1024px) { .gd-pay-rail--mobile { display: none; } }
 

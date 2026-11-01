@@ -16,12 +16,81 @@ interface GalleryItem {
   order: number;
 }
 
-const getSegment = (id: number) => {
-  if (id >= 500) return "Signature Suites";
-  if (id >= 300) return "Spacious Flats";
-  if (id >= 200) return "Premium Floors";
-  return "Studios";
-};
+export interface GallerySegmentSource {
+  accommodationType?: string | null;
+  category?: string | null;
+  propertyType?: string | null;
+  unitType?: string | null;
+  propertyName?: string | null;
+  property_name?: string | null;
+}
+
+function classifySegmentToken(raw: string): string | null {
+  const token = raw.trim().toLowerCase();
+  if (!token) return null;
+  if (token.includes("dorm") || token.includes("hostel")) return "Hostel & Dorms";
+  if (token.includes("villa")) return "Villas";
+  if (token.includes("cottage") || token.includes("bungalow") || token.includes("chalet")) return "Cottages";
+  if (token.includes("penthouse") || token.includes("suite")) return "Suites & Penthouses";
+  if (token.includes("b&b") || token.includes("bnb") || token.includes("guest house") || token.includes("guesthouse") || token.includes("homestay")) {
+    return "Homestays & B&Bs";
+  }
+  if (token.includes("studio")) return "Studios";
+  if (
+    token.includes("apartment") ||
+    token.includes("flat") ||
+    token.includes("bhk") ||
+    token.includes("loft")
+  ) {
+    return "Apartments";
+  }
+  if (token.includes("hotel") || token.includes("room")) return "Rooms";
+  return null;
+}
+
+/**
+ * GUEST-050: Resolves gallery filter segment from real listing/property metadata
+ * (`accommodationType`, `category`, `unitType`, or `property_name`) rather than
+ * hardcoded numeric DB ID thresholds. When a tenant has fewer than 3 properties,
+ * defaults to the property/unit display name so tabs reflect actual homes.
+ */
+export function resolveGallerySegment(
+  property: GallerySegmentSource,
+  totalPropertiesCount = 0,
+): string {
+  const unitDisplayName = property.property_name?.trim() || "";
+  const canonicalPropertyName = property.propertyName?.trim() || "";
+
+  if (totalPropertiesCount > 0 && totalPropertiesCount < 3) {
+    if (unitDisplayName) return unitDisplayName;
+    if (canonicalPropertyName) return canonicalPropertyName;
+  }
+
+  const explicitTypeCandidates = [
+    property.accommodationType,
+    property.category,
+    property.propertyType,
+  ];
+  for (const candidate of explicitTypeCandidates) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      const classified = classifySegmentToken(candidate);
+      if (classified) return classified;
+      return candidate.trim();
+    }
+  }
+
+  // Note: `unitType` in useTenantListings defaults to "1bhk" unless "penthouse" is in the name;
+  // check the actual listing/property names before falling back to unitType so villas/cottages/rooms
+  // are classified accurately.
+  for (const nameCandidate of [unitDisplayName, canonicalPropertyName, property.unitType]) {
+    if (typeof nameCandidate === "string" && nameCandidate.trim()) {
+      const classified = classifySegmentToken(nameCandidate);
+      if (classified) return classified;
+    }
+  }
+
+  return canonicalPropertyName || unitDisplayName || "Homes";
+}
 
 const GalleryPage = () => {
   const { properties } = useTenantListings();
@@ -53,7 +122,7 @@ const GalleryPage = () => {
         propertyId: id,
         propertyName: name,
         location,
-        segment: getSegment(id),
+        segment: resolveGallerySegment(property as GallerySegmentSource, properties.length),
         url,
         order: index,
       }));

@@ -5,7 +5,10 @@ import HostelDormBadge, { isHostelDorm, resolveGenderPolicy } from './HostelDorm
 describe('HostelDormBadge (HSL-002 / HSL-011: gender rule from the API only)', () => {
   it('detects hostel dorm accommodations from the API type, never from the listing name', () => {
     expect(isHostelDorm({ accommodationType: 'HostelDorm' })).toBe(true);
-    expect(isHostelDorm({ propertyType: 'Hostel' })).toBe(true);
+    // TASK-10299109: a Hostel PROPERTY is not a dorm. Only the listing's own accommodationType says so.
+    expect(isHostelDorm({ propertyType: 'Hostel' })).toBe(false);
+    expect(isHostelDorm({ accommodationType: 'PrivateRoom', propertyType: 'Hostel' })).toBe(false);
+    expect(isHostelDorm({ accommodationType: ' hosteldorm ', propertyType: 'Hostel' })).toBe(true);
     expect(isHostelDorm({ propertyType: 'Entire Villa' })).toBe(false);
     // A name is not an input any more: a villa called "Dorm Retreat" is not a dorm.
     expect(isHostelDorm({ accommodationType: 'Hotel', propertyType: 'Villa', name: 'Bed in 6-Bed Mixed Dormitory' } as never)).toBe(false);
@@ -44,6 +47,15 @@ describe('HostelDormBadge (HSL-002 / HSL-011: gender rule from the API only)', (
   it('makes no refund claim anywhere in the badge', () => {
     const { container } = render(<HostelDormBadge accommodationType="HostelDorm" genderPolicy="FemaleOnly" />);
     expect(container.textContent).not.toMatch(/refund/i);
+  });
+
+  it('TASK-10299109: a private room of a Hostel property renders no dorm badge', () => {
+    const { container } = render(<HostelDormBadge accommodationType="PrivateRoom" propertyType="Hostel" genderPolicy="Mixed" />);
+    expect(container.firstChild).toBeNull();
+    expect(screen.queryByTestId('hostel-dorm-base-badge')).toBeNull();
+    // A Hostel property whose listing carries no accommodationType at all is not a dorm either.
+    const bare = render(<HostelDormBadge propertyType="Hostel" />);
+    expect(bare.container.firstChild).toBeNull();
   });
 
   it('renders nothing for regular hotel/villa listings', () => {

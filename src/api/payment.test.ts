@@ -46,13 +46,15 @@ describe('Payment API Client (TASK-10298941 & TASK-10298942)', () => {
     });
     globalThis.fetch = fetchMock;
 
-    const result = await initiateUpiDeeplink({ bookingId: 101, amountInr: 5000 }, 'testtenant');
+    const result = await initiateUpiDeeplink({ bookingId: 101, bookingToken: 'tok_abc123', amountInr: 5000 }, 'testtenant');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toContain('/api/upi-deeplink/initiate');
     expect(init.method).toBe('POST');
     expect(init.headers['X-Tenant-Slug']).toBe('testtenant');
+    // L1 2026-10-29: the API now refuses (404) an initiate without the booking's own guest-link token.
+    expect(JSON.parse(init.body as string)).toEqual({ bookingId: 101, bookingToken: 'tok_abc123', amountInr: 5000 });
     expect(result).toEqual(mockResponse);
   });
 });

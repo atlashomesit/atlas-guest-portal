@@ -208,9 +208,13 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
     // 'Post to Room' is selected by default for room QR
     expect(screen.getByTestId("pos-qr-room-guardrail-section")).toBeTruthy();
 
-    // Enter wrong verification code "0000"
+    // Enter client-side known invalid placeholder "0000" -> inline alert + disabled submit
     const input = screen.getByTestId("pos-qr-verification-input");
     fireEvent.change(input, { target: { value: "0000" } });
+    expect(screen.getByTestId("pos-qr-room-invalid-alert")).toBeTruthy();
+
+    // Enter wrong verification code "9999" -> submits and enforces server 403 ROOM_VERIFICATION_FAILED
+    fireEvent.change(input, { target: { value: "9999" } });
 
     // Submit order
     fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));

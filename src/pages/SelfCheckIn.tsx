@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
+import ArrivalDetailsEditor, { type ArrivalDetailsDraft } from "../components/ArrivalDetailsEditor";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
+import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
 
 interface CheckinDetails {
   /** BNB-009: lets the page reach the booking-link-token guest endpoints (meal preferences). */
@@ -30,6 +32,11 @@ interface CheckinDetails {
    * house rules; null until then. Lets a resumed self check-in skip re-showing the checkbox.
    */
   houseRulesSignedAt?: string | null;
+  /**
+   * GUEST-042: timestamp of check-in submission or completed status from backend.
+   */
+  checkInSubmittedAtUtc?: string | null;
+  isCompleted?: boolean | null;
   guestCount?: number | null;
   guestName?: string | null;
   /**
@@ -103,6 +110,144 @@ function isPlausibleGuestEmail(raw: string): boolean {
 
 type Step = "auth" | "summary" | "id-upload" | "house-rules" | "damage-waiver" | "done";
 
+/**
+ * GUEST-041: Comprehensive alphabetical ISO nationality list for FRRO Form C compliance.
+ */
+const ISO_NATIONALITIES = [
+  "Afghanistan",
+  "Albania",
+  "Algeria",
+  "Andorra",
+  "Angola",
+  "Argentina",
+  "Armenia",
+  "Australia",
+  "Austria",
+  "Azerbaijan",
+  "Bahamas",
+  "Bahrain",
+  "Bangladesh",
+  "Barbados",
+  "Belarus",
+  "Belgium",
+  "Belize",
+  "Benin",
+  "Bhutan",
+  "Bolivia",
+  "Bosnia and Herzegovina",
+  "Botswana",
+  "Brazil",
+  "Brunei",
+  "Bulgaria",
+  "Cambodia",
+  "Cameroon",
+  "Canada",
+  "Chile",
+  "China",
+  "Colombia",
+  "Costa Rica",
+  "Croatia",
+  "Cuba",
+  "Cyprus",
+  "Czech Republic",
+  "Denmark",
+  "Dominican Republic",
+  "Ecuador",
+  "Egypt",
+  "El Salvador",
+  "Estonia",
+  "Ethiopia",
+  "Fiji",
+  "Finland",
+  "France",
+  "Georgia",
+  "Germany",
+  "Ghana",
+  "Greece",
+  "Guatemala",
+  "Honduras",
+  "Hong Kong",
+  "Hungary",
+  "Iceland",
+  "India",
+  "Indonesia",
+  "Iran",
+  "Iraq",
+  "Ireland",
+  "Israel",
+  "Italy",
+  "Jamaica",
+  "Japan",
+  "Jordan",
+  "Kazakhstan",
+  "Kenya",
+  "Kuwait",
+  "Kyrgyzstan",
+  "Laos",
+  "Latvia",
+  "Lebanon",
+  "Lithuania",
+  "Luxembourg",
+  "Malaysia",
+  "Maldives",
+  "Malta",
+  "Mauritius",
+  "Mexico",
+  "Monaco",
+  "Mongolia",
+  "Morocco",
+  "Myanmar",
+  "Namibia",
+  "Nepal",
+  "Netherlands",
+  "New Zealand",
+  "Nigeria",
+  "Norway",
+  "Oman",
+  "Pakistan",
+  "Panama",
+  "Paraguay",
+  "Peru",
+  "Philippines",
+  "Poland",
+  "Portugal",
+  "Qatar",
+  "Romania",
+  "Russia",
+  "Rwanda",
+  "Saudi Arabia",
+  "Senegal",
+  "Serbia",
+  "Singapore",
+  "Slovakia",
+  "Slovenia",
+  "South Africa",
+  "South Korea",
+  "Spain",
+  "Sri Lanka",
+  "Sweden",
+  "Switzerland",
+  "Taiwan",
+  "Tanzania",
+  "Thailand",
+  "Turkey",
+  "UAE",
+  "Uganda",
+  "Ukraine",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States",
+  "Uruguay",
+  "Uzbekistan",
+  "Vatican City",
+  "Venezuela",
+  "Vietnam",
+  "Yemen",
+  "Zambia",
+  "Zimbabwe",
+  "Other",
+] as const;
+
 export default function SelfCheckIn() {
   const brandName = getTenantBrandName();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
@@ -164,6 +309,33 @@ export default function SelfCheckIn() {
     nationality.trim() !== "" &&
     nationality.trim().toLowerCase() !== "india" &&
     nationality.trim().toLowerCase() !== "in";
+
+  // GUEST-041: Stay-date validation for passport and visa expiry (FRRO Form C compliance)
+  const checkoutDateStr = details?.checkoutDate ? details.checkoutDate.slice(0, 10) : "";
+  const visaExpiryStr = visaExpiryDate.trim().slice(0, 10);
+  const passportExpiryStr = passportExpiryDate.trim().slice(0, 10);
+
+  const isVisaExpiredForStay = Boolean(
+    isForeignGuest &&
+    checkoutDateStr &&
+    visaExpiryStr &&
+    visaExpiryStr < checkoutDateStr
+  );
+
+  const isPassportExpiredForStay = Boolean(
+    isForeignGuest &&
+    checkoutDateStr &&
+    passportExpiryStr &&
+    passportExpiryStr <= checkoutDateStr
+  );
+
+  const visaExpiryError = isVisaExpiredForStay
+    ? `Visa must be valid through your checkout date (${details?.checkoutDate}) for Indian FRRO compliance.`
+    : "";
+
+  const passportExpiryError = isPassportExpiredForStay
+    ? `Passport must be valid after your checkout date (${details?.checkoutDate}).`
+    : "";
   // TASK-5131: Aadhaar VC preferred; photo upload is explicit fallback only
   const [aadhaarVcVerified, setAadhaarVcVerified] = useState(false);
   // TASK-102530: setAadhaarMasked is still called live from updateGuest() and
@@ -389,11 +561,40 @@ export default function SelfCheckIn() {
     setStep("id-upload");
   };
 
+  const applyArrivalCorrection = (next: ArrivalDetailsDraft) => {
+    // A guest-count correction must not inherit a pending auto-advance from earlier ID verification.
+    if (advanceTimerRef.current !== null) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+    setArrivalTime(next.arrivalTime);
+    setGuestCount(next.guestCount);
+    setContactPhone(next.contactPhone);
+    setContactEmail(next.contactEmail);
+    setContactPhoneError("");
+    setContactEmailError("");
+    setGuests((previous) => Array.from({ length: Number(next.guestCount) }, (_, index) => previous[index] ?? {
+      name: "", govtIdType: "", govtIdNumber: "", phoneNumber: "", isVerified: false, activeVerifyTab: "digilocker",
+    }));
+  };
+
   const handleContinueFromIdUpload = () => {
     if (idCollectedElsewhere) {
       setError("");
       setStep("house-rules");
       return;
+    }
+
+    // GUEST-041: Stay-date validation for foreign guests before proceeding
+    if (isForeignGuest && checkoutDateStr) {
+      if (isVisaExpiredForStay) {
+        setError(visaExpiryError);
+        return;
+      }
+      if (isPassportExpiredForStay) {
+        setError(passportExpiryError);
+        return;
+      }
     }
 
     for (let i = 0; i < guests.length; i++) {
@@ -511,7 +712,11 @@ export default function SelfCheckIn() {
       });
     }
     setGuests(initialGuests);
-    setStep("summary");
+    if (data.checkInSubmittedAtUtc || data.isCompleted) {
+      setStep("done");
+    } else {
+      setStep("summary");
+    }
   };
 
   const handleVerify = async () => {
@@ -576,6 +781,21 @@ export default function SelfCheckIn() {
     if (!details) return;
     setBusy(true);
     setError("");
+
+    // GUEST-041: Stay-date validation for foreign guests before completing
+    if (isForeignGuest && checkoutDateStr) {
+      if (isVisaExpiredForStay) {
+        setError(visaExpiryError);
+        setBusy(false);
+        return;
+      }
+      if (isPassportExpiredForStay) {
+        setError(passportExpiryError);
+        setBusy(false);
+        return;
+      }
+    }
+
     try {
       // TASK-4346: Upload ID document if provided
       let idDocumentUrl: string | null = null;
@@ -829,11 +1049,9 @@ export default function SelfCheckIn() {
             <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
               <InfoRow label="Check-in" value={`${details.checkinDate} at ${details.checkinTime}`} />
               <InfoRow label="Check-out" value={`${details.checkoutDate} at ${details.checkoutTime}`} />
-              {details.wifiName && <InfoRow label="WiFi" value={details.wifiName} />}
-              {details.wifiPassword && <InfoRow label="WiFi password" value={details.wifiPassword} />}
-              {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
               {details.emergencyContactPhone && <InfoRow label="Emergency" value={details.emergencyContactPhone} />}
             </div>
+            <StayAccessBlock wifiName={details.wifiName} wifiPass={details.wifiPassword} doorCode={details.doorCode} />
 
             {/* TASK-102915: split-stay legs in date order. Rendered only when the
                 API returns more than one leg; single-room bookings (no `stays`)
@@ -987,6 +1205,14 @@ export default function SelfCheckIn() {
         {/* ── Step: ID ───────────────────────────────────────────── */}
         {step === "id-upload" && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1">
+            <ArrivalDetailsEditor
+              value={{ arrivalTime, guestCount, contactPhone, contactEmail }}
+              currentGuestCount={guests.length}
+              phoneRequired={details?.guestHasDeliverablePhone === false}
+              validatePhone={isPlausibleGuestPhone}
+              validateEmail={isPlausibleGuestEmail}
+              onApply={applyArrivalCorrection}
+            />
             <h2 className="text-xl font-bold text-text-primary mb-1">Government ID Verification</h2>
             <p className="text-text-secondary text-sm mb-5">
               Please provide and verify government-issued ID for all {guests.length} {guests.length === 1 ? "guest" : "guests"}.
@@ -1010,16 +1236,11 @@ export default function SelfCheckIn() {
               }}
             >
               <option value="">Select nationality</option>
-              <option value="India">India</option>
-              <option value="United States">United States</option>
-              <option value="United States (OCI)">United States (OCI)</option>
-              <option value="United Kingdom">United Kingdom</option>
-              <option value="United Kingdom (OCI)">United Kingdom (OCI)</option>
-              <option value="Canada">Canada</option>
-              <option value="Australia">Australia</option>
-              <option value="Germany">Germany</option>
-              <option value="France">France</option>
-              <option value="Other">Other</option>
+              {ISO_NATIONALITIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
             </select>
 
             {isForeignGuest && (
@@ -1032,7 +1253,9 @@ export default function SelfCheckIn() {
                   visaNumber.trim() &&
                   visaType.trim() &&
                   visaExpiryDate.trim() &&
-                  dateOfBirth.trim() ? (
+                  dateOfBirth.trim() &&
+                  !isVisaExpiredForStay &&
+                  !isPassportExpiredForStay ? (
                     <span
                       data-testid="checkin-form-c-badge"
                       className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800"
@@ -1069,10 +1292,19 @@ export default function SelfCheckIn() {
                     <input
                       id="checkin-passport-expiry"
                       type="date"
-                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      className={`w-full rounded-lg border ${passportExpiryError ? "border-red-500" : "border-border-subtle"} px-4 py-2.5 text-sm focus:outline-none focus:ring-2 ${passportExpiryError ? "focus:ring-red-500" : "focus:ring-brand-primary"} bg-white`}
                       value={passportExpiryDate}
                       onChange={(e) => setPassportExpiryDate(e.target.value)}
                     />
+                    {passportExpiryError && (
+                      <p
+                        data-testid="checkin-passport-expiry-error"
+                        role="alert"
+                        className="mt-1 text-xs text-red-600 font-medium"
+                      >
+                        {passportExpiryError}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="checkin-dob" className="block text-sm font-medium text-text-primary mb-1">
@@ -1133,10 +1365,19 @@ export default function SelfCheckIn() {
                     <input
                       id="checkin-visa-expiry"
                       type="date"
-                      className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary bg-white"
+                      className={`w-full rounded-lg border ${visaExpiryError ? "border-red-500" : "border-border-subtle"} px-4 py-2.5 text-sm focus:outline-none focus:ring-2 ${visaExpiryError ? "focus:ring-red-500" : "focus:ring-brand-primary"} bg-white`}
                       value={visaExpiryDate}
                       onChange={(e) => setVisaExpiryDate(e.target.value)}
                     />
+                    {visaExpiryError && (
+                      <p
+                        data-testid="checkin-visa-expiry-error"
+                        role="alert"
+                        className="mt-1 text-xs text-red-600 font-medium"
+                      >
+                        {visaExpiryError}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label htmlFor="checkin-oci-number" className="block text-sm font-medium text-text-primary mb-1">
@@ -1521,7 +1762,7 @@ export default function SelfCheckIn() {
             </div>
 
             {error && (
-              <p id="checkin-id-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
+              <p id="checkin-id-error" data-testid="checkin-id-error" role="alert" className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 mb-4">{error}</p>
             )}
 
             <label className="flex items-start gap-3 cursor-pointer mb-5">
@@ -1682,9 +1923,7 @@ export default function SelfCheckIn() {
             )}
 
             <div className="rounded-xl bg-bg-page border border-border-subtle p-4 text-left text-sm mb-6">
-              {details.wifiName && <InfoRow label="WiFi" value={details.wifiName} />}
-              {details.wifiPassword && <InfoRow label="WiFi password" value={details.wifiPassword} />}
-              {details.doorCode && <InfoRow label="Door code" value={details.doorCode} />}
+              <StayAccessBlock wifiName={details.wifiName} wifiPass={details.wifiPassword} doorCode={details.doorCode} />
               {details.emergencyContactPhone && <InfoRow label="Emergency contact" value={details.emergencyContactPhone} />}
             </div>
 
@@ -1704,15 +1943,48 @@ export default function SelfCheckIn() {
               />
             </div>
 
-            <a
-              href="/"
-              className="inline-block rounded-xl border border-border-subtle px-6 py-3 text-sm font-medium text-text-primary hover:border-brand-primary transition"
-            >
-              Back to homepage
-            </a>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setStep("summary")}
+                data-testid="update-guest-details-btn"
+                className="inline-block rounded-xl border border-border-subtle px-6 py-3 text-sm font-medium text-text-primary hover:border-brand-primary transition"
+              >
+                Update Guest Details
+              </button>
+              <a
+                href="/"
+                className="inline-block rounded-xl border border-border-subtle px-6 py-3 text-sm font-medium text-text-primary hover:border-brand-primary transition"
+              >
+                Back to homepage
+              </a>
+            </div>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** GUEST-039: Wi-Fi + door code with 1-tap Copy, and a scan-to-connect Wi-Fi QR. Renders nothing when there is nothing to show. */
+function StayAccessBlock({ wifiName, wifiPass, doorCode }: { wifiName?: string | null; wifiPass?: string | null; doorCode?: string | null }) {
+  if (!wifiName && !wifiPass && !doorCode) return null;
+  return (
+    <div className="mb-5" data-testid="stay-access-block">
+      {wifiName && <CopyableInfoRow label="WiFi" value={wifiName} copyAriaLabel="Copy Wi-Fi network name" copyTestId="copy-wifi-name-btn" />}
+      {wifiPass && <CopyableInfoRow label="WiFi password" value={wifiPass} mono copyAriaLabel="Copy Wi-Fi password" copyTestId="copy-wifi-password-btn" />}
+      {wifiName && <WifiScanToConnect ssid={wifiName} passphrase={wifiPass} />}
+      {doorCode && (
+        <CopyableInfoRow
+          label="Door code"
+          value={doorCode}
+          mono
+          copyLabel="Copy Code"
+          copyAriaLabel="Copy door code"
+          copyTestId="copy-door-code-btn"
+          valueTestId="door-code-value"
+        />
+      )}
     </div>
   );
 }

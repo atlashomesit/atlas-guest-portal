@@ -5,6 +5,8 @@ import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantListingAddress, getTenantOverrides } from "../tenant/tenantOverrides";
 import { useLocation, useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
+import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
+import GuestDepositHoldCard, { type GuestDepositHold } from "@/components/stay/GuestDepositHoldCard"; // PAY-006
 import SEO from "../components/SEO";
 import WeatherWidget from "../components/WeatherWidget";
 import ErrorDisplay, { type ErrorResponse as ApiErrorResponse, type RecoveryAction as ApiRecoveryAction } from "../components/ErrorDisplay";
@@ -228,6 +230,8 @@ interface BookingSummary {
   mealPreferences?: GuestMealPreferences | null;
   /** PAY-009: refunds on this booking (newest first); empty/absent = no tracker. */
   refunds?: GuestRefund[];
+  /** PAY-006: the refundable security-deposit card hold on this booking (status, amount, expiry); absent = no hold, no card. */
+  depositHold?: GuestDepositHold | null;
   /** PAY-010: the guest said they paid the host's UPI link / QR; the host has not confirmed yet. NOT paid. */
   awaitingHostPaymentConfirmation?: boolean;
   /** TASK-1296: guest referral code (e.g. FRIEND42) for the WhatsApp share button. */
@@ -239,6 +243,8 @@ interface BookingSummary {
   propertyLongitude?: number;
   /** TASK-1254: Booking reference for self check-in flow (ExternalReservationId or ATL-{id} fallback). */
   bookingRef?: string;
+  /** GUEST-053: Assigned smart-lock door code & key access on Stay Hub upon check-in completion. */
+  doorCode?: string | null;
   /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
   preferredLanguage?: string | null;
   // TASK-4510: Digital Guest Guidebook
@@ -369,6 +375,12 @@ export default function BookingConfirmationPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
   const [copyRefManual, setCopyRefManual] = useState(false);
+  const [doorCodeCopied, setDoorCodeCopied] = useState(false);
+  const copyDoorCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+  }, []);
   const [shareLanguage, setShareLanguage] = useState<"en" | "hi" | "te">("en");
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "success" | "failed">("pending");
   const [paymentFailureReason, setPaymentFailureReason] = useState<string | null>(null);
@@ -776,13 +788,17 @@ export default function BookingConfirmationPage() {
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
   const whatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${whatsappText}` : "";
   // GUEST-026: Direct pre-filled WhatsApp link with booking reference and guest name
+  const isPendingBooking = booking.status === "Pending";
   const messageHostWhatsappText = encodeURIComponent(
-    `Hi, I have a confirmed booking (#${booking.bookingId})${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Looking forward to my stay!`
+    isPendingBooking
+      ? `Hi, I have a question about booking #${booking.bookingId}${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Its current status is Pending. Please help me check the booking status.`
+      : `Hi, I have a confirmed booking (#${booking.bookingId})${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Looking forward to my stay!`
   );
   const messageHostWhatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${messageHostWhatsappText}` : "";
   // GUEST-031/GUEST-030: canonical check-in deep-link, carries the booking token.
-  const hubCheckinPath = booking.bookingRef && (token || booking.status === "Confirmed" || booking.status === "CheckedIn")
-    ? `/check-in/${encodeURIComponent(booking.bookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ""}`
+  const effectiveBookingRef = booking.bookingRef || (booking.bookingId ? `ATL-${booking.bookingId}` : "");
+  const hubCheckinPath = effectiveBookingRef && (token || booking.status === "Confirmed" || booking.status === "CheckedIn")
+    ? `/check-in/${encodeURIComponent(effectiveBookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ""}`
     : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
@@ -844,6 +860,38 @@ export default function BookingConfirmationPage() {
       gstInvoiceNumber: booking.gstInvoiceNumber ?? null,
     };
     openPrintableHtml(buildReceiptHtml(args));
+  }
+
+  // GUEST-053: copy door code with 1-tap and clipboard fallback
+  async function handleCopyDoorCode() {
+    if (!booking?.doorCode) return;
+    try {
+      await navigator.clipboard.writeText(booking.doorCode);
+      setDoorCodeCopied(true);
+      if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+      copyDoorCodeTimerRef.current = setTimeout(() => setDoorCodeCopied(false), 2000);
+      return;
+    } catch {
+      /* fallback */
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = booking.doorCode;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) {
+        setDoorCodeCopied(true);
+        if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+        copyDoorCodeTimerRef.current = setTimeout(() => setDoorCodeCopied(false), 2000);
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   // TASK-102057: open a printable Stay Guide (check-in, WiFi, directions, host contacts).
@@ -1257,15 +1305,61 @@ export default function BookingConfirmationPage() {
                 Check in online, save your stay to your calendar, message your host and print your stay guide.
               </p>
             </div>
+            {/* GUEST-053: Display assigned smart-lock door code & key access on Stay Hub upon check-in completion */}
+            {booking.doorCode && (
+              <div
+                data-testid="access-door-code-card"
+                className="rounded-xl border border-border-subtle bg-bg-surface p-4 shadow-sm space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg" aria-hidden="true">🔑</span>
+                    <h3 className="text-sm font-semibold text-text-primary">Access &amp; Door Code</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyDoorCode}
+                    data-testid="copy-door-code-btn"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle bg-bg-page px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-bg-surface transition-colors"
+                  >
+                    {doorCodeCopied ? "✓ Copied!" : "Copy Code"}
+                  </button>
+                </div>
+                <div className="flex items-baseline gap-3 bg-bg-page rounded-lg p-3 border border-border-subtle">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Door Code:</span>
+                  <span className="text-xl font-mono font-bold tracking-widest text-text-primary" data-testid="door-code-value">
+                    {booking.doorCode}
+                  </span>
+                  {doorCodeCopied && (
+                    <span className="text-xs text-emerald-600 font-medium ml-auto" data-testid="door-code-copied-confirmation">
+                      Copied to clipboard
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-text-secondary leading-relaxed space-y-1" data-testid="door-lock-instructions">
+                  <p>Enter this code on the smart lock keypad to unlock.</p>
+                  {booking.checkinInstructions && (
+                    <p>{booking.checkinInstructions}</p>
+                  )}
+                </div>
+              </div>
+            )}
             {hubCheckinPath && (
               <Link
                 to={hubCheckinPath}
                 data-testid="stay-hub-checkin"
                 className="flex items-center justify-between gap-4 rounded-xl bg-brand-primary text-white px-4 py-3.5 hover:bg-brand-primary/90 transition-colors"
               >
-                <span className="text-sm font-semibold">Complete Web Check-In &amp; Get Door Code</span>
+                <span className="text-sm font-semibold">
+                  {booking.doorCode ? "✓ Checked In — View Door & Key Access" : "Complete Web Check-In"}
+                </span>
                 <span className="shrink-0 text-lg" aria-hidden>→</span>
               </Link>
+            )}
+            {hasWhatsAppContact && isPendingBooking && (
+              <p className="text-xs leading-relaxed my-2 text-text-secondary" data-testid="stay-hub-whatsapp-status">
+                Your message includes booking #{booking.bookingId} and its Pending status. Check the status with your host before treating this booking as confirmed.
+              </p>
             )}
             <div className="flex flex-wrap gap-2.5">
               {hasWhatsAppContact && (
@@ -1534,14 +1628,23 @@ export default function BookingConfirmationPage() {
           </Suspense>
         )}
 
+        {/* PAY-006: security-deposit card-hold status (Authorized / Captured / Released) with the bank-authorization countdown */}
+        {!isCancelled && <GuestDepositHoldCard hold={booking.depositHold} bookingId={booking.bookingId ?? bookingId ?? ''} token={token} />}
+
         {/* WiFi */}
         {!isCancelled && booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-3">📶 WiFi</h2>
             <div className="space-y-0">
-              {booking.wifiName && <InfoRow label="Network" value={booking.wifiName} />}
-              {booking.wifiPassword && <InfoRow label="Password" value={booking.wifiPassword} mono />}
+              {booking.wifiName && (
+                <CopyableInfoRow label="Network" value={booking.wifiName} copyAriaLabel="Copy Wi-Fi network name" copyTestId="copy-wifi-name-btn" />
+              )}
+              {booking.wifiPassword && (
+                <CopyableInfoRow label="Password" value={booking.wifiPassword} mono copyAriaLabel="Copy Wi-Fi password" copyTestId="copy-wifi-password-btn" />
+              )}
             </div>
+            {/* GUEST-039: standard WIFI: QR so a phone camera joins with one scan */}
+            {booking.wifiName && <WifiScanToConnect ssid={booking.wifiName} passphrase={booking.wifiPassword} />}
           </div>
         )}
 

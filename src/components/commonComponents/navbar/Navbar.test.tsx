@@ -74,6 +74,14 @@ describe("Navbar CTA", () => {
     expect(screen.getByRole('button', { name: /toggle navigation/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^Stays$/i })).toHaveAttribute('href', '/#our-homes');
   });
+  it("TASK-10299142: in marketplace mode Stays targets the grid anchor and keeps the active search dates", () => {
+    renderNavbar(["/search?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2"]);
+    expect(screen.getByRole("link", { name: /^Stays$/i })).toHaveAttribute(
+      "href",
+      "/?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2#our-homes",
+    );
+  });
+
   it("renders Help navigation as internal link (replaces Contact — Gap 1 simplification)", () => {
     renderNavbar();
 

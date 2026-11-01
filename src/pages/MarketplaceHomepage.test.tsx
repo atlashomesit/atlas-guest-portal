@@ -188,3 +188,33 @@ describe('MKT-020 marketplace map pin filtering & TASK-10298776 < 4★ rating gu
     expect(screen.getByText('Hyderabad Penthouse')).toBeInTheDocument();
   });
 });
+
+describe('TASK-10299142: the marketplace grid is the #our-homes anchor the header/footer Stays link targets', () => {
+  it('carries id="our-homes" and scrolls it into view when the URL names the anchor', async () => {
+    const scrolled: Element[] = [];
+    const proto = Element.prototype as unknown as { scrollIntoView?: unknown };
+    const original = proto.scrollIntoView;
+    proto.scrollIntoView = function scrollIntoView(this: Element) {
+      scrolled.push(this);
+    };
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
+    try {
+      render(
+        <MemoryRouter initialEntries={['/?brand=atlastays&checkIn=2026-12-10&checkOut=2026-12-12#our-homes']}>
+          <MarketplaceHomepage />
+        </MemoryRouter>,
+      );
+      await settle();
+
+      const grid = screen.getByTestId('marketplace-grid');
+      expect(grid).toHaveAttribute('id', 'our-homes');
+      expect(document.getElementById('our-homes')).toBe(grid);
+      expect(scrolled).toContain(grid);
+    } finally {
+      proto.scrollIntoView = original;
+    }
+  });
+});
