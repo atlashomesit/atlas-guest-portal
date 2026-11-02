@@ -37,6 +37,7 @@ function timeOf(createdAt: string): number {
  * Filter by exact star rating (when set), then sort: 'recent' = newest first,
  * 'highest' = rating desc with newest-first tie-break. Never mutates the input.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located pure filter/sort helper
 export function applyReviewFilterSort<T extends FilterSortableReview>(
   reviews: readonly T[],
   opts: { starFilter: ReviewStarFilter; sort: ReviewSortKey },

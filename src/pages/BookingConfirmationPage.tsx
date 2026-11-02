@@ -155,6 +155,7 @@ function buildBookingIcsContent(args: {
 /**
  * TASK-103121: Clean phone formatting with dial code / international format (+91 for India).
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located phone formatter
 export function formatCleanInternationalPhone(raw?: string | null): string {
   if (!raw) return "";
   const trimmed = raw.trim();
@@ -181,6 +182,7 @@ export function formatCleanInternationalPhone(raw?: string | null): string {
  * - Standard international format without +
  * - Prepends 91 for 10-digit Indian numbers
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located phone formatter
 export function cleanWaPhoneDigits(raw?: string | null): string {
   if (!raw) return "";
   const digits = raw.replace(/\D/g, "");

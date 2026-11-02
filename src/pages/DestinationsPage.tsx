@@ -57,6 +57,7 @@ async function fetchMarketplaceListings(signal: AbortSignal): Promise<Marketplac
 }
 
 /** Stays per city guide, counted with the guide's own keyword rule. A city with none is simply absent from the map. */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located count helper
 export function countStaysByCity(rows: readonly MarketplaceCityMatchCandidate[]): Partial<Record<CityLandingSlug, number>> {
   const counts: Partial<Record<CityLandingSlug, number>> = {};
   for (const city of CITY_DIRECTORY) {

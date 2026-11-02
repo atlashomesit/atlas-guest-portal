@@ -6,11 +6,13 @@ import React from "react";
 import { QRCodeSVG } from "qrcode.react";
 
 /** The characters the WIFI: QR format reserves are backslash-escaped, so a password like `a;b"c` still scans. */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located QR helper
 export function escapeWifiQrValue(value: string): string {
   return value.replace(/([\\;,:"])/g, "\\$1");
 }
 
 /** Standard `WIFI:S:<ssid>;T:WPA;P:<password>;;` payload that iOS Camera and Android scanners join with one tap. */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located QR helper
 export function buildWifiQrPayload(ssid: string, password?: string | null): string {
   const s = escapeWifiQrValue(ssid);
   if (!password) return `WIFI:S:${s};T:nopass;;`;

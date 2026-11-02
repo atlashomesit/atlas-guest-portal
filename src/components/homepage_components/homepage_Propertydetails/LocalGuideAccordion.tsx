@@ -26,6 +26,7 @@ export type LocalGuideCategory =
  * Entries without a trailing parenthesized hint (e.g. "Durgam Cheruvu Lake")
  * yield `distance: null` and the caller renders the name alone.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located parser helper
 export function parseNearPlace(raw: string): ParsedNearPlace {
   const trimmed = raw.trim();
   const match = trimmed.match(/^(.*?)\s*\(([^()]*)\)\s*$/);
@@ -93,6 +94,7 @@ const CATEGORY_ORDER: LocalGuideCategory[] = [
  * Presentational grouping of host/API-supplied place names by keyword — the
  * category labels are client-side buckets, not host declarations.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located categorizer helper
 export function categorizeNearPlace(name: string): LocalGuideCategory {
   const lowered = name.toLowerCase();
   for (const { category, keywords } of CATEGORY_KEYWORDS) {
@@ -109,6 +111,7 @@ export interface LocalGuideGroup {
 }
 
 /** Group non-blank entries, preserving source order within each category. */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located grouping helper
 export function groupNearPlaces(places: readonly string[]): LocalGuideGroup[] {
   const parsed = places
     .filter((entry) => typeof entry === "string" && entry.trim().length > 0)

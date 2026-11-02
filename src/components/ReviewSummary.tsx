@@ -53,6 +53,7 @@ const SENTIMENT_STYLES: Record<string, { bg: string; text: string; emoji: string
 
 const reviewSummaryCache = new Map<number, { promise: Promise<ReviewSummaryData | null>; expiresAt: number }>();
 
+// eslint-disable-next-line react-refresh/only-export-components -- test cache reset helper co-located with component
 export function _clearReviewSummaryCacheForTests(): void {
   reviewSummaryCache.clear();
 }
