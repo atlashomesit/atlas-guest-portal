@@ -43,33 +43,6 @@ export default function FavoritesPage() {
   // Reset typed addresses, progress and success immediately at an account/tenant boundary.
   const reminderScope = JSON.stringify([reminderTenant, auth.isAuthenticated, auth.guestId, knownEmail.toLowerCase()]);
 
-  const loadListings = React.useCallback(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchPublicListings()
-      .then((list) => {
-        if (!cancelled) {
-          setAll(list);
-          // TASK-4010: Check if API is available by attempting a non-critical fetch
-          checkApiAvailability();
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setAll([]);
-          console.error("Favorites listings load failed:", err);
-          setError("We couldn't load saved homes right now. Please try again.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // TASK-4010: Check if SavedListingsController API is available (TASK-4526: only count as synced if GET works)
   const checkApiAvailability = React.useCallback(async () => {
     try {
@@ -88,6 +61,33 @@ export default function FavoritesPage() {
       setSyncStatus("local");
     }
   }, []);
+
+  const loadListings = React.useCallback(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchPublicListings()
+      .then((list) => {
+        if (!cancelled) {
+          setAll(list);
+          // TASK-4010: Check if API is available by attempting a non-critical fetch
+          void checkApiAvailability();
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setAll([]);
+          console.error("Favorites listings load failed:", err);
+          setError("We couldn't load saved homes right now. Please try again.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [checkApiAvailability]);
 
   useEffect(() => loadListings(), [loadListings]);
 

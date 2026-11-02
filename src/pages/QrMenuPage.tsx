@@ -649,7 +649,7 @@ export default function QrMenuPage() {
   };
 
   // Filter items
-  const allCategories = menu?.categories || [];
+  const allCategories = useMemo(() => menu?.categories ?? [], [menu?.categories]);
   const isKnownInvalidCode = verificationCode.trim() === "0000";
   const showVerificationWarning = isKnownInvalidCode || Boolean(verificationError);
   const visibleCategories = useMemo(() => {

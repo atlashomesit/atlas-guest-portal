@@ -19,8 +19,8 @@ import { clampTransformWidth, isAllowedBlobImageUrl } from "./functions/_lib/gue
 // index.html's script tag is simply ignored, not a real credential).
 const devCspNonce = randomBytes(16).toString("base64");
 
-const RUNTIME_CONFIG_PATH = path.resolve(__dirname, "public/.well-known/atlas-runtime-config.json");
-const MANIFEST_PATH = path.resolve(__dirname, "public/manifest.webmanifest");
+const RUNTIME_CONFIG_PATH = path.resolve(import.meta.dirname, "public/.well-known/atlas-runtime-config.json");
+const MANIFEST_PATH = path.resolve(import.meta.dirname, "public/manifest.webmanifest");
 // Dev-server backend target for the vite proxy + dev runtime-config plugin.
 // Resolved, in order: (1) VITE_API_PROXY_TARGET env (explicit override), then
 // (2) the apiBaseUrl already written into atlas-runtime-config.json — non-default
@@ -166,7 +166,7 @@ export default defineConfig({
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
     dedupe: ["react", "react-dom", "react-router", "react-router-dom"],
   },
