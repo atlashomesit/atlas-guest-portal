@@ -17,6 +17,7 @@ const PLACEHOLDER_CLASS =
  * Blob URLs are rewritten through `/img` (see `buildGuestImageSrcSet`) rather than this
  * query-param builder. Only emit decorative ?w= srcset for origins that honour it.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located srcset helper
 export function shouldBuildResponsiveSrcSet(src: string): boolean {
   try {
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
@@ -31,6 +32,7 @@ export function shouldBuildResponsiveSrcSet(src: string): boolean {
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located srcset helper
 export const buildResponsiveSrcSet = (src: string, widths: number[] = RESPONSIVE_WIDTHS) => {
   try {
     if (!shouldBuildResponsiveSrcSet(src)) return undefined;

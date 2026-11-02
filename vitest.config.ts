@@ -105,7 +105,7 @@ const testFiles = ["src", "tests", "functions", "eslint-rules"]
   .flatMap((d) => {
     let entries: unknown[];
     try {
-      entries = readdirSync(path.resolve(__dirname, d), { recursive: true });
+      entries = readdirSync(path.resolve(import.meta.dirname, d), { recursive: true });
     } catch {
       return []; // scan root absent — same as globSync matching nothing
     }
@@ -137,7 +137,7 @@ const TZ_EAST_ZONE = "Asia/Tokyo"; // +09:00
 
 const usesModuleMocks = new Set(
   testFiles.filter((f) =>
-    /\bvi\.(mock|doMock)\(/.test(readFileSync(path.resolve(__dirname, f), "utf8"))
+    /\bvi\.(mock|doMock)\(/.test(readFileSync(path.resolve(import.meta.dirname, f), "utf8"))
   )
 );
 const tzEastFiles = testFiles.filter((f) => TZ_EAST_RE.test(f));
@@ -222,14 +222,14 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      vitest: path.resolve(__dirname, "node_modules/vitest"),
-      react: path.resolve(__dirname, "node_modules/react"),
-      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
-      "react-router-dom": path.resolve(__dirname, "node_modules/react-router-dom"),
-      "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime.js"),
-      "react-router-dom/node_modules/react": path.resolve(__dirname, "node_modules/react"),
-      "react-router-dom/node_modules/react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      "@": path.resolve(import.meta.dirname, "./src"),
+      vitest: path.resolve(import.meta.dirname, "node_modules/vitest"),
+      react: path.resolve(import.meta.dirname, "node_modules/react"),
+      "react-dom": path.resolve(import.meta.dirname, "node_modules/react-dom"),
+      "react-router-dom": path.resolve(import.meta.dirname, "node_modules/react-router-dom"),
+      "react/jsx-runtime": path.resolve(import.meta.dirname, "node_modules/react/jsx-runtime.js"),
+      "react-router-dom/node_modules/react": path.resolve(import.meta.dirname, "node_modules/react"),
+      "react-router-dom/node_modules/react-dom": path.resolve(import.meta.dirname, "node_modules/react-dom"),
     },
     dedupe: ["react", "react-dom", "react-router-dom"],
   },

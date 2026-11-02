@@ -136,6 +136,7 @@ const PRESETS: Preset[] = [
 ];
 
 // TASK-4847: exported so the preset date-math can be unit-tested (pure function, no DOM).
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported for unit tests
 export function computePreset(id: string, today: Date): { startDate: Date; endDate: Date } | null {
   const dow = today.getDay(); // 0=Sun…6=Sat
   if (id === 'tonight') {

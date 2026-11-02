@@ -716,6 +716,38 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => window.removeEventListener('atlas:set-checkin', handleAvailabilityDateSelect);
   }, []);
 
+  // Helper function to check if a date range has interior-night overlaps with blocked/hold dates.
+  // Used by URL hydration, handleRangeChange, and handleReserve to ensure consistent validation.
+  const checkInteriorNightOverlap = useCallback(
+    (startDate: Date, endDate: Date): boolean => {
+      const start = startOfCalendarDay(startDate);
+      const end = startOfCalendarDay(endDate);
+
+      let cursor = start;
+      while (cursor.getTime() < end.getTime()) {
+        const dayISO = toCalendarISO(cursor);
+        const status = dateStatusMap.get(dayISO);
+        // TASK-7491: a no-usable-rate NIGHT blocks the range exactly like a Blocked/Hold night —
+        // fail closed on price. The checkout date itself is exclusive (this loop stops BEFORE
+        // endIST), so a no-usable-rate checkout day alone does not block the range, matching the
+        // same "guest is never charged for the checkout night" semantics as the Blocked/Hold case.
+        if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold' || dateBookabilityMap.get(dayISO) === false) {
+          return true;
+        }
+        // TASK-4628: re-normalize each step so the iterated dayISO can never drift off the civil
+        // day and MISS an occupied night — the divergence behind the E13 overlap-block message
+        // firing locally but not on remote dev. On the calendar basis `addDays` already preserves
+        // local midnight across a DST boundary; `startOfCalendarDay` keeps that guarantee explicit
+        // and keeps these per-night ISOs in lockstep with the calendar's own block rendering.
+        cursor = startOfCalendarDay(addDays(cursor, 1));
+      }
+      return false;
+    },
+    [blockedSet, dateStatusMap, dateBookabilityMap],
+  );
+  const checkInteriorNightOverlapRef = useRef(checkInteriorNightOverlap);
+  checkInteriorNightOverlapRef.current = checkInteriorNightOverlap;
+
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
   // TASK-2630: Ensure AtlasBookingCalendar displays URL-param dates, not today+1/today+2 defaults
   // TASK-4293: `listingId` is a dep so this re-runs after PropertyDetails resolves the listing
@@ -755,7 +787,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     // effect very likely fires before the availability-calendar GET resolves, so blockedSet/
     // dateStatusMap can still be empty here — see the hydratedRangeRef re-validation effect
     // below, which catches an overlap that only becomes visible once that fetch settles.
-    if (checkInteriorNightOverlap(start, end)) {
+    if (checkInteriorNightOverlapRef.current(start, end)) {
       setDateRange({ startDate: start, endDate: end });
       setDateConflictError('These dates overlap an existing booking or hold.');
       hasHydratedFromContextRef.current = true;
@@ -765,7 +797,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
     hydratedRangeRef.current = { start, end };
-  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights, getEffectiveMinStayForDate]);
+  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights, getEffectiveMinStayForDate, setDateConflictError, setDateError]);
 
   // TASK-4726 fix: re-validate a URL-hydrated range against interior-night overlaps once the
   // availability-calendar fetch (blockedSet/dateStatusMap) has actually loaded. The hydration
@@ -797,7 +829,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     } else if (dateError?.startsWith('Minimum stay is ')) {
       setDateError(null);
     }
-  }, [blockedSet, dateStatusMap, perDateMinStayMap, dateRange.startDate, dateRange.endDate, getEffectiveMinStayForDate, dateError, setDateError, setDateConflictError]);
+  }, [blockedSet, dateStatusMap, perDateMinStayMap, dateRange.startDate, dateRange.endDate, checkInteriorNightOverlap, getEffectiveMinStayForDate, dateError, setDateError, setDateConflictError]);
 
   useEffect(() => {
     const g = booking.guests;
@@ -952,7 +984,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       isActive = false;
     };
     // availabilityRange is memoized and stable; rely on lastAvailabilityKeyRef deduplication for same requests
-  }, [listingId, isBookingDisabled, availabilityRange, today, availabilityRefreshNonce]);
+  }, [listingId, isBookingDisabled, availabilityRange, today, availabilityRefreshNonce, verifiedTenantSlug]);
 
   // TASK-4830: manual retry after an availability-fetch failure. Clear the dedup key (the fetch
   // effect early-returns while lastAvailabilityKeyRef still holds this URL) and bump the nonce so
@@ -1329,33 +1361,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   return true; // disable blocked/hold dates otherwise (including as a check-in candidate)
 }, [blockedSet, dateStatusMap, dateBookabilityMap, today, dateRange.startDate]);
-
-// Helper function to check if a date range has interior-night overlaps with blocked/hold dates.
-// Used by URL hydration, handleRangeChange, and handleReserve to ensure consistent validation.
-const checkInteriorNightOverlap = (startDate: Date, endDate: Date): boolean => {
-  const start = startOfCalendarDay(startDate);
-  const end = startOfCalendarDay(endDate);
-
-  let cursor = start;
-  while (cursor.getTime() < end.getTime()) {
-    const dayISO = toCalendarISO(cursor);
-    const status = dateStatusMap.get(dayISO);
-    // TASK-7491: a no-usable-rate NIGHT blocks the range exactly like a Blocked/Hold night —
-    // fail closed on price. The checkout date itself is exclusive (this loop stops BEFORE
-    // endIST), so a no-usable-rate checkout day alone does not block the range, matching the
-    // same "guest is never charged for the checkout night" semantics as the Blocked/Hold case.
-    if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold' || dateBookabilityMap.get(dayISO) === false) {
-      return true;
-    }
-    // TASK-4628: re-normalize each step so the iterated dayISO can never drift off the civil
-    // day and MISS an occupied night — the divergence behind the E13 overlap-block message
-    // firing locally but not on remote dev. On the calendar basis `addDays` already preserves
-    // local midnight across a DST boundary; `startOfCalendarDay` keeps that guarantee explicit
-    // and keeps these per-night ISOs in lockstep with the calendar's own block rendering.
-    cursor = startOfCalendarDay(addDays(cursor, 1));
-  }
-  return false;
-};
 
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateError(null);
@@ -2170,6 +2175,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     selectedRatePlanId, selectedRatePlan, effectiveRatePlanCancellationTier, isSelectedRatePlanNonRefundable,
     isDorm, dormBedsLeft, dormGenderPolicy,
     securityDepositAmount, publicRatePlans, cancellationTrustText,
+    breakfastExtraLineAmount, breakfastPricePerPerson, checkInteriorNightOverlap,
+    cleaningFeeLineAmount, getEffectiveMinStayForDate, includeBreakfast,
+    listingLookupFailed, setDateConflictError, setDateError,
   ]);
 
   // Hand-off link for the Reserve 422 above. Derived at render, not captured in handleReserve, so it

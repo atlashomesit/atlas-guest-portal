@@ -13,6 +13,7 @@ import { Info } from 'lucide-react';
  * covers. NEVER invent host-specific policy amounts or rules — amounts shown
  * in the breakdown come from the server; the tip only explains the concept.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located fee copy map
 export const FEE_INFO_COPY = {
   cleaning:
     'One-time charge for professional cleaning of the unit before your check-in. Set by the host and varies by unit — it is not a per-night charge.',
