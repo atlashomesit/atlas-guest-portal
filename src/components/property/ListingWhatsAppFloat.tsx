@@ -37,6 +37,7 @@ function normalizePhoneDigits(raw: string): string {
  * Builds the wa.me link with the URL-encoded pre-filled room query.
  * Returns "" when no host number is available — callers must render nothing in that case.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located URL builder
 export function buildListingWhatsAppUrl(
   phoneDigits: string,
   listingName: string,

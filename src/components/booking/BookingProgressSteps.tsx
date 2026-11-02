@@ -8,7 +8,7 @@
  */
 import React from "react";
 
-export const BOOKING_STEPS = ["Dates & Guests", "Guest Info", "Review", "Payment"] as const;
+const BOOKING_STEPS = ["Dates & Guests", "Guest Info", "Review", "Payment"] as const;
 
 interface BookingProgressStepsProps {
   /** 1-based index of the current step. Clamped to 1..4. */

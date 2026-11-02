@@ -39,6 +39,7 @@ function formatMealPlan(label?: string | null, code?: string | null): string | n
  * or generic system default ("Atlas101 . Double", "Standard Rate", "Default", "BAR", etc.)
  * that must never be shown to a guest.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located rate plan helper
 export function isInternalOrDefaultRatePlanName(name?: string | null): boolean {
   if (!name || !name.trim()) return true;
   const trimmed = name.trim();

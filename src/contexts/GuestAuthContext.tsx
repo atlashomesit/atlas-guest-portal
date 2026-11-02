@@ -119,6 +119,7 @@ export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   return <GuestAuthContext.Provider value={value}>{children}</GuestAuthContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with provider
 export const useGuestAuth = (): GuestAuthContextValue => {
   const context = useContext(GuestAuthContext);
   if (!context) {

@@ -93,6 +93,7 @@ const CTA_DARK = '#111827';
 const CTA_DARK_LUM = luminanceFromRgb(0x11, 0x18, 0x27); // 0.00918
 const CTA_WHITE_LUM = 1.0;
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located contrast helper
 export function readableCtaText(background: string): string {
   const channels = parseHexChannels(background);
   if (!channels) return 'var(--text-on-cta, #ffffff)';
@@ -108,6 +109,7 @@ export function readableCtaText(background: string): string {
 // toward black (for white text) or toward white (for dark text) in 1% steps and return the
 // first hex that clears 4.5 with its optimal text colour. The step granularity keeps the
 // shift minimal and hue largely intact.
+// eslint-disable-next-line react-refresh/only-export-components -- co-located contrast helper
 export function clampedBrandColor(background: string): string {
   const channels = parseHexChannels(background);
   if (!channels) return background;
@@ -141,6 +143,7 @@ export function clampedBrandColor(background: string): string {
   return background;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located contrast helper
 export function ctaStyle(background: string): { background: string; color: string } {
   const bg = clampedBrandColor(background);
   return { background: bg, color: readableCtaText(bg) };
@@ -152,7 +155,7 @@ export function ctaStyle(background: string): { background: string; color: strin
 // threading a focus ref through four separately-defined sub-components, a single persistent
 // (never unmounted) status region reports each transition in words; only its TEXT changes,
 // which is the reliable way to get assistive tech to actually announce it.
-export function stepAnnouncementText(step: Step, listingCount: number): string {
+function stepAnnouncementText(step: Step, listingCount: number): string {
   switch (step) {
     case 'select': return listingCount > 1 ? 'Choose a stay' : 'Loading stay details';
     case 'dates': return 'Choose your dates and number of guests';

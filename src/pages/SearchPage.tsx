@@ -68,6 +68,7 @@ function deleteGuestBreakdown(params: URLSearchParams) {
 }
 
 import { appendQuerySuffix } from "../utils/navigation";
+// eslint-disable-next-line react-refresh/only-export-components -- re-export for backwards compatibility
 export { appendQuerySuffix };
 
 type NormalizedListing = {

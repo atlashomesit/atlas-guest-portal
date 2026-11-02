@@ -55,7 +55,7 @@ export const STICKY_BAR_BOOKING_FORM_SELECTOR = '[data-testid="guest-booking-for
  * Clicking one sets `openCalendar` on the widget, which renders AtlasBookingCalendar —
  * a fixed bottom sheet on narrow viewports. No second picker is built here.
  */
-export const DATE_SHEET_TRIGGER_SELECTORS = [
+const DATE_SHEET_TRIGGER_SELECTORS = [
   "#unit-booking-dates",
   '[aria-label="Select check-in date"]',
 ] as const;
@@ -65,6 +65,7 @@ export const DATE_SHEET_TRIGGER_SELECTORS = [
  * AtlasBookingCalendar bottom sheet. Returns true when a trigger was found and
  * clicked, false when the caller should fall back (e.g. scroll to the form).
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located sheet trigger helper
 export function tryOpenPropertyDateSheet(doc: Document = document): boolean {
   for (const selector of DATE_SHEET_TRIGGER_SELECTORS) {
     const trigger = doc.querySelector(selector) as HTMLElement | null;

@@ -2,7 +2,7 @@ import React from 'react';
 import HostelDormBadge, { formatBedType } from './HostelDormBadge';
 import { type DormGenderPolicy } from '@/utils/dormListing';
 
-export const DORM_GENDER_FILTERS = ['All', 'Mixed Dorm', 'Female Only', 'Male Only'] as const;
+const DORM_GENDER_FILTERS = ['All', 'Mixed Dorm', 'Female Only', 'Male Only'] as const;
 export type DormGenderFilter = (typeof DORM_GENDER_FILTERS)[number];
 
 export interface DormBedOption {

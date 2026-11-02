@@ -24,6 +24,7 @@ export interface ParentChildCrossSellBannerProps {
 }
 
 /** CLU-011: role/type come from the API payload only - never guessed from the listing name. */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located cluster helper
 export function isParentListing(listing: {
   isParentCluster?: boolean;
   clusterRole?: string | null;
@@ -37,6 +38,7 @@ export function isParentListing(listing: {
 }
 
 /** `/homes/{propertySlug}/{childId}?checkIn=yyyy-MM-dd&checkOut=yyyy-MM-dd` (dates optional). */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located cluster helper
 export function buildChildRoomHref(
   propertySlug: string | undefined,
   childId: number,
