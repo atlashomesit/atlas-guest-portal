@@ -838,7 +838,7 @@ const PropertyDetails = () => {
         return () => {
             controller.abort();
         };
-    }, [listingIdParam, data?.listingId]);
+    }, [listingIdParam, data?.listingId, tenantSlugFromUrl]);
 
     // Public /listings only Includes cover + SortOrder==1, so catalog property_img is incomplete.
     // Hydrate full photoUrls from GET /listings/{id} once per listing for "View gallery".
@@ -1362,7 +1362,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, apiProperties, location.state]);
+    }, [propertySlug, listingIdParam, listingId, apiProperties, location.state, tenantSlugFromUrl]);
 useEffect(() => {
   if (!data?.id) return;
 
