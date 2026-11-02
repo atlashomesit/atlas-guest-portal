@@ -66,6 +66,17 @@ export function acceptablePropertySlugs(item: PropertySlugCandidate): string[] {
     slugs.add(normalizeSlug(getPropertySlug({ property_name: source, name: source, id: item.id ?? undefined })));
   }
 
+  // TASK-10299259: Legacy saved searches / bundled fallback (`propertyData.ts`) used "Room 101".."Room 302"
+  // (`/homes/room-301/5`), while the API serves raw SKU `Atlas301` (`displayName: "Studio 301"`).
+  // Accept `room-<NNN>` when the listing's SKU is `Atlas<NNN>`.
+  for (const source of [item.property_name, item.propertyName]) {
+    if (typeof source !== 'string') continue;
+    const atlasMatch = source.trim().match(/^atlas[-_\s]*(\d{3})\b/i);
+    if (atlasMatch) {
+      slugs.add(`room-${atlasMatch[1]}`);
+    }
+  }
+
   return Array.from(slugs).filter(Boolean);
 }
 

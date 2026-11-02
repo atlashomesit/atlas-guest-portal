@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { alignPromotionLabelPercent, allInTotalLabel, directPriceDisplay, directSavingsLabel } from './directBookingPrice';
+import {
+  alignPromotionLabelPercent,
+  allInTotalLabel,
+  directPriceDisplay,
+  directSavingsLabel,
+  plainMealLabel,
+} from './directBookingPrice';
 
 // Founder ruling 2026-10-21. Numbers are the live Penthouse 501 quote measured on prod that day
 // (2 Nov, 1 night): baseAmount 5998, discountAmount 1499.5 (25%), finalAmount 4633.46 (incl. 3% fee).
@@ -111,5 +117,48 @@ describe('promotion label percent equals the real saving (TASK-10299258)', () =>
     expect(d?.savingsPercent).toBe(8);
     expect(d?.appliedPromotionLabel).toBe('Direct Booking Special (8% off)');
     expect(d?.appliedPromotionLabel).toContain(`${d?.savingsPercent}% off`);
+  });
+
+  it('aligns bare percentage promo labels and stacked-discount quotes (last-minute + direct booking)', () => {
+    expect(alignPromotionLabelPercent('Last-Minute 25% off', 3785, 3560)).toBe('Last-Minute 6% off');
+    expect(alignPromotionLabelPercent('Early Bird 20% off', 5000, 4000)).toBe('Early Bird 20% off');
+    expect(alignPromotionLabelPercent('Early Bird 20% off', 5000, 5000)).toBe('Early Bird');
+
+    // Stacked quote: originalNightlyRate 3785 before last-minute rule, post-rule baseAmount 7120 (3560/night),
+    // plus additional floor-clamped discountAmount 160 -> net 6960 (3480/night) = 8% total saving vs 3785.
+    const stacked = directPriceDisplay({
+      baseAmount: 7120,
+      discountAmount: 160,
+      finalAmount: 7169,
+      nights: 2,
+      originalNightlyRate: 3785,
+      discountedNightlyRate: 3480,
+      appliedPromotionLabel: 'Last-Minute Deal (25% off)',
+    });
+    expect(stacked?.standardNightly).toBe(3785);
+    expect(stacked?.realNightly).toBe(3480);
+    expect(stacked?.savingsPercent).toBe(8);
+    expect(stacked?.appliedPromotionLabel).toBe('Last-Minute Deal (8% off)');
+  });
+});
+
+describe('plainMealLabel (TASK-10299260)', () => {
+  it('maps raw meal codes and API meal labels to plain guest wording', () => {
+    expect(plainMealLabel(null)).toBe('Room only, no meals');
+    expect(plainMealLabel('')).toBe('Room only, no meals');
+    expect(plainMealLabel('Room Only')).toBe('Room only, no meals');
+    expect(plainMealLabel('RO')).toBe('Room only, no meals');
+    expect(plainMealLabel('EP')).toBe('Room only, no meals');
+    expect(plainMealLabel('CP')).toBe('Breakfast included');
+    expect(plainMealLabel('BB')).toBe('Breakfast included');
+    expect(plainMealLabel('Breakfast Included')).toBe('Breakfast included');
+    expect(plainMealLabel('MAP')).toBe('Breakfast and dinner included');
+    expect(plainMealLabel('HB')).toBe('Breakfast and dinner included');
+    expect(plainMealLabel('Half Board (Breakfast & Dinner)')).toBe('Breakfast and dinner included');
+    expect(plainMealLabel('AP')).toBe('All meals included');
+    expect(plainMealLabel('FB')).toBe('All meals included');
+    expect(plainMealLabel('Full Board')).toBe('All meals included');
+    expect(plainMealLabel('AI')).toBe('All meals and drinks included');
+    expect(plainMealLabel('All Inclusive')).toBe('All meals and drinks included');
   });
 });

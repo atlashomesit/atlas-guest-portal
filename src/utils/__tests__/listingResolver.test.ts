@@ -174,4 +174,31 @@ describe('resolveListing', () => {
       expect.anything(),
     );
   });
+
+  it('TASK-10299259: resolves display-name and legacy room slugs (studio-302, room-301, atlas-homes-room-301) against raw Atlas SKU listings', async () => {
+    const publicCatalog = [
+      { id: 5, name: 'Atlas301', displayName: 'Studio 301', propertyId: 2 },
+      { id: 6, name: 'Atlas302', displayName: 'Studio 302', propertyId: 2 },
+    ];
+
+    fetchMock
+      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
+      .mockResolvedValueOnce(makeResponse({ ok: true, status: 200, json: async () => publicCatalog }));
+    const studio302 = await resolveListing('studio-302');
+    expect(studio302).toMatchObject({ id: 6, name: 'Atlas302' });
+
+    _resetDedupedJsonFetchForTests();
+    fetchMock
+      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
+      .mockResolvedValueOnce(makeResponse({ ok: true, status: 200, json: async () => publicCatalog }));
+    const room301 = await resolveListing('room-301');
+    expect(room301).toMatchObject({ id: 5, name: 'Atlas301' });
+
+    _resetDedupedJsonFetchForTests();
+    fetchMock
+      .mockResolvedValueOnce(makeResponse({ ok: false, status: 404 }))
+      .mockResolvedValueOnce(makeResponse({ ok: true, status: 200, json: async () => publicCatalog }));
+    const shortLink301 = await resolveListing('atlas-homes-room-301');
+    expect(shortLink301).toMatchObject({ id: 5, name: 'Atlas301' });
+  });
 });

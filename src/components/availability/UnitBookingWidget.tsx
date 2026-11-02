@@ -1878,7 +1878,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       datesUnavailable,
       // Founder ruling 2026-10-21 / TASK-10299208: never show an internal/OTA plan name ("Atlas501_PH . Double")
       // or raw meal code ("EP") to a guest. A label appears only when the guest actually chose between real options, in plain words.
-      ratePlanLabel: publicRatePlans.length > 1 ? plainMealLabel(selectedRatePlan?.mealPlanLabel) : null,
+      ratePlanLabel:
+        publicRatePlans.length > 1
+          ? plainMealLabel(selectedRatePlan?.mealPlanLabel || selectedRatePlan?.mealPlanCode)
+          : null,
       mealPlanCode: null,
       mealPlanLabel: null,
       hasMultipleRatePlans: publicRatePlans.length > 1,
@@ -2557,7 +2560,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       data-testid={`rate-plan-meal-badge-${plan.id}`}
                       style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}
                     >
-                      {plainMealLabel(plan.mealPlanLabel)}
+                      {plainMealLabel(plan.mealPlanLabel || plan.mealPlanCode)}
                     </div>
                     {plan.isAgentRate && (
                       <div

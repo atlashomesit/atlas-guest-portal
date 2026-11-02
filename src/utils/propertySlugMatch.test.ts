@@ -120,5 +120,11 @@ describe("TASK-10299259: all seven Atlas homes open from a marketplace link (raw
 
   it("a slug of another home still does not match (the guard is not switched off)", () => {
     expect(propertySlugMatchesListing("suite-202", asRecord(ATLAS_HOMES[0]))).toBe(false);
+    expect(propertySlugMatchesListing("room-301", asRecord(ATLAS_HOMES[0]))).toBe(false);
+  });
+
+  it("matches legacy saved-search 'room-<NNN>' slugs (e.g. /homes/room-301/5) to the matching Atlas home", () => {
+    const atlas301 = ATLAS_HOMES.find((h) => h.name === "Atlas301")!;
+    expect(propertySlugMatchesListing("room-301", asRecord(atlas301))).toBe(true);
   });
 });

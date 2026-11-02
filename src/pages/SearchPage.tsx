@@ -7,7 +7,7 @@ import { propertyData } from "../data";
 import { fetchPublicListings, resolveStaticMaxGuests, type PublicListing } from "../api/listingClient";
 import { getListingDisplayName } from "../lib/listingDisplayName";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
-import { allInTotalLabel, directSavingsLabel, type DirectPriceDisplay } from "../utils/directBookingPrice";
+import { alignPromotionLabelPercent, allInTotalLabel, directSavingsLabel, type DirectPriceDisplay } from "../utils/directBookingPrice";
 import { isGroupHome, isSmallParty, sizedForPartyFirst } from "../utils/smallParty";
 import { useMarketplaceCardPrices, type MarketplaceCardPriceItem } from "../hooks/useMarketplaceCardPrices";
 import { hasOnlinePaymentRail } from "../tenant/paymentRail";
@@ -2081,7 +2081,11 @@ const SearchPage = () => {
                               className="mb-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
                               data-testid="guest-listing-deal-badge"
                             >
-                              {dailyBreakdown.appliedPromotionLabel}
+                              {alignPromotionLabelPercent(
+                                dailyBreakdown.appliedPromotionLabel,
+                                dailyBreakdown.originalNightlyRate ?? dailyBreakdown.baseAmount,
+                                dailyBreakdown.actualPrice,
+                              )}
                             </span>
                           )}
                           <p className="text-xs" data-testid="guest-listing-direct-saving" style={{ margin: 0 }}>

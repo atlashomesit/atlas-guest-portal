@@ -410,4 +410,49 @@ describe('Wave 2 GuestDetailsPage bundle (TASK-1040087, GUEST-049, TASK-1040117 
     expect(screen.queryByTestId('checkout-original-nightly-rate')).not.toBeInTheDocument();
     expect(screen.queryByTestId('checkout-deal-badge')).not.toBeInTheDocument();
   });
+
+  it('TASK-10299258 & TASK-10299260: aligns floor-clamped promo badge percent and maps raw atlas101 slug/name to Studio 101 in checkout header & breadcrumb', async () => {
+    window.sessionStorage.setItem(
+      CHECKOUT_HOLD_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        holdListingId: 1,
+        holdPropertySlug: 'atlas101',
+        holdUnitSlug: '1',
+        holdTenantSlug: 'atlas',
+        holdListingName: 'Atlas101',
+        holdPriceBreakdown: {
+          baseAmount: 4600,
+          discountAmount: 0,
+          convenienceFeeAmount: 138,
+          finalAmount: 4738,
+          nights: 2,
+          currency: 'INR',
+          originalNightlyRate: 2500,
+          discountedNightlyRate: 2300,
+          appliedPromotionLabel: 'Direct Booking Special (25% off)',
+        },
+        checkIn: istInstantFromCalendarDate(new Date(2026, 9, 20)).toISOString(),
+        checkOut: istInstantFromCalendarDate(new Date(2026, 9, 22)).toISOString(),
+        guests: 2,
+      }),
+    );
+
+    const view = render(
+      <MemoryRouter initialEntries={['/book/atlas101/1/details']}>
+        <BookingProvider>
+          <GuestDetailsPage />
+        </BookingProvider>
+      </MemoryRouter>,
+    );
+
+    await settle();
+
+    // Real saving is (2500 - 2300) / 2500 = 8%, not 25%
+    expect(screen.getByTestId('checkout-deal-badge').textContent).toBe('Direct Booking Special (8% off)');
+    // Raw SKU "atlas101" / "Atlas101" is mapped to "Studio 101" with no duplicate "atlas101 · Studio 101"
+    expect(screen.getByTestId('booking-recap').textContent).toContain('Studio 101');
+    expect(view.container.textContent).not.toContain('Back to atlas101');
+    expect(view.container.textContent).toContain('Back to Studio 101');
+  });
 });

@@ -79,6 +79,7 @@ import { fetchListingById } from '@/api/listingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
 import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
+import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
 import { dormNeedsGenderAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
@@ -430,7 +431,7 @@ const GuestDetailsPage: React.FC = () => {
             if (l?.id && !isNaN(Number(l.id))) {
               updateBooking({
                 holdListingId: Number(l.id),
-                holdListingName: l.name ?? null,
+                holdListingName: l.name ? getListingDisplayName(l.id, l.name) : null,
               });
             }
           })
@@ -983,7 +984,11 @@ const GuestDetailsPage: React.FC = () => {
     (originalNightlyRateForStrike != null || (discountRow != null && discountRow.amount > 0))
       ? originalNightlyRateForStrike != null
         ? alignPromotionLabelPercent(priceBreakdown.appliedPromotionLabel.trim(), originalNightlyRateForStrike, displayedPerNight)
-        : priceBreakdown.appliedPromotionLabel.trim()
+        : alignPromotionLabelPercent(
+            priceBreakdown.appliedPromotionLabel.trim(),
+            effectiveBaseAmount,
+            Math.max(0, effectiveBaseAmount - (discountRow?.amount ?? 0)),
+          )
       : null;
 
   // ── Check-in/out display ─────────────────────────────────────────────────
@@ -993,13 +998,26 @@ const GuestDetailsPage: React.FC = () => {
   const checkOutDisplay = booking.checkOut
     ? formatDateInTimezone(new Date(booking.checkOut), 'Asia/Kolkata')
     : '—';
-  // propertyName: prefer booking.propertyName (set by BookingContext), fallback to deriving from slug
-  const propertyName = booking.propertyName ?? (propertySlug ? propertySlug.replace(/-/g, ' ') : '');
-  // TASK-2623: prefer holdListingName (the actual listing name passed from UnitBookingWidget);
-  // fall back to unitSlug-derived display only when holdListingName is unavailable.
+  // propertyName: prefer booking.propertyName (set by BookingContext), fallback to deriving from slug,
+  // and map raw Atlas SKUs ("atlas101", "atlas501 ph") to their guest-facing display name ("Studio 101").
+  const effectivePropertySlug = propertySlug ?? booking.holdPropertySlug ?? '';
+  const rawPropertyName =
+    booking.propertyName ?? (effectivePropertySlug ? effectivePropertySlug.replace(/-/g, ' ') : '');
+  const propertyName = rawPropertyName ? getListingDisplayName(undefined, rawPropertyName) : '';
+  // TASK-2623 / TASK-10299260: prefer holdListingName (the actual listing name passed from UnitBookingWidget),
+  // mapped through getListingDisplayName so raw SKU names ("Atlas101") show as "Studio 101".
   // When unitSlug is purely numeric (e.g. "5"), skip the slug→name fallback entirely.
-  const unitName = booking.holdListingName?.trim()
-    || (unitSlug && /\D/.test(unitSlug) ? unitSlug.replace(/-/g, ' ') : unitSlug ?? '');
+  const rawUnitName =
+    booking.holdListingName?.trim() ||
+    (unitSlug && /\D/.test(unitSlug) ? unitSlug.replace(/-/g, ' ') : unitSlug ?? '');
+  const unitName =
+    rawUnitName && /\D/.test(rawUnitName)
+      ? getListingDisplayName(booking.holdListingId ?? undefined, rawUnitName)
+      : rawUnitName;
+  const distinctUnitName =
+    unitName && propertyName && unitName.trim().toLowerCase() === propertyName.trim().toLowerCase()
+      ? ''
+      : unitName;
 
   // TASK-5179: free-cancellation deadline from resolved listing policy (not a hardcoded 48h).
   const freeCancellationCopy = useMemo(() => {
@@ -2429,8 +2447,12 @@ const GuestDetailsPage: React.FC = () => {
           {/* Breadcrumb (desktop only) */}
           <div className="gd-breadcrumb">
             <Link to={propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/'} className="gd-breadcrumb-link">{propertyName}</Link>
-            <span className="gd-breadcrumb-sep">›</span>
-            <Link to={propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/'} className="gd-breadcrumb-link">{unitName}</Link>
+            {distinctUnitName && (
+              <>
+                <span className="gd-breadcrumb-sep">›</span>
+                <Link to={propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/'} className="gd-breadcrumb-link">{distinctUnitName}</Link>
+              </>
+            )}
             <span className="gd-breadcrumb-sep">›</span>
             <span className="gd-breadcrumb-current">Confirm and pay</span>
           </div>
@@ -2448,7 +2470,7 @@ const GuestDetailsPage: React.FC = () => {
             </div>
             <div className="gd-recap-body">
               <h4 className="gd-recap-name">
-                {propertyName}{unitName ? ` · ${unitName}` : ''}
+                {propertyName}{distinctUnitName ? ` · ${distinctUnitName}` : ''}
               </h4>
               <div className="gd-recap-dates">{checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : ''}</div>
               <div className="gd-recap-guests">
@@ -3246,7 +3268,7 @@ const GuestDetailsPage: React.FC = () => {
               <div className="gd-aside-thumb-id">{brandInitial}</div>
             </div>
             <div>
-              <h4 className="gd-aside-stay-name">{propertyName}{unitName ? ` · ${unitName}` : ''}</h4>
+              <h4 className="gd-aside-stay-name">{propertyName}{distinctUnitName ? ` · ${distinctUnitName}` : ''}</h4>
               <div className="gd-aside-stay-dates">
                 {checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : ''} · {booking.guests ?? 1} guest{(booking.guests ?? 1) !== 1 ? 's' : ''}
               </div>
