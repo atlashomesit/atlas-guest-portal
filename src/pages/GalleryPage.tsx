@@ -54,6 +54,7 @@ function classifySegmentToken(raw: string): string | null {
  * hardcoded numeric DB ID thresholds. When a tenant has fewer than 3 properties,
  * defaults to the property/unit display name so tabs reflect actual homes.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located gallery segment helper
 export function resolveGallerySegment(
   property: GallerySegmentSource,
   totalPropertiesCount = 0,

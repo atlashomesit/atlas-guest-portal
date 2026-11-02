@@ -94,6 +94,7 @@ type MarketplaceItem = {
  * TASK-1039954: Resolves property type badge ("Homestay", "Villa", "B&B", "Hostel", "Hotel")
  * for marketplace property cards with clean tag alignment.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace helper
 export function resolvePropertyTypeBadge(item: {
   propertyType?: string | null;
   accommodationType?: string | null;
@@ -123,6 +124,7 @@ export function resolvePropertyTypeBadge(item: {
  * and maps internal Atlas SKU codes (e.g. Atlas101 -> Studio 101, Atlas501_PH -> Penthouse 501)
  * using getListingDisplayName.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace helper
 export function resolveMarketplaceListingDisplayName(item: {
   id?: number | string | null;
   title?: string | null;
@@ -142,6 +144,7 @@ export function resolveMarketplaceListingDisplayName(item: {
   return resolved || candidate || 'Listing';
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace path helper
 export function marketplaceListingPath(
   item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'> & {
     displayName?: string | null;
@@ -171,6 +174,7 @@ export function marketplaceListingPath(
 // TASK-10089: source-aware provenance labels. "Verified" applies ONLY to completed
 // stays verified by Atlas; imported feedback is labelled by its source. Zero/absent
 // counts render nothing — never "0 verified stays", never a fabricated claim.
+// eslint-disable-next-line react-refresh/only-export-components -- co-located provenance formatter
 export function formatVerifiedStaysLabel(count?: number | null): string | null {
   if (count == null || count <= 0) return null;
   return count === 1 ? '1 verified stay' : `${count} verified stays`;
@@ -179,7 +183,7 @@ export function formatVerifiedStaysLabel(count?: number | null): string | null {
 // MKT-012 / MKT-015: external review count labelled by its real dominant source, e.g. "54 reviews on Airbnb".
 // Says "Google" only when the source is Google. Normalizes raw sync source codes (e.g. "AtlasSyncBookingCom" -> "Booking.com")
 // and still renders the provenance label as plain text when sourceUrl is null/empty.
-export function normalizeExternalReviewSourceName(source?: string | null): string {
+function normalizeExternalReviewSourceName(source?: string | null): string {
   const raw = source?.trim() || 'Google';
   const lower = raw.toLowerCase();
   if (
@@ -195,6 +199,7 @@ export function normalizeExternalReviewSourceName(source?: string | null): strin
   return raw;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located provenance formatter
 export function formatExternalReviewsLabel(
   count?: number | null,
   source?: string | null,

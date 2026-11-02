@@ -3,6 +3,7 @@ import { isHostelDormType, parseDormGenderPolicy, type DormGenderPolicy } from '
 
 export type GenderPolicy = DormGenderPolicy;
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located dorm formatter
 export function formatBedType(type?: string | null): string {
   if (!type) return '';
   const normalized = type.toLowerCase().replace(/[-_]/g, ' ').trim();
@@ -36,6 +37,7 @@ export interface HostelDormBadgeProps {
  * a private room of a Hostel property is sold by the room and must not carry a dorm badge. `propertyType` stays
  * in the signature only so existing callers still compile; it is ignored.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located dorm helper
 export function isHostelDorm(props: {
   accommodationType?: string | null;
   propertyType?: string | null;
@@ -44,6 +46,7 @@ export function isHostelDorm(props: {
 }
 
 /** The API's own value, or null when it states none. Never inferred from the listing name. */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located dorm helper
 export function resolveGenderPolicy(policy?: string | null): GenderPolicy | null {
   return parseDormGenderPolicy(policy);
 }

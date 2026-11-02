@@ -16,6 +16,7 @@ export type GuestDepositHold = {
 const formatInr = (n: number): string => `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(n)}`;
 
 /** "3 days 4 hours left", "5 hours left", "12 minutes left" or "ended"; null without a usable expiry. */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located countdown helper
 export function depositHoldTimeLeft(expiresAtUtc: string | null | undefined, nowMs: number): string | null {
   if (!expiresAtUtc) return null;
   const end = Date.parse(expiresAtUtc);
