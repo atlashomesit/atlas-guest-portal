@@ -2096,6 +2096,8 @@ const GuestDetailsPage: React.FC = () => {
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, booking.listingRatePlanId,
       isMarketplaceCheckout, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
+      appliedPromoCode, appliedReferralCode, bringingPet, includeBreakfast,
+      promoDiscountAmount, referralDiscountAmount,
     ],
   );
 
