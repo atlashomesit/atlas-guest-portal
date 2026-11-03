@@ -246,7 +246,9 @@ interface BookingSummary {
   /** TASK-1254: Booking reference for self check-in flow (ExternalReservationId or ATL-{id} fallback). */
   bookingRef?: string;
   /** GUEST-053: Assigned smart-lock door code & key access on Stay Hub upon check-in completion. */
+  doorCodeVisible?: boolean;
   doorCode?: string | null;
+  doorCodeLabel?: string | null;
   /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
   preferredLanguage?: string | null;
   // TASK-4510: Digital Guest Guidebook
