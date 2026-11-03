@@ -184,4 +184,52 @@ describe('GuestDietarySelector (BNB-009)', () => {
     expect(fetchMock).toHaveBeenCalled();
     expect(screen.queryByTestId('guest-dietary-selector')).not.toBeInTheDocument();
   });
+
+  it('BNB-022: submits home-cooked dinner order and evening date, and surfaces 4:00 PM CUTOFF_EXCEEDED error', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            error: 'CUTOFF_EXCEEDED',
+            message: 'Home-cooked dinner requests for tonight must be placed before 4:00 PM property local time.',
+          }),
+          { status: 400 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }));
+
+    render(
+      <GuestDietarySelector
+        bookingId={101}
+        token="tok"
+        checkinDate="2026-12-10"
+        checkoutDate="2026-12-12"
+        mealPreferences={prefs()}
+      />,
+    );
+
+    const dateSelect = screen.getByTestId('dietary-dinner-date-select') as HTMLSelectElement;
+    // "Select evening" + 2026-12-10 + 2026-12-11
+    expect(Array.from(dateSelect.options).map((o) => o.value)).toEqual(['', '2026-12-10', '2026-12-11']);
+
+    fireEvent.change(screen.getByTestId('dietary-dinner-order-input'), {
+      target: { value: '2 Veg Thalis, less spicy' },
+    });
+    fireEvent.change(dateSelect, { target: { value: '2026-12-10' } });
+    fireEvent.click(screen.getByTestId('save-dietary-btn'));
+
+    await settle();
+    expect(screen.getByTestId('dietary-save-error')).toHaveTextContent(/before 4:00 PM/i);
+
+    fireEvent.change(dateSelect, { target: { value: '2026-12-11' } });
+    fireEvent.click(screen.getByTestId('save-dietary-btn'));
+
+    await settle();
+    expect(screen.getByTestId('dietary-save-status')).toBeInTheDocument();
+    const [, secondInit] = fetchMock.mock.calls[1];
+    expect(JSON.parse(secondInit.body)).toMatchObject({
+      homeCookedDinnerOrder: '2 Veg Thalis, less spicy',
+      homeCookedDinnerOrderDate: '2026-12-11',
+    });
+  });
 });
