@@ -45,7 +45,7 @@ import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import Lightbox from '../../ui/Lightbox';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
-import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
+import { appendQuerySuffix, buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
 import {
   buildPropertyDetailBackHref,
   buildSimilarStayHref,
@@ -1374,7 +1374,11 @@ useEffect(() => {
   const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
   if (Number.isFinite(lid) && lid > 0) {
       setFav(isFavorite(lid));
-      const path = buildHomeUnitPath(propertySlug ?? String(data.id), lid);
+      const basePath = buildHomeUnitPath(propertySlug ?? String(data.id), lid);
+      const pathParams = new URLSearchParams();
+      if (tenantSlugFromUrl) pathParams.set("tenant", tenantSlugFromUrl);
+      if (isBrandAtlastaysParam) pathParams.set("brand", "atlastays");
+      const path = appendQuerySuffix(basePath, pathParams.toString());
       addRecentlyViewed({
           listingId: lid,
           path,
@@ -1392,7 +1396,7 @@ useEffect(() => {
       updateBooking({ listingDetailPath: path });
   }
 
-}, [data?.id, data?.property_name, data?.listingId, data?.property_img, data?.property_location, data?.property_price, listingId, propertySlug, resolvedListingId, setProperty, updateBooking]);
+}, [data?.id, data?.property_name, data?.listingId, data?.property_img, data?.property_location, data?.property_price, isBrandAtlastaysParam, listingId, propertySlug, resolvedListingId, setProperty, tenantSlugFromUrl, updateBooking]);
 
     // Similar listings: GET /listings/{id}/similar
     useEffect(() => {
