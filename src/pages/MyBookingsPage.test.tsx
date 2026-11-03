@@ -128,8 +128,9 @@ describe("MyBookingsPage — GUEST-055 & GUEST-056", () => {
     // Switch to Past tab to see booking 422 with ✓ Reviewed badge instead of Rate your stay CTA
     const pastTab = screen.getByRole("tab", { name: /past/i });
     fireEvent.click(pastTab);
+    await settle();
 
-    expect(await screen.findByTestId("my-bookings-reviewed-badge")).toHaveTextContent("Reviewed");
+    expect(screen.getByTestId("my-bookings-reviewed-badge")).toHaveTextContent("Reviewed");
     expect(screen.queryByTestId("my-bookings-review-cta")).not.toBeInTheDocument();
   });
 });

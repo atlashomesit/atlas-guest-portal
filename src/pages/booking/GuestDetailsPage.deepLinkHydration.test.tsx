@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingProvider } from '@/contexts/BookingContext';
 import { fetchGuestPriceBreakdown } from '@/api/pricingClient';
+import { settle } from '@/test/settle';
 import GuestDetailsPage from './GuestDetailsPage';
 
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -144,17 +145,16 @@ describe('GuestDetailsPage deep-link query hydration (TASK-10298987)', () => {
       </BookingProvider>
     );
 
-    await waitFor(() => {
-      expect(fetchGuestPriceBreakdown).toHaveBeenCalledWith(
-        101,
-        '2026-11-10',
-        '2026-11-15',
-        expect.any(AbortSignal),
-        null,
-        3,
-        'test-tenant',
-      );
-    });
+    await settle();
+    expect(fetchGuestPriceBreakdown).toHaveBeenCalledWith(
+      101,
+      '2026-11-10',
+      '2026-11-15',
+      expect.any(AbortSignal),
+      null,
+      3,
+      'test-tenant',
+    );
 
     const emailInput = screen.getByTestId('guest-booking-email');
     fireEvent.change(emailInput, { target: { value: 'vip@example.com' } });
@@ -162,17 +162,16 @@ describe('GuestDetailsPage deep-link query hydration (TASK-10298987)', () => {
     const promoInput = screen.getByTestId('guest-booking-promo');
     fireEvent.change(promoInput, { target: { value: 'VIP500' } });
     fireEvent.blur(promoInput);
+    await settle();
 
-    await waitFor(() => {
-      const promoCall = fetchSpy.mock.calls.find(([u]) => String(u).includes('/api/promo-codes/validate'));
-      expect(promoCall).toBeDefined();
-      const body = JSON.parse(String(promoCall?.[1]?.body ?? '{}'));
-      expect(body).toMatchObject({
-        code: 'VIP500',
-        listingId: 101,
-        subtotal: 15000,
-        guestEmail: 'vip@example.com',
-      });
+    const promoCall = fetchSpy.mock.calls.find(([u]) => String(u).includes('/api/promo-codes/validate'));
+    expect(promoCall).toBeDefined();
+    const body = JSON.parse(String(promoCall?.[1]?.body ?? '{}'));
+    expect(body).toMatchObject({
+      code: 'VIP500',
+      listingId: 101,
+      subtotal: 15000,
+      guestEmail: 'vip@example.com',
     });
 
     fetchSpy.mockRestore();

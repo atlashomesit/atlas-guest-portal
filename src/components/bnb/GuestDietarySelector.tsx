@@ -51,7 +51,7 @@ export interface GuestDietarySelectorProps {
   className?: string;
 }
 
-export function getStayEveningDates(checkinDate?: string | null, checkoutDate?: string | null): string[] {
+function getStayEveningDates(checkinDate?: string | null, checkoutDate?: string | null): string[] {
   const startStr = (checkinDate || '').slice(0, 10);
   const endStr = (checkoutDate || '').slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startStr) || !/^\d{4}-\d{2}-\d{2}$/.test(endStr)) return [];
@@ -61,7 +61,10 @@ export function getStayEveningDates(checkinDate?: string | null, checkoutDate?: 
   const dates: string[] = [];
   const cursor = new Date(start);
   while (cursor < end && dates.length < 60) {
-    dates.push(cursor.toISOString().slice(0, 10));
+    const yyyy = cursor.getUTCFullYear();
+    const mm = String(cursor.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(cursor.getUTCDate()).padStart(2, '0');
+    dates.push(`${yyyy}-${mm}-${dd}`);
     cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
   return dates;

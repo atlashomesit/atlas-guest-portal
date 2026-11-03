@@ -148,7 +148,7 @@ describe('SearchPage — Category & Amenity URL sync and Sort control (TASK-1039
     await settle();
 
     // Non-Atlas listing 676 remains visible
-    expect(await screen.findByText('The Estate by Grove & Co')).toBeInTheDocument();
+    expect(screen.getByText('The Estate by Grove & Co')).toBeInTheDocument();
 
     const calledUrls = mockFetch.mock.calls.map((c) => String(c[0]));
     expect(calledUrls.some((u) => u.includes('/marketplace/listings') && u.includes('checkIn=2026-12-10') && u.includes('checkOut=2026-12-12'))).toBe(true);
@@ -183,7 +183,7 @@ describe('SearchPage — Category & Amenity URL sync and Sort control (TASK-1039
     renderAt('/search?brand=atlastays&availableNow=true');
     await settle();
 
-    expect(await screen.findByText('Brahmaputra View Homestay')).toBeInTheDocument();
+    expect(screen.getByText('Brahmaputra View Homestay')).toBeInTheDocument();
     const calledUrls = mockFetch.mock.calls.map((c) => String(c[0]));
     const mpUrl = calledUrls.find((u) => u.includes('/marketplace/listings'));
     expect(mpUrl).toBeDefined();

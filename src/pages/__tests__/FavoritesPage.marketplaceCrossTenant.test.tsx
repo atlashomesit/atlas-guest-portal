@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GuestAuthContext, type GuestAuthState } from '@/contexts/GuestAuthContext';
 import { BookingProvider, useBooking } from '@/contexts/BookingContext';
 import { setDomainResolvedSlug } from '@/tenant/tenantResolver';
+import { settle } from '@/test/settle';
 import FavoritesPage from '../FavoritesPage';
 import Reserve from '../Reserve';
 import { useEffect } from 'react';
@@ -91,9 +92,8 @@ describe('TASK-1040103 marketplace cross-tenant Favorites & Reserve navigation',
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Kashi Heritage Villa')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByText('Kashi Heritage Villa')).toBeInTheDocument();
 
     const cardLink = screen.getByRole('link', { name: /View Kashi Heritage Villa/i });
     expect(cardLink.getAttribute('href')).toContain('/homes/kashi-heritage-villa/502?tenant=kashi-villa&brand=atlastays');
@@ -109,18 +109,16 @@ describe('TASK-1040103 marketplace cross-tenant Favorites & Reserve navigation',
       </MemoryRouter>
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Kashi Heritage Villa')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByText('Kashi Heritage Villa')).toBeInTheDocument();
 
     const continueBtn = screen.getByRole('button', { name: /Continue to booking/i });
     fireEvent.click(continueBtn);
+    await settle();
 
-    await waitFor(() => {
-      const target = screen.getByTestId('location-probe').textContent ?? '';
-      expect(target).toBe(
-        '/homes/kashi-heritage-villa/502?tenant=kashi-villa&brand=atlastays&checkIn=2026-12-10&checkOut=2026-12-12&guests=3'
-      );
-    });
+    const target = screen.getByTestId('location-probe').textContent ?? '';
+    expect(target).toBe(
+      '/homes/kashi-heritage-villa/502?tenant=kashi-villa&brand=atlastays&checkIn=2026-12-10&checkOut=2026-12-12&guests=3'
+    );
   });
 });
