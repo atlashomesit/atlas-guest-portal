@@ -21,6 +21,7 @@ import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
 import { reportUpiPaid } from '@/api/payment';
 import { isMobileCheckoutUserAgent } from '@/utils/razorpayCheckoutOptions';
 import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
+import { isPricingNotConfiguredError } from '@/utils/pricingNotConfigured';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -610,7 +611,8 @@ function GuestDetailsForm({
     setLoadingPricing(true);
     fetchGuestPriceBreakdown(listing.id, checkInStr, checkOutStr, undefined, undefined, guests)
       .then((p) => { if (!cancelled) setPricing(p); })
-      .catch(() => { if (!cancelled) setError('Could not load pricing. Please try again.'); })
+      // 409 PRICING_NOT_CONFIGURED (founder-ruled 2026-11-03): the host has not set this room's pricing yet - say that, in the API's words.
+      .catch((err: unknown) => { if (!cancelled) setError(isPricingNotConfiguredError(err) ? err.message : 'Could not load pricing. Please try again.'); })
       .finally(() => { if (!cancelled) setLoadingPricing(false); });
     return () => { cancelled = true; };
   }, [listing.id, checkInStr, checkOutStr, guests]);
