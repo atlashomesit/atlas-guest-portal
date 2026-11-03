@@ -378,6 +378,7 @@ export default function BookingConfirmationPage() {
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
   const [copyRefManual, setCopyRefManual] = useState(false);
   const [doorCodeCopied, setDoorCodeCopied] = useState(false);
+  const [isOfflineCachedCopy, setIsOfflineCachedCopy] = useState(false);
   const copyDoorCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -470,13 +471,15 @@ export default function BookingConfirmationPage() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  useEffect(() => {
+  const loadBookingSummary = useCallback(() => {
     if (!bookingId || !token) {
       setError("Invalid booking link. Please use the link from your confirmation email.");
       setLoading(false);
       return;
     }
 
+    const scopedCacheKey = `atlas_stay_arrival_cache_${bookingId}_${token.slice(0, 8)}`;
+    const legacyCacheKey = `atlas_stay_arrival_cache_${bookingId}`;
     const url = buildApiUrl(`/api/guest/bookings/${bookingId}/summary?t=${encodeURIComponent(token)}`);
     fetch(url, {
       headers: { Accept: "application/json", ...getApiHeaders() },
@@ -485,14 +488,18 @@ export default function BookingConfirmationPage() {
         if (res.status === 404) {
           const parsed404 = await res.clone().json().catch(() => null) as ApiErrorEnvelope | null;
           if (parsed404?.code && parsed404?.message) setErrorPayload(parsed404);
-          throw new Error("Booking not found. Please check your confirmation email for the correct link.");
+          const err404 = new Error("Booking not found. Please check your confirmation email for the correct link.") as Error & { httpStatus?: number };
+          err404.httpStatus = 404;
+          throw err404;
         }
         if (!res.ok) {
           const parsed = await res.clone().json().catch(() => null) as ApiErrorEnvelope | null;
           if (parsed?.code && parsed?.message) {
             setErrorPayload(parsed);
           }
-          throw new Error(await messageFromApiResponse(res));
+          const errHttp = new Error(await messageFromApiResponse(res)) as Error & { httpStatus?: number };
+          errHttp.httpStatus = res.status;
+          throw errHttp;
         }
         return res.json() as Promise<BookingSummary>;
       })
@@ -504,6 +511,52 @@ export default function BookingConfirmationPage() {
           b.propertyAddress = overrideAddr;
         }
         setBooking(b);
+        setIsOfflineCachedCopy(false);
+        setError(null);
+        try {
+          const snapshot = {
+            bookingId: b.bookingId,
+            bookingRef: b.bookingRef,
+            listingId: b.listingId,
+            guestId: b.guestId,
+            guestName: b.guestName,
+            propertyName: b.propertyName,
+            listingName: b.listingName,
+            checkinDate: b.checkinDate,
+            checkoutDate: b.checkoutDate,
+            checkinDateIso: b.checkinDateIso,
+            checkoutDateIso: b.checkoutDateIso,
+            nights: b.nights,
+            status: b.status,
+            propertyAddress: b.propertyAddress,
+            propertyPhone: b.propertyPhone,
+            checkinInstructions: b.checkinInstructions,
+            checkInTime: b.checkInTime,
+            checkOutTime: b.checkOutTime,
+            currency: b.currency,
+            totalAmount: b.totalAmount,
+            wifiVisible: b.wifiVisible,
+            wifiName: b.wifiName,
+            wifiPassword: b.wifiPassword,
+            doorCodeVisible: b.doorCodeVisible,
+            doorCode: b.doorCode,
+            doorCodeLabel: b.doorCodeLabel,
+            guidebookAppliancesText: b.guidebookAppliancesText,
+            guidebookWifiTroubleshootingText: b.guidebookWifiTroubleshootingText,
+            guidebookTrashParkingText: b.guidebookTrashParkingText,
+            guidebookCheckoutChecklistText: b.guidebookCheckoutChecklistText,
+            guidebookFoodThingsTodoText: b.guidebookFoodThingsTodoText,
+            nearbyLandmarks: b.nearbyLandmarks,
+            mealPlanCode: b.mealPlanCode,
+            cancellationPolicy: b.cancellationPolicy,
+            savedAtUtc: new Date().toISOString(),
+          };
+          const serialized = JSON.stringify(snapshot);
+          localStorage.setItem(scopedCacheKey, serialized);
+          localStorage.setItem(legacyCacheKey, serialized);
+        } catch {
+          // ignore storage quota/privacy failures
+        }
         // TASK-1480: confirmed = guest views booking confirmation page
         track('confirmed', b.listingId);
         // Fetch prior modification requests (best-effort, non-blocking)
@@ -523,12 +576,34 @@ export default function BookingConfirmationPage() {
             .catch(() => {});
         }
       })
-      .catch((err: Error) => {
+      .catch((err: Error & { httpStatus?: number }) => {
         console.error(err);
+        const status = err?.httpStatus;
+        const isExplicitAuthOrNotFound = status === 404 || status === 401 || status === 403;
+        if (!isExplicitAuthOrNotFound && status === undefined) {
+          try {
+            const raw = localStorage.getItem(scopedCacheKey) ?? localStorage.getItem(legacyCacheKey);
+            if (raw) {
+              const cached = JSON.parse(raw) as BookingSummary;
+              if (cached && String(cached.bookingId) === String(bookingId)) {
+                setBooking(cached);
+                setIsOfflineCachedCopy(true);
+                setError(null);
+                return;
+              }
+            }
+          } catch {
+            // fall through to standard error state
+          }
+        }
         setError("We couldn't load your booking — please try again.");
       })
       .finally(() => setLoading(false));
   }, [bookingId, token]);
+
+  useEffect(() => {
+    loadBookingSummary();
+  }, [loadBookingSummary]);
 
   useEffect(() => {
     if (!errorPayload?.code) return;
@@ -1048,6 +1123,23 @@ export default function BookingConfirmationPage() {
         robots="noindex, nofollow"
       />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-6" data-testid="booking-confirmation-page">
+
+        {isOfflineCachedCopy && (
+          <div
+            data-testid="confirmation-offline-cache-banner"
+            role="status"
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center justify-between gap-3 flex-wrap"
+          >
+            <span>Offline copy — showing your last saved stay details</span>
+            <button
+              type="button"
+              onClick={() => void loadBookingSummary()}
+              className="rounded-lg border border-amber-400 bg-white px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="space-y-1">
