@@ -213,5 +213,8 @@ describe("CityLandingPage", () => {
     expect(anchors.length, "city-page card container must contain at least one /homes/ anchor").toBeGreaterThan(0);
     // Same-tenant city page (not marketplace) — no ?tenant= hint needed.
     expect(anchors[0].getAttribute("href")).toMatch(/\/homes\/atlas-coastal-villa\/501$/);
+    // MKT-042: rating chip on city-page cards follows the card's /homes/... href + #reviews.
+    const reviewsLink = screen.getByRole("link", { name: "View guest reviews" });
+    expect(reviewsLink.getAttribute("href")).toBe("/homes/atlas-coastal-villa/501#reviews");
   });
 });
