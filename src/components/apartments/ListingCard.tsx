@@ -1,6 +1,7 @@
 import HostIdentityLabel from '@/components/property/HostIdentityLabel';
 import HostelDormBadge, { isHostelDorm } from '../hostel/HostelDormBadge';
 import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
+import { feePercent } from "../../utils/paymentFeeCopy";
 import React, { useMemo, useState } from "react";
 import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
 import { priceDisplayConfig } from "../../config/priceDisplay.config";
@@ -64,6 +65,9 @@ type ListingCardProps = {
   lastMinuteDiscountPercent?: number | null;
   /** TASK-4312: whether the listing owner is GST-registered. */
   isGstRegistered?: boolean;
+  /** MKT-042: per-listing payment fee flags for cross-tenant marketplace cards. */
+  chargesOnlinePaymentFee?: boolean;
+  convenienceFeePercent?: number | null;
   /** DESIGN-028: listing-scoped cancellation tier for the card trust chip. */
   cancellationTier?: CancellationTier | string | null;
   onClick?: () => void;
@@ -115,11 +119,19 @@ const ListingCard: React.FC<ListingCardProps> = ({
   estimateNights: estimateNightsProp,
   lastMinuteDiscountPercent,
   isGstRegistered = true, // TASK-4312: default to true for backward compat
+  chargesOnlinePaymentFee,
+  convenienceFeePercent,
   cancellationTier = null,
   onClick,
   href,
 }) => {
-  const processingFeePercent = useTenantProcessingFee();
+  const tenantProcessingFeePercent = useTenantProcessingFee(!marketplace);
+  const processingFeePercent = marketplace
+    ? chargesOnlinePaymentFee === false
+      ? 0
+      : feePercent(convenienceFeePercent)
+    : tenantProcessingFeePercent;
+  const reviewsHref = href ? `${href}#reviews` : `/property/${id}#reviews`;
   const cancellationChip = resolveListingCardCancellationChip(cancellationTier);
   // TASK-101158: never claim "Secure Razorpay payments" on a tenant with no online rail
   // (bookingMode WHATSAPP/MANUAL or paymentProvider null) — omit the chip, don't reword it.
@@ -298,7 +310,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
           <div className="flex flex-shrink-0 items-center">
             {hasVerifiedReviews && (reviewCount ?? 0) > 0 ? (
               <a
-                href={`/property/${id}#reviews`}
+                href={reviewsHref}
                 onClick={(e) => {
                   e.stopPropagation();
                 }}
@@ -311,7 +323,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
               </a>
             ) : hasVerifiedReviews ? (
               <a
-                href={`/property/${id}#reviews`}
+                href={reviewsHref}
                 onClick={(e) => {
                   e.stopPropagation();
                 }}
@@ -487,8 +499,12 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">
                     {hasVerifiedReviews ? `Avg. rating ${ratingSnippet}` : ratingSnippet}
                   </span>
-                  {/* TASK-1705: Owner-share trust badge */}
-                  <OwnerShareBadge nightlyPrice={finalPrice} />
+                  {/* TASK-1705 / MKT-042: Owner-share trust badge */}
+                  {marketplace ? (
+                    <OwnerShareBadge processingFeePercent={processingFeePercent} />
+                  ) : (
+                    <OwnerShareBadge nightlyPrice={finalPrice} />
+                  )}
                 </div>
               </div>
               {href ? (

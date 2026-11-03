@@ -122,6 +122,73 @@ describe("CityLandingPage", () => {
       // The tenant-scoped path must never be used on the marketplace host.
       expect(fetchPublicListings).not.toHaveBeenCalled();
     });
+
+    it("MKT-042: forwards accommodationType, amenityCodes, isGstRegistered, fee flags, and preserves brand/utm params on card hrefs", async () => {
+      setMarketplaceMode(true);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          const u = String(url);
+          if (u.includes("/marketplace/listings")) {
+            return {
+              ok: true,
+              json: async () => ({
+                items: [
+                  {
+                    id: 724,
+                    tenantSlug: "sahil-goyal",
+                    title: "Anjuna Hostel Dorm",
+                    city: "Goa",
+                    pricePerNight: 1000,
+                    maxGuests: 6,
+                    rating: 4.9,
+                    reviewCount: 8,
+                    accommodationType: "HostelDorm",
+                    amenityCodes: ["wifi", "free_parking"],
+                    isGstRegistered: false,
+                    chargesOnlinePaymentFee: false,
+                    convenienceFeePercent: 2.5,
+                  },
+                ],
+                total: 1,
+              }),
+            } as unknown as Response;
+          }
+          return { ok: false, json: async () => ({}) } as unknown as Response;
+        }),
+      );
+
+      render(
+        <MemoryRouter initialEntries={["/homestays-in-goa?brand=atlastays&utm_source=google&utm_campaign=summer"]}>
+          <CurrencyProvider>
+            <BookingProvider>
+              <CityLandingPage citySlug="goa" />
+            </BookingProvider>
+          </CurrencyProvider>
+        </MemoryRouter>,
+      );
+
+      await settle();
+      const section = screen.getByTestId("city-landing-listings");
+      // Dorm badge and per-bed indicator rendered via forwarded accommodationType="HostelDorm"
+      expect(screen.getByTestId("hostel-dorm-base-badge")).toBeInTheDocument();
+      // Amenity labels rendered via forwarded amenityCodes
+      expect(section.textContent).toMatch(/Free Parking/i);
+      // Unregistered host (isGstRegistered=false, chargesOnlinePaymentFee=false) -> Est. ₹1,000 total (no 5% GST, no 3% fee)
+      expect(section.textContent).toContain("₹1,000 est. total");
+
+      const roomLink = screen.getByRole("link", { name: /View room Anjuna Hostel Dorm/i });
+      const href = roomLink.getAttribute("href") ?? "";
+      expect(href).toContain("/homes/anjuna-hostel-dorm/724?");
+      expect(href).toContain("tenant=sahil-goyal");
+      expect(href).toContain("brand=atlastays");
+      expect(href).toContain("utm_source=google");
+      expect(href).toContain("utm_campaign=summer");
+
+      // Rating chip link uses the card's cross-tenant href + #reviews
+      const reviewsLink = screen.getByRole("link", { name: "View guest reviews" });
+      expect(reviewsLink.getAttribute("href")).toBe(`${href}#reviews`);
+    });
   });
 
   // MKT-014: cards on a city landing page are now real `<a href>` anchors, not nested buttons
