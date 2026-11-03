@@ -83,7 +83,7 @@ import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
-import { dormNeedsGenderAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
+import { dormNeedsGenderAcknowledgement, readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
 import { hostCallDigits } from '@/utils/hostCallDigits';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
 import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
@@ -690,9 +690,12 @@ const GuestDetailsPage: React.FC = () => {
   const houseRulesRowRef = useRef<HTMLDivElement>(null);
   /** A listing with no host-written rules shows no tick and never blocks a booking on missing host data. */
   const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
-  // HSL-011: a women-only / men-only dorm (policy straight from the listing API, carried by Reserve) needs a required
-  // tick before Pay. It gates the Pay button and is sent as `dormGenderAcknowledged`; the API stores it with the listing's policy.
-  const dormAckRequired = dormNeedsGenderAcknowledgement(booking.holdDormGenderPolicy);
+  // HSL-011: a women-only / men-only dorm (policy straight from the listing API, carried by Reserve or resolved on
+  // direct/deep-link checkout) needs a required tick before Pay. It gates the Pay button and is sent as
+  // `dormGenderAcknowledged`; the API stores it with the listing's policy.
+  const [listingDormGenderPolicy, setListingDormGenderPolicy] = useState<DormGenderPolicy | null>(null);
+  const effectiveDormGenderPolicy = booking.holdDormGenderPolicy ?? listingDormGenderPolicy ?? null;
+  const dormAckRequired = dormNeedsGenderAcknowledgement(effectiveDormGenderPolicy);
   const [dormAckAccepted, setDormAckAccepted] = useState(false);
   const [dormAckError, setDormAckError] = useState('');
   const dormAckRowRef = useRef<HTMLDivElement>(null);
@@ -706,27 +709,31 @@ const GuestDetailsPage: React.FC = () => {
     return () => controller.abort();
   }, [holdListingId, effectiveTenantSlug]);
 
-  // TASK-1039977 / PAY-006: Refundable security deposit resolution & consent
+  // TASK-1039977 / PAY-006: Refundable security deposit resolution & consent + HSL-011 dorm gender policy fallback
   const [listingSecurityDeposit, setListingSecurityDeposit] = useState<number | null>(null);
 
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
-    if (booking.holdSecurityDepositAmount != null) return;
+    if (booking.holdSecurityDepositAmount != null && booking.holdDormGenderPolicy != null) return;
     const ac = new AbortController();
     void fetchListingById(id, ac.signal)
       .then((l) => {
-        if (!ac.signal.aborted) {
+        if (!ac.signal.aborted && l) {
           const raw = l?.securityDepositAmount ?? (l as Record<string, unknown>)?.SecurityDepositAmount;
           const val = Number(raw);
           if (Number.isFinite(val) && val > 0) {
             setListingSecurityDeposit(val);
           }
+          const dorm = readDormListingFields(l as Record<string, unknown>);
+          if (dorm.accommodationType === 'HostelDorm' && dorm.dormGenderPolicy) {
+            setListingDormGenderPolicy(dorm.dormGenderPolicy);
+          }
         }
       })
       .catch(() => { /* non-critical */ });
     return () => ac.abort();
-  }, [holdListingId, booking.holdSecurityDepositAmount]);
+  }, [holdListingId, booking.holdSecurityDepositAmount, booking.holdDormGenderPolicy]);
 
   const effectiveSecurityDepositAmount =
     booking.holdSecurityDepositAmount ??
@@ -2155,6 +2162,9 @@ const GuestDetailsPage: React.FC = () => {
           setOrderError('No payment was taken.');
           setOrderErrorHeading(pricingNotConfigured);
           setOrderErrorIs409(true);
+        } else if ((status === 400 || status === 422) && apiCode === 'DORM_GENDER_ACK_REQUIRED') {
+          setDormAckError('Please confirm the dorm rule to continue.');
+          setOrderError('Please confirm the dorm gender rule to continue. No payment was taken.');
         } else if (status === 409 && apiCode === 'STAY_RULE_REFUSED') {
           // The host's own stay rule (minimum stay, closed to arrival, stop-sell, ...): the API's sentence is accurate and readable, and
           // nobody "got there first", so never say that. Nothing was held and no money moved.
@@ -3039,7 +3049,7 @@ const GuestDetailsPage: React.FC = () => {
             {/* HSL-011: women-only / men-only dorm - REQUIRED rule tick before Pay. Renders nothing for any other listing. */}
             <div ref={dormAckRowRef}>
               <DormGenderAcknowledgement
-                policy={booking.holdDormGenderPolicy}
+                policy={effectiveDormGenderPolicy}
                 accepted={dormAckAccepted}
                 onChange={(next) => { setDormAckAccepted(next); if (next) setDormAckError(''); }}
                 error={dormAckError}

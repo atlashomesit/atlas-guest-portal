@@ -11,6 +11,7 @@ import axios from 'axios';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingProvider } from '@/contexts/BookingContext';
+import * as listingClient from '@/api/listingClient';
 import { istInstantFromCalendarDate } from '@/utils/date';
 import GuestDetailsPage from './GuestDetailsPage';
 import { settle } from '../../test/settle';
@@ -186,5 +187,25 @@ describe('GuestDetailsPage - HSL-011 dorm gender rule tick before Pay', () => {
     fillDetails();
     fireEvent.click(screen.getByTestId('guest-booking-consent'));
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
+  });
+
+  it('resolves dormGenderPolicy from fetchListingById when holdDormGenderPolicy is absent from draft', async () => {
+    const spy = vi.spyOn(listingClient, 'fetchListingById').mockResolvedValueOnce({
+      id: 637,
+      name: '6-Bed Women Dorm',
+      accommodationType: 'HostelDorm',
+      dormGenderPolicy: 'FemaleOnly',
+    } as never);
+    seedDraft(null);
+    await renderPage();
+
+    expect(screen.getByTestId('dorm-gender-ack-card')).toHaveTextContent('Women-only dorm');
+    fillDetails();
+    fireEvent.click(screen.getByTestId('guest-booking-consent'));
+    expect(screen.getByTestId('guest-booking-submit')).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('dorm-gender-ack-checkbox'));
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
+    spy.mockRestore();
   });
 });
