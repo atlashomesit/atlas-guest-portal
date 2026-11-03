@@ -324,6 +324,7 @@ export default function MarketplaceHomepage() {
         ? newSort
         : 'recommended';
     setSortBy(valid);
+    setPage(1);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (valid !== 'recommended') {
@@ -405,8 +406,9 @@ export default function MarketplaceHomepage() {
     if (maxPrice != null) p.set('maxPrice', String(maxPrice));
     // MKT-026: the server filters on real amenity codes before pagination, so page 2+ is filtered too.
     if (serverAmenityCodes.length > 0) p.set('amenities', serverAmenityCodes.join(','));
+    if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
