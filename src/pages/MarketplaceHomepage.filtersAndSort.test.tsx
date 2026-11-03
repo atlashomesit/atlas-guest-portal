@@ -118,6 +118,45 @@ describe('TASK-1039950 — Filter pills synced with URL search parameters', () =
     expect(roomsBtn.className).toContain('bg-black');
   });
 
+  it('MKT-041: clicking Villas category pill requests category=villas and renders matching villa cards', async () => {
+    const fetchSpy = vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.includes('/marketplace/properties')) {
+        return { ok: true, json: async () => [] } as unknown as Response;
+      }
+      if (u.includes('category=villas')) {
+        return {
+          ok: true,
+          json: async () => ({ items: [mockListings[0]], total: 1, page: 1, pageSize: 20 }),
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ items: mockListings, total: mockListings.length, page: 1, pageSize: 20 }),
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const villasBtn = screen.getByTestId('marketplace-filter-villas');
+    fireEvent.click(villasBtn);
+    await settle();
+
+    expect(villasBtn.className).toContain('bg-black');
+    const listingUrls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingUrls[listingUrls.length - 1]).toContain('category=villas');
+    expect(screen.getByText('Comfort Villa')).toBeInTheDocument();
+    expect(screen.queryByText('Budget Studio')).not.toBeInTheDocument();
+  });
+
   it('clicking an amenity filter pill toggles selection', async () => {
     render(
       <MemoryRouter initialEntries={['/']}>
