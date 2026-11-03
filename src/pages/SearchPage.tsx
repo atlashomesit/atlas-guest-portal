@@ -351,7 +351,7 @@ function matchesCategory(unit: NormalizedListing, cat: string): boolean {
   return true;
 }
 
-const SearchPage = () => {
+const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boolean) => void }) => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const processingFeePercent = useTenantProcessingFee();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1104,6 +1104,10 @@ const SearchPage = () => {
   const showEmptyState =
     !isLoading && !hasInvalidDates && !apiError && sortedUnits.length === 0 && !showTonightProbeBanner &&
     !dateAvailLoading && !dateAvailCheckFailed;
+  useEffect(() => {
+    onEmptyStateChange?.(showEmptyState && !isMarketplaceSearch);
+    return () => onEmptyStateChange?.(false);
+  }, [isMarketplaceSearch, onEmptyStateChange, showEmptyState]);
   /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
   const showDateAvailabilitySkeleton =
     explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
@@ -1291,7 +1295,7 @@ const SearchPage = () => {
 
         </div>
 
-        <div className={`search-browse${showEmptyState && !isMarketplaceSearch ? " search-browse--empty" : ""}`}>
+        <div className="search-browse">
           <aside className="search-secondary-region" aria-label="Refine your results">          <details className="search-filters__secondary" data-testid="search-secondary-filters">
             <summary>More filters <span className="search-filters__summary-hint">Price, amenities &amp; accessibility</span></summary>
             <div className="search-filters__secondary-content">

@@ -163,7 +163,17 @@ describe('UX-2026-11-03-06: tenant search recovery', () => {
     tenantOverridesFlag.onlyApiListings = false;
     _setTenantContextForTests(null);
   });
-  const renderRecovery = () => render(<CurrencyProvider><MemoryRouter initialEntries={['/search?checkIn=2026-11-10&checkOut=2026-11-12&guests=3&adults=2&children=1&amenities=wifi&minPrice=1000']}><SearchPage /><SearchLocation /></MemoryRouter></CurrencyProvider>);
+  const renderRecovery = (onEmptyStateChange?: (empty: boolean) => void) => render(<CurrencyProvider><MemoryRouter initialEntries={['/search?checkIn=2026-11-10&checkOut=2026-11-12&guests=3&adults=2&children=1&amenities=wifi&minPrice=1000']}><SearchPage onEmptyStateChange={onEmptyStateChange} /><SearchLocation /></MemoryRouter></CurrencyProvider>);
+
+  it('opts into inline shell help only for confirmed empty results and releases it on unmount', async () => {
+    const onEmptyStateChange = vi.fn();
+    const { unmount } = renderRecovery(onEmptyStateChange);
+    expect(onEmptyStateChange).not.toHaveBeenCalledWith(true);
+    await settle();
+    expect(onEmptyStateChange).toHaveBeenLastCalledWith(true);
+    unmount();
+    expect(onEmptyStateChange).toHaveBeenLastCalledWith(false);
+  });
 
   it('focuses the existing date field, retains date/party scope while clearing optional filters and offers the tenant contact', async () => {
     renderRecovery();
@@ -198,9 +208,11 @@ describe('UX-2026-11-03-06: tenant search recovery', () => {
 
   it('keeps failed availability distinct from a successful empty search', async () => {
     mockFetch.mockResolvedValue({ ok: false });
-    renderRecovery();
+    const onEmptyStateChange = vi.fn();
+    renderRecovery(onEmptyStateChange);
     await settle();
     expect(screen.getByTestId('search-date-availability-failed')).toBeInTheDocument();
     expect(screen.queryByTestId('search-empty-state')).not.toBeInTheDocument();
+    expect(onEmptyStateChange).not.toHaveBeenCalledWith(true);
   });
 });

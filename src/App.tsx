@@ -152,6 +152,7 @@ export function CheckinBookingRefAliasRedirect() {
 function AppWrapper() {
   const location = useLocation();
   const [, setLanguageVersion] = useState(0);
+  const [tenantSearchEmpty, setTenantSearchEmpty] = useState(false);
 
   // TASK-4018: Listen for language changes across the app
   useEffect(() => {
@@ -179,6 +180,10 @@ function AppWrapper() {
   // Other themes/routes keep the global consent banner; no tenant resolution changes.
   const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
     && !(isMarketplaceMode() && isAtlastaysMarketplaceSurface());
+  // The reviewed marketplace and confirmed tenant empty search keep help in normal flow.
+  const inlineReviewSupport =
+    (location.pathname === '/' && isMarketplaceMode() && isAtlastaysMarketplaceSurface()) ||
+    (location.pathname === '/search' && tenantSearchEmpty);
 
   const withBoundary = (element: React.ReactNode, name: string) => (
     <ErrorBoundary key={`${name}-${location.pathname}`} name={name}>
@@ -287,7 +292,7 @@ function AppWrapper() {
               )}
             />
           ))}
-          <Route path="/search" element={withBoundary(<Suspense fallback={<LazyFallback />}><SearchPage /></Suspense>, "search-route")} />
+          <Route path="/search" element={withBoundary(<Suspense fallback={<LazyFallback />}><SearchPage onEmptyStateChange={setTenantSearchEmpty} /></Suspense>, "search-route")} />
           <Route path="/blog" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogHome /></Suspense>, "blog-home-route")} />
           {/* TASK-4307: single-segment /blog/:segment is handled by BlogCategory, which
               renders the article when the segment is a post slug (canonical /blog/<slug>)
@@ -347,7 +352,7 @@ function AppWrapper() {
         </Suspense>
         </main>
       </ErrorBoundary>
-      {!shouldHideFooter && <div className={inlineHomeConsent ? "home-inline-support" : undefined}><Suspense fallback={null}><SupportWidget /></Suspense></div>}
+      {!shouldHideFooter && <div className={inlineHomeConsent ? "home-inline-support" : inlineReviewSupport ? "review-inline-support" : undefined}><Suspense fallback={null}><SupportWidget placement={inlineReviewSupport ? "inline" : "floating"} /></Suspense></div>}
       {!shouldHideFooter && <Footer />}
       {!shouldHideFooter && !inlineHomeConsent && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
