@@ -393,3 +393,26 @@ describe("Navbar CTA", () => {
     expect(logoImg.className).toContain("navbar-logo--stacked");
   });
 });
+
+it('uses Atlastays only for the marketplace shell and preserves configured tenant identity', () => {
+  vi.mocked(getTenantContext).mockReturnValue({ name: 'Atlas tenant', slug: 'atlas', logoUrl: '/tenant-fixture.svg', isMarketplaceRoot: true });
+  renderNavbar(['/?brand=atlastays']);
+  expect(screen.getByRole('link', { name: 'Atlastays — home' })).toHaveTextContent('Atlastays');
+  expect(screen.queryByRole('img', { name: 'Fixture Stays' })).toBeNull();
+});
+
+it('keeps the tenant name and logo outside the marketplace shell', () => {
+  vi.mocked(getTenantContext).mockReturnValue({ name: 'Fixture Stays', slug: 'fixture', logoUrl: '/tenant-fixture.svg' });
+  renderNavbar(['/search']);
+  const home = screen.getByRole('link', { name: 'Fixture Stays — home' });
+  expect(home.querySelector('img')).toHaveAttribute('src', '/tenant-fixture.svg');
+  expect(home).toHaveTextContent('Fixture Stays');
+});
+
+it('does not let a marketplace preview query replace a white-label tenant identity', () => {
+  vi.mocked(getTenantContext).mockReturnValue({ name: 'Tenant private name', slug: 'fixture', guestCommsBrandingMode: 'Neutral', logoUrl: '/tenant-fixture.svg', legalContactPack: { displayName: 'Fixture Stays', isCustomDomain: true } });
+  renderNavbar(['/search?brand=atlastays']);
+  const home = screen.getByRole('link', { name: 'Fixture Stays — home' });
+  expect(home.querySelector('img')).toHaveAttribute('src', '/tenant-fixture.svg');
+  expect(screen.queryByRole('link', { name: 'Atlastays — home' })).toBeNull();
+});

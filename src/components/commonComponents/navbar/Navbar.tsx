@@ -7,7 +7,7 @@ import MobileSearchPill from './MobileSearchPill';
 import { primaryNav, ctaNav, tripsMenuNav, resolveNavTo } from '../../../config/navigation';
 import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
-import { resolveTenantBrandName } from '../../../tenant/displayBrand';
+import { MARKETPLACE_BRAND_BASELINE, resolveTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldShowHostAcquisitionCtas } from '../../../tenant/tenantOverrides';
 import { getTenantSlug, isMarketplaceMode, isAtlastaysMarketplaceSurface } from '../../../tenant/tenantResolver';
 import { getAdminPortalLoginUrl } from '../../../config/adminPortal';
@@ -65,6 +65,13 @@ const Navbar = () => {
     location.search.includes('brand=atlastays') ||
     (typeof window !== 'undefined' && (window.location?.search ?? '').includes('brand=atlastays')) ||
     isMarketplaceMode();
+  const hasTenantIdentity = tenant && !tenant.isMarketplaceRoot && (
+    tenant.guestCommsBrandingMode === 'Neutral' || tenant.legalContactPack?.isCustomDomain ||
+    !['atlas', 'marketplace', 'marketplace-root'].includes(tenant.slug)
+  );
+  const isMarketplaceShell = isMarketplaceBrand && !hasTenantIdentity &&
+    (new URLSearchParams(location.search).get('brand') === 'atlastays' || isAtlastaysMarketplaceSurface());
+  const shellBrandName = isMarketplaceShell ? MARKETPLACE_BRAND_BASELINE : brandName;
   const { booking } = useBooking();
   const { language, changeLanguage, availableLanguages, getLanguageName } = useTranslation();
 
@@ -257,9 +264,11 @@ const Navbar = () => {
             // link-name, WCAG 2.4.4/4.1.2). Derive from the resolved tenant brand name
             // (falls back to the marketplace baseline, never empty) rather than hardcoding
             // "Atlas" so white-label tenants get their own name here too.
-            aria-label={`${brandName || 'Atlas'} — home`}
+            aria-label={`${shellBrandName || 'Atlas'} — home`}
           >
-            {showLogo && (
+            {isMarketplaceShell ? (
+              <span className="navbar-marketplace-wordmark">{MARKETPLACE_BRAND_BASELINE}</span>
+            ) : showLogo && (
               <img
                 src={logoSrc}
                 // Wordmark logos visually spell out the brand name, so they carry the real alt
@@ -275,7 +284,7 @@ const Navbar = () => {
               />
             )}
             {/* Wordmark logos already include the brand name — hide duplicate text */}
-            {brandName && !isWordmarkLogo(logoSrc) ? (
+            {!isMarketplaceShell && brandName && !isWordmarkLogo(logoSrc) ? (
               <span className="navbar-logo-text">{brandName}</span>
             ) : null}
           </Link>

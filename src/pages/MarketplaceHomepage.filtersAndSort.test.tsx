@@ -351,3 +351,23 @@ describe('TASK-1039951 — Price range filtering qualifies positive rates only',
     expect(screen.queryByText('Luxury Suite')).not.toBeInTheDocument();
   });
 });
+
+it('discloses secondary filters on phones without hiding categories or sort, and keeps them open on desktop', async () => {
+  const originalWidth = window.innerWidth;
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 });
+  render(<MemoryRouter><MarketplaceHomepage /></MemoryRouter>);
+  await settle();
+  const disclosure = screen.getByTestId('marketplace-secondary-filters');
+  expect(disclosure).not.toHaveAttribute('open');
+  expect(screen.getByTestId('marketplace-filter-villas').closest('details')).toBeNull();
+  expect(screen.getByTestId('marketplace-sort-select').closest('details')).toBeNull();
+  fireEvent.click(disclosure.querySelector('summary')!);
+  expect(disclosure).toHaveAttribute('open');
+  fireEvent.change(screen.getByTestId('marketplace-search'), { target: { value: 'Goa' } });
+  await settle();
+  expect(screen.getByTestId('marketplace-search')).toHaveValue('Goa');
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
+  fireEvent(window, new Event('resize'));
+  expect(disclosure).toHaveAttribute('open');
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+});
