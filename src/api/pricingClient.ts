@@ -1,6 +1,7 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
 import { getAgentCode } from '@/lib/agentCode';
+import { PricingNotConfiguredError, pricingNotConfiguredMessage } from '@/utils/pricingNotConfigured';
 
 export type PricingBreakdown = {
   baseAmount?: number;
@@ -318,11 +319,25 @@ export async function fetchGuestPriceBreakdown(
 
   const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
   if (!response.ok) {
+    // 409 PRICING_NOT_CONFIGURED (founder-ruled 2026-11-03): the host has not set this room's pricing yet. Keep that on the error so a screen can
+    // show the API's own words ("This room can't be booked online yet. Please contact the host.") instead of its generic "could not load pricing".
+    const notConfigured = await pricingNotConfiguredMessageFrom(response);
+    if (notConfigured) throw new PricingNotConfiguredError(notConfigured);
     throw new Error(await messageFromApiResponse(response));
   }
 
   const raw = (await response.json()) as Record<string, unknown>;
   return mapGuestPriceBreakdown(raw);
+}
+
+/** The PRICING_NOT_CONFIGURED sentence when this failed response is that 409, else null. Reads a clone, so the body stays readable. */
+async function pricingNotConfiguredMessageFrom(response: Response): Promise<string | null> {
+  if (response.status !== 409) return null;
+  try {
+    return pricingNotConfiguredMessage(response.status, await response.clone().json());
+  } catch {
+    return null;
+  }
 }
 
 /** Maps a raw PriceBreakdownDto (camel or Pascal case) to {@link GuestPriceBreakdown}. */

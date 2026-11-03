@@ -240,6 +240,36 @@ describe('GuestDetailsPage - the hold starts at Pay (2026-10-19)', () => {
     expect(rzp.opened).toBe(0);
   });
 
+  it('a room the host has not priced yet says so in the API\'s own words - NEVER "Something went wrong" or "just booked" - and no money moves', async () => {
+    // FOUNDER-RULED 2026-11-03: POST /api/Razorpay/order for a room with no pricing answers 409 PRICING_NOT_CONFIGURED (it used to be a 500,
+    // which this page showed as "Something went wrong").
+    const post = vi.spyOn(axios, 'post').mockRejectedValue(
+      new AxiosError('conflict', 'ERR_BAD_REQUEST', undefined, undefined, {
+        status: 409,
+        statusText: 'Conflict',
+        data: { code: 'PRICING_NOT_CONFIGURED', message: "This room can't be booked online yet. Please contact the host." },
+        headers: {},
+        config: {} as never,
+      }),
+    );
+    await renderPage();
+    fillDetails();
+    fireEvent.click(screen.getByTestId('guest-booking-consent'));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('guest-booking-submit'));
+    });
+    await settle();
+
+    expect(screen.getAllByText("This room can't be booked online yet. Please contact the host.").length).toBeGreaterThan(0);
+    expect(document.body.textContent).toContain('No payment was taken');
+    expect(document.body.textContent).not.toMatch(/Something went wrong|Server error|just booked|someone else got there first|Payment cancelled/i);
+    // The way back to the property stays on the panel (it is the inline 409 panel), and nothing was charged.
+    expect(screen.getAllByRole('button', { name: /^Back to/ }).length).toBeGreaterThan(0);
+    expect(post).toHaveBeenCalledTimes(1); // the hold attempt only
+    expect(rzp.opened).toBe(0);
+  });
+
   it('shows the host\'s house rules with a REQUIRED tick: Pay stays disabled until it is ticked, and the final-charge carries it', async () => {
     ctx.info = baseInfo({
       hasHouseRules: true,

@@ -93,6 +93,7 @@ import { getIstCalendarDate, toCalendarISO, istInstantFromCalendarDate } from '@
 import { resolveListing } from '@/utils/listingResolver';
 import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
+import { pricingNotConfiguredMessage } from '@/utils/pricingNotConfigured';
 import { ADS_MEASUREMENT_CONSENT_SEGMENTS, resolveAdsMeasurementWho } from '@/content/consent/adsMeasurementConsent';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
@@ -2002,6 +2003,10 @@ const GuestDetailsPage: React.FC = () => {
               ? (data as { error: { code: string } }).error.code
               : '';
 
+        // 409 PRICING_NOT_CONFIGURED (founder-ruled 2026-11-03): the host has not set this room's pricing yet. The API's own sentence is the
+        // answer; it used to reach this page as a 500 and read "Something went wrong".
+        const pricingNotConfigured = pricingNotConfiguredMessage(status, data);
+
         const isProviderNotConfigured =
           isProviderNotConfiguredError(err) ||
           ((status === 422 || status === 503) && (
@@ -2043,6 +2048,12 @@ const GuestDetailsPage: React.FC = () => {
         } else if (status === 422 && apiCode === 'HOUSE_RULES_NOT_ACCEPTED') {
           setHouseRulesError('Please accept the house rules to continue.');
           setOrderError('Please accept the house rules to continue. No payment was taken.');
+        } else if (pricingNotConfigured !== null) {
+          // Not a lost-the-dates race and not a payment failure: say what the API says, as the heading, and that nothing was taken. Nothing was held
+          // and no money moved. The inline 409 panel keeps the way back to the property.
+          setOrderError('No payment was taken.');
+          setOrderErrorHeading(pricingNotConfigured);
+          setOrderErrorIs409(true);
         } else if (status === 409 && apiCode === 'STAY_RULE_REFUSED') {
           // The host's own stay rule (minimum stay, closed to arrival, stop-sell, ...): the API's sentence is accurate and readable, and
           // nobody "got there first", so never say that. Nothing was held and no money moved.
