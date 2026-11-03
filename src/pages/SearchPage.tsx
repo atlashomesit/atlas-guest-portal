@@ -47,7 +47,7 @@ import {
 } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 import { isHostelDormType } from "../utils/dormListing";
-import { CONTACT } from "../config/contact";
+import { CONTACT, formatDisplayNumber, getTelLink } from "../config/contact";
 import { getPropertyDesignImage } from "../config/branding";
 import "./search-page.css";
 
@@ -351,7 +351,7 @@ function matchesCategory(unit: NormalizedListing, cat: string): boolean {
   return true;
 }
 
-const SearchPage = () => {
+const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boolean) => void }) => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const processingFeePercent = useTenantProcessingFee();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -950,7 +950,7 @@ const SearchPage = () => {
     updateParam("amenities", newAmenities.join(","));
   };
 
-  const clearFilters = () => {
+  const resetFilters = (preserveSearchScope: boolean) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("category");
@@ -961,8 +961,10 @@ const SearchPage = () => {
       next.delete("remoteWork");
       next.delete("longStay");
       next.delete("availableNow");
-      next.delete("guests");
-      deleteGuestBreakdown(next);
+      if (!preserveSearchScope) {
+        next.delete("guests");
+        deleteGuestBreakdown(next);
+      }
       // TASK-1738: clear digital nomad filters
       next.delete("nomadWifi");
       next.delete("nomadWorkspace");
@@ -972,6 +974,13 @@ const SearchPage = () => {
       next.delete("view");
       return next;
     }, { replace: true });
+  };
+  const clearFilters = () => resetFilters(false);
+  const clearOptionalFilters = () => resetFilters(true);
+  const focusSearchDates = () => {
+    const input = document.getElementById("filter-checkin");
+    input?.focus({ preventScroll: true });
+    input?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   /** TASK-1456: removable chips + count badge (one chip per logical filter). */
@@ -1093,7 +1102,12 @@ const SearchPage = () => {
   const showErrorState =
     !isLoading && !hasInvalidDates && apiError && sortedUnits.length === 0 && !showTonightProbeBanner;
   const showEmptyState =
-    !isLoading && !hasInvalidDates && !apiError && sortedUnits.length === 0 && !showTonightProbeBanner;
+    !isLoading && !hasInvalidDates && !apiError && sortedUnits.length === 0 && !showTonightProbeBanner &&
+    !dateAvailLoading && !dateAvailCheckFailed;
+  useEffect(() => {
+    onEmptyStateChange?.(showEmptyState && !isMarketplaceSearch);
+    return () => onEmptyStateChange?.(false);
+  }, [isMarketplaceSearch, onEmptyStateChange, showEmptyState]);
   /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
   const showDateAvailabilitySkeleton =
     explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
@@ -1603,10 +1617,10 @@ const SearchPage = () => {
         {showEmptyState && !mapView && (
           <div className="flex flex-col gap-8">
             <div
-              className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
+              className="search-empty-recovery rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
               data-testid="search-empty-state"
             >
-              {!hideAtlasBranding && (
+              {isMarketplaceSearch && !hideAtlasBranding && (
                 <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
                   {tenant?.logoUrl ? (
                     <img
@@ -1631,15 +1645,21 @@ const SearchPage = () => {
                   )}
                 </div>
               )}
-              <h2 className="text-xl font-bold text-text-primary sm:text-2xl">{`No ${unitNoun.marketingPlural} match your filters`}</h2>
+              <h2 className="text-xl font-bold text-text-primary sm:text-2xl">{isMarketplaceSearch ? `No ${unitNoun.marketingPlural} match your filters` : "No stays are available for this search"}</h2>
               <p className="mx-auto mt-3 max-w-lg text-text-muted">
                 Try adjusting dates, price range, or guest count.
               </p>
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
+                {!isMarketplaceSearch && (
+                  <button type="button" onClick={focusSearchDates} data-testid="search-empty-change-dates"
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-cta-secondary">
+                    Change dates
+                  </button>
+                )}
                 {hasActiveFilters ? (
                   <button
                     type="button"
-                    onClick={clearFilters}
+                    onClick={isMarketplaceSearch ? clearFilters : clearOptionalFilters}
                     className="inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-on-cta)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
                     data-testid="search-empty-clear-filters"
                   >
@@ -1651,9 +1671,14 @@ const SearchPage = () => {
                   className={`inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary shadow-sm hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto ${hasActiveFilters ? "" : "bg-cta-primary text-[var(--text-on-cta)] border-transparent hover:bg-cta-secondary"}`}
                   data-testid="search-empty-browse-all"
                 >
-                  Browse all apartments
+                  {isMarketplaceSearch ? "Browse all apartments" : "Browse all stays"}
                 </Link>
               </div>
+              {!isMarketplaceSearch && getTelLink() && (
+                <p className="mt-4 text-sm text-text-muted">
+                  Need help? <a href={getTelLink()} className="font-semibold underline underline-offset-4">Call {getTenantBrandName()} · {formatDisplayNumber()}</a>
+                </p>
+              )}
             </div>
 
             {emptyStateSuggestions.length > 0 && (

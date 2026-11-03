@@ -342,3 +342,11 @@
   .search-card__cta { padding-inline: 12px; }
 }
 @media (max-width: 600px) { .search-page__shell { width: calc(100% - 2rem); } .search-page__shell > header h1 { font-size: 26px; } }
+
+/* UX-2026-11-03-06: compact recovery with the approved filters-before-results order. */
+#filter-checkin { scroll-margin-top: calc(var(--measured-nav-height, 100px) + 24px); }
+@media (max-width: 1023px) {
+  .search-empty-recovery { padding: 22px 18px; }
+  .search-empty-recovery > div:last-of-type { margin-top: 16px; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .search-empty-recovery > div:last-of-type > * { width: auto; max-width: none; padding: 10px 14px; }
+}

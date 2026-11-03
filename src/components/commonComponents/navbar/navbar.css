@@ -633,3 +633,7 @@
 }
 /* The neutral fallback artwork uses dark strokes; keep it visible on dark tenant headers. */
 .navbar-logo[src$="tenant-logo-placeholder.svg"] { background: #fefcf9; border-radius: 8px; padding: 4px; }
+
+/* Marketplace identity never replaces a tenant's configured logo or name. */
+.navbar-marketplace-wordmark { font-family: var(--font-family-display, Georgia, serif); font-size: 1.5rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+@media (max-width: 639px) { .navbar-marketplace-wordmark { font-size: 1.15rem; } }
