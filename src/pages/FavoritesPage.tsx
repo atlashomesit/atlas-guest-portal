@@ -118,7 +118,7 @@ export default function FavoritesPage() {
             propertyName: item.title,
             propertyAddress: item.city,
             baseNightlyRate: typeof item.pricePerNight === "number" ? item.pricePerNight : undefined,
-            maxGuests: typeof item.maxGuests === "number" ? item.maxGuests : undefined,
+            maxGuests: typeof item.maxGuests === "number" ? item.maxGuests : 0,
             coverPhotoUrl: item.coverImageUrl ?? undefined,
             tenantSlug: typeof item.tenantSlug === "string" && item.tenantSlug.trim() ? item.tenantSlug.trim() : undefined,
           });

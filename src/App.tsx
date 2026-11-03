@@ -149,6 +149,28 @@ export function CheckinBookingRefAliasRedirect() {
   return <Navigate to={`/check-in/${encodeURIComponent(bookingRef)}${location.search}`} replace />;
 }
 
+/** Redirects legacy `/property_details/:id`, `/properties/:id`, and `/property/:id` routes to `/homes/:propertySlug/:id`, preserving query and hash (`#reviews`). */
+export function LegacyPropertyRedirect() {
+  const { id } = useParams();
+  const location = useLocation();
+
+  if (!id) {
+    return <Navigate to="/" replace />;
+  }
+
+  const normalizedId = id.toLowerCase();
+  const trailingNumericId = normalizedId.match(/(\d+)$/)?.[1];
+  if (!trailingNumericId) {
+    // TASK-1220: malformed legacy slugs (no numeric listing id) should still land on a
+    // concrete not-found page instead of hanging behind the property-details resolver.
+    return <Navigate to={`/homes/${normalizedId}${location.search}${location.hash}`} replace />;
+  }
+  const idParts = normalizedId.split('-').filter(Boolean);
+  const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
+
+  return <Navigate to={`/homes/${canonicalPropertySlug}/${trailingNumericId}${location.search}${location.hash}`} replace />;
+}
+
 function AppWrapper() {
   const location = useLocation();
   const [, setLanguageVersion] = useState(0);
@@ -194,27 +216,6 @@ function AppWrapper() {
   useEffect(() => {
     trackEvent('page_view', { surface: 'router' }, { route: location.pathname });
   }, [location.pathname]);
-
-  const LegacyPropertyRedirect = () => {
-    const { id } = useParams();
-    const location = useLocation();
-
-    if (!id) {
-      return <Navigate to="/" replace />;
-    }
-
-    const normalizedId = id.toLowerCase();
-    const trailingNumericId = normalizedId.match(/(\d+)$/)?.[1];
-    if (!trailingNumericId) {
-      // TASK-1220: malformed legacy slugs (no numeric listing id) should still land on a
-      // concrete not-found page instead of hanging behind the property-details resolver.
-      return <Navigate to={`/homes/${normalizedId}${location.search}`} replace />;
-    }
-    const idParts = normalizedId.split('-').filter(Boolean);
-    const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
-
-    return <Navigate to={`/homes/${canonicalPropertySlug}/${trailingNumericId}${location.search}`} replace />;
-  };
 
   return (
     <>
@@ -308,6 +309,7 @@ function AppWrapper() {
           <Route path="/homes/:roomNo" element={withBoundary(<Suspense fallback={<LazyFallback />}><LegacyHomeRoomRedirect /></Suspense>, "home-details-route")} />
           <Route path="/property_details/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-legacy-route")} />
           <Route path="/properties/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-modern-redirect-route")} />
+          <Route path="/property/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-singular-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Suspense fallback={<LazyFallback />}><Reserve /></Suspense>, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><BookingConfirmationPage /></Suspense>, "booking-confirmation-route")} />
           {/* TASK-10299239: security-deposit hold page, reached from the pre-arrival message; authorised by the same booking-link token (?t=). */}
