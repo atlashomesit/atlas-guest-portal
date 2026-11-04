@@ -859,7 +859,7 @@ export default function QrMenuPage() {
               maxLength={8}
               placeholder="e.g. 4829 or Stay PIN"
               value={verificationCode}
-              onChange={(e) => setVerificationCode(e.target.value)}
+              onChange={(e) => { setVerificationCode(e.target.value); setVerificationError(null); }}
               style={{
                 width: "100%",
                 padding: "8px 12px",
@@ -1690,7 +1690,7 @@ export default function QrMenuPage() {
                     maxLength={8}
                     placeholder="e.g. 4829 or Stay PIN"
                     value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
+                    onChange={(e) => { setVerificationCode(e.target.value); setVerificationError(null); }}
                     style={{
                       width: "100%",
                       padding: "8px 12px",
