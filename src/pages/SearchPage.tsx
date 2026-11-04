@@ -928,9 +928,23 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
     return () => c.abort();
   }, [sortedUnits, isLoading, hasInvalidDates, explicitDateSearch, isMarketplaceSearch]);
 
+  // Two date/filter edits can land before React re-renders (e.g. check-in then check-out typed in
+  // quick succession). A functional setSearchParams built from the render-time searchParams then let the
+  // second write overwrite the first, so one of the two edits was silently lost. Build every update from
+  // the latest params we have written, not from the last render.
+  const latestSearchParamsRef = useRef(searchParams);
+  useEffect(() => {
+    latestSearchParamsRef.current = searchParams;
+  }, [searchParams]);
+  const applySearchParamsUpdate = (mutate: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(latestSearchParamsRef.current);
+    mutate(next);
+    latestSearchParamsRef.current = next;
+    setSearchParams(next, { replace: true });
+  };
+
   const updateParam = (key: string, value: string) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+    applySearchParamsUpdate((next) => {
       if (value) {
         next.set(key, value);
         if (key === "sortBy") next.set("sort", value);
@@ -939,8 +953,7 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
         if (key === "sortBy") next.delete("sort");
       }
       if (key === "guests") deleteGuestBreakdown(next);
-      return next;
-    }, { replace: true });
+    });
   };
 
   const toggleAmenity = (amenity: string) => {
@@ -951,8 +964,7 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
   };
 
   const resetFilters = (preserveSearchScope: boolean) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+    applySearchParamsUpdate((next) => {
       next.delete("category");
       next.delete("minPrice");
       next.delete("maxPrice");
@@ -972,8 +984,7 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
       next.delete("sortBy");
       next.delete("sort");
       next.delete("view");
-      return next;
-    }, { replace: true });
+    });
   };
   const clearFilters = () => resetFilters(false);
   const clearOptionalFilters = () => resetFilters(true);
