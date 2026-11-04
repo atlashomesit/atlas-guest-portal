@@ -10,6 +10,8 @@ import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 import MultiPinMap, { type MapPin } from "../components/map/MultiPinMap";
 import { usePropertyListings } from "../hooks/usePropertyListings";
+import { useTenantListings } from "../hooks/useTenantListings";
+import { collectListingCities, formatCityList } from "../utils/listingCities";
 
 const MAP_SCRIPT_ID = "atlas-homestays-google-maps-script";
 const FALLBACK_STATIC_MAP_URL = "/images/atlas-homestays-static-map.svg";
@@ -59,6 +61,12 @@ const LocationPage = () => {
     return Array.from(seen.values());
   }, [listingsById]);
   const useMultiPin = propertyPins.length >= 2;
+
+  // GUEST-061: the contact card below names the tenant's registered address (one city). When the homes
+  // are in several cities, say where they are so the page never reads as if every home is at that address.
+  const { properties: tenantProperties } = useTenantListings();
+  const homeCities = useMemo(() => collectListingCities(tenantProperties), [tenantProperties]);
+  const homeCitiesLine = homeCities.length >= 2 ? formatCityList(homeCities) : null;
 
   const [mapStatus, setMapStatus] = useState<MapStatus>("loading");
   const [, setErrorDetails] = useState<string | null>(null);
@@ -298,6 +306,11 @@ const LocationPage = () => {
                   ) : (
                     <Typography className="text-text-muted">
                       Exact map pins aren&apos;t published yet — reach {tenantName} for directions.
+                    </Typography>
+                  )}
+                  {homeCitiesLine && (
+                    <Typography className="text-text-muted" data-testid="location-home-cities">
+                      Our homes are in {homeCitiesLine}. Open a home to see its exact address.
                     </Typography>
                   )}
                   {(phone || email) && (
