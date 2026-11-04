@@ -31,6 +31,7 @@ import {
   marketplaceStayNights,
 } from "../../../hooks/useMarketplaceCardPrices";
 
+import { resolveHomesPlace } from "../../../utils/listingCities";
 import "./homepage_location.css";
 import "../atlas-home-v2.css";
 
@@ -477,7 +478,11 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               // TASK-7194: white-label uses the tenant's own city when known — never invent Hyderabad/KPHB.
               const noun =
                 sortedListings.length === 1 ? unitNoun.singular : unitNoun.plural;
-              const city = tenant?.legalContactPack?.city?.trim();
+              // GUEST-061: the cities the listings are really in; the legal-address city only when no listing names one.
+              const city = resolveHomesPlace(
+                sortedListings.map((l) => propertyLookup[String(l.id)]),
+                tenant?.legalContactPack?.city,
+              );
               if (hideAtlasBranding) {
                 return `${sortedListings.length} owner-run ${noun}${city ? ` in ${city}` : ''}. Same hands clean them, restock them, and answer the door.`;
               }

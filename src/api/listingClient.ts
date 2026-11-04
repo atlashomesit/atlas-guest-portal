@@ -194,6 +194,8 @@ export type PublicListing = {
   onlinePaymentsAvailable?: boolean;
   /** TASK-10299183: whether small-party discount pricing is configured. */
   hasSmallPartyPricing?: boolean;
+  /** GUEST-061: the city the listing is in, when the public listing payload names one. */
+  city?: string | null;
   /** CLU-011: cluster role and id from public listing DTO (API only) */
   clusterRole?: string | null;
   clusterId?: number | null;
@@ -333,6 +335,10 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
       return Number.isFinite(n) && n > 0 ? n : null;
     })(),
     onlinePaymentsAvailable: payload.onlinePaymentsAvailable !== false && payload.OnlinePaymentsAvailable !== false,
+    city: (() => {
+      const raw = payload.city ?? payload.City;
+      return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+    })(),
     hasSmallPartyPricing: Boolean(payload.hasSmallPartyPricing || payload.HasSmallPartyPricing || payload.occupancyPricingEnabled || payload.OccupancyPricingEnabled),
     clusterRole: (() => {
       const raw = payload.clusterRole ?? payload.ClusterRole;

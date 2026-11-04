@@ -14,6 +14,7 @@ import {
 import { resolveHeroRefundProcessingChip } from '../../../utils/cancellationPolicy';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
 import { useTenantListings } from '../../../hooks/useTenantListings';
+import { resolveHomesPlace } from '../../../utils/listingCities';
 import '../atlas-home-v2.css';
 import '../home-first-glance.css';
 
@@ -41,9 +42,11 @@ const Slider = () => {
   const { properties: heroListings } = useTenantListings();
   const listingCount = heroListings.length;
   // TASK-7194: never hardcode Hyderabad on white-label — use tenant legal city when present.
+  // GUEST-061: name the cities the listings are really in; the legal-address city is only the fallback
+  // when no listing names one.
   const heroCity = showAtlasContent
     ? 'Hyderabad'
-    : (tenant?.legalContactPack?.city?.trim() || null);
+    : resolveHomesPlace(heroListings, tenant?.legalContactPack?.city);
   const heroImageUrl = showAtlasContent
     ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
     : '';
