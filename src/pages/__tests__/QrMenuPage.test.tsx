@@ -225,6 +225,28 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
     expect(screen.getByText(/Room verification failed: Room does not have an active CheckedIn booking today or phone last-4 \/ PIN did not match/i)).toBeTruthy();
   });
 
+  // Live owner-UX run 2026-11-04: a guest who mistyped the code could never retry, because the failure banner kept
+  // "Charge to Room" disabled even after the code was edited.
+  test("after a wrong code is refused, editing the code clears the refusal and lets the guest retry", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?room=101");
+    await settle();
+    fireEvent.click(screen.getByTestId("add-to-cart-1"));
+    const input = screen.getByTestId("pos-qr-verification-input");
+
+    fireEvent.change(input, { target: { value: "9999" } });
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await settle();
+    expect(screen.getByTestId("pos-qr-room-verification-error")).toBeTruthy();
+
+    fireEvent.change(input, { target: { value: "4829" } });
+    expect(screen.queryByTestId("pos-qr-room-verification-error")).toBeNull();
+    expect((screen.getByTestId("pos-qr-submit-btn") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await settle();
+    expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
+  });
+
   test("succeeds with valid phone last-4 and renders live status tracker with WhatsApp update badge (Done When #2 & #4)", async () => {
     renderQrMenu("/qr-menu/coorg-resort?room=101");
 
