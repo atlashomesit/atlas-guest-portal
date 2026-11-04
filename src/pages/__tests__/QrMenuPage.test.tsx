@@ -208,12 +208,8 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
     // 'Post to Room' is selected by default for room QR
     expect(screen.getByTestId("pos-qr-room-guardrail-section")).toBeTruthy();
 
-    // Enter client-side known invalid placeholder "0000" -> inline alert + disabled submit
-    const input = screen.getByTestId("pos-qr-verification-input");
-    fireEvent.change(input, { target: { value: "0000" } });
-    expect(screen.getByTestId("pos-qr-room-invalid-alert")).toBeTruthy();
-
     // Enter wrong verification code "9999" -> submits and enforces server 403 ROOM_VERIFICATION_FAILED
+    const input = screen.getByTestId("pos-qr-verification-input");
     fireEvent.change(input, { target: { value: "9999" } });
 
     // Submit order
@@ -242,6 +238,113 @@ describe("TASK-10298855: Guest Room & Table QR Self-Ordering Web Surface", () =>
     expect(screen.queryByTestId("pos-qr-room-verification-error")).toBeNull();
     expect((screen.getByTestId("pos-qr-submit-btn") as HTMLButtonElement).disabled).toBe(false);
 
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await settle();
+    expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
+  });
+
+  // A phone that really ends in 0000 (or a stay PIN that does) is a genuine code. The server has no special rule for it and decides every
+  // code the same way, so the page must not refuse it before it is sent: a guest with such a phone could never charge a meal to the room.
+  test("0000 is a real code: the page does not block it, sends it, and charges the room when the server accepts it", async () => {
+    const baseFetch = (global.fetch as any).getMockImplementation();
+    (global.fetch as any).mockImplementation((url: string, options?: any) => {
+      if (url.includes("/order") && options?.method === "POST") {
+        const body = JSON.parse(options.body);
+        if (body.settlementMethod === "POST_TO_ROOM" && body.verificationCode === "0000") {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            json: async () => ({
+              orderNumber: "POS-20261104-0000",
+              status: "KOT_Fired",
+              liveStep: "Order Received",
+              targetLabel: "Villa 101 (Guest With Zeros)",
+              settlementMethod: body.settlementMethod,
+              totalAmount: 480,
+              gstAmount: 24,
+              createdAtUtc: new Date().toISOString(),
+              estimatedMinutes: 15,
+              kotNumber: "KOT-20261104-001",
+              kotStatus: "Pending",
+              whatsAppUpdates: true,
+              lines: body.lines,
+            }),
+          });
+        }
+      }
+      return baseFetch(url, options);
+    });
+
+    renderQrMenu("/qr-menu/coorg-resort?room=101");
+    await settle();
+    fireEvent.click(screen.getByTestId("add-to-cart-1"));
+
+    fireEvent.change(screen.getByTestId("pos-qr-verification-input"), { target: { value: "0000" } });
+
+    expect(screen.queryByTestId("pos-qr-room-invalid-alert")).toBeNull();
+    expect((screen.getByTestId("pos-qr-submit-btn") as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByTestId("settle-post-to-room") as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await settle();
+
+    const post = (global.fetch as any).mock.calls.find((c: any[]) => c[1]?.method === "POST");
+    expect(post).toBeTruthy();
+    expect(JSON.parse(post[1].body)).toMatchObject({ settlementMethod: "POST_TO_ROOM", verificationCode: "0000" });
+    expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
+    expect(screen.getByText("POS-20261104-0000")).toBeTruthy();
+  });
+
+  test("0000 on the room-code strip before the cart is filled is not blocked either", async () => {
+    renderQrMenu("/qr-menu/coorg-resort?room=101");
+    await settle();
+    expect(screen.getByTestId("pos-qr-room-preverify-strip")).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId("pos-qr-verification-input"), { target: { value: "0000" } });
+
+    expect(screen.queryByTestId("pos-qr-room-invalid-alert-pre")).toBeNull();
+    expect(screen.queryByTestId("pos-qr-room-invalid-alert")).toBeNull();
+  });
+
+  test("a refused 0000 shows the server's refusal and the tries left, then editing the code clears it (the server still counts and locks)", async () => {
+    const baseFetch = (global.fetch as any).getMockImplementation();
+    (global.fetch as any).mockImplementation((url: string, options?: any) => {
+      if (url.includes("/order") && options?.method === "POST") {
+        const body = JSON.parse(options.body);
+        if (body.settlementMethod === "POST_TO_ROOM" && body.verificationCode === "0000") {
+          return Promise.resolve({
+            ok: false,
+            status: 403,
+            json: async () => ({
+              code: "ROOM_VERIFICATION_FAILED",
+              error: "Room verification failed: Room does not have an active CheckedIn booking today, or the phone last-4 / PIN did not match.",
+              attemptsRemaining: 3,
+            }),
+          });
+        }
+      }
+      return baseFetch(url, options);
+    });
+
+    renderQrMenu("/qr-menu/coorg-resort?room=101");
+    await settle();
+    fireEvent.click(screen.getByTestId("add-to-cart-1"));
+    const input = screen.getByTestId("pos-qr-verification-input");
+
+    fireEvent.change(input, { target: { value: "0000" } });
+    fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
+    await settle();
+
+    // The refusal came from the server (the request WAS sent) and carries the server's own words and its count.
+    const post = (global.fetch as any).mock.calls.find((c: any[]) => c[1]?.method === "POST");
+    expect(JSON.parse(post[1].body).verificationCode).toBe("0000");
+    expect(screen.getByTestId("pos-qr-room-verification-error")).toBeTruthy();
+    expect(screen.getByTestId("pos-qr-attempts-remaining").textContent).toContain("3 tries");
+    expect((screen.getByTestId("pos-qr-submit-btn") as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(input, { target: { value: "4829" } });
+    expect(screen.queryByTestId("pos-qr-room-verification-error")).toBeNull();
+    expect((screen.getByTestId("pos-qr-submit-btn") as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(screen.getByTestId("pos-qr-submit-btn"));
     await settle();
     expect(screen.getByTestId("pos-qr-live-tracker")).toBeTruthy();
