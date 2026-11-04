@@ -933,13 +933,25 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
   // second write overwrite the first, so one of the two edits was silently lost. Build every update from
   // the latest params we have written, not from the last render.
   const latestSearchParamsRef = useRef(searchParams);
+  // Writes not yet reflected back in `searchParams`. A render that still shows an EARLIER write must not
+  // roll the ref back (that dropped the check-out edit when check-in's render landed after it).
+  const pendingWritesRef = useRef<string[]>([]);
   useEffect(() => {
+    const current = searchParams.toString();
+    const idx = pendingWritesRef.current.indexOf(current);
+    if (idx >= 0) {
+      pendingWritesRef.current = pendingWritesRef.current.slice(idx + 1);
+      if (pendingWritesRef.current.length > 0) return; // later writes still in flight; keep the ref ahead
+    } else {
+      pendingWritesRef.current = []; // external navigation (back button, link): adopt it
+    }
     latestSearchParamsRef.current = searchParams;
   }, [searchParams]);
   const applySearchParamsUpdate = (mutate: (next: URLSearchParams) => void) => {
     const next = new URLSearchParams(latestSearchParamsRef.current);
     mutate(next);
     latestSearchParamsRef.current = next;
+    pendingWritesRef.current.push(next.toString());
     setSearchParams(next, { replace: true });
   };
 
