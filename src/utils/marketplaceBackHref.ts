@@ -169,6 +169,25 @@ export function selectSimilarStaysForParty<T extends Record<string, unknown>>(
   return [...fits, ...smaller].slice(0, limit);
 }
 
+/**
+ * GUEST-062: "similar" means the same city. Drops similar-stay items that name a different city than the
+ * listing being viewed (a Udaipur suite was offering four Jaipur rooms). An item that names no city is kept
+ * (we cannot tell), and so is every item when the viewed listing has no city.
+ */
+export function keepSimilarStaysInSameCity<T extends Record<string, unknown>>(
+  items: T[],
+  city: string | null | undefined,
+): T[] {
+  if (!Array.isArray(items)) return [];
+  const want = (city ?? '').trim().toLowerCase();
+  if (!want) return items;
+  return items.filter((item) => {
+    const raw = item.city ?? item.City;
+    const have = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+    return !have || have === want;
+  });
+}
+
 export function formatSimilarStayPrice(nightlyRate: number, currency = 'INR'): string {
   if (currency === 'INR') {
     return `from ₹${nightlyRate.toLocaleString('en-IN')} / night`;
