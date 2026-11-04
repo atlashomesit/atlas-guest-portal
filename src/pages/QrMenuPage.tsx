@@ -280,7 +280,7 @@ function resolveFulfillAtIso(mode: FulfillAtMode, customTime: string, now: Date 
 
 export default function QrMenuPage() {
   const { tenantSlug = "atlas" } = useParams<{ tenantSlug: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // POS-011: the printed room QR is `?rk=<opaque key>`. The old numeric `?room=<listingId>` keeps working while the API allows it.
   const roomKeyParam = searchParams.get("rk")?.trim() || undefined;
@@ -420,9 +420,22 @@ export default function QrMenuPage() {
     };
   }, [tenantSlug, roomKeyParam, urlListingId, tableCode, menuReloadNonce]);
 
+  // A reload (or the back button) must bring the guest's order tracker back instead of an empty menu that invites a second order.
+  // The order number goes into this page's own address, replacing the entry, so the existing `?order=` recovery below does the rest.
+  const placedOrderNumber = useRef<string | null>(null);
+  const rememberOrderInUrl = (orderNumber: string | null) => {
+    placedOrderNumber.current = orderNumber;
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (orderNumber) next.set("order", orderNumber); else next.delete("order");
+      return next;
+    }, { replace: true });
+  };
+
   // If order param is provided, load initial order tracking
   useEffect(() => {
-    if (!orderParam) return;
+    // An order this page just placed is already on screen; only an order arriving through the address is fetched.
+    if (!orderParam || placedOrderNumber.current === orderParam) return;
     let cancelled = false;
 
     async function loadOrder() {
@@ -663,6 +676,7 @@ export default function QrMenuPage() {
 
       const orderData: OrderStatus = await res.json();
       setActiveOrder(orderData);
+      rememberOrderInUrl(orderData.orderNumber);
       setPromoCode("");
       setCart({});
       setFulfillAt("NOW");
@@ -1117,7 +1131,7 @@ export default function QrMenuPage() {
             )}
 
             <button
-              onClick={() => setActiveOrder(null)}
+              onClick={() => { setActiveOrder(null); rememberOrderInUrl(null); }}
               style={{
                 width: "100%",
                 padding: "10px",

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import QrMenuPage from "../QrMenuPage";
 import { settle } from "@/test/settle";
 
@@ -17,6 +17,7 @@ const order = {
   chargedStayLabel: "Heritage Whole Villa", orderedFromLabel: "Courtyard Room A", bedLabel: "Courtyard Room A",
   settlementMethod: "POST_TO_ROOM", totalAmount: 105, gstAmount: 5, createdAtUtc: "2026-11-03T12:00:00Z", estimatedMinutes: 15, lines: [],
 };
+function LocationProbe() { return <div data-testid="location-search">{useLocation().search}</div>; }
 function setup(handler: (body: Record<string, unknown>) => ReturnType<typeof response>, suffix = "") {
   const bodies: Record<string, unknown>[] = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, options?: RequestInit) => {
@@ -28,6 +29,7 @@ function setup(handler: (body: Record<string, unknown>) => ReturnType<typeof res
     return response(200, url.includes("/order/") ? order : menu);
   }));
   render(<MemoryRouter initialEntries={[`/qr-menu/owner-ux?rk=test-room-key${suffix}`]}>
+    <LocationProbe />
     <Routes><Route path="/qr-menu/:tenantSlug" element={<QrMenuPage />} /></Routes>
   </MemoryRouter>);
   return bodies;
@@ -48,6 +50,21 @@ describe("QR verified stay attribution", () => {
     const attribution = screen.getByTestId("pos-qr-charge-attribution");
     expect(attribution).toHaveTextContent("Charged to Heritage Whole Villa");
     expect(attribution).toHaveTextContent("Ordered from Courtyard Room A");
+  });
+  // Live owner-UX run 2026-11-04: reloading right after ordering showed an empty menu again, with nothing to say the order existed.
+  test("a placed order is kept in the address so a reload brings the tracker back, and dismissing the tracker removes it", async () => {
+    setup(() => response(201, order));
+    await submit();
+    expect(screen.getByTestId("location-search")).toHaveTextContent("rk=test-room-key");
+    expect(screen.getByTestId("location-search")).toHaveTextContent("order=POS-1");
+    cleanup();
+    setup(() => response(201, order), "&order=POS-1");
+    await settle();
+    expect(screen.getByTestId("pos-qr-charge-attribution")).toHaveTextContent("Ordered from Courtyard Room A");
+    fireEvent.click(screen.getByText("Order More Items"));
+    await settle();
+    expect(screen.getByTestId("location-search")).toHaveTextContent("rk=test-room-key");
+    expect(screen.getByTestId("location-search")).not.toHaveTextContent("order=");
   });
   test("restores the same attribution from a saved order URL", async () => {
     setup(() => response(201, order), "&order=POS-1");
