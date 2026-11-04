@@ -690,8 +690,10 @@ export default function QrMenuPage() {
 
   // Filter items
   const allCategories = useMemo(() => menu?.categories ?? [], [menu?.categories]);
-  const isKnownInvalidCode = verificationCode.trim() === "0000";
-  const showVerificationWarning = isKnownInvalidCode || Boolean(verificationError);
+  // The server decides whether a code is right (phone last-4 or stay PIN, 5 tries then a lockout). The page never rules a code out
+  // itself: a phone or PIN that really ends in 0000 is a genuine code. Only a refusal the server has just sent holds the button
+  // until the guest edits the code.
+  const showVerificationWarning = Boolean(verificationError);
   const visibleCategories = useMemo(() => {
     if (selectedCategory === "ALL") return allCategories;
     return allCategories.filter((c) => c.categoryKey === selectedCategory);
@@ -885,28 +887,6 @@ export default function QrMenuPage() {
               }}
               data-testid="pos-qr-verification-input"
             />
-            {isKnownInvalidCode && (
-              <div
-                style={{
-                  backgroundColor: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#991b1b",
-                  padding: "8px 10px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  marginTop: "8px",
-                }}
-                data-testid="pos-qr-room-invalid-alert-pre"
-              >
-                <AlertCircle size={14} />
-                <span>
-                  Phone last-4 or Stay PIN does not match active CheckedIn booking for this room. Please Pay Now via UPI or pay online upfront.
-                </span>
-              </div>
-            )}
             <button
               type="button"
               disabled
@@ -1728,28 +1708,6 @@ export default function QrMenuPage() {
                         <option value="">Choose a bed</option>
                         {verifiedRoom.bedOptions.map((bed) => <option key={bed} value={bed}>{bed}</option>)}
                       </select>
-                    </div>
-                  )}
-                  {isKnownInvalidCode && (
-                    <div
-                      style={{
-                        backgroundColor: "#fef2f2",
-                        border: "1px solid #fecaca",
-                        color: "#991b1b",
-                        padding: "8px 10px",
-                        borderRadius: "6px",
-                        fontSize: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        marginTop: "8px",
-                      }}
-                      data-testid="pos-qr-room-invalid-alert"
-                    >
-                      <AlertCircle size={14} />
-                      <span>
-                        Phone last-4 or Stay PIN does not match active CheckedIn booking for this room. Please Pay Now via UPI or pay online upfront.
-                      </span>
                     </div>
                   )}
                 </div>
