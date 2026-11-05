@@ -121,3 +121,19 @@ describe('GUEST-062: similar stays are the same city', () => {
     expect(keepSimilarStaysInSameCity(items, null)).toHaveLength(4);
   });
 });
+
+describe('WALK2-2: a plan saved in the Price Per Guest editor with uneven or percent rows', () => {
+  const inr = (n: number) => `₹${n}`;
+  it('says the price changes with the guests and shows no number', () => {
+    expect(describeIncludedGuests(2, null, 4, inr, true)).toBe('Includes 2 guests. Price changes with the number of guests');
+    expect(readIncludedGuestFields({ includedGuests: 2, priceChangesWithGuests: true })).toEqual({
+      includedGuests: 2,
+      extraGuestRate: null,
+      priceChangesWithGuests: true,
+    });
+  });
+  it('a plain per-extra-guest amount still wins, and a home that sleeps only the included guests says nothing extra', () => {
+    expect(describeIncludedGuests(2, 500, 4, inr, true)).toBe('Includes 2 guests, then ₹500 per extra guest per night');
+    expect(describeIncludedGuests(2, null, 2, inr, true)).toBe('Includes 2 guests');
+  });
+});

@@ -6,6 +6,8 @@
 export interface IncludedGuestFields {
   includedGuests: number | null;
   extraGuestRate: number | null;
+  /** The API says guest-count prices apply but are not one simple per-extra-guest amount: say so, with no number. */
+  priceChangesWithGuests?: boolean;
 }
 
 function positiveNumber(raw: unknown): number | null {
@@ -19,18 +21,26 @@ export function readIncludedGuestFields(payload: Record<string, unknown> | null 
   const p = payload ?? {};
   const included = positiveNumber(p.includedGuests ?? p.IncludedGuests ?? p.baseOccupancy ?? p.BaseOccupancy);
   const extra = positiveNumber(p.extraGuestRate ?? p.ExtraGuestRate);
-  return { includedGuests: included != null ? Math.floor(included) : null, extraGuestRate: extra };
+  const varies = p.priceChangesWithGuests === true || p.PriceChangesWithGuests === true;
+  return {
+    includedGuests: included != null ? Math.floor(included) : null,
+    extraGuestRate: extra,
+    ...(varies ? { priceChangesWithGuests: true } : {}),
+  };
 }
 
 /**
  * "Includes 2 guests, then ₹500 per extra guest per night". The extra-guest clause appears only when the host set
- * a rate and the home sleeps more people than the price includes. Returns null when the included count is unknown.
+ * a rate and the home sleeps more people than the price includes. When the API says the price follows the guest count
+ * in a way one number cannot describe, the line says that instead and shows no number. Returns null when the included
+ * count is unknown.
  */
 export function describeIncludedGuests(
   includedGuests: number | null | undefined,
   extraGuestRate: number | null | undefined,
   maxGuests: number | null | undefined,
   formatAmount: (n: number) => string,
+  priceChangesWithGuests?: boolean | null,
 ): string | null {
   if (includedGuests == null || !Number.isFinite(includedGuests) || includedGuests < 1) return null;
   const base = `Includes ${includedGuests} guest${includedGuests === 1 ? '' : 's'}`;
@@ -38,5 +48,6 @@ export function describeIncludedGuests(
   if (extraGuestRate != null && extraGuestRate > 0 && canHaveExtra) {
     return `${base}, then ${formatAmount(extraGuestRate)} per extra guest per night`;
   }
+  if (priceChangesWithGuests && canHaveExtra) return `${base}. Price changes with the number of guests`;
   return base;
 }

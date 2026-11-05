@@ -132,6 +132,7 @@ export interface UnitBookingWidgetProps {
   /** GUEST-060: guests the price covers and the host's extra-guest nightly rate, when the listing sends them. Display only. */
   includedGuests?: number | null;
   extraGuestRate?: number | null;
+  priceChangesWithGuests?: boolean | null;
   /** Custom small-party hint text. Defaults to "Special rate available for 1-2 guests". */
   smallPartyHint?: string | null;
 }
@@ -275,6 +276,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   hasSmallPartyPricing = false,
   includedGuests = null,
   extraGuestRate = null,
+  priceChangesWithGuests = null,
   smallPartyHint,
 }) => {
   if (import.meta.env.DEV) {
@@ -1940,7 +1942,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     formatCurrency(n, { maximumFractionDigits: 0 });
 
   // GUEST-060: "Includes N guests" from the listing's own numbers; empty when the API sends none.
-  const includedGuestsLine = describeIncludedGuests(includedGuests, extraGuestRate, effectiveMaxGuests, displayPrice);
+  const includedGuestsLine = describeIncludedGuests(includedGuests, extraGuestRate, effectiveMaxGuests, displayPrice, priceChangesWithGuests);
 
   const convenienceFeePctLabel = Number((convenienceFeePercent * 100).toFixed(2));
   const referralDiscountApplied = 0;

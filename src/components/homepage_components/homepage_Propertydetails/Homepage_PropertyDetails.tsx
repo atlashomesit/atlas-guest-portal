@@ -410,6 +410,7 @@ interface Property {
     /** GUEST-060: guests the price covers and the host's extra-guest nightly rate (API only; null when not sent). */
     includedGuests?: number | null;
     extraGuestRate?: number | null;
+    priceChangesWithGuests?: boolean | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -445,6 +446,7 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         graceHours: item.graceHours,
         includedGuests: item.includedGuests ?? null,
         extraGuestRate: item.extraGuestRate ?? null,
+        priceChangesWithGuests: item.priceChangesWithGuests ?? null,
         minStay: item.minStay,
         latitude: item.latitude,
         longitude: item.longitude,
@@ -2815,7 +2817,7 @@ useEffect(() => {
                         {data.maxGuests != null && data.maxGuests > 0
                           ? `Up to ${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'} welcome.${(() => {
                               // GUEST-060: what the price covers, from the host's own numbers; nothing when the API sends none.
-                              const line = describeIncludedGuests(data.includedGuests, data.extraGuestRate, data.maxGuests, (n) => formatCurrency(n, { maximumFractionDigits: 0 }));
+                              const line = describeIncludedGuests(data.includedGuests, data.extraGuestRate, data.maxGuests, (n) => formatCurrency(n, { maximumFractionDigits: 0 }), data.priceChangesWithGuests);
                               return line ? ` ${line}.` : '';
                             })()}`
                           : 'Contact host for occupancy details.'}
@@ -3013,6 +3015,7 @@ useEffect(() => {
                         securityDepositAmount={data.securityDepositAmount ?? null}
                         includedGuests={data.includedGuests ?? null}
                         extraGuestRate={data.extraGuestRate ?? null}
+                        priceChangesWithGuests={data.priceChangesWithGuests ?? null}
                         hasSmallPartyPricing={Boolean(data.hasSmallPartyPricing || (data as unknown as { occupancyPricingEnabled?: boolean }).occupancyPricingEnabled)}
                         onStickySummaryChange={setStickyBookingSummary}
                         tenantContext={effectiveTenantCtx}
