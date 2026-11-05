@@ -5,13 +5,16 @@
 export const REFUND_APPROVAL_WINDOW = "within 24 hours";
 export const REFUND_SETTLEMENT_DAYS = "7–10 business days";
 
+/** GUEST-059 (founder ruled 2026-11-05): the host approves refunds. One sentence, reused everywhere. */
+export const REFUND_APPROVER_SENTENCE = "Refunds are approved by your host.";
+
 /** Property-page refund journey step 1 (TASK-1039743) */
 export const REFUND_REQUEST_STEP_DESC =
   "Request cancellation from your booking confirmation; our team reviews it.";
 
 /** Property-page refund journey step 2 */
 export const REFUND_INITIATED_STEP_DESC =
-  `Atlas approves and initiates your refund ${REFUND_APPROVAL_WINDOW}. Reference number sent to you.`;
+  `Atlas approves and initiates your refund ${REFUND_APPROVAL_WINDOW}. Reference number sent to you. ${REFUND_APPROVER_SENTENCE}`;
 
 /** Property-page refund journey step 3 */
 export const REFUND_SETTLEMENT_STEP_DESC =
@@ -23,7 +26,7 @@ export const REFUND_CONFIRMATION_STEP_DESC =
 
 /** /policies and /faq canonical timeline sentence */
 export const REFUND_POLICY_TIMELINE_SENTENCE =
-  `Where refunds are applicable, we approve and initiate the refund ${REFUND_APPROVAL_WINDOW} after confirming your cancellation. Funds reach the original payment method in ${REFUND_SETTLEMENT_DAYS}.`;
+  `Where refunds are applicable, we approve and initiate the refund ${REFUND_APPROVAL_WINDOW} after confirming your cancellation. Funds reach the original payment method in ${REFUND_SETTLEMENT_DAYS}. ${REFUND_APPROVER_SENTENCE}`;
 
 /** Booking confirmation cancellation request disclosure (AC7) */
 export const REFUND_CANCELLATION_REQUEST_DISCLOSURE =
