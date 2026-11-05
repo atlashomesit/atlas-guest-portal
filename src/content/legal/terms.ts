@@ -1,3 +1,4 @@
+import { REFUND_APPROVER_SENTENCE } from "../../config/refundPolicyTimelines";
 import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
 
 export type TermsSection = {
@@ -33,6 +34,7 @@ export const termsSections: TermsSection[] = [
     body: [
       "The cancellation policy that applies to your stay is the one shown on the home's listing for the rate you choose, and again on your booking confirmation. Each rate can differ, and some rates are non-refundable.",
       "Where that policy allows a refund, it is returned to the original payment method. Where no policy is shown for your stay, contact the host before you pay.",
+      REFUND_APPROVER_SENTENCE,
       "No-shows and early departures are typically non-refundable once the stay start date has begun, unless required by law.",
     ],
   },
