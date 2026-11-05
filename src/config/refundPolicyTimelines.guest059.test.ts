@@ -10,6 +10,21 @@ import { termsSections } from '@/content/legal/terms';
 import { faqItems } from '@/content/legal/faqs';
 import { withRatePlanCancellation } from '@/utils/cancellationPolicy';
 
+describe('GUEST-059 no refund line says anyone but the host approves', () => {
+  it('the shared wording never gives approval to Atlas or our team, and keeps the 24-hour start', async () => {
+    const all = await import('./refundPolicyTimelines');
+    const lines = Object.values(all).filter((v): v is string => typeof v === 'string');
+    for (const line of lines) {
+      expect(line).not.toMatch(/Atlas approves|we approve|our team/i);
+      expect(line).not.toMatch(/We'll review and approve/i);
+    }
+    expect(all.REFUND_INITIATED_STEP_DESC).toContain('within 24 hours');
+    expect(all.REFUND_POLICY_TIMELINE_SENTENCE).toContain('within 24 hours');
+    expect(all.REFUND_CANCELLATION_REQUEST_DISCLOSURE).toMatch(/your host will review it/i);
+    expect(all.REFUND_CANCELLATION_RECEIVED_MESSAGE).toMatch(/your host will review it/i);
+  });
+});
+
 describe('GUEST-059 refunds are approved by the host', () => {
   it('the shared sentence is plain', () => {
     expect(REFUND_APPROVER_SENTENCE).toBe('Refunds are approved by your host.');
