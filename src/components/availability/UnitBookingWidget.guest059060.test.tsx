@@ -169,6 +169,12 @@ describe('UnitBookingWidget - GUEST-060: guest count above the maximum, and what
     expect(screen.getByTestId('bw-included-guests').textContent).toBe('Includes 4 guests');
   });
 
+  it('WALK2-2: rows that are not one plain amount say the price changes with the guests, with no number', async () => {
+    stubPlansEndpoint([plan({ id: 27, name: 'Standard', isDefault: true })]);
+    await renderWidget({ maxGuests: 4, includedGuests: 2, extraGuestRate: null, priceChangesWithGuests: true });
+    expect(screen.getByTestId('bw-included-guests').textContent).toBe('Includes 2 guests. Price changes with the number of guests');
+  });
+
   it('shows nothing when the listing sends no included-guest count', async () => {
     stubPlansEndpoint([plan({ id: 26, name: 'Standard', isDefault: true })]);
     await renderWidget({ maxGuests: 8 });
