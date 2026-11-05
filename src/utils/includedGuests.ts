@@ -30,6 +30,22 @@ export function readIncludedGuestFields(payload: Record<string, unknown> | null 
 }
 
 /**
+ * The public listing reply is the one reply that always carries these facts; the catalog row and GET /listings/{id}
+ * may not. Use the listing row's values only until that reply arrives, or if it failed.
+ */
+export function pickIncludedGuestFacts(
+  publicFacts: IncludedGuestFields | null,
+  listing: { includedGuests?: number | null; extraGuestRate?: number | null; priceChangesWithGuests?: boolean | null },
+): IncludedGuestFields {
+  if (publicFacts) return publicFacts;
+  return {
+    includedGuests: listing.includedGuests ?? null,
+    extraGuestRate: listing.extraGuestRate ?? null,
+    ...(listing.priceChangesWithGuests ? { priceChangesWithGuests: true } : {}),
+  };
+}
+
+/**
  * "Includes 2 guests, then ₹500 per extra guest per night". The extra-guest clause appears only when the host set
  * a rate and the home sleeps more people than the price includes. When the API says the price follows the guest count
  * in a way one number cannot describe, the line says that instead and shows no number. Returns null when the included

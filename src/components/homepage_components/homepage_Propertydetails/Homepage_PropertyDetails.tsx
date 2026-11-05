@@ -69,7 +69,7 @@ import {
 } from '../../../utils/guestImageUrl';
 import { getStandardStayTimes } from '../../../content/faqHighlights';
 import { formatCurrency } from '../../../utils/formatting';
-import { describeIncludedGuests, readIncludedGuestFields } from '../../../utils/includedGuests';
+import { describeIncludedGuests, pickIncludedGuestFacts, readIncludedGuestFields, type IncludedGuestFields } from '../../../utils/includedGuests';
 import {
   describeCancellationPolicy,
   resolveEffectiveCancellationTier,
@@ -677,6 +677,8 @@ const PropertyDetails = () => {
     const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
     /** REV-030: blended star counts from `GET /api/public/listings/{id}`. */
     const [publicRatingStarCounts, setPublicRatingStarCounts] = useState<number[] | null>(null);
+    /** GUEST-060: what the price covers, from GET /api/public/listings/{id}; the catalog row and GET /listings/{id} may not carry it. */
+    const [publicGuestFacts, setPublicGuestFacts] = useState<IncludedGuestFields | null>(null);
     /**
      * REV-046: review-QR "Guest feedback" notes (`guestFeedback` on both review endpoints). Kept apart from
      * `listingReviewsFromApi` / `externalReviewsFromApi` on purpose: nothing derived from this list may feed
@@ -958,6 +960,7 @@ const PropertyDetails = () => {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
             setPublicRatingStarCounts(null);
+            setPublicGuestFacts(null);
             setGuestFeedbackFromApi([]);
             return;
         }
@@ -965,6 +968,7 @@ const PropertyDetails = () => {
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
         setExternalReviewsFromApi([]);
         setPublicRatingStarCounts(null);
+        setPublicGuestFacts(null);
         setGuestFeedbackFromApi([]);
         void (async () => {
             try {
@@ -1018,10 +1022,12 @@ const PropertyDetails = () => {
                                 ? publicPayload.RatingStarCounts
                                 : null;
                         setPublicRatingStarCounts(starCounts);
+                        setPublicGuestFacts(readIncludedGuestFields(publicPayload as Record<string, unknown>));
                     }
                 } else if (!ac.signal.aborted) {
                     setExternalReviewsFromApi([]);
                     setPublicRatingStarCounts(null);
+                    setPublicGuestFacts(null);
                 }
 
                 if (!ac.signal.aborted) {
@@ -1041,6 +1047,7 @@ const PropertyDetails = () => {
                     setListingReviewsFromApi(null);
                     setExternalReviewsFromApi([]);
                     setPublicRatingStarCounts(null);
+                    setPublicGuestFacts(null);
                     setGuestFeedbackFromApi([]);
                 }
             }
@@ -2817,7 +2824,8 @@ useEffect(() => {
                         {data.maxGuests != null && data.maxGuests > 0
                           ? `Up to ${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'} welcome.${(() => {
                               // GUEST-060: what the price covers, from the host's own numbers; nothing when the API sends none.
-                              const line = describeIncludedGuests(data.includedGuests, data.extraGuestRate, data.maxGuests, (n) => formatCurrency(n, { maximumFractionDigits: 0 }), data.priceChangesWithGuests);
+                              const facts = pickIncludedGuestFacts(publicGuestFacts, data);
+                              const line = describeIncludedGuests(facts.includedGuests, facts.extraGuestRate, data.maxGuests, (n) => formatCurrency(n, { maximumFractionDigits: 0 }), facts.priceChangesWithGuests);
                               return line ? ` ${line}.` : '';
                             })()}`
                           : 'Contact host for occupancy details.'}
@@ -3013,9 +3021,9 @@ useEffect(() => {
                         clusterRole={data.clusterRole ?? null}
                         clusterId={data.clusterId ?? null}
                         securityDepositAmount={data.securityDepositAmount ?? null}
-                        includedGuests={data.includedGuests ?? null}
-                        extraGuestRate={data.extraGuestRate ?? null}
-                        priceChangesWithGuests={data.priceChangesWithGuests ?? null}
+                        includedGuests={pickIncludedGuestFacts(publicGuestFacts, data).includedGuests}
+                        extraGuestRate={pickIncludedGuestFacts(publicGuestFacts, data).extraGuestRate}
+                        priceChangesWithGuests={pickIncludedGuestFacts(publicGuestFacts, data).priceChangesWithGuests ?? null}
                         hasSmallPartyPricing={Boolean(data.hasSmallPartyPricing || (data as unknown as { occupancyPricingEnabled?: boolean }).occupancyPricingEnabled)}
                         onStickySummaryChange={setStickyBookingSummary}
                         tenantContext={effectiveTenantCtx}
