@@ -94,7 +94,7 @@ import { getIstCalendarDate, toCalendarISO, istInstantFromCalendarDate } from '@
 import { resolveListing } from '@/utils/listingResolver';
 import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
-import { pricingNotConfiguredMessage } from '@/utils/pricingNotConfigured';
+import { isPricingNotConfiguredError, pricingNotConfiguredMessage } from '@/utils/pricingNotConfigured';
 import { ADS_MEASUREMENT_CONSENT_SEGMENTS, resolveAdsMeasurementWho } from '@/content/consent/adsMeasurementConsent';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
@@ -842,6 +842,8 @@ const GuestDetailsPage: React.FC = () => {
   // GuestDetailsPage mounts on a deep-link or restored draft without holdPriceBreakdown,
   // or when stay parameters (guests, ratePlanId, checkIn, checkOut) change.
   const hydratedQuoteKeyRef = useRef<string | null>(null);
+  // TASK-1040051: the API refused to quote this stay (409 PRICING_NOT_CONFIGURED). Its sentence; null otherwise.
+  const [quoteRefusedMessage, setQuoteRefusedMessage] = useState<string | null>(null);
   useEffect(() => {
     const listingIdNum = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(listingIdNum) || listingIdNum <= 0 || !booking.checkIn || !booking.checkOut) {
@@ -878,6 +880,7 @@ const GuestDetailsPage: React.FC = () => {
     )
       .then((quote) => {
         if (ac.signal.aborted || !quote) return;
+        setQuoteRefusedMessage(null);
         const nightsCount = Math.max(
           1,
           Math.round((Date.parse(`${checkOutDate}T00:00:00Z`) - Date.parse(`${checkInDate}T00:00:00Z`)) / 86400000),
@@ -906,8 +909,10 @@ const GuestDetailsPage: React.FC = () => {
           },
         });
       })
-      .catch(() => {
-        /* non-fatal; fallback estimate remains active */
+      .catch((err: unknown) => {
+        if (ac.signal.aborted) return;
+        // TASK-1040051: a refusal is final for this stay (no total, no Pay); any other failure stays non-fatal.
+        setQuoteRefusedMessage(isPricingNotConfiguredError(err) ? err.message : null);
       });
 
     return () => ac.abort();
@@ -1201,6 +1206,11 @@ const GuestDetailsPage: React.FC = () => {
       }
     };
   }, []);
+
+  // TASK-1040051: no real price yet (no server quote and no base amount) reads as "Total INR 1" from the estimate's
+  // floor. Never show that placeholder: the amount is hidden until a real quote exists.
+  const checkoutPriceKnown =
+    quoteRefusedMessage == null && (serverFinalAmount != null || baseAmount > 0);
 
   /** TASK-2875: when the server total differs, the Pay CTA shows the authoritative charge (INR). */
   const chargeInr =
@@ -2465,7 +2475,8 @@ const GuestDetailsPage: React.FC = () => {
     (!houseRulesRequired || houseRulesAccepted) &&
     (!dormAckRequired || dormAckAccepted) &&
     (!depositRequired || depositAccepted);
-  const payDisabled = isSubmitting || !readyToPay || notTakingBookings;
+  // TASK-1040051: a stay the API refused to price can never be paid for here.
+  const payDisabled = isSubmitting || !readyToPay || notTakingBookings || quoteRefusedMessage != null;
 
   return (
     <div className="gd-page">
@@ -3541,7 +3552,7 @@ const GuestDetailsPage: React.FC = () => {
           <div className="gd-price-total">
             <span className="label">Total</span>
             <div style={{ textAlign: 'right' }}>
-              <div className="num">{displayPrice(displayTotal)}</div>
+              <div className="num" data-testid="checkout-total-amount">{checkoutPriceKnown ? displayPrice(displayTotal) : '—'}</div>
               <small className="num-sub" data-testid="checkout-total-gst-note">
                 INR
               </small>
@@ -3601,9 +3612,16 @@ const GuestDetailsPage: React.FC = () => {
               >
                 {isSubmitting
                   ? <><IconSpinner size={16}/> Securing your booking…</>
-                  : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
+                  : checkoutPriceKnown
+                    ? <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
+                    : <><IconLock size={14}/> Pay to confirm</>
                 }
               </button>
+              {quoteRefusedMessage != null && (
+                <div className="gd-pay-microcopy" role="alert" data-testid="checkout-pricing-not-configured">
+                  {quoteRefusedMessage}
+                </div>
+              )}
 
               {/* Pay microcopy */}
               {!readyToPay && (
@@ -3619,7 +3637,7 @@ const GuestDetailsPage: React.FC = () => {
                           : 'Tick the consent box to enable payment.'}
                 </div>
               )}
-              {readyToPay && (
+              {readyToPay && checkoutPriceKnown && (
                 <div className="gd-pay-microcopy">
                   You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
                   {freeCancellationCopy?.deadlineFormatted
@@ -3770,15 +3788,17 @@ const GuestDetailsPage: React.FC = () => {
             type={readyToPay ? 'submit' : 'button'}
             form="gd-details-form"
             className="gd-mobile-bar-cta"
-            disabled={isSubmitting}
+            disabled={isSubmitting || quoteRefusedMessage != null}
             onClick={readyToPay ? undefined : scrollToConsent}
             data-testid="guest-booking-submit-mobile"
           >
             {isSubmitting
               ? <><IconSpinner size={14}/> Securing…</>
-              : serverTotalConfirmRequired
-                ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
-                : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
+              : !checkoutPriceKnown
+                ? <><IconLock size={14}/> Pay</>
+                : serverTotalConfirmRequired
+                  ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
+                  : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
             }
           </button>
         ) : notTakingBookings ? (
