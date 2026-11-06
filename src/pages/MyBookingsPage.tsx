@@ -407,16 +407,15 @@ export default function MyBookingsPage() {
           </div>
         )}
 
-        {bookings.length > 0 && bookings[0].token && (
+        {bookings.length > 0 && bookings[0].id && bookings[0].token && (
           <div className="text-center pt-2 flex flex-col items-center gap-2">
-            {(guestId && token) && (
-              <Link
-                to={`/profile?bookingId=${bookings[0].id}&t=${encodeURIComponent(token)}`}
-                className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
-              >
-                Update contact details
-              </Link>
-            )}
+            <Link
+              to={`/profile?bookingId=${bookings[0].id}&t=${encodeURIComponent(bookings[0].token)}`}
+              className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"
+              data-testid="my-bookings-update-profile"
+            >
+              Update contact details
+            </Link>
             <Link
               to={`/preferences/${encodeURIComponent(bookings[0].token)}`}
               className="text-sm text-text-muted underline underline-offset-2 hover:text-text-primary"

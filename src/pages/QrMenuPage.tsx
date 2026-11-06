@@ -103,6 +103,10 @@ export interface OrderStatus {
   status: string;
   liveStep: "Scheduled" | "Order Received" | "Preparing in Kitchen" | "Out for Delivery" | "Served";
   targetLabel: string;
+  /** Verified stay attribution, retained by the API when the tracker is reloaded. No guest identity. */
+  chargedStayLabel?: string | null;
+  orderedFromLabel?: string | null;
+  bedLabel?: string | null;
   settlementMethod: string;
   totalAmount: number;
   gstAmount: number;
@@ -276,7 +280,7 @@ function resolveFulfillAtIso(mode: FulfillAtMode, customTime: string, now: Date 
 
 export default function QrMenuPage() {
   const { tenantSlug = "atlas" } = useParams<{ tenantSlug: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // POS-011: the printed room QR is `?rk=<opaque key>`. The old numeric `?room=<listingId>` keeps working while the API allows it.
   const roomKeyParam = searchParams.get("rk")?.trim() || undefined;
@@ -338,6 +342,13 @@ export default function QrMenuPage() {
     });
   }, [roomChargeAvailable, offerPayNow, offerPayOnDelivery]);
   const [verificationCode, setVerificationCode] = useState<string>("");
+  const [verifiedRoom, setVerifiedRoom] = useState<{ chargedStayLabel: string; bedOptions: string[] } | null>(null);
+  const [selectedBed, setSelectedBed] = useState("");
+  // A bed choice belongs to this verified code and QR, never to the next stay opened on the same page.
+  useEffect(() => {
+    setVerifiedRoom(null);
+    setSelectedBed("");
+  }, [tenantSlug, roomKeyParam, urlListingId, verificationCode]);
   const [guestName, setGuestName] = useState<string>("");
   const [guestPhone, setGuestPhone] = useState<string>("");
   // POS-062: takeaway PICKUP is offered on the plain menu link only (no room, no table), where today's order is a counter walk-in. It is paid at the
@@ -409,9 +420,22 @@ export default function QrMenuPage() {
     };
   }, [tenantSlug, roomKeyParam, urlListingId, tableCode, menuReloadNonce]);
 
+  // A reload (or the back button) must bring the guest's order tracker back instead of an empty menu that invites a second order.
+  // The order number goes into this page's own address, replacing the entry, so the existing `?order=` recovery below does the rest.
+  const placedOrderNumber = useRef<string | null>(null);
+  const rememberOrderInUrl = (orderNumber: string | null) => {
+    placedOrderNumber.current = orderNumber;
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      if (orderNumber) next.set("order", orderNumber); else next.delete("order");
+      return next;
+    }, { replace: true });
+  };
+
   // If order param is provided, load initial order tracking
   useEffect(() => {
-    if (!orderParam) return;
+    // An order this page just placed is already on screen; only an order arriving through the address is fetched.
+    if (!orderParam || placedOrderNumber.current === orderParam) return;
     let cancelled = false;
 
     async function loadOrder() {
@@ -552,6 +576,10 @@ export default function QrMenuPage() {
     if (cartLines.length === 0) return;
 
     setVerificationError(null);
+    if (settlementMethod === "POST_TO_ROOM" && verifiedRoom && !selectedBed) {
+      setVerificationError("Choose the bed to charge before placing your order.");
+      return;
+    }
     const scheduledForIso = resolveFulfillAtIso(fulfillAt, customFulfillTime);
     if (scheduledForIso === undefined) {
       setVerificationError("Please pick the time you would like your order served, or choose 'As soon as possible'.");
@@ -575,6 +603,7 @@ export default function QrMenuPage() {
         // POS-011: the room key from the printed QR; only a room charge needs it, and a legacy numeric link has none.
         roomKey: settlementMethod === "POST_TO_ROOM" ? roomKeyParam : undefined,
         verificationCode: settlementMethod === "POST_TO_ROOM" ? verificationCode.trim() : undefined,
+        bedLabel: settlementMethod === "POST_TO_ROOM" && selectedBed ? selectedBed : undefined,
         // POS-047 L3: only the code goes up; a room charge refuses a promo code on the server, so none is sent with one.
         promoCode: settlementMethod !== "POST_TO_ROOM" && promoCode.trim() ? promoCode.trim().toUpperCase() : undefined,
         guestName: guestName.trim() || undefined,
@@ -607,6 +636,14 @@ export default function QrMenuPage() {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => null);
+        if (errorData?.code === "BED_SELECTION_REQUIRED" && Array.isArray(errorData.bedOptions)) {
+          // Returned only after successful PIN/phone verification. No order or charge was created.
+          const bedOptions = errorData.bedOptions.filter((bed: unknown): bed is string => typeof bed === "string" && bed.trim().length > 0);
+          setVerifiedRoom({ chargedStayLabel: errorData.chargedStayLabel || targetHeading, bedOptions });
+          setSelectedBed("");
+          setVerificationError(errorData.error || "Choose the bed to charge, then place your order.");
+          return;
+        }
         if (errorData?.code === "ROOM_CHARGE_LOCKED") {
           // POS-011: too many wrong codes for this room. Show when it ends and offer the other ways to pay. The order is NOT
           // re-sent: the guest chooses Pay Now / Pay on Delivery, or taps "Check again" later.
@@ -625,6 +662,8 @@ export default function QrMenuPage() {
           return;
         }
         if (res.status === 403 || errorData?.code === "ROOM_VERIFICATION_FAILED") {
+          setVerifiedRoom(null);
+          setSelectedBed("");
           if (typeof errorData?.attemptsRemaining === "number") setAttemptsRemaining(errorData.attemptsRemaining);
           setVerificationError(
             errorData?.error ||
@@ -637,6 +676,7 @@ export default function QrMenuPage() {
 
       const orderData: OrderStatus = await res.json();
       setActiveOrder(orderData);
+      rememberOrderInUrl(orderData.orderNumber);
       setPromoCode("");
       setCart({});
       setFulfillAt("NOW");
@@ -650,8 +690,10 @@ export default function QrMenuPage() {
 
   // Filter items
   const allCategories = useMemo(() => menu?.categories ?? [], [menu?.categories]);
-  const isKnownInvalidCode = verificationCode.trim() === "0000";
-  const showVerificationWarning = isKnownInvalidCode || Boolean(verificationError);
+  // The server decides whether a code is right (phone last-4 or stay PIN, 5 tries then a lockout). The page never rules a code out
+  // itself: a phone or PIN that really ends in 0000 is a genuine code. Only a refusal the server has just sent holds the button
+  // until the guest edits the code.
+  const showVerificationWarning = Boolean(verificationError);
   const visibleCategories = useMemo(() => {
     if (selectedCategory === "ALL") return allCategories;
     return allCategories.filter((c) => c.categoryKey === selectedCategory);
@@ -833,7 +875,7 @@ export default function QrMenuPage() {
               maxLength={8}
               placeholder="e.g. 4829 or Stay PIN"
               value={verificationCode}
-              onChange={(e) => setVerificationCode(e.target.value)}
+              onChange={(e) => { setVerificationCode(e.target.value); setVerificationError(null); }}
               style={{
                 width: "100%",
                 padding: "8px 12px",
@@ -845,28 +887,6 @@ export default function QrMenuPage() {
               }}
               data-testid="pos-qr-verification-input"
             />
-            {isKnownInvalidCode && (
-              <div
-                style={{
-                  backgroundColor: "#fef2f2",
-                  border: "1px solid #fecaca",
-                  color: "#991b1b",
-                  padding: "8px 10px",
-                  borderRadius: "6px",
-                  fontSize: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  marginTop: "8px",
-                }}
-                data-testid="pos-qr-room-invalid-alert-pre"
-              >
-                <AlertCircle size={14} />
-                <span>
-                  Phone last-4 or Stay PIN does not match active CheckedIn booking for this room. Please Pay Now via UPI or pay online upfront.
-                </span>
-              </div>
-            )}
             <button
               type="button"
               disabled
@@ -1000,6 +1020,16 @@ export default function QrMenuPage() {
                 <span style={{ color: "#64748b" }}>Location / Folio:</span>
                 <span style={{ fontWeight: 700 }}>{activeOrder.targetLabel}</span>
               </div>
+              {activeOrder.chargedStayLabel && (
+                <div data-testid="pos-qr-charge-attribution" style={{ borderTop: "1px solid #e2e8f0", paddingTop: "8px", marginBottom: "10px", overflowWrap: "anywhere" }}>
+                  <div><strong>Charged to {activeOrder.chargedStayLabel}</strong></div>
+                  {activeOrder.orderedFromLabel ? (
+                    <div style={{ marginTop: "4px", color: "#475569" }}>Ordered from {activeOrder.orderedFromLabel}</div>
+                  ) : activeOrder.bedLabel ? (
+                    <div style={{ marginTop: "4px", color: "#475569" }}>{activeOrder.bedLabel}</div>
+                  ) : null}
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
                 <span style={{ color: "#64748b" }}>Kitchen Ticket (KOT):</span>
                 <span style={{ fontWeight: 700 }}>{activeOrder.kotNumber || "KOT-Pending"}</span>
@@ -1081,7 +1111,7 @@ export default function QrMenuPage() {
             )}
 
             <button
-              onClick={() => setActiveOrder(null)}
+              onClick={() => { setActiveOrder(null); rememberOrderInUrl(null); }}
               style={{
                 width: "100%",
                 padding: "10px",
@@ -1639,6 +1669,7 @@ export default function QrMenuPage() {
                   data-testid="pos-qr-room-guardrail-section"
                 >
                   <label
+                    htmlFor="pos-qr-verification-code"
                     style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#1e1b18", marginBottom: "4px" }}
                   >
                     Security Verification for {targetHeading}:
@@ -1647,12 +1678,13 @@ export default function QrMenuPage() {
                     Enter the last 4 digits of your booking&apos;s registered phone number OR 4-digit Stay PIN to post charges to your room folio.
                   </p>
                   <input
+                    id="pos-qr-verification-code"
                     type="text"
                     required
                     maxLength={8}
                     placeholder="e.g. 4829 or Stay PIN"
                     value={verificationCode}
-                    onChange={(e) => setVerificationCode(e.target.value)}
+                    onChange={(e) => { setVerificationCode(e.target.value); setVerificationError(null); }}
                     style={{
                       width: "100%",
                       padding: "8px 12px",
@@ -1664,26 +1696,18 @@ export default function QrMenuPage() {
                     }}
                     data-testid="pos-qr-verification-input"
                   />
-                  {isKnownInvalidCode && (
-                    <div
-                      style={{
-                        backgroundColor: "#fef2f2",
-                        border: "1px solid #fecaca",
-                        color: "#991b1b",
-                        padding: "8px 10px",
-                        borderRadius: "6px",
-                        fontSize: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        marginTop: "8px",
-                      }}
-                      data-testid="pos-qr-room-invalid-alert"
-                    >
-                      <AlertCircle size={14} />
-                      <span>
-                        Phone last-4 or Stay PIN does not match active CheckedIn booking for this room. Please Pay Now via UPI or pay online upfront.
-                      </span>
+                  {verifiedRoom && (
+                    <div style={{ marginTop: "12px" }} data-testid="pos-qr-verified-stay">
+                      <p style={{ margin: "0 0 8px", fontSize: "12px", overflowWrap: "anywhere" }}>
+                        Verified stay: <strong>{verifiedRoom.chargedStayLabel}</strong>. Choose which bed this order belongs to.
+                      </p>
+                      <label htmlFor="pos-qr-bed" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>Bed to charge</label>
+                      <select id="pos-qr-bed" data-testid="pos-qr-bed-select" required value={selectedBed}
+                        onChange={(e) => { setSelectedBed(e.target.value); setVerificationError(null); }}
+                        style={{ width: "100%", minHeight: "44px", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1", backgroundColor: "#fff", fontSize: "14px" }}>
+                        <option value="">Choose a bed</option>
+                        {verifiedRoom.bedOptions.map((bed) => <option key={bed} value={bed}>{bed}</option>)}
+                      </select>
                     </div>
                   )}
                 </div>

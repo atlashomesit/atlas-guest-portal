@@ -20,13 +20,39 @@ function buildSupportAnswer(businessPhone: string, ownerPhone: string): string {
   return ownerPhone.trim() ? `${base} For escalations, the owner line is ${ownerPhone}.` : base;
 }
 
+/** GUEST-062: the standard times the generic FAQ states; the listing page falls back to the same words. */
+export const STANDARD_CHECK_IN_TIME = "2:00 PM";
+export const STANDARD_CHECK_OUT_TIME = "11:00 AM";
+
+function usesAtlasDemoFaq(slug: string | undefined): boolean {
+  return (
+    !isNeutralBrandingMode() &&
+    (isMarketplaceMode() || (slug ?? "").trim().toLowerCase() === "atlas")
+  );
+}
+
+/**
+ * GUEST-062: the standard check-in / check-out times for a listing that has none of its own, but ONLY
+ * when the FAQ this visitor reads actually states them (the generic FAQ). A tenant with its own FAQ, and
+ * the Atlas/marketplace FAQ (which deliberately names no times), get null so the page never shows a time
+ * its own FAQ does not back.
+ */
+export function getStandardStayTimes(): { checkIn: string; checkOut: string } | null {
+  const tenantCtx = getTenantContext();
+  if (tenantCtx?.faq && tenantCtx.faq.length > 0) return null;
+  const overrides = getTenantOverrides(tenantCtx?.slug);
+  if (overrides.faq && overrides.faq.length > 0) return null;
+  if (usesAtlasDemoFaq(tenantCtx?.slug)) return null;
+  return { checkIn: STANDARD_CHECK_IN_TIME, checkOut: STANDARD_CHECK_OUT_TIME };
+}
+
 function genericWhiteLabelFaq(businessPhone: string, ownerPhone: string): FaqHighlight[] {
   return [
     {
       id: "checkin-checkout",
       question: "How do check-in and check-out work?",
       answer:
-        "Standard check-in is 2:00 PM and check-out is 11:00 AM unless your confirmation says otherwise. Self check-in with ID is supported when offered, and early/late slots depend on availability.",
+        `Standard check-in is ${STANDARD_CHECK_IN_TIME} and check-out is ${STANDARD_CHECK_OUT_TIME} unless your confirmation says otherwise. Self check-in with ID is supported when offered, and early/late slots depend on availability.`,
     },
     {
       id: "changes-cancellations",
@@ -83,9 +109,7 @@ export function getFaqHighlights(): FaqHighlight[] {
   const businessPhone = formatDisplayNumber("business");
   const ownerPhone = formatDisplayNumber("owner");
 
-  const useAtlasDemoFaq =
-    !isNeutralBrandingMode() &&
-    (isMarketplaceMode() || (slug ?? "").trim().toLowerCase() === "atlas");
+  const useAtlasDemoFaq = usesAtlasDemoFaq(slug);
 
   if (!useAtlasDemoFaq) {
     return genericWhiteLabelFaq(businessPhone, ownerPhone);
@@ -110,8 +134,8 @@ export function getFaqHighlights(): FaqHighlight[] {
       id: "extra-guests-fees",
       question: "Can I add extra guests or pay additional fees?",
       answer:
-        // Founder ruling 2026-10-21: matches the pricing (two guests included in every home, ruled 2026-07-08).
-        "The price you see includes two guests. Extra guests are welcome up to each home's limit for a small nightly fee per guest, and the price updates as soon as you add them.",
+        // GUEST-058: hosts choose their own included guests and extra-guest rate; do not state one host's numbers here.
+        "The price you see covers the guests the host includes in that home; the listing shows how many. Extra guests are welcome up to each home's limit and may cost more per night, and the price updates as soon as you add them.",
     },
     {
       id: "wifi-parking",

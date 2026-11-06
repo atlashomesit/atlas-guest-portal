@@ -21,10 +21,19 @@ export interface GuestMealPreferences {
   preferredBreakfastTime?: string | null;
   earlyPackedBreakfast: boolean;
   foodAllergies?: string | null;
+  /** BNB-022: optional home-cooked dinner order text (max 500 chars). */
+  homeCookedDinnerOrder?: string | null;
+  /** BNB-022: optional evening date (yyyy-MM-dd) within [CheckinDate, CheckoutDate). */
+  homeCookedDinnerOrderDate?: string | null;
+  /** BNB-022: stay check-in date (yyyy-MM-dd). */
+  checkinDate?: string | null;
+  /** BNB-022: stay check-out date (yyyy-MM-dd). */
+  checkoutDate?: string | null;
   options: {
     dietaryTags: MealOption[];
     breakfastTimeSlots: MealOption[];
     maxFoodAllergiesLength: number;
+    maxDinnerOrderLength?: number;
   };
 }
 
@@ -37,7 +46,28 @@ export interface GuestDietarySelectorProps {
    * summary has none. Leave it `undefined` and the component loads the summary itself.
    */
   mealPreferences?: GuestMealPreferences | null;
+  checkinDate?: string | null;
+  checkoutDate?: string | null;
   className?: string;
+}
+
+function getStayEveningDates(checkinDate?: string | null, checkoutDate?: string | null): string[] {
+  const startStr = (checkinDate || '').slice(0, 10);
+  const endStr = (checkoutDate || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startStr) || !/^\d{4}-\d{2}-\d{2}$/.test(endStr)) return [];
+  const start = new Date(`${startStr}T00:00:00Z`);
+  const end = new Date(`${endStr}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) return [];
+  const dates: string[] = [];
+  const cursor = new Date(start);
+  while (cursor < end && dates.length < 60) {
+    const yyyy = cursor.getUTCFullYear();
+    const mm = String(cursor.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(cursor.getUTCDate()).padStart(2, '0');
+    dates.push(`${yyyy}-${mm}-${dd}`);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
 }
 
 const TAG_ICONS: Record<string, string> = {
@@ -56,6 +86,8 @@ const GuestDietarySelector: React.FC<GuestDietarySelectorProps> = ({
   bookingId,
   token,
   mealPreferences,
+  checkinDate,
+  checkoutDate,
   className = '',
 }) => {
   const [fetched, setFetched] = useState<GuestMealPreferences | null>(null);
@@ -71,8 +103,18 @@ const GuestDietarySelector: React.FC<GuestDietarySelectorProps> = ({
           { headers: { Accept: 'application/json', ...getApiHeaders() } },
         );
         if (!res.ok) return;
-        const body = (await res.json()) as { mealPreferences?: GuestMealPreferences | null };
-        if (!cancelled && body.mealPreferences) setFetched(body.mealPreferences);
+        const body = (await res.json()) as {
+          checkinDate?: string | null;
+          checkoutDate?: string | null;
+          mealPreferences?: GuestMealPreferences | null;
+        };
+        if (!cancelled && body.mealPreferences) {
+          setFetched({
+            ...body.mealPreferences,
+            checkinDate: body.mealPreferences.checkinDate ?? body.checkinDate ?? null,
+            checkoutDate: body.mealPreferences.checkoutDate ?? body.checkoutDate ?? null,
+          });
+        }
       } catch {
         /* the section simply stays hidden when the summary cannot be loaded */
       }
@@ -91,6 +133,8 @@ const GuestDietarySelector: React.FC<GuestDietarySelectorProps> = ({
       bookingId={bookingId}
       token={token}
       prefs={prefs}
+      checkinDate={checkinDate ?? prefs.checkinDate}
+      checkoutDate={checkoutDate ?? prefs.checkoutDate}
       className={className}
     />
   );
@@ -100,19 +144,32 @@ interface MealFormProps {
   bookingId: number | string;
   token: string;
   prefs: GuestMealPreferences;
+  checkinDate?: string | null;
+  checkoutDate?: string | null;
   className: string;
 }
 
-const MealForm: React.FC<MealFormProps> = ({ bookingId, token, prefs, className }) => {
+const MealForm: React.FC<MealFormProps> = ({ bookingId, token, prefs, checkinDate, checkoutDate, className }) => {
   const knownTagIds = prefs.options.dietaryTags.map((o) => o.id);
   const knownSlotIds = prefs.options.breakfastTimeSlots.map((o) => o.id);
   const maxAllergies = prefs.options.maxFoodAllergiesLength || 1000;
+  const maxDinnerOrder = prefs.options.maxDinnerOrderLength || 500;
+  const stayEvenings = getStayEveningDates(checkinDate, checkoutDate);
 
   // Pre-fill from what the host already has (the server). An unsaved draft from a failed save wins.
   const draft = (() => {
     try {
       const raw = localStorage.getItem(draftKey(bookingId));
-      return raw ? (JSON.parse(raw) as Partial<{ tags: string[]; slot: string; packed: boolean; allergies: string }>) : null;
+      return raw
+        ? (JSON.parse(raw) as Partial<{
+            tags: string[];
+            slot: string;
+            packed: boolean;
+            allergies: string;
+            dinnerOrder: string;
+            dinnerDate: string;
+          }>)
+        : null;
     } catch {
       return null;
     }
@@ -132,10 +189,18 @@ const MealForm: React.FC<MealFormProps> = ({ bookingId, token, prefs, className 
   const [allergies, setAllergies] = useState<string>(() =>
     typeof draft?.allergies === 'string' ? draft.allergies : prefs.foodAllergies ?? '',
   );
+  const [dinnerOrder, setDinnerOrder] = useState<string>(() =>
+    typeof draft?.dinnerOrder === 'string' ? draft.dinnerOrder : prefs.homeCookedDinnerOrder ?? '',
+  );
+  const [dinnerDate, setDinnerDate] = useState<string>(() =>
+    typeof draft?.dinnerDate === 'string' ? draft.dinnerDate : prefs.homeCookedDinnerOrderDate ?? '',
+  );
   const [status, setStatus] = useState<SaveState>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const touch = () => {
     if (status !== 'saving') setStatus('idle');
+    setErrorMessage(null);
   };
 
   const toggleTag = (id: string) => {
@@ -145,11 +210,23 @@ const MealForm: React.FC<MealFormProps> = ({ bookingId, token, prefs, className 
 
   const handleSave = async () => {
     setStatus('saving');
+    setErrorMessage(null);
+    const hasDinnerInput =
+      dinnerOrder.trim().length > 0 ||
+      Boolean(prefs.homeCookedDinnerOrder) ||
+      dinnerDate.trim().length > 0 ||
+      Boolean(prefs.homeCookedDinnerOrderDate);
     const body = {
       dietaryTags: tags,
       preferredBreakfastTime: slot,
       earlyPackedBreakfast: packed,
       foodAllergies: allergies,
+      ...(hasDinnerInput
+        ? {
+            homeCookedDinnerOrder: dinnerOrder.trim(),
+            ...(dinnerDate || prefs.homeCookedDinnerOrderDate ? { homeCookedDinnerOrderDate: dinnerDate } : {}),
+          }
+        : {}),
     };
     try {
       const res = await fetch(
@@ -160,7 +237,23 @@ const MealForm: React.FC<MealFormProps> = ({ bookingId, token, prefs, className 
           body: JSON.stringify(body),
         },
       );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let serverMessage: string | null = null;
+        try {
+          const errBody = (await res.json()) as { error?: string; message?: string };
+          if (errBody?.error === 'CUTOFF_EXCEEDED') {
+            serverMessage =
+              errBody.message ||
+              'Home-cooked dinner requests for tonight must be placed before 4:00 PM property local time.';
+          } else if (errBody?.message || errBody?.error) {
+            serverMessage = errBody.message ?? errBody.error ?? null;
+          }
+        } catch {
+          /* ignore json parse error */
+        }
+        setErrorMessage(serverMessage);
+        throw new Error(`HTTP ${res.status}`);
+      }
       try {
         localStorage.removeItem(draftKey(bookingId));
       } catch {
@@ -172,7 +265,7 @@ const MealForm: React.FC<MealFormProps> = ({ bookingId, token, prefs, className 
       try {
         localStorage.setItem(
           draftKey(bookingId),
-          JSON.stringify({ tags, slot, packed, allergies }),
+          JSON.stringify({ tags, slot, packed, allergies, dinnerOrder, dinnerDate }),
         );
       } catch {
         /* ignore storage errors */
@@ -294,6 +387,51 @@ const MealForm: React.FC<MealFormProps> = ({ bookingId, token, prefs, className 
         />
       </div>
 
+      <div className="space-y-2" data-testid="dietary-dinner-preorder-section">
+        <label
+          htmlFor="dietary-dinner-order"
+          className="block text-xs font-bold uppercase tracking-wider text-emerald-900"
+        >
+          Home-cooked dinner request (optional — order by 4:00 PM)
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <input
+            id="dietary-dinner-order"
+            type="text"
+            maxLength={maxDinnerOrder}
+            value={dinnerOrder}
+            onChange={(e) => {
+              setDinnerOrder(e.target.value);
+              touch();
+            }}
+            data-testid="dietary-dinner-order-input"
+            placeholder="e.g. 2 Veg Thalis, Phulkas & Dal"
+            className="sm:col-span-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs text-emerald-950 shadow-2xs focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          />
+          <select
+            id="dietary-dinner-date"
+            aria-label="Dinner evening"
+            value={dinnerDate}
+            onChange={(e) => {
+              setDinnerDate(e.target.value);
+              touch();
+            }}
+            data-testid="dietary-dinner-date-select"
+            className="rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-medium text-emerald-950 shadow-2xs focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          >
+            <option value="">Every evening of stay</option>
+            {stayEvenings.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="text-[11px] text-emerald-700/90">
+          Same-day home-cooked dinner requests close at 4:00 PM property time so the kitchen can source fresh ingredients.
+        </p>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3 pt-1">
         <button
           type="button"
@@ -322,7 +460,7 @@ const MealForm: React.FC<MealFormProps> = ({ bookingId, token, prefs, className 
             data-testid="dietary-save-error"
             role="alert"
           >
-            We could not save your choices. Please check your connection and tap Save again.
+            {errorMessage || 'We could not save your choices. Please check your connection and tap Save again.'}
           </span>
         )}
       </div>

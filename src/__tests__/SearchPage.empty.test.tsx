@@ -5,12 +5,13 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import { CurrencyProvider } from '../contexts/CurrencyContext';
 import SearchPage from '../pages/SearchPage';
 import { settle } from '../test/settle';
+import { _setTenantContextForTests } from '../tenant/tenantContext';
 
 const mockFetchPublicListings = vi.fn();
 vi.mock('../api/listingClient', () => ({
@@ -81,7 +82,7 @@ describe('SearchPage — empty state (TASK-1451)', () => {
     await settle();
     expect(screen.getByTestId('search-empty-state')).toBeInTheDocument();
 
-    expect(screen.getByRole('heading', { name: /no homestays match your filters/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'No stays are available for this search' })).toBeInTheDocument();
     expect(screen.getByText(/try adjusting dates, price range, or guest count/i)).toBeInTheDocument();
     expect(screen.getByTestId('search-empty-clear-filters')).toBeInTheDocument();
     expect(screen.getByTestId('search-empty-suggestions')).toBeInTheDocument();
@@ -142,5 +143,76 @@ describe('SearchPage — load failure must not claim zero results (TASK-7195)', 
     await settle();
     expect(screen.getByTestId('search-empty-state')).toBeInTheDocument();
     expect(screen.queryByTestId('search-load-error')).not.toBeInTheDocument();
+  });
+});
+
+function SearchLocation() {
+  return <output data-testid="search-location">{useLocation().search}</output>;
+}
+
+describe('UX-2026-11-03-06: tenant search recovery', () => {
+  beforeEach(() => {
+    tenantOverridesFlag.onlyApiListings = true;
+    _setTenantContextForTests({ name: 'Fixture tenant', slug: 'weekly-fixture', guestCommsBrandingMode: 'Neutral', legalContactPack: { displayName: 'Fixture Stays', contactPhone: '+910000000099', isCustomDomain: true } });
+    mockFetchPublicListings.mockReset();
+    mockFetchPublicListings.mockResolvedValue([]);
+    mockFetch.mockReset();
+    mockFetch.mockImplementation(async () => ({ ok: true, json: async () => ({ availableListingIds: [] }) }));
+  });
+  afterEach(() => {
+    tenantOverridesFlag.onlyApiListings = false;
+    _setTenantContextForTests(null);
+  });
+  const renderRecovery = (onEmptyStateChange?: (empty: boolean) => void) => render(<CurrencyProvider><MemoryRouter initialEntries={['/search?checkIn=2026-11-10&checkOut=2026-11-12&guests=3&adults=2&children=1&amenities=wifi&minPrice=1000']}><SearchPage onEmptyStateChange={onEmptyStateChange} /><SearchLocation /></MemoryRouter></CurrencyProvider>);
+
+  it('opts into inline shell help only for confirmed empty results and releases it on unmount', async () => {
+    const onEmptyStateChange = vi.fn();
+    const { unmount } = renderRecovery(onEmptyStateChange);
+    expect(onEmptyStateChange).not.toHaveBeenCalledWith(true);
+    await settle();
+    expect(onEmptyStateChange).toHaveBeenLastCalledWith(true);
+    unmount();
+    expect(onEmptyStateChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('focuses the existing date field, retains date/party scope while clearing optional filters and offers the tenant contact', async () => {
+    renderRecovery();
+    await settle();
+    const scrollIntoView = vi.fn();
+    screen.getByLabelText('Check-in').scrollIntoView = scrollIntoView;
+    fireEvent.click(screen.getByTestId('search-empty-change-dates'));
+    expect(screen.getByLabelText('Check-in')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' });
+    expect(screen.getByRole('link', { name: /Call Fixture Stays/ })).toHaveAttribute('href', 'tel:+910000000099');
+    fireEvent.click(screen.getByTestId('search-empty-clear-filters'));
+    await settle();
+    const params = new URLSearchParams(screen.getByTestId('search-location').textContent ?? '');
+    expect(params.get('checkIn')).toBe('2026-11-10');
+    expect(params.get('checkOut')).toBe('2026-11-12');
+    expect(params.get('guests')).toBe('3');
+    expect(params.get('adults')).toBe('2');
+    expect(params.get('children')).toBe('1');
+    expect(params.has('amenities')).toBe(false);
+    expect(params.has('minPrice')).toBe(false);
+    expect(screen.getByLabelText('Guests')).toHaveValue(3);
+    expect(screen.getByTestId('search-empty-browse-all')).toHaveAttribute('href', '/search');
+  });
+
+  it('does not claim empty success while date availability is still loading', async () => {
+    mockFetch.mockReturnValue(new Promise(() => {}));
+    renderRecovery();
+    await settle();
+    expect(screen.queryByTestId('search-empty-state')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('search-date-availability-skeleton').length).toBeGreaterThan(0);
+  });
+
+  it('keeps failed availability distinct from a successful empty search', async () => {
+    mockFetch.mockResolvedValue({ ok: false });
+    const onEmptyStateChange = vi.fn();
+    renderRecovery(onEmptyStateChange);
+    await settle();
+    expect(screen.getByTestId('search-date-availability-failed')).toBeInTheDocument();
+    expect(screen.queryByTestId('search-empty-state')).not.toBeInTheDocument();
+    expect(onEmptyStateChange).not.toHaveBeenCalledWith(true);
   });
 });

@@ -8,6 +8,7 @@ import Subheading from '../components/commonComponents/subheading/Subheading';
 import SEO from '../components/SEO';
 import { getTenantBrandName } from '../tenant/displayBrand';
 import { formatHumanDate } from '../utils/formatting';
+import { appendQuerySuffix } from '../utils/navigation';
 
 const Reserve = () => {
   const { booking } = useBooking();
@@ -33,12 +34,12 @@ const Reserve = () => {
       return;
     }
 
-    const checkInParam = booking.checkIn ? `?checkIn=${encodeURIComponent(booking.checkIn)}` : '';
-    const checkOutSep = booking.checkIn && booking.checkOut ? '&' : '?';
-    const checkOutParam = booking.checkOut ? `${checkOutSep}checkOut=${encodeURIComponent(booking.checkOut)}` : '';
-    const guestsParam = booking.guests ? `&guests=${booking.guests}` : '';
+    const params = new URLSearchParams();
+    if (booking.checkIn) params.set('checkIn', booking.checkIn);
+    if (booking.checkOut) params.set('checkOut', booking.checkOut);
+    if (booking.guests) params.set('guests', String(booking.guests));
 
-    navigate(`${base}${checkInParam}${checkOutParam}${guestsParam}`);
+    navigate(appendQuerySuffix(base, params.toString()));
   };
 
   return (

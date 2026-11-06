@@ -179,4 +179,38 @@ describe('ListingCard independent controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View room Sunrise Villa' }));
     expect(openRoom).toHaveBeenCalledTimes(1);
   });
+
+  it('MKT-042: marketplace card uses listing fee/GST props and links rating chip to href#reviews', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    render(
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingCard
+            marketplace
+            id="724"
+            name="Baga Cottage"
+            location="Goa"
+            image=""
+            price={2000}
+            rating={4.8}
+            reviews={14}
+            propertyType="Homestay"
+            guests={2}
+            petFriendly={false}
+            isGstRegistered={false}
+            chargesOnlinePaymentFee={false}
+            convenienceFeePercent={3}
+            href="/homes/baga-cottage/724?tenant=host-b&brand=atlastays"
+          />
+        </BookingProvider>
+      </CurrencyProvider>,
+    );
+
+    const reviews = screen.getByRole('link', { name: 'View guest reviews' });
+    expect(reviews).toHaveAttribute('href', '/homes/baga-cottage/724?tenant=host-b&brand=atlastays#reviews');
+
+    // OwnerShareBadge receives processingFeePercent=0 (since chargesOnlinePaymentFee=false)
+    const ownerBadge = screen.getByText(/Book direct — host keeps more/i);
+    expect(ownerBadge.getAttribute('title')).toContain('No payment-processing fee.');
+  });
 });

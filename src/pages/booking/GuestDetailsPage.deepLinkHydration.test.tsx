@@ -1,10 +1,27 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BookingProvider } from '@/contexts/BookingContext';
+import { fetchGuestPriceBreakdown } from '@/api/pricingClient';
+import { settle } from '@/test/settle';
 import GuestDetailsPage from './GuestDetailsPage';
 
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
+vi.mock('@/api/pricingClient', () => ({
+  fetchGuestPriceBreakdown: vi.fn(async () => ({
+    listingId: 101,
+    checkIn: '2026-11-10',
+    checkOut: '2026-11-15',
+    currency: 'INR',
+    baseAmount: 15000,
+    discountAmount: 1500,
+    convenienceFeeAmount: 0,
+    finalAmount: 14700,
+    extraGuestFee: 800,
+    cleaningFee: 400,
+  })),
+}));
 
 vi.mock('@/lib/events', () => ({
   track: vi.fn(),
@@ -102,5 +119,61 @@ describe('GuestDetailsPage deep-link query hydration (TASK-10298987)', () => {
     // Stale draft blocking modal SHOULD be shown when no dates exist
     expect(screen.getByText(/Let's pick your dates again/i)).toBeDefined();
     expect(screen.getByText(/We couldn't find the stay you were booking/i)).toBeDefined();
+  });
+
+  it('TASK-1040062: fetches fetchGuestPriceBreakdown when holdPriceBreakdown is null on deep-link and sends guestEmail + subtotal on promo validate', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/promo-codes/validate')) {
+        return new Response(
+          JSON.stringify({ valid: true, message: 'Code applied!', discountAmount: 500 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+
+    const initialUrl = '/book/seaside-property/101/details?checkIn=2026-11-10&checkOut=2026-11-15&guests=3&tenant=test-tenant';
+
+    render(
+      <BookingProvider>
+        <MemoryRouter initialEntries={[initialUrl]}>
+          <Routes>
+            <Route path="/book/:propertySlug/:unitSlug/details" element={<GuestDetailsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </BookingProvider>
+    );
+
+    await settle();
+    expect(fetchGuestPriceBreakdown).toHaveBeenCalledWith(
+      101,
+      '2026-11-10',
+      '2026-11-15',
+      expect.any(AbortSignal),
+      null,
+      3,
+      'test-tenant',
+    );
+
+    const emailInput = screen.getByTestId('guest-booking-email');
+    fireEvent.change(emailInput, { target: { value: 'vip@example.com' } });
+
+    const promoInput = screen.getByTestId('guest-booking-promo');
+    fireEvent.change(promoInput, { target: { value: 'VIP500' } });
+    fireEvent.blur(promoInput);
+    await settle();
+
+    const promoCall = fetchSpy.mock.calls.find(([u]) => String(u).includes('/api/promo-codes/validate'));
+    expect(promoCall).toBeDefined();
+    const body = JSON.parse(String(promoCall?.[1]?.body ?? '{}'));
+    expect(body).toMatchObject({
+      code: 'VIP500',
+      listingId: 101,
+      subtotal: 15000,
+      guestEmail: 'vip@example.com',
+    });
+
+    fetchSpy.mockRestore();
   });
 });

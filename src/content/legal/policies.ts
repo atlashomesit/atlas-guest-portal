@@ -23,11 +23,11 @@ export const policySections: PolicySection[] = [
     id: "cancellation-refunds",
     title: "Cancellation & Refunds",
     summary:
-      "Notice periods determine eligibility for refunds or credits; no-shows and early departures are generally non-refundable once the stay begins.",
+      "The cancellation policy shown on the home's listing for your rate decides what you can be refunded; no-shows and early departures are generally non-refundable once the stay begins.",
     details: [
-      "100% refund (minus non-recoverable processing fees) for cancellations received more than 15 days before check-in, where stated.",
-      "50% refund or equivalent credit for cancellations received 7–15 days before check-in, if applicable to your rate plan.",
-      "Within 7 days of arrival, cancellations, no-shows, and early departures are typically non-refundable once the stay start date has begun unless required by law.",
+      "The cancellation policy that applies to your stay is the one shown on the home's listing for the rate you choose, and again on your booking confirmation. Each rate can differ, and some rates are non-refundable.",
+      "Where no cancellation policy is shown for your stay, contact the host before you pay.",
+      "No-shows and early departures are typically non-refundable once the stay start date has begun, unless required by law.",
       REFUND_POLICY_TIMELINE_SENTENCE,
     ],
     termsRefs: ["cancellations-refunds", "booking-payments"],

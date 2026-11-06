@@ -29,6 +29,7 @@ import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
 import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
 import { OUR_HOMES_ANCHOR_ID } from '@/config/navigation'; // TASK-10299142
+import './marketplace-homepage.css';
 import { useScrollToHash } from '@/hooks/useScrollToHash'; // TASK-10299142
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
@@ -226,6 +227,13 @@ export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' |
 
 export default function MarketplaceHomepage() {
   const navigate = useNavigate();
+  const [wideFilters, setWideFilters] = useState(() => window.innerWidth >= 768);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    const update = () => setWideFilters(window.innerWidth >= 768);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -324,6 +332,7 @@ export default function MarketplaceHomepage() {
         ? newSort
         : 'recommended';
     setSortBy(valid);
+    setPage(1);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (valid !== 'recommended') {
@@ -405,8 +414,9 @@ export default function MarketplaceHomepage() {
     if (maxPrice != null) p.set('maxPrice', String(maxPrice));
     // MKT-026: the server filters on real amenity codes before pagination, so page 2+ is filtered too.
     if (serverAmenityCodes.length > 0) p.set('amenities', serverAmenityCodes.join(','));
+    if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -683,7 +693,7 @@ export default function MarketplaceHomepage() {
 
   return (
     <>
-    <section className="mx-auto w-full max-w-6xl px-4 py-8" data-testid="marketplace-homepage">
+    <section className="marketplace-homepage" data-testid="marketplace-homepage">
       {/* TASK-1876: SEO meta for marketplace homepage.
           TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
           shipped brand baseline (MARKETPLACE_BRAND_BASELINE), mirroring Home.tsx's
@@ -736,49 +746,27 @@ export default function MarketplaceHomepage() {
         <AirbnbSearchBar />
       </div>
 
-      {/* MKT-034: one-click city directory under the hero. Thumbnails borrow a real photo from the listings already loaded;
-          no stay counts here (one loaded page would under-report) - /destinations carries those. */}
-      <ExploreDestinationsStrip listings={items} />
-
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="marketplace-controls">
+        <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
+          open={wideFilters || filtersOpen}
+          onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <div className="marketplace-secondary-content">
+            <ExploreDestinationsStrip listings={items} />
+            <div className="marketplace-refinements">
         <input
+          aria-label="Search by city"
           data-testid="marketplace-search"
           className="min-h-[44px] rounded-xl border border-border px-4 py-2"
           placeholder="Search by city"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        {(['all', 'homes', 'rooms', 'villas'] as const).map((c) => (
-          <button
-            key={c}
-            data-testid={`marketplace-filter-${c}`}
-            className={`min-h-[44px] rounded-xl px-4 py-2 ${category === c ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
-            onClick={() => handleCategoryChange(c)}
-          >
-            {c === 'all' ? 'All' : c[0].toUpperCase() + c.slice(1)}
-          </button>
-        ))}
-        {/* TL-PROP: map view toggle. Hidden if no properties have lat/lng configured. */}
-        {mapPins.length > 0 && (
-          <button
-            data-testid="marketplace-map-toggle"
-            className={`ml-auto min-h-[44px] rounded-xl px-4 py-2 ${showMap ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
-            onClick={() => setShowMap((v) => !v)}
-            aria-pressed={showMap}
-          >
-            {showMap ? 'Hide map' : `Map (${mapPins.length})`}
-          </button>
-        )}
-      </div>
-
-      {/* MKT-023 / TASK-10298932 / TASK-1039950: Top amenities quick filter pills */}
       <AmenityFilterPills
         selectedAmenity={selectedAmenity}
         onSelectAmenity={handleAmenityChange}
       />
 
-      {/* TASK-4413: price-range control & TASK-1039952: sort dropdown */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="marketplace-min-price" className="text-sm font-medium text-text-muted">
             Price / night
@@ -819,6 +807,31 @@ export default function MarketplaceHomepage() {
           )}
         </div>
 
+            </div>
+          </div>
+        </details>
+        <div className="marketplace-primary-controls">
+        {(['all', 'homes', 'rooms', 'villas'] as const).map((c) => (
+          <button
+            key={c}
+            data-testid={`marketplace-filter-${c}`}
+            className={`min-h-[44px] rounded-xl px-4 py-2 ${category === c ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
+            onClick={() => handleCategoryChange(c)}
+          >
+            {c === 'all' ? 'All' : c[0].toUpperCase() + c.slice(1)}
+          </button>
+        ))}
+        {/* TL-PROP: map view toggle. Hidden if no properties have lat/lng configured. */}
+        {mapPins.length > 0 && (
+          <button
+            data-testid="marketplace-map-toggle"
+            className={`ml-auto min-h-[44px] rounded-xl px-4 py-2 ${showMap ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
+            onClick={() => setShowMap((v) => !v)}
+            aria-pressed={showMap}
+          >
+            {showMap ? 'Hide map' : `Map (${mapPins.length})`}
+          </button>
+        )}
         {/* TASK-1039952: Missing sort dropdown on Marketplace Homepage */}
         <div className="flex items-center gap-2" data-testid="marketplace-sort-wrapper">
           <label htmlFor="marketplace-sort" className="text-sm font-medium text-text-muted whitespace-nowrap">
@@ -838,6 +851,7 @@ export default function MarketplaceHomepage() {
             <option value="rating_desc">Rating: High to Low</option>
           </select>
         </div>
+        </div>
       </div>
 
       {showMap && mapPins.length > 0 && (
@@ -847,7 +861,7 @@ export default function MarketplaceHomepage() {
       )}
 
       {/* TASK-10299142: the header/footer "Stays" link targets #our-homes; on the marketplace that is this grid. */}
-      <div id={OUR_HOMES_ANCHOR_ID} className="mt-8 grid scroll-mt-28 gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="marketplace-grid">
+      <div id={OUR_HOMES_ANCHOR_ID} className="marketplace-results-grid scroll-mt-28" data-testid="marketplace-grid">
         {/* TASK-1875: skeleton cards while loading */}
         {loading && Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
 
@@ -877,7 +891,7 @@ export default function MarketplaceHomepage() {
                     alt={cardTitle || 'Listing photo'}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    sizes="(max-width: 639px) 100vw, (max-width: 959px) 50vw, (max-width: 1279px) 33vw, (max-width: 1599px) 25vw, (max-width: 2099px) 20vw, 330px"
                   />
                 </div>
 

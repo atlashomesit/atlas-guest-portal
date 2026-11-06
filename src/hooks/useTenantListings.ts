@@ -66,6 +66,8 @@ export type TenantPropertyRecord = {
   clusterRole?: string | null;
   clusterId?: number | null;
   isParentCluster?: boolean | null;
+  /** GUEST-061: the listing's city when the public listing payload names one. */
+  city?: string | null;
 };
 
 export type TenantListingsState = "idle" | "loading" | "error" | "success";
@@ -175,6 +177,7 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     clusterRole: dto.clusterRole ?? null,
     clusterId: dto.clusterId ?? null,
     isParentCluster: dto.isParentCluster ?? (dto.clusterRole ? dto.clusterRole.toUpperCase() === 'PARENT' : null),
+    city: dto.city ?? null,
   };
 };
 

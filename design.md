@@ -120,3 +120,20 @@ Independent review of the merged property-page change (private `atlas-ux-evidenc
 - Booking card order at 1024px and up with the card beside the gallery: price, dates and guests, price lines, Reserve, then the reassurance blocks, then the listing preview photo (it repeats the gallery beside it). Nothing is removed; the pinned card now shows Reserve at 1280x720. This replaces the 01-E order only for the preview photo's position. Phone and tablet keep the established order.
 - Desktop floaters (WhatsApp, FAQs, Chat with us) stack in the left gutter and step aside while the footer is within reach of the stack, so they never cover footer links.
 - Not changed: the heritage layout (its own page, gallery mosaic and card position are as before #661) stays outside the beside-gallery layout until it has its own approval.
+
+
+## Daily five - 3 November 2026 implementation approval
+
+Sreekar said: "I approve all five proposals for November 3. Implement them and show me the actual before and after on mobile and wide screens for final approval before merging." Immutable approval: private `atlas-ux-evidence/docs/ux/daily-five/2026-11-03/r1/index.html`, gallery SHA-256 `561cc458f37b4b9b4f29aca0233aeeeff8a2c9a2c0ccfc6e12defec4ab3e5da1`; receipt: `2026-11-03/implemented-r1/APPROVAL.json`.
+
+UXD-2026-11-03-05-A: The active DIRECT5 offer reports denied or unavailable Clipboard API copying truthfully, exposes a readonly exact code with Select code, and focuses/selects it clear of existing widgets. A successful retry removes the fallback and resets Copied after two seconds. Preserve all offer colors, promo validation, eligibility, navigation and Theme/Chat controls. This supersedes only the disclosed r1 presentation/behavior scope. Actual native four-viewport and 200% zoom comparisons and independent per-ID review belong in `2026-11-03/implemented-r1/`.
+
+Implementation approval does not authorize merging. Keep the feature PR DRAFT, labelled `hold-for-review`, with auto-merge disabled until Sreekar approves the actual result and exact final head. No direct dev push, release, deployment or activation of historical held tests.
+
+## Approved weekly experience review — 3 November 2026 r1
+
+Sreekar approved the visual and usability changes in private `atlas-ux-evidence/docs/ux/weekly-experience-review/2026-11-03/r1/REPORT.md`, retaining separate approval for new capabilities and pricing/billing rules. UX-2026-10-12-07 uses a fluid marketplace grid, an Atlastays-only marketplace wordmark and a native phone disclosure for destinations/city/amenities/price, retaining categories/map/sort and existing cards, rates, provenance and consent. Configured tenant identity remains authoritative, including when a marketplace preview query is present. UX-2026-11-03-06 shows neutral tenant empty-search recovery only after successful loading and availability: Change dates focuses the existing date input, recovery Clear filters retains dates and party, Browse all uses the existing search route, and contact uses the tenant-aware helper. Existing global filter-reset behavior, date/guest/search/API and booking/payment semantics remain unchanged.
+
+This supersedes only the named presentation/recovery decisions; prior approved date pickers, booking shortcuts, search layouts and tenant themes remain. Actual evidence belongs in private `docs/ux/backlog-reviews/weekly-2026-11-03/implementation/guest/`. No deployment is authorized by this change.
+
+Implementation review refinement: on marketplace home and confirmed tenant empty search, the existing Chat with us launcher sits in normal document flow before the footer so it cannot cover filters or recovery actions. Its existing drawer, contact behavior and focus restoration remain. Other routes and failed/loading search retain the existing floating launcher. Tenant More filters stays before the recovery result in document and phone visual order.

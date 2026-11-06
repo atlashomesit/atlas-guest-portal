@@ -87,21 +87,38 @@ function fetchListingReviewBatch(id: number): Promise<ListingReviewBatch> {
     return cached.promise;
   }
 
-  const promise = Promise.all([
-    fetch(buildApiUrl(`/api/listings/${id}/reviews`), { headers: getApiHeaders() })
+  const promise = (async (): Promise<ListingReviewBatch> => {
+    const nativeRes = await fetch(buildApiUrl(`/api/listings/${id}/reviews`), { headers: getApiHeaders() })
       .then((res) => (res.ok ? res.json() : null))
-      .catch(() => null),
-    fetch(buildApiUrl(`/api/public/listings/${id}`), { headers: getApiHeaders() })
-      .then((res) => (res.ok ? res.json() : null))
-      .catch(() => null),
-  ]).then(([nativeRes, publicRes]) => ({
-    nativeReviews: (nativeRes?.reviews ?? []) as ReviewDto[],
-    externalReviews: (publicRes?.externalReviews ?? []) as ExternalReviewDto[],
-    guestFeedbackRaw: [
-      ...(Array.isArray(nativeRes?.guestFeedback) ? nativeRes.guestFeedback : []),
-      ...(Array.isArray(publicRes?.guestFeedback) ? publicRes.guestFeedback : []),
-    ] as unknown[],
-  }));
+      .catch(() => null);
+
+    // TASK-1040123: GET /api/listings/{id}/reviews already returns reviews, externalReviews, and guestFeedback
+    // in one payload. Skip the redundant GET /api/public/listings/{id} waterfall unless externalReviews or
+    // guestFeedback is absent from the response.
+    const hasUnifiedPayload =
+      nativeRes !== null &&
+      typeof nativeRes === "object" &&
+      Array.isArray(nativeRes.externalReviews) &&
+      Array.isArray(nativeRes.guestFeedback);
+
+    const publicRes = hasUnifiedPayload
+      ? null
+      : await fetch(buildApiUrl(`/api/public/listings/${id}`), { headers: getApiHeaders() })
+          .then((res) => (res.ok ? res.json() : null))
+          .catch(() => null);
+
+    const externalFromNative = Array.isArray(nativeRes?.externalReviews) ? (nativeRes.externalReviews as ExternalReviewDto[]) : [];
+    const externalFromPublic = Array.isArray(publicRes?.externalReviews) ? (publicRes.externalReviews as ExternalReviewDto[]) : [];
+
+    return {
+      nativeReviews: (nativeRes?.reviews ?? []) as ReviewDto[],
+      externalReviews: externalFromNative.length > 0 ? externalFromNative : externalFromPublic,
+      guestFeedbackRaw: [
+        ...(Array.isArray(nativeRes?.guestFeedback) ? nativeRes.guestFeedback : []),
+        ...(Array.isArray(publicRes?.guestFeedback) ? publicRes.guestFeedback : []),
+      ] as unknown[],
+    };
+  })();
 
   verifiedReviewsCache.set(id, { promise, expiresAt: now + 5 * 60 * 1000 });
   return promise;

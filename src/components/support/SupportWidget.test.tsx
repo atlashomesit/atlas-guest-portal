@@ -24,6 +24,21 @@ const renderWidget = () =>
   );
 
 describe("SupportWidget", () => {
+  it("keeps the same drawer and focus return when its launcher is inline", () => {
+    render(<MemoryRouter><SupportWidget placement="inline" /></MemoryRouter>);
+    const trigger = screen.getByRole("button", { name: /chat with us/i });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: /need a hand/i });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(screen.getByText(/Request callback/i)).toBeInTheDocument();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const restored = screen.getByRole("button", { name: /chat with us/i });
+    expect(restored).toHaveFocus();
+    expect(restored).toHaveAttribute("data-placement", "inline");
+  });
+
   it("renders the minimized pill by default", () => {
     renderWidget();
     expect(screen.getByRole("button", { name: /chat with us/i })).toBeInTheDocument();

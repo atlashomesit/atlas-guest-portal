@@ -76,6 +76,7 @@ import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
 import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
 import { fetchListingById } from '@/api/listingClient';
+import { fetchGuestPriceBreakdown } from '@/api/pricingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
 import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
@@ -837,6 +838,90 @@ const GuestDetailsPage: React.FC = () => {
   const [availableAddOns, setAvailableAddOns] = useState<AddOnService[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
 
+  // TASK-1040062: Hydrate holdPriceBreakdown via GET /api/pricing/guest-breakdown when
+  // GuestDetailsPage mounts on a deep-link or restored draft without holdPriceBreakdown,
+  // or when stay parameters (guests, ratePlanId, checkIn, checkOut) change.
+  const hydratedQuoteKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const listingIdNum = holdListingId != null ? Number(holdListingId) : NaN;
+    if (!Number.isFinite(listingIdNum) || listingIdNum <= 0 || !booking.checkIn || !booking.checkOut) {
+      return;
+    }
+    const checkInDate = /^\d{4}-\d{2}-\d{2}$/.test(booking.checkIn)
+      ? booking.checkIn
+      : toCalendarISO(getIstCalendarDate(new Date(booking.checkIn)));
+    const checkOutDate = /^\d{4}-\d{2}-\d{2}$/.test(booking.checkOut)
+      ? booking.checkOut
+      : toCalendarISO(getIstCalendarDate(new Date(booking.checkOut)));
+    const guestsCount = booking.guests ?? 2;
+    const ratePlanId = booking.listingRatePlanId ?? null;
+    const quoteKey = `${listingIdNum}|${checkInDate}|${checkOutDate}|${guestsCount}|${ratePlanId ?? ''}|${effectiveTenantSlug ?? ''}`;
+
+    if (priceBreakdown != null && hydratedQuoteKeyRef.current === null) {
+      hydratedQuoteKeyRef.current = quoteKey;
+      return;
+    }
+    if (priceBreakdown != null && hydratedQuoteKeyRef.current === quoteKey) {
+      return;
+    }
+
+    hydratedQuoteKeyRef.current = quoteKey;
+    const ac = new AbortController();
+    fetchGuestPriceBreakdown(
+      listingIdNum,
+      checkInDate,
+      checkOutDate,
+      ac.signal,
+      ratePlanId,
+      guestsCount,
+      effectiveTenantSlug,
+    )
+      .then((quote) => {
+        if (ac.signal.aborted || !quote) return;
+        const nightsCount = Math.max(
+          1,
+          Math.round((Date.parse(`${checkOutDate}T00:00:00Z`) - Date.parse(`${checkInDate}T00:00:00Z`)) / 86400000),
+        );
+        updateBooking({
+          holdPriceBreakdown: {
+            baseAmount: quote.baseAmount,
+            discountAmount: quote.discountAmount,
+            convenienceFeeAmount: quote.convenienceFeeAmount,
+            finalAmount: quote.finalAmount ?? (quote.baseAmount - quote.discountAmount + quote.convenienceFeeAmount),
+            nights: nightsCount,
+            currency: 'INR',
+            touristTaxAmount: quote.touristTaxAmount,
+            ...(quote.cleaningFee ? { cleaningFee: quote.cleaningFee } : {}),
+            ...(quote.petFee ? { petFee: quote.petFee } : {}),
+            ...(quote.extraGuestFee ? { extraGuestFee: quote.extraGuestFee } : {}),
+            ...(quote.weekendRateAdjustmentAmount
+              ? { weekendRateAdjustmentAmount: quote.weekendRateAdjustmentAmount }
+              : {}),
+            ...(quote.originalNightlyRate != null ? { originalNightlyRate: quote.originalNightlyRate } : {}),
+            ...(quote.discountedNightlyRate != null ? { discountedNightlyRate: quote.discountedNightlyRate } : {}),
+            ...(quote.appliedPromotionLabel != null ? { appliedPromotionLabel: quote.appliedPromotionLabel } : {}),
+            ...(quote.breakfastPricePerPerson ? { breakfastPricePerPerson: quote.breakfastPricePerPerson } : {}),
+            ...(quote.includeBreakfast ? { includeBreakfast: quote.includeBreakfast } : {}),
+            ...(quote.breakfastExtraAmount ? { breakfastExtraAmount: quote.breakfastExtraAmount } : {}),
+          },
+        });
+      })
+      .catch(() => {
+        /* non-fatal; fallback estimate remains active */
+      });
+
+    return () => ac.abort();
+  }, [
+    holdListingId,
+    booking.checkIn,
+    booking.checkOut,
+    booking.guests,
+    booking.listingRatePlanId,
+    priceBreakdown,
+    effectiveTenantSlug,
+    updateBooking,
+  ]);
+
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
@@ -1219,11 +1304,17 @@ const GuestDetailsPage: React.FC = () => {
     if (!code || !holdListingId) return;
     setPromoValidating(true);
     setPromoMessage(null);
+    const trimmedEmail = formData.email.trim();
     try {
       const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getApiHeaders(effectiveTenantSlug) },
-        body: JSON.stringify({ code, listingId: Number(holdListingId), subtotal: baseAmount }),
+        body: JSON.stringify({
+          code,
+          listingId: Number(holdListingId),
+          subtotal: baseAmount,
+          guestEmail: trimmedEmail || undefined,
+        }),
       });
       if (!res.ok) { setPromoMessage('Could not validate code — try again.'); return; }
       const data = (await res.json()) as { valid: boolean; message: string; discountAmount?: number };
@@ -1240,7 +1331,7 @@ const GuestDetailsPage: React.FC = () => {
     } finally {
       setPromoValidating(false);
     }
-  }, [promoCode, holdListingId, baseAmount, effectiveTenantSlug]);
+  }, [promoCode, holdListingId, baseAmount, effectiveTenantSlug, formData.email]);
 
   // ── Promo remove (TASK-102118) ──────────────────────────────────────────
   // 1-click remove behind the savings chip's (x) button. No dedicated

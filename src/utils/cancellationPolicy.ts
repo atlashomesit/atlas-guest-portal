@@ -119,6 +119,62 @@ export function describeCancellationPolicy(
   };
 }
 
+/**
+ * GUEST-059: what the SELECTED rate plan itself says about cancelling, so the listing-level
+ * cancellation block, the trust row and the booking box all read from the same words the guest
+ * sees on the rate option. The plan's own summary (written from the plan's real window by the
+ * API) wins over the generic tier prose, which only describes the listing default and would
+ * otherwise tell a guest on a non-refundable rate that they get a full refund any time.
+ * Returns null when the plan carries nothing — callers then fall back to the listing tier.
+ */
+export interface RatePlanCancellationCopy {
+  headline: string;
+  nonRefundable: boolean;
+}
+
+export function describeRatePlanCancellation(
+  policy: string | null | undefined,
+  summary: string | null | undefined,
+): RatePlanCancellationCopy | null {
+  const p = (policy ?? '').trim();
+  const sum = (summary ?? '').trim();
+  if (/^non[-_ ]?refundable$/i.test(p)) {
+    return { headline: sum || 'Non-refundable rate', nonRefundable: true };
+  }
+  if (sum) return { headline: sum, nonRefundable: /^non[-_ ]?refundable/i.test(sum) };
+  return null;
+}
+
+/**
+ * GUEST-059: lay the selected rate plan's wording over the listing-level cancellation block.
+ * Nothing is invented: the headline is the plan's own summary; a non-refundable plan says so and
+ * drops the refund timeline (there is no refund to walk through); any other plan keeps the refund
+ * steps and only the "how money comes back" sentence, never a tier window that could disagree
+ * with the plan's own days. With no plan wording the block is returned untouched.
+ */
+export function withRatePlanCancellation<T extends { headline: string; description: string; steps: unknown[] }>(
+  base: T,
+  plan: RatePlanCancellationCopy | null | undefined,
+  hasOnlinePayment: boolean,
+): T {
+  if (!plan) return base;
+  if (plan.nonRefundable) {
+    return {
+      ...base,
+      headline: plan.headline,
+      description: 'This rate is not refundable. Choose another rate, if one is offered, to cancel with a refund.',
+      steps: [],
+    };
+  }
+  return {
+    ...base,
+    headline: plan.headline,
+    description: hasOnlinePayment
+      ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
+      : 'Your host arranges the refund directly with you.',
+  };
+}
+
 export interface CancellationRefundTier {
   cutoffLabel: string;
   refundPercent: number;
@@ -370,6 +426,8 @@ export function resolveFreeCancellationTrustCopy(input: {
   windowHoursOverride?: number | null;
   bookingCreatedAt?: Date;
   graceHours?: number | null;
+  /** GUEST-059: the selected rate plan's own cancellation summary; wins over tier prose in the fallback line. */
+  planSummary?: string | null;
   now?: Date;
 }): FreeCancellationTrustCopy {
   const now = input.now ?? new Date();
@@ -398,6 +456,11 @@ export function resolveFreeCancellationTrustCopy(input: {
 
   if (applicableGraceHours != null) {
     return { trustMessage: null, deadlineFormatted: null, applicableGraceHours };
+  }
+
+  const planSummary = (input.planSummary ?? '').trim();
+  if (planSummary) {
+    return { trustMessage: planSummary, deadlineFormatted: null, applicableGraceHours: null };
   }
 
   // GUEST-037: name the listing's actual policy instead of a vague "standard policy" line, so this

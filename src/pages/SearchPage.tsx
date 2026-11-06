@@ -47,7 +47,7 @@ import {
 } from "../utils/amenityCodes";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 import { isHostelDormType } from "../utils/dormListing";
-import { CONTACT } from "../config/contact";
+import { CONTACT, formatDisplayNumber, getTelLink } from "../config/contact";
 import { getPropertyDesignImage } from "../config/branding";
 import "./search-page.css";
 
@@ -114,6 +114,8 @@ type NormalizedListing = {
   accessibilityUnknown: boolean;
   /** TASK-10299183: online payment / checkout gateway available for listing. */
   onlinePaymentsAvailable?: boolean;
+  /** TASK-1040101: whether online payment fee is charged on this listing (preserved from MarketplaceListingDto). */
+  chargesOnlinePaymentFee?: boolean;
   /** TASK-10299183: whether small-party pricing is configured. */
   hasSmallPartyPricing?: boolean;
   /** TASK-10299109: dorm and hostel accommodation and gender fields */
@@ -252,6 +254,7 @@ type MarketplaceApiItem = {
   coverImageUrl?: string;
   rating?: number | null;
   reviewCount?: number | null;
+  chargesOnlinePaymentFee?: boolean;
 };
 
 function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing[] {
@@ -284,6 +287,8 @@ function marketplaceToNormalized(items: MarketplaceApiItem[]): NormalizedListing
     accessibilityFeatures: [],
     accessibilityUnknown: true,
     onlinePaymentsAvailable: (item as unknown as { onlinePaymentsAvailable?: boolean }).onlinePaymentsAvailable !== false,
+    chargesOnlinePaymentFee:
+      typeof item.chargesOnlinePaymentFee === "boolean" ? item.chargesOnlinePaymentFee : undefined,
     hasSmallPartyPricing: false,
     accommodationType: (item as Record<string, unknown>).accommodationType as string ?? null,
     dormGenderPolicy: (item as Record<string, unknown>).dormGenderPolicy as any ?? null,
@@ -346,7 +351,7 @@ function matchesCategory(unit: NormalizedListing, cat: string): boolean {
   return true;
 }
 
-const SearchPage = () => {
+const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boolean) => void }) => {
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const processingFeePercent = useTenantProcessingFee();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -375,14 +380,26 @@ const SearchPage = () => {
   const adultsParam = searchParams.get("adults");
   const childrenParam = searchParams.get("children");
   const destinationParam = searchParams.get("destination") ?? searchParams.get("city") ?? searchParams.get("location");
+  const availableNowParam = searchParams.get("availableNow");
 
   const loadFromMarketplace = useCallback(async (signal: AbortSignal) => {
     setApiError(false);
     try {
       const p = new URLSearchParams();
       if (destinationParam?.trim()) p.set("city", destinationParam.trim());
-      if (checkInParam) p.set("checkIn", checkInParam);
-      if (checkOutParam) p.set("checkOut", checkOutParam);
+      if (checkInParam && checkOutParam) {
+        p.set("checkIn", checkInParam);
+        p.set("checkOut", checkOutParam);
+      } else if (availableNowParam === "true") {
+        const todayStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+        const tomorrowDate = new Date(Date.now() + 86400000);
+        const tomorrowStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(tomorrowDate);
+        p.set("checkIn", todayStr);
+        p.set("checkOut", tomorrowStr);
+      } else {
+        if (checkInParam) p.set("checkIn", checkInParam);
+        if (checkOutParam) p.set("checkOut", checkOutParam);
+      }
       const guestTotal =
         Math.max((Number(adultsParam) || 0) + (Number(childrenParam) || 0), Number(guestsParam) || 0);
       if (guestTotal > 0) p.set("guests", String(guestTotal));
@@ -402,7 +419,7 @@ const SearchPage = () => {
         setApiListings([]);
       }
     }
-  }, [adultsParam, checkInParam, checkOutParam, childrenParam, destinationParam, guestsParam]);
+  }, [adultsParam, availableNowParam, checkInParam, checkOutParam, childrenParam, destinationParam, guestsParam]);
 
   const loadFromApi = useCallback(async (signal: AbortSignal) => {
     setApiError(false);
@@ -451,7 +468,6 @@ const SearchPage = () => {
   const maxPriceParam = searchParams.get("maxPrice");
   const remoteWorkParam = searchParams.get("remoteWork");
   const longStayParam = searchParams.get("longStay");
-  const availableNowParam = searchParams.get("availableNow");
   const amenitiesParamRaw = searchParams.get("amenities") || searchParams.get("amenity");
   const sortByParam = searchParams.get("sortBy") || searchParams.get("sort");
   const nomadWifiParam = searchParams.get("nomadWifi");
@@ -541,8 +557,9 @@ const SearchPage = () => {
     !onlyApiListings && apiListings === null && !isLoading && listings.length > 0;
 
   // TASK-8351: single availability-batch call for [today, tomorrow) instead of 40× listing-availability fan-out (5 waves of 8) — reuses dateAvailCacheRef, fail-open on non-2xx.
+  // TASK-1040101: skip single-tenant availability-batch on marketplace search (delegated to GET /marketplace/listings).
   useEffect(() => {
-    if (!availableNow) {
+    if (!availableNow || isMarketplaceSearch) {
       setTonightAvailableIds(null);
       setTonightProbeLoading(false);
       return;
@@ -609,11 +626,12 @@ const SearchPage = () => {
     })();
 
     return () => controller.abort();
-  }, [availableNow]);
+  }, [availableNow, isMarketplaceSearch]);
 
   // TASK-1648: GET /api/public/listings/availability?checkIn&checkOut when present, else batch; cache by date pair; fail-open
+  // TASK-1040101: skip single-tenant availability-batch on marketplace search (cross-tenant date filtering is handled by GET /marketplace/listings).
   useEffect(() => {
-    if (!checkIn || !checkOut || hasInvalidDates) {
+    if (isMarketplaceSearch || !checkIn || !checkOut || hasInvalidDates) {
       setDateAvailableIds(null);
       setDateAvailLoading(false);
       return;
@@ -686,7 +704,7 @@ const SearchPage = () => {
     })();
 
     return () => controller.abort();
-  }, [checkIn, checkOut, hasInvalidDates]);
+  }, [checkIn, checkOut, hasInvalidDates, isMarketplaceSearch]);
 
   const handleImageSearchResults = useCallback((matches: ImageSearchMatch[]) => {
     const normalized = apiToNormalized(matches.map((m) => m.listing));
@@ -713,8 +731,8 @@ const SearchPage = () => {
         if (!haystack.includes(dest)) return false;
       }
       if (guests && guests > unit.maxGuests) return false;
-      // TASK-1865: exclude listings confirmed unavailable for selected dates; skip when still loading or fetch failed
-      if (checkIn && checkOut && !dateAvailLoading && dateAvailableIds !== null) {
+      // TASK-1865 / TASK-1040101: exclude listings confirmed unavailable for selected dates on single-tenant search
+      if (!isMarketplaceSearch && checkIn && checkOut && !dateAvailLoading && dateAvailableIds !== null) {
         if (!dateAvailableIds.has(unit.numericId)) return false;
       }
       // TASK-577: Filter by remote work friendliness (co-working desk or WiFi >= 25 Mbps)
@@ -749,7 +767,7 @@ const SearchPage = () => {
       if (categoryParam && categoryParam !== "all") {
         if (!matchesCategory(unit, categoryParam)) return false;
       }
-      if (availableNow) {
+      if (availableNow && !isMarketplaceSearch) {
         if (tonightProbeLoading) return true;
         if (tonightAvailableIds === null) return true;
         if (!tonightAvailableIds.has(unit.numericId)) return false;
@@ -806,11 +824,11 @@ const SearchPage = () => {
     const seenIds = new Set(baseScope.map((u) => u.numericId));
     const suggestionsToQuote = emptyStateSuggestions.filter((u) => !seenIds.has(u.numericId));
     const scope = [...baseScope, ...suggestionsToQuote];
-    const feeCharged = isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext());
+    const defaultFeeCharged = isMarketplaceSearch ? true : hasOnlinePaymentRail(getTenantContext());
     return scope.map((unit) => ({
       id: unit.numericId,
       tenantSlug: new URLSearchParams(unit.canonicalPath.split("?")[1] ?? "").get("tenant") ?? tenant?.slug ?? "",
-      chargesOnlinePaymentFee: feeCharged,
+      chargesOnlinePaymentFee: unit.chargesOnlinePaymentFee ?? defaultFeeCharged,
     }));
   }, [quoteStay, priceDrivenView, unitsBeforePriceFilter, visibleCount, emptyStateSuggestions, isMarketplaceSearch, tenant?.slug]);
   const stayPrices = useMarketplaceCardPrices(quoteItems, quoteStay ?? { checkIn: null, checkOut: null, guests: null });
@@ -884,9 +902,9 @@ const SearchPage = () => {
   }, [availableNow, guests, hasInvalidDates, longStay, mapView, minPrice, maxPrice, monthlyStay, nomadWifi, nomadWorkspace, remoteWork, selectedAmenities, sortBy, tonightProbeLoading]);
 
   useEffect(() => {
-    if (isLoading || hasInvalidDates || explicitDateSearch) {
-      if (explicitDateSearch || hasInvalidDates) setAvailabilityById({});
-      setAvailabilityFetchDone(explicitDateSearch || hasInvalidDates);
+    if (isMarketplaceSearch || isLoading || hasInvalidDates || explicitDateSearch) {
+      if (isMarketplaceSearch || explicitDateSearch || hasInvalidDates) setAvailabilityById({});
+      setAvailabilityFetchDone(isMarketplaceSearch || explicitDateSearch || hasInvalidDates);
       return;
     }
     const ids = sortedUnits.map((u) => u.numericId).filter((id) => id > 0);
@@ -908,11 +926,37 @@ const SearchPage = () => {
         if (!c.signal.aborted) setAvailabilityFetchDone(true);
       });
     return () => c.abort();
-  }, [sortedUnits, isLoading, hasInvalidDates, explicitDateSearch]);
+  }, [sortedUnits, isLoading, hasInvalidDates, explicitDateSearch, isMarketplaceSearch]);
+
+  // Two date/filter edits can land before React re-renders (e.g. check-in then check-out typed in
+  // quick succession). A functional setSearchParams built from the render-time searchParams then let the
+  // second write overwrite the first, so one of the two edits was silently lost. Build every update from
+  // the latest params we have written, not from the last render.
+  const latestSearchParamsRef = useRef(searchParams);
+  // Writes not yet reflected back in `searchParams`. A render that still shows an EARLIER write must not
+  // roll the ref back (that dropped the check-out edit when check-in's render landed after it).
+  const pendingWritesRef = useRef<string[]>([]);
+  useEffect(() => {
+    const current = searchParams.toString();
+    const idx = pendingWritesRef.current.indexOf(current);
+    if (idx >= 0) {
+      pendingWritesRef.current = pendingWritesRef.current.slice(idx + 1);
+      if (pendingWritesRef.current.length > 0) return; // later writes still in flight; keep the ref ahead
+    } else {
+      pendingWritesRef.current = []; // external navigation (back button, link): adopt it
+    }
+    latestSearchParamsRef.current = searchParams;
+  }, [searchParams]);
+  const applySearchParamsUpdate = (mutate: (next: URLSearchParams) => void) => {
+    const next = new URLSearchParams(latestSearchParamsRef.current);
+    mutate(next);
+    latestSearchParamsRef.current = next;
+    pendingWritesRef.current.push(next.toString());
+    setSearchParams(next, { replace: true });
+  };
 
   const updateParam = (key: string, value: string) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+    applySearchParamsUpdate((next) => {
       if (value) {
         next.set(key, value);
         if (key === "sortBy") next.set("sort", value);
@@ -921,8 +965,7 @@ const SearchPage = () => {
         if (key === "sortBy") next.delete("sort");
       }
       if (key === "guests") deleteGuestBreakdown(next);
-      return next;
-    }, { replace: true });
+    });
   };
 
   const toggleAmenity = (amenity: string) => {
@@ -932,9 +975,8 @@ const SearchPage = () => {
     updateParam("amenities", newAmenities.join(","));
   };
 
-  const clearFilters = () => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
+  const resetFilters = (preserveSearchScope: boolean) => {
+    applySearchParamsUpdate((next) => {
       next.delete("category");
       next.delete("minPrice");
       next.delete("maxPrice");
@@ -943,8 +985,10 @@ const SearchPage = () => {
       next.delete("remoteWork");
       next.delete("longStay");
       next.delete("availableNow");
-      next.delete("guests");
-      deleteGuestBreakdown(next);
+      if (!preserveSearchScope) {
+        next.delete("guests");
+        deleteGuestBreakdown(next);
+      }
       // TASK-1738: clear digital nomad filters
       next.delete("nomadWifi");
       next.delete("nomadWorkspace");
@@ -952,8 +996,14 @@ const SearchPage = () => {
       next.delete("sortBy");
       next.delete("sort");
       next.delete("view");
-      return next;
-    }, { replace: true });
+    });
+  };
+  const clearFilters = () => resetFilters(false);
+  const clearOptionalFilters = () => resetFilters(true);
+  const focusSearchDates = () => {
+    const input = document.getElementById("filter-checkin");
+    input?.focus({ preventScroll: true });
+    input?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   /** TASK-1456: removable chips + count badge (one chip per logical filter). */
@@ -1064,7 +1114,7 @@ const SearchPage = () => {
   const visibleUnits = sortedUnits.slice(0, visibleCount);
   const hasMore = visibleCount < sortedUnits.length;
   const dateAvailCheckFailed =
-    explicitDateSearch && !dateAvailLoading && dateAvailableIds === null && !hasInvalidDates;
+    !isMarketplaceSearch && explicitDateSearch && !dateAvailLoading && dateAvailableIds === null && !hasInvalidDates;
   const showTonightProbeBanner = availableNow && tonightProbeLoading;
   // TASK-7195: a failed primary listings fetch must never be told apart from a genuine
   // zero-result search. For most tenants a static fallback keeps `sortedUnits` non-empty on
@@ -1075,17 +1125,22 @@ const SearchPage = () => {
   const showErrorState =
     !isLoading && !hasInvalidDates && apiError && sortedUnits.length === 0 && !showTonightProbeBanner;
   const showEmptyState =
-    !isLoading && !hasInvalidDates && !apiError && sortedUnits.length === 0 && !showTonightProbeBanner;
+    !isLoading && !hasInvalidDates && !apiError && sortedUnits.length === 0 && !showTonightProbeBanner &&
+    !dateAvailLoading && !dateAvailCheckFailed;
+  useEffect(() => {
+    onEmptyStateChange?.(showEmptyState && !isMarketplaceSearch);
+    return () => onEmptyStateChange?.(false);
+  }, [isMarketplaceSearch, onEmptyStateChange, showEmptyState]);
   /** TASK-1648: skeleton while public availability resolves for selected dates (list view). */
   const showDateAvailabilitySkeleton =
     explicitDateSearch && !hasInvalidDates && dateAvailLoading && !isLoading && !mapView;
   /** TASK-2893: dates were searched but the live availability check returned nothing (fail-open),
    * so we're showing all homes unfiltered — don't claim they're "available for your dates". */
   const dateAvailUnconfirmed =
-    explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds === null;
+    !isMarketplaceSearch && explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds === null;
   /** TASK-4070: only true once the availability fetch resolved with real data. */
   const dateAvailConfirmed =
-    explicitDateSearch && !hasInvalidDates && !dateAvailLoading && dateAvailableIds !== null;
+    explicitDateSearch && !hasInvalidDates && (isMarketplaceSearch ? (!isLoading && !apiError) : (!dateAvailLoading && dateAvailableIds !== null));
   const queryString = searchParams.toString();
   const querySuffix = queryString ? `?${queryString}` : "";
   const approximatePinHint = useMemo(
@@ -1585,10 +1640,10 @@ const SearchPage = () => {
         {showEmptyState && !mapView && (
           <div className="flex flex-col gap-8">
             <div
-              className="rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
+              className="search-empty-recovery rounded-2xl border border-border-subtle bg-bg-surface px-4 py-8 text-center shadow-sm sm:px-8"
               data-testid="search-empty-state"
             >
-              {!hideAtlasBranding && (
+              {isMarketplaceSearch && !hideAtlasBranding && (
                 <div className="mx-auto mb-6 flex max-w-xs justify-center" aria-hidden>
                   {tenant?.logoUrl ? (
                     <img
@@ -1613,15 +1668,21 @@ const SearchPage = () => {
                   )}
                 </div>
               )}
-              <h2 className="text-xl font-bold text-text-primary sm:text-2xl">{`No ${unitNoun.marketingPlural} match your filters`}</h2>
+              <h2 className="text-xl font-bold text-text-primary sm:text-2xl">{isMarketplaceSearch ? `No ${unitNoun.marketingPlural} match your filters` : "No stays are available for this search"}</h2>
               <p className="mx-auto mt-3 max-w-lg text-text-muted">
                 Try adjusting dates, price range, or guest count.
               </p>
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
+                {!isMarketplaceSearch && (
+                  <button type="button" onClick={focusSearchDates} data-testid="search-empty-change-dates"
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-on-cta)] hover:bg-cta-secondary">
+                    Change dates
+                  </button>
+                )}
                 {hasActiveFilters ? (
                   <button
                     type="button"
-                    onClick={clearFilters}
+                    onClick={isMarketplaceSearch ? clearFilters : clearOptionalFilters}
                     className="inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-on-cta)] shadow hover:bg-cta-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto"
                     data-testid="search-empty-clear-filters"
                   >
@@ -1633,9 +1694,14 @@ const SearchPage = () => {
                   className={`inline-flex min-h-[44px] w-full max-w-xs items-center justify-center rounded-xl border border-border-subtle px-5 py-3 text-sm font-semibold text-text-primary shadow-sm hover:bg-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary sm:w-auto ${hasActiveFilters ? "" : "bg-cta-primary text-[var(--text-on-cta)] border-transparent hover:bg-cta-secondary"}`}
                   data-testid="search-empty-browse-all"
                 >
-                  Browse all apartments
+                  {isMarketplaceSearch ? "Browse all apartments" : "Browse all stays"}
                 </Link>
               </div>
+              {!isMarketplaceSearch && getTelLink() && (
+                <p className="mt-4 text-sm text-text-muted">
+                  Need help? <a href={getTelLink()} className="font-semibold underline underline-offset-4">Call {getTenantBrandName()} · {formatDisplayNumber()}</a>
+                </p>
+              )}
             </div>
 
             {emptyStateSuggestions.length > 0 && (
@@ -1916,7 +1982,7 @@ const SearchPage = () => {
                     {explicitDateSearch ? (
                       dateAvailLoading ? (
                         <span className="inline-block h-5 w-16 rounded-full bg-bg-muted" aria-hidden />
-                      ) : dateAvailableIds !== null ? (
+                      ) : (dateAvailableIds !== null || isMarketplaceSearch) ? (
                         <span
                           className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800"
                           data-testid="search-listing-availability-chip"

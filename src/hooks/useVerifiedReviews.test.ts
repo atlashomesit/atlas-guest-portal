@@ -274,4 +274,35 @@ describe('useVerifiedReviews — author name and locale (REV-041)', () => {
     expect(result.current.reviews.map((r) => r.firstName)).toEqual(['Amelie', 'Ravi', 'Guest']);
     expect(result.current.reviews.map((r) => r.locale ?? null)).toEqual(['fr-FR', null, null]);
   });
+
+  it('TASK-1040123: skips redundant GET /api/public/listings/{id} waterfall when /api/listings/{id}/reviews returns unified payload', async () => {
+    const calledUrls: string[] = [];
+    const fetcher = vi.fn().mockImplementation((url: string) => {
+      calledUrls.push(url);
+      if (url.includes('/api/listings/101/reviews')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            reviews: [
+              { id: 11, guestName: 'Kiran Rao', rating: 5, body: 'Superb stay!', createdAt: '2026-10-10T10:00:00Z', isVerifiedStay: true },
+            ],
+            externalReviews: [
+              { guestName: 'Maya Lin', rating: 4.9, body: 'Great location.', reviewDate: '2026-10-08', source: 'airbnb' },
+            ],
+            guestFeedback: [],
+          }),
+        });
+      }
+      return Promise.resolve({ ok: false, json: async () => null });
+    });
+
+    vi.stubGlobal('fetch', fetcher);
+
+    const { result } = renderHook(() => useVerifiedReviews([101], 3));
+    await settle();
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.reviews).toHaveLength(2);
+    expect(calledUrls.some((u) => u.includes('/api/public/listings/101'))).toBe(false);
+  });
 });

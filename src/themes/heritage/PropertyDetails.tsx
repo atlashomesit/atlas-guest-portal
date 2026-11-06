@@ -53,9 +53,13 @@ import { useTenantListings } from '@/hooks/useTenantListings';
 import { usePropertyListings } from '@/hooks/usePropertyListings';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useListingHostDescription } from '@/hooks/useListingHostDescription';
+import { getStandardStayTimes } from '@/content/faqHighlights';
+import { formatCurrency } from '@/utils/formatting';
+import { describeIncludedGuests, pickIncludedGuestFacts, readIncludedGuestFields, type IncludedGuestFields } from '@/utils/includedGuests';
 import {
   describeCancellationPolicy,
   resolveEffectiveCancellationTier,
+  withRatePlanCancellation,
 } from '@/utils/cancellationPolicy';
 import { trackEvent } from '@/utils/analytics';
 import { Button } from '@/components/ui/Button';
@@ -69,6 +73,7 @@ import {
   formatSimilarStayPrice,
   hasPropertyDetailSearchFilters,
   selectSimilarStaysForParty,
+  keepSimilarStaysInSameCity,
 } from '@/utils/marketplaceBackHref';
 import { propertySlugMatchesListing } from '@/utils/propertySlugMatch';
 import { centroidForCity } from '@/utils/mapCoords';
@@ -410,6 +415,10 @@ interface Property {
     isParentCluster?: boolean | null;
     securityDepositAmount?: number | null;
     hasSmallPartyPricing?: boolean | null;
+    /** GUEST-060: guests the price covers and the host's extra-guest nightly rate (API only; null when not sent). */
+    includedGuests?: number | null;
+    extraGuestRate?: number | null;
+    priceChangesWithGuests?: boolean | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -443,6 +452,9 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         cancellationTier: item.cancellationTier,
         cancellationWindowHours: (item as unknown as { cancellationWindowHours?: number | null }).cancellationWindowHours ?? null,
         graceHours: item.graceHours,
+        includedGuests: item.includedGuests ?? null,
+        extraGuestRate: item.extraGuestRate ?? null,
+        priceChangesWithGuests: item.priceChangesWithGuests ?? null,
         minStay: (item as unknown as { minStay?: number | null }).minStay ?? null,
         latitude: item.latitude,
         longitude: item.longitude,
@@ -670,6 +682,8 @@ const PropertyDetails = () => {
     const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
     /** REV-030: blended star counts from `GET /api/public/listings/{id}`. */
     const [publicRatingStarCounts, setPublicRatingStarCounts] = useState<number[] | null>(null);
+    /** GUEST-060: what the price covers, from GET /api/public/listings/{id}; the catalog row and GET /listings/{id} may not carry it. */
+    const [publicGuestFacts, setPublicGuestFacts] = useState<IncludedGuestFields | null>(null);
     /**
      * REV-046: review-QR "Guest feedback" notes (`guestFeedback` on both review endpoints). Kept apart from
      * `listingReviewsFromApi` / `externalReviewsFromApi` on purpose: nothing derived from this list may feed
@@ -950,6 +964,7 @@ const PropertyDetails = () => {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
             setPublicRatingStarCounts(null);
+            setPublicGuestFacts(null);
             setGuestFeedbackFromApi([]);
             return;
         }
@@ -957,6 +972,7 @@ const PropertyDetails = () => {
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
         setExternalReviewsFromApi([]);
         setPublicRatingStarCounts(null);
+        setPublicGuestFacts(null);
         setGuestFeedbackFromApi([]);
         void (async () => {
             try {
@@ -1007,10 +1023,12 @@ const PropertyDetails = () => {
                                 ? publicPayload.RatingStarCounts
                                 : null;
                         setPublicRatingStarCounts(starCounts);
+                        setPublicGuestFacts(readIncludedGuestFields(publicPayload as Record<string, unknown>));
                     }
                 } else if (!ac.signal.aborted) {
                     setExternalReviewsFromApi([]);
                     setPublicRatingStarCounts(null);
+                    setPublicGuestFacts(null);
                 }
 
                 if (!ac.signal.aborted) {
@@ -1030,6 +1048,7 @@ const PropertyDetails = () => {
                     setListingReviewsFromApi(null);
                     setExternalReviewsFromApi([]);
                     setPublicRatingStarCounts(null);
+                    setPublicGuestFacts(null);
                     setGuestFeedbackFromApi([]);
                 }
             }
@@ -1298,6 +1317,7 @@ const PropertyDetails = () => {
                                 pub.cancellationWindowHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
                         })(), // TASK-4356 / TASK-5205
+                        ...readIncludedGuestFields(apiListing as Record<string, unknown>), // GUEST-060
                         graceHours: (() => {
                             const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
@@ -1727,10 +1747,18 @@ useEffect(() => {
     // TASK-7428 / MKT-011: shared predicate for "an online gateway will actually charge this guest" —
     // uses effectiveTenantCtx so marketplace listings use the listing host's real bookingMode.
     const ppHasOnlinePayment = hasOnlinePaymentRail(effectiveTenantCtx);
-    const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
-      fallbackText: _resolvedCancellationText,
-      hasOnlinePayment: ppHasOnlinePayment,
-    });
+    // GUEST-059: the selected rate plan's own cancellation wording wins over the listing-tier prose,
+    // so this block, the trust row and the booking box never disagree about the same stay.
+    // GUEST-062: a listing with no times of its own shows the standard times its tenant's FAQ states (null when the FAQ states none).
+    const ppStandardStayTimes = getStandardStayTimes();
+    const ppCancellationInfo = withRatePlanCancellation(
+      getPpCancellationInfo(data.cancellationTier, {
+        fallbackText: _resolvedCancellationText,
+        hasOnlinePayment: ppHasOnlinePayment,
+      }),
+      stickyBookingSummary?.ratePlanCancellation,
+      ppHasOnlinePayment,
+    );
     const ppHasLocation =
         (typeof data.latitude === 'number' && Number.isFinite(data.latitude)) ||
         mapSrcTrimmed.length > 0 ||
@@ -2729,7 +2757,7 @@ useEffect(() => {
                         <p>{ppCancellationInfo.description}</p>
                       </div>
                     </div>
-                    <div className="pp-timeline" role="list">
+                    <div className="pp-timeline" role="list" hidden={ppCancellationInfo.steps.length === 0}>
                       {ppCancellationInfo.steps.map((step) => (
                         <div key={step.title} className="pp-timeline-step" role="listitem">
                           <div className="pp-tl-dot" aria-hidden="true" />
@@ -2755,7 +2783,12 @@ useEffect(() => {
                       </strong>
                       <span>
                         {data.maxGuests != null && data.maxGuests > 0
-                          ? `Up to ${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'} welcome.`
+                          ? `Up to ${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'} welcome.${(() => {
+                              // GUEST-060: what the price covers, from the host's own numbers; nothing when the API sends none.
+                              const facts = pickIncludedGuestFacts(publicGuestFacts, data);
+                              const line = describeIncludedGuests(facts.includedGuests, facts.extraGuestRate, data.maxGuests, (n) => formatCurrency(n, { maximumFractionDigits: 0 }), facts.priceChangesWithGuests);
+                              return line ? ` ${line}.` : '';
+                            })()}`
                           : 'Contact host for occupancy details.'}
                       </span>
                     </div>
@@ -2764,10 +2797,12 @@ useEffect(() => {
                       <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
                       <small>Check-in</small>
                       <strong data-testid={resolvedCheckInTime ? 'property-check-in-time' : 'property-check-in-pending'}>
-                        {resolvedCheckInTime ?? 'Ask host'}
+                        {resolvedCheckInTime ?? ppStandardStayTimes?.checkIn ?? 'Ask host'}
                       </strong>
                       {resolvedCheckInTime ? (
                         <span>Early check-in subject to availability.</span>
+                      ) : ppStandardStayTimes ? (
+                        <span>Standard check-in time. Your confirmation says if it differs.</span>
                       ) : (
                         <span>Host will confirm check-in time.</span>
                       )}
@@ -2777,10 +2812,12 @@ useEffect(() => {
                       <div className="pp-v2-knowicon"><PpV2ClockOutIcon /></div>
                       <small>Check-out</small>
                       <strong data-testid={resolvedCheckOutTime ? 'property-check-out-time' : 'property-check-out-pending'}>
-                        {resolvedCheckOutTime ?? 'Ask host'}
+                        {resolvedCheckOutTime ?? ppStandardStayTimes?.checkOut ?? 'Ask host'}
                       </strong>
                       {resolvedCheckOutTime ? (
                         <span>Late check-out subject to availability.</span>
+                      ) : ppStandardStayTimes ? (
+                        <span>Standard check-out time. Your confirmation says if it differs.</span>
                       ) : (
                         <span>Host will confirm check-out time.</span>
                       )}
@@ -2800,7 +2837,8 @@ useEffect(() => {
                   if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
                   const urlGuestCount = Number(searchParams.get('guests')) || ((Number(searchParams.get('adults')) || 0) + (Number(searchParams.get('children')) || 0));
                   const targetPartyGuests = urlGuestCount > 0 ? urlGuestCount : booking?.guests;
-                  const similarItems = selectSimilarStaysForParty(s.items, targetPartyGuests, 4);
+                  const similarItems = selectSimilarStaysForParty(keepSimilarStaysInSameCity(s.items, data.city), targetPartyGuests, 4);
+                  if (similarItems.length === 0) return null;
                   return (
                     <section className="pp-section" aria-label="Similar stays">
                       <div className="pp-section-head"><h2>Similar stays</h2></div>
@@ -2944,6 +2982,9 @@ useEffect(() => {
                         clusterRole={data.clusterRole ?? null}
                         clusterId={data.clusterId ?? null}
                         securityDepositAmount={data.securityDepositAmount ?? null}
+                        includedGuests={pickIncludedGuestFacts(publicGuestFacts, data).includedGuests}
+                        extraGuestRate={pickIncludedGuestFacts(publicGuestFacts, data).extraGuestRate}
+                        priceChangesWithGuests={pickIncludedGuestFacts(publicGuestFacts, data).priceChangesWithGuests ?? null}
                         hasSmallPartyPricing={Boolean(data.hasSmallPartyPricing || (data as unknown as { occupancyPricingEnabled?: boolean }).occupancyPricingEnabled)}
                         onStickySummaryChange={setStickyBookingSummary}
                         tenantContext={effectiveTenantCtx}

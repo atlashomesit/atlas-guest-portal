@@ -98,4 +98,97 @@ describe('SearchPage — Category & Amenity URL sync and Sort control (TASK-1039
     const chipStrip = screen.getByTestId('search-active-filter-chips');
     expect(chipStrip).toHaveTextContent(/₹2,000–₹8,000\/night/i);
   });
+
+  it('TASK-1040101: dated marketplace search skips single-tenant availability-batch and retains non-Atlas listings', async () => {
+    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/marketplace/listings')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 676,
+                tenantSlug: 'grove-and-co',
+                title: 'The Estate by Grove & Co',
+                city: 'Bengaluru',
+                pricePerNight: 4500,
+                maxGuests: 4,
+                chargesOnlinePaymentFee: false,
+              },
+            ],
+            total: 1,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (url.includes('/api/pricing/guest-breakdown')) {
+        return new Response(
+          JSON.stringify({
+            listingId: 676,
+            currency: 'INR',
+            baseAmount: 9000,
+            discountAmount: 0,
+            convenienceFeeAmount: 270,
+            finalAmount: 9270,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      // If availability-batch were called, return only atlas IDs (1..7) to prove it is skipped
+      if (url.includes('/api/public/listings/availability-batch')) {
+        return new Response(
+          JSON.stringify({ availableListingIds: [1, 2, 3] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    renderAt('/search?brand=atlastays&city=Bengaluru&checkIn=2026-12-10&checkOut=2026-12-12');
+    await settle();
+
+    // Non-Atlas listing 676 remains visible
+    expect(screen.getByText('The Estate by Grove & Co')).toBeInTheDocument();
+
+    const calledUrls = mockFetch.mock.calls.map((c) => String(c[0]));
+    expect(calledUrls.some((u) => u.includes('/marketplace/listings') && u.includes('checkIn=2026-12-10') && u.includes('checkOut=2026-12-12'))).toBe(true);
+    expect(calledUrls.some((u) => u.includes('/api/public/listings/availability-batch'))).toBe(false);
+    expect(calledUrls.some((u) => u.includes('/api/public/listings/availability-summary'))).toBe(false);
+  });
+
+  it('TASK-1040101: availableNow on marketplace search delegates today->tomorrow to /marketplace/listings and skips availability-batch', async () => {
+    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/marketplace/listings')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 450,
+                tenantSlug: 'mitali-saikia',
+                title: 'Brahmaputra View Homestay',
+                city: 'Guwahati',
+                pricePerNight: 2800,
+                maxGuests: 3,
+              },
+            ],
+            total: 1,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    renderAt('/search?brand=atlastays&availableNow=true');
+    await settle();
+
+    expect(screen.getByText('Brahmaputra View Homestay')).toBeInTheDocument();
+    const calledUrls = mockFetch.mock.calls.map((c) => String(c[0]));
+    const mpUrl = calledUrls.find((u) => u.includes('/marketplace/listings'));
+    expect(mpUrl).toBeDefined();
+    expect(mpUrl).toMatch(/checkIn=\d{4}-\d{2}-\d{2}/);
+    expect(mpUrl).toMatch(/checkOut=\d{4}-\d{2}-\d{2}/);
+    expect(calledUrls.some((u) => u.includes('/api/public/listings/availability-batch'))).toBe(false);
+  });
 });

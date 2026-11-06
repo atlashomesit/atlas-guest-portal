@@ -118,6 +118,45 @@ describe('TASK-1039950 — Filter pills synced with URL search parameters', () =
     expect(roomsBtn.className).toContain('bg-black');
   });
 
+  it('MKT-041: clicking Villas category pill requests category=villas and renders matching villa cards', async () => {
+    const fetchSpy = vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.includes('/marketplace/properties')) {
+        return { ok: true, json: async () => [] } as unknown as Response;
+      }
+      if (u.includes('category=villas')) {
+        return {
+          ok: true,
+          json: async () => ({ items: [mockListings[0]], total: 1, page: 1, pageSize: 20 }),
+        } as unknown as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ items: mockListings, total: mockListings.length, page: 1, pageSize: 20 }),
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const villasBtn = screen.getByTestId('marketplace-filter-villas');
+    fireEvent.click(villasBtn);
+    await settle();
+
+    expect(villasBtn.className).toContain('bg-black');
+    const listingUrls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingUrls[listingUrls.length - 1]).toContain('category=villas');
+    expect(screen.getByText('Comfort Villa')).toBeInTheDocument();
+    expect(screen.queryByText('Budget Studio')).not.toBeInTheDocument();
+  });
+
   it('clicking an amenity filter pill toggles selection', async () => {
     render(
       <MemoryRouter initialEntries={['/']}>
@@ -210,6 +249,45 @@ describe('TASK-1039952 — Sort dropdown on Marketplace Homepage', () => {
     // Comfort Villa (4.9), Luxury Suite (4.7), Budget Studio (4.2)
     expect(headings).toEqual(['Comfort Villa', 'Luxury Suite', 'Budget Studio']);
   });
+
+  it('TASK-1040102: passes sort=<sortBy> to GET /marketplace/listings and resets page to 1', async () => {
+    const fetchSpy = vi.fn(async (url: string) => {
+      const u = String(url);
+      if (u.includes('/marketplace/properties')) {
+        return { ok: true, json: async () => [] } as unknown as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ items: mockListings, total: 36, page: 1, pageSize: 20 }),
+      } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    // Load page 2 first
+    const showMoreBtn = screen.getByRole('button', { name: /show more homes/i });
+    fireEvent.click(showMoreBtn);
+    await settle();
+    expect(fetchSpy.mock.calls.some((c) => String(c[0]).includes('/marketplace/listings') && String(c[0]).includes('page=2'))).toBe(true);
+
+    // Change sort to Price: Low to High
+    const sortSelect = screen.getByTestId('marketplace-sort-select');
+    fireEvent.change(sortSelect, { target: { value: 'price_asc' } });
+    await settle();
+
+    const listingUrls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    const lastListingUrl = listingUrls[listingUrls.length - 1];
+    expect(lastListingUrl).toContain('sort=price_asc');
+    expect(lastListingUrl).toContain('page=1');
+  });
 });
 
 describe('TASK-1039951 — Price range filtering qualifies positive rates only', () => {
@@ -272,4 +350,24 @@ describe('TASK-1039951 — Price range filtering qualifies positive rates only',
     expect(screen.getByText('Comfort Villa')).toBeInTheDocument();
     expect(screen.queryByText('Luxury Suite')).not.toBeInTheDocument();
   });
+});
+
+it('discloses secondary filters on phones without hiding categories or sort, and keeps them open on desktop', async () => {
+  const originalWidth = window.innerWidth;
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 393 });
+  render(<MemoryRouter><MarketplaceHomepage /></MemoryRouter>);
+  await settle();
+  const disclosure = screen.getByTestId('marketplace-secondary-filters');
+  expect(disclosure).not.toHaveAttribute('open');
+  expect(screen.getByTestId('marketplace-filter-villas').closest('details')).toBeNull();
+  expect(screen.getByTestId('marketplace-sort-select').closest('details')).toBeNull();
+  fireEvent.click(disclosure.querySelector('summary')!);
+  expect(disclosure).toHaveAttribute('open');
+  fireEvent.change(screen.getByTestId('marketplace-search'), { target: { value: 'Goa' } });
+  await settle();
+  expect(screen.getByTestId('marketplace-search')).toHaveValue('Goa');
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1280 });
+  fireEvent(window, new Event('resize'));
+  expect(disclosure).toHaveAttribute('open');
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
 });

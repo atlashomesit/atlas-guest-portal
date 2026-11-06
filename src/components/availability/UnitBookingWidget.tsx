@@ -27,8 +27,10 @@ import {
 import { calculateNights, formatDateInTimezone, formatIsoDateInTimezone } from '@/utils/dateHelpers';
 import {
   type CancellationTier,
+  describeRatePlanCancellation,
   resolveFreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
+import { describeIncludedGuests } from '@/utils/includedGuests';
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
@@ -127,6 +129,10 @@ export interface UnitBookingWidgetProps {
   securityDepositAmount?: number | null;
   /** TASK-10299183: small-party pricing configured on listing. */
   hasSmallPartyPricing?: boolean;
+  /** GUEST-060: guests the price covers and the host's extra-guest nightly rate, when the listing sends them. Display only. */
+  includedGuests?: number | null;
+  extraGuestRate?: number | null;
+  priceChangesWithGuests?: boolean | null;
   /** Custom small-party hint text. Defaults to "Special rate available for 1-2 guests". */
   smallPartyHint?: string | null;
 }
@@ -147,6 +153,11 @@ export type BookingStickySummary = {
   hasMultipleRatePlans?: boolean;
   /** TOP10-2026-10-27-01-C: "14–16 Nov · 2 guests" for the phone sticky bar (display only). */
   stayLabel?: string | null;
+  /**
+   * GUEST-059: the selected rate plan's own cancellation wording, so the listing's "If you need to
+   * cancel" block and trust row say the same thing as the rate option the guest picked.
+   */
+  ratePlanCancellation?: { headline: string; nonRefundable: boolean } | null;
 };
 
 /** One quiet automatic re-fetch after a real pricing failure (a dropped connection, a busy API), then the guest's own "Try again". */
@@ -263,6 +274,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   dormBedCount = null,
   securityDepositAmount = null,
   hasSmallPartyPricing = false,
+  includedGuests = null,
+  extraGuestRate = null,
+  priceChangesWithGuests = null,
   smallPartyHint,
 }) => {
   if (import.meta.env.DEV) {
@@ -367,6 +381,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // CFB-009 / BNB-009 / BNB-010: Optional "Add breakfast" toggle on Room-Only (EP) direct bookings.
   const [includeBreakfast, setIncludeBreakfast] = useState(false);
   const [guests, setGuests] = useState(2);
+  const [guestsOverLimit, setGuestsOverLimit] = useState<number | null>(null);
   const [guestsOpen, setGuestsOpen] = useState(false);
 
   // TASK-10299183: small-party pricing hint in booking box
@@ -835,6 +850,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const g = booking.guests;
     if (typeof g === 'number' && g >= 1 && g <= effectiveMaxGuests) {
       setGuests(g);
+      setGuestsOverLimit(null);
+    } else if (typeof g === 'number' && g > effectiveMaxGuests && effectiveMaxGuests >= 1) {
+      // GUEST-060: a guest count above this home's maximum used to be dropped silently and the page showed the
+      // default 2 adults. Say so, and keep the most the home allows instead of a smaller number.
+      setGuests(effectiveMaxGuests);
+      setGuestsOverLimit(g);
     }
   }, [booking.guests, effectiveMaxGuests]);
 
@@ -1507,9 +1528,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       windowHoursOverride: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
       bookingCreatedAt: new Date(),
       graceHours: resolvedGraceHours,
+      planSummary: selectedRatePlan?.cancellationSummary ?? null,
     });
   }, [
     isSelectedRatePlanNonRefundable,
+    selectedRatePlan?.cancellationSummary,
     dateRange.startDate,
     effectiveRatePlanCancellationTier,
     selectedRatePlan?.cancellationPolicy,
@@ -1891,8 +1914,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       mealPlanLabel: null,
       hasMultipleRatePlans: publicRatePlans.length > 1,
       stayLabel: stickyStayLabel,
+      ratePlanCancellation: describeRatePlanCancellation(
+        selectedRatePlan?.cancellationPolicy,
+        selectedRatePlan?.cancellationSummary,
+      ),
     });
   }, [
+    selectedRatePlan?.cancellationPolicy,
+    selectedRatePlan?.cancellationSummary,
     stickyStayLabel,
     onStickySummaryChange,
     canReviewBooking,
@@ -1911,6 +1940,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
     formatCurrency(n, { maximumFractionDigits: 0 });
+
+  // GUEST-060: "Includes N guests" from the listing's own numbers; empty when the API sends none.
+  const includedGuestsLine = describeIncludedGuests(includedGuests, extraGuestRate, effectiveMaxGuests, displayPrice, priceChangesWithGuests);
 
   const convenienceFeePctLabel = Number((convenienceFeePercent * 100).toFixed(2));
   const referralDiscountApplied = 0;
@@ -2439,6 +2471,23 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     : `Maximum ${effectiveMaxGuests} guest${effectiveMaxGuests === 1 ? '' : 's'} for this home`}
                 </small>
               )}
+              {guestsOverLimit != null && guestsOverLimit > effectiveMaxGuests && (
+                <small
+                  role="status"
+                  data-testid="bw-guests-over-limit"
+                  style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}
+                >
+                  {`You asked for ${guestsOverLimit} ${isDorm ? 'beds' : 'guests'}, but this home allows up to ${effectiveMaxGuests}. We've set ${effectiveMaxGuests}.`}
+                </small>
+              )}
+              {!isDorm && includedGuestsLine && (
+                <small
+                  data-testid="bw-included-guests"
+                  style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}
+                >
+                  {includedGuestsLine}
+                </small>
+              )}
             </div>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--text-muted, #6b5a55)', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
           </button>
@@ -2459,7 +2508,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     className="bw-counter-btn"
                     aria-label={isDorm ? 'Decrease beds' : 'Decrease guests'}
                     disabled={guests <= 1}
-                    onClick={() => setGuests((current) => Math.max(1, current - 1))}
+                    onClick={() => { setGuestsOverLimit(null); setGuests((current) => Math.max(1, current - 1)); }}
                   >−</button>
                   <span className="bw-counter-val">{guests}</span>
                   <button
@@ -2467,7 +2516,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     className="bw-counter-btn"
                     aria-label={isDorm ? 'Increase beds' : 'Increase guests'}
                     disabled={guests >= (isDorm ? dormMaxBeds : effectiveMaxGuests)}
-                    onClick={() => setGuests((current) => Math.min(isDorm ? dormMaxBeds : effectiveMaxGuests, current + 1))}
+                    onClick={() => { setGuestsOverLimit(null); setGuests((current) => Math.min(isDorm ? dormMaxBeds : effectiveMaxGuests, current + 1)); }}
                   >+</button>
                 </div>
               </div>

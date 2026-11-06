@@ -5,9 +5,11 @@ import { FaHeart } from "react-icons/fa";
 import SEO from "../components/SEO";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getFavoriteIds, getRecentlyViewed, toggleFavorite } from "../utils/guestHistory";
-import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import { appendQuerySuffix, buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { getTenantContext } from "../tenant/tenantContext";
+import { isMarketplaceMode } from "../tenant/tenantResolver";
 import { LoadingState } from "../components/LoadingState";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
@@ -16,13 +18,26 @@ import SavedHomeCover from "../components/SavedHomeCover";
 import SavedHomesReminder from "../components/SavedHomesReminder";
 import { useGuestAuth } from "../contexts/GuestAuthContext";
 
+type FavoriteListing = PublicListing & { tenantSlug?: string };
+
+interface MarketplaceFavoriteItem {
+  id: number;
+  tenantSlug?: string;
+  title?: string;
+  displayName?: string | null;
+  city?: string;
+  pricePerNight?: number;
+  maxGuests?: number;
+  coverImageUrl?: string | null;
+}
+
 export default function FavoritesPage() {
   const brandName = getTenantBrandName();
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
   const processingFeePercent = useTenantProcessingFee();
   const { getListingPricing: getDailyListingPricing } = useDailyPricingSummary();
   const estimateNights = estimateStayNights(null, null);
-  const [all, setAll] = useState<PublicListing[]>([]);
+  const [all, setAll] = useState<FavoriteListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favEpoch, setFavEpoch] = useState(0);
@@ -62,14 +77,67 @@ export default function FavoritesPage() {
     }
   }, []);
 
+  const isBrandAtlastaysParam = searchParams.get("brand")?.trim().toLowerCase() === "atlastays";
+  const isMarketplaceContext =
+    Boolean(getTenantContext()?.isMarketplaceRoot) || isMarketplaceMode() || isBrandAtlastaysParam;
+
   const loadListings = React.useCallback(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchPublicListings()
-      .then((list) => {
+    const targetIds = sharedWishlistIds ?? getFavoriteIds();
+
+    const mergeWithMarketplaceIfNeeded = async (baseList: FavoriteListing[]): Promise<FavoriteListing[]> => {
+      const hasMissingSavedIds = targetIds.some((id) => !baseList.some((l) => l.id === id));
+      if (!isMarketplaceContext && !hasMissingSavedIds) {
+        return baseList;
+      }
+      try {
+        const res = await fetch(buildApiUrl("/marketplace/listings?page=1&pageSize=100"), {
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok || typeof res.json !== "function") return baseList;
+        const data = (await res.json()) as { items?: MarketplaceFavoriteItem[] };
+        const mktItems = Array.isArray(data?.items) ? data.items : [];
+        if (mktItems.length === 0) return baseList;
+        const mktById = new Map<number, MarketplaceFavoriteItem>();
+        for (const item of mktItems) {
+          if (typeof item?.id === "number") mktById.set(item.id, item);
+        }
+        const merged: FavoriteListing[] = baseList.map((row) => {
+          const mkt = mktById.get(row.id);
+          const slug = typeof mkt?.tenantSlug === "string" && mkt.tenantSlug.trim() ? mkt.tenantSlug.trim() : row.tenantSlug;
+          return slug ? { ...row, tenantSlug: slug } : row;
+        });
+        const existingIds = new Set(merged.map((r) => r.id));
+        for (const item of mktItems) {
+          if (typeof item?.id !== "number" || existingIds.has(item.id)) continue;
+          merged.push({
+            id: item.id,
+            name: item.displayName || item.title,
+            propertyName: item.title,
+            propertyAddress: item.city,
+            baseNightlyRate: typeof item.pricePerNight === "number" ? item.pricePerNight : undefined,
+            maxGuests: typeof item.maxGuests === "number" ? item.maxGuests : 0,
+            coverPhotoUrl: item.coverImageUrl ?? undefined,
+            tenantSlug: typeof item.tenantSlug === "string" && item.tenantSlug.trim() ? item.tenantSlug.trim() : undefined,
+          });
+          existingIds.add(item.id);
+        }
+        return merged;
+      } catch {
+        return baseList;
+      }
+    };
+
+    (isMarketplaceContext
+      ? fetchPublicListings().catch(() => [] as PublicListing[])
+      : fetchPublicListings()
+    )
+      .then((list) => mergeWithMarketplaceIfNeeded(list))
+      .then((mergedList) => {
         if (!cancelled) {
-          setAll(list);
+          setAll(mergedList);
           // TASK-4010: Check if API is available by attempting a non-critical fetch
           void checkApiAvailability();
         }
@@ -87,7 +155,7 @@ export default function FavoritesPage() {
     return () => {
       cancelled = true;
     };
-  }, [checkApiAvailability]);
+  }, [checkApiAvailability, isMarketplaceContext, sharedWishlistIds]);
 
   useEffect(() => loadListings(), [loadListings]);
 
@@ -102,8 +170,13 @@ export default function FavoritesPage() {
     return all.filter((l) => favIds.has(l.id));
   }, [all, favIds, sharedWishlistIds]);
 
-  const listingPath = (l: PublicListing) =>
-    buildHomeUnitPath(getPropertySlug({ name: l.name, property_name: l.propertyName }), l.id);
+  const listingPath = (l: FavoriteListing) => {
+    const basePath = buildHomeUnitPath(getPropertySlug({ name: l.name, property_name: l.propertyName }), l.id);
+    const params = new URLSearchParams();
+    if (l.tenantSlug) params.set("tenant", l.tenantSlug);
+    if (isBrandAtlastaysParam) params.set("brand", "atlastays");
+    return appendQuerySuffix(basePath, params.toString());
+  };
 
   // TASK-1299: encode saved IDs into shareable URL (no backend needed)
   const handleShareWishlist = () => {

@@ -7,6 +7,7 @@ import {
   CheckinAliasRedirect,
   CheckinBookingRefAliasRedirect,
   GuestPortalAliasRedirect,
+  LegacyPropertyRedirect,
 } from '@/App';
 import { GuestAuthContext } from '@/contexts/GuestAuthContext';
 import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
@@ -18,7 +19,7 @@ import MarketplaceListingCard from '@/components/MarketplaceListingCard';
 
 function LocationDisplay({ testId }: { testId: string }) {
   const loc = useLocation();
-  return <div data-testid={testId}>{`${loc.pathname}${loc.search}`}</div>;
+  return <div data-testid={testId}>{`${loc.pathname}${loc.search}${loc.hash}`}</div>;
 }
 
 describe('Wave 2 Guest Portal Routing, UPI SVG QR Fallback, Touch Targets, Gallery & Deals', () => {
@@ -148,6 +149,21 @@ describe('Wave 2 Guest Portal Routing, UPI SVG QR Fallback, Touch Targets, Galle
         </MemoryRouter>,
       );
       expect(screen.getByTestId('checkin-ref-landed').textContent).toBe('/check-in/ATL-102?t=tok123');
+    });
+
+    it('redirects /property/:id#reviews to /homes/atlas-homes/:id#reviews preserving query and hash', () => {
+      const appSrc = fs.readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf-8');
+      expect(appSrc).toContain('path="/property/:id"');
+
+      render(
+        <MemoryRouter initialEntries={['/property/9001?tenant=atlas#reviews']}>
+          <Routes>
+            <Route path="/property/:id" element={<LegacyPropertyRedirect />} />
+            <Route path="/homes/:propertySlug/:unitSlug" element={<LocationDisplay testId="property-landed" />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      expect(screen.getByTestId('property-landed').textContent).toBe('/homes/atlas-homes/9001?tenant=atlas#reviews');
     });
   });
 

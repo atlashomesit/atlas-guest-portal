@@ -24,7 +24,9 @@ import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types"
 const SCROLL_BUFFER_PX = 320;
 const DISMISS_KEY = "supportDrawer:dismissed";
 
-const SupportWidgetContent = () => {
+type SupportWidgetProps = { placement?: "floating" | "inline" };
+
+const SupportWidgetContent = ({ placement = "floating" }: SupportWidgetProps) => {
   const brandName = getTenantBrandName();
   const location = useLocation();
   const matchPropertyDetails =
@@ -284,7 +286,7 @@ const SupportWidgetContent = () => {
 
   return (
     <>
-      {!isOpen && !bookingContentVisible ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
+      {!isOpen && !bookingContentVisible ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} placement={placement} /> : null}
 
       {isOpen ? (
         <>
@@ -323,14 +325,14 @@ const SupportWidgetContent = () => {
   );
 };
 
-const SupportWidget = () => {
+const SupportWidget = ({ placement = "floating" }: SupportWidgetProps) => {
   const location = useLocation();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- location changes on navigate, linter flags as outer scope
   const featureFlags = useMemo(() => getFeatureFlags(), [location.search]);
 
   return (
     <SupportDrawerFlagsProvider flags={featureFlags}>
-      <SupportWidgetContent />
+      <SupportWidgetContent placement={placement} />
     </SupportDrawerFlagsProvider>
   );
 };
