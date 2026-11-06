@@ -2499,7 +2499,9 @@ useEffect(() => {
                   const rating = ppCombinedAverageRating;
                   const count = ppCombinedReviewCount;
                   // TASK-8019: "verified stay(s) / through this platform" only for native Atlas reviews.
-                  const nativeVerifiedCount = api.totalCount;
+                  // TASK-1040061: api.totalCount is native + external combined, so an external-only listing (reviews: [])
+                  // read as "4 verified stays". Only the native rows the API actually returned may claim it.
+                  const nativeVerifiedCount = api.reviews.length;
                   const externalSources = Array.from(
                     new Set(
                       ppMergedReviews
