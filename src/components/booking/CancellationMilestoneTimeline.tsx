@@ -31,9 +31,14 @@ export default function CancellationMilestoneTimeline({
   if (Number.isNaN(checkIn.getTime())) return null;
 
   const effectiveTier = resolveEffectiveCancellationTier(cancellationTier);
+  // TASK-1040050: the cutoff is computed from the RAW tier, exactly like the "Free cancellation until" line on the same
+  // page (resolveFreeCancellationTrustCopy) and the deadline the API stamps on the booking (RefundDeadlineResolver: a
+  // listing or plan with no named tier gets the platform 7-day window). Passing the Flexible fallback here used to put
+  // "Full refund cutoff: 8 Dec" (48 h) beside "Free cancellation until 3 Dec" for the same stay. The tier label and fee
+  // wording below still use effectiveTier, which is how the refund calculator names an untiered stay.
   const deadline = computeEffectiveCancellationDeadline(
     checkIn,
-    effectiveTier,
+    cancellationTier,
     windowHoursOverride,
     bookingCreatedAt,
     graceHours,
