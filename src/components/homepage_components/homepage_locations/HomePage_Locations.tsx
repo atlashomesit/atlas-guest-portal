@@ -10,6 +10,7 @@ import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { trackEvent } from "../../../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug } from "../../../utils/navigation";
 import OptimizedImage from "../../ui/OptimizedImage";
+import HostelDormBadge, { isHostelDorm } from "../../hostel/HostelDormBadge";
 import { useDailyPricingSummary } from "../../../hooks/useDailyPricingSummary";
 import { useListingPhotosFromApi } from "../../../contexts/ListingPhotosContext";
 import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/useTenantListings";
@@ -284,6 +285,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const renderPrice = (model: ListingModel) => {
     const apiListingId = model.property?.listingId ?? model.listing.id;
     const numericListingId = Number(apiListingId);
+    // TASK-1040089: a dorm is sold by the bed, so its tile prices "per bed" like the listing card does (same API field, never the name).
+    const perBed = isHostelDorm({ accommodationType: model.property?.accommodationType });
+    const nightUnit = perBed ? "bed / night" : "night";
 
     if (hasStayDates) {
       const stayPrice = stayPrices.get(numericListingId);
@@ -316,7 +320,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               <span className="ahv2-price-amt" data-testid="home-card-real-price">
                 {formatCurrency(display.realNightly)}
               </span>
-              <span className="ahv2-price-meta">/ night</span>
+              <span className="ahv2-price-meta">{`/ ${nightUnit}`}</span>
             </div>
             {display.savingsPercent > 0 && (
               <span className="ahv2-price-save" data-testid="home-card-saving">
@@ -380,7 +384,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             </span>
             {/* GUEST-048: this card is today's price (no dates picked); the booking box prices the chosen dates, so a weekend
                 rate there can differ. Say "tonight" instead of leaving a bare nightly figure. [FG: pricing] wording. */}
-            <span className="ahv2-price-meta" data-testid="home-card-night-label">/ night tonight</span>
+            <span className="ahv2-price-meta" data-testid="home-card-night-label">{`/ ${nightUnit} tonight`}</span>
           </div>
           {display.savingsPercent > 0 && (
             <span className="ahv2-price-save" data-testid="home-card-saving">
@@ -417,7 +421,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
           )}
         </div>
         <span className="ahv2-price-meta">
-          per night · taxes included
+          {perBed ? "per bed" : "per night"} · taxes included
           {hasSpecialDateMultiplier || specialLabel
             ? ` · ${specialLabel ?? priceDisplayConfig.defaultSpecialLabel}`
             : ""}
@@ -567,6 +571,12 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   {!hideAtlasBranding && <span className="ahv2-eyebrow">{getTenantBrandName()}</span>}
                   <h3 className="ahv2-card-title">{cardTitle}</h3>
                   <p className="ahv2-card-desc">{descriptor}</p>
+
+                  {/* TASK-1040089: dorm + Women-only / Men-only / Mixed chips, straight from the API fields the listing card uses. */}
+                  <HostelDormBadge
+                    accommodationType={model.property?.accommodationType}
+                    genderPolicy={model.property?.dormGenderPolicy}
+                  />
 
                   {renderAmenities(model.property)}
 
