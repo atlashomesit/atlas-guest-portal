@@ -7,6 +7,7 @@ import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getFavoriteIds, getRecentlyViewed, toggleFavorite } from "../utils/guestHistory";
 import { appendQuerySuffix, buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { fetchAllMarketplacePages } from "../api/marketplacePaging"; // TASK-1040071
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 import { isMarketplaceMode } from "../tenant/tenantResolver";
@@ -93,12 +94,20 @@ export default function FavoritesPage() {
         return baseList;
       }
       try {
-        const res = await fetch(buildApiUrl("/marketplace/listings?page=1&pageSize=100"), {
-          headers: { Accept: "application/json" },
+        // TASK-1040071: page through every marketplace listing (server max 100 per page) so a saved home
+        // ranked 101+ is still merged in and keeps its tenantSlug.
+        const mktItems = await fetchAllMarketplacePages<MarketplaceFavoriteItem>({
+          buildUrl: (page, pageSize) => buildApiUrl(`/marketplace/listings?page=${page}&pageSize=${pageSize}`),
+          init: { headers: { Accept: "application/json" } },
+          readPage: (json) => {
+            const data = json as { items?: MarketplaceFavoriteItem[]; total?: number } | null;
+            return {
+              rows: Array.isArray(data?.items) ? data.items.filter((i) => typeof i?.id === "number") : [],
+              total: typeof data?.total === "number" ? data.total : undefined,
+            };
+          },
+          rowKey: (item) => item.id,
         });
-        if (!res.ok || typeof res.json !== "function") return baseList;
-        const data = (await res.json()) as { items?: MarketplaceFavoriteItem[] };
-        const mktItems = Array.isArray(data?.items) ? data.items : [];
         if (mktItems.length === 0) return baseList;
         const mktById = new Map<number, MarketplaceFavoriteItem>();
         for (const item of mktItems) {

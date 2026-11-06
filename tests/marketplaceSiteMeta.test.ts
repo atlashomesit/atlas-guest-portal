@@ -172,6 +172,50 @@ describe("marketplaceSiteMeta pure logic (MKT-013)", () => {
       expect(items[0].id).toBe(1);
     });
 
+    it("TASK-1040071: pages through every listing so a home ranked 101+ is found (115 listings, server pageSize max 100)", async () => {
+      const all: MarketplaceListingMetaRow[] = Array.from({ length: 115 }, (_, i) => ({
+        id: 1000 + i,
+        title: `Home ${i + 1}`,
+        tenantSlug: "t1",
+      }));
+      const mockFetch = vi.fn(async (url: string) => {
+        const u = new URL(String(url));
+        const page = Number(u.searchParams.get("page"));
+        const pageSize = Number(u.searchParams.get("pageSize"));
+        // the real server clamps pageSize > 100 to 20; a client that asks for <= 100 gets exactly that
+        const effective = pageSize <= 0 || pageSize > 100 ? 20 : pageSize;
+        const items = all.slice((page - 1) * effective, page * effective);
+        return { ok: true, json: async () => ({ items, total: all.length, page, pageSize: effective }) };
+      });
+
+      const items = await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(items).toHaveLength(115);
+      expect(items.find((l) => l.id === 1114)?.title).toBe("Home 115");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      for (const call of mockFetch.mock.calls) {
+        expect(Number(new URL(String(call[0])).searchParams.get("pageSize"))).toBeLessThanOrEqual(100);
+      }
+
+      // second call is served from the cache
+      await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("TASK-1040071: a failing later page returns what was gathered and does not cache the partial list", async () => {
+      const page1 = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, title: `H${i + 1}`, tenantSlug: "t" }));
+      let calls = 0;
+      const mockFetch = vi.fn(async () => {
+        calls++;
+        if (calls === 2) throw new Error("boom");
+        return { ok: true, json: async () => ({ items: calls === 1 ? page1 : [], total: 101 }) };
+      });
+      const first = await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(first).toHaveLength(100);
+      const callsAfterFirst = mockFetch.mock.calls.length;
+      await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(mockFetch.mock.calls.length).toBeGreaterThan(callsAfterFirst); // retried, not cached
+    });
+
     it("fails open on API error and returns empty array", async () => {
       const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
       const items = await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
