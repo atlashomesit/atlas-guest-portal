@@ -529,7 +529,8 @@ describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pr
     // DESIGN-030 (326df4d6) added a `!datesUnavailable &&` guard alongside `!rangePricingPending`
     // on the settled breakdown (an unavailable range shows the "Dates unavailable" headline
     // instead, never the real purchase breakdown) — the rangePricingPending gate is unchanged.
-    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (');
+    // TASK-1040051 added `pricingRefusedMessage == null` (a stay the server refused to price shows its sentence, never a breakdown).
+    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && pricingRefusedMessage == null && (');
   });
 
   it('only a terminal (non-abort) pricing fetch failure degrades to the fallback estimate', () => {

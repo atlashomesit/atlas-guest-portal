@@ -34,6 +34,7 @@ import { describeIncludedGuests } from '@/utils/includedGuests';
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
 import { formatCurrency } from '@/utils/formatting';
+import { isPricingNotConfiguredError } from '@/utils/pricingNotConfigured';
 import { isSmallParty, SMALL_PARTY_HINT_DEFAULT } from '@/utils/smallParty';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
@@ -375,6 +376,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Without these the quote of the PREVIOUS dates was shown as the quote of the new ones until the new fetch landed.
   const [serverPriceBreakdownKey, setServerPriceBreakdownKey] = useState<string | null>(null);
   const [quoteSettledKey, setQuoteSettledKey] = useState<string | null>(null);
+  // TASK-1040051: the server REFUSED to quote this stay (409 PRICING_NOT_CONFIGURED: the host has not set this room's pricing).
+  // Keyed like the quote, so it only ever speaks for the stay it was fetched for. While set, no total and no Reserve.
+  const [quoteRefused, setQuoteRefused] = useState<{ key: string | null; message: string } | null>(null);
   // MRP-002: Public rate plans for this listing & selected rate plan ID.
   const [publicRatePlans, setPublicRatePlans] = useState<PublicListingRatePlanDto[]>([]);
   const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
@@ -1298,12 +1302,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         if (controller.signal.aborted) return;
         setServerPriceBreakdown(b);
         setServerPriceBreakdownKey(quoteKey);
+        setQuoteRefused(null);
         setQuoteSettledKey(quoteKey);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (controller.signal.aborted) return; // superseded by a newer stay: its own answer decides
         setServerPriceBreakdown(null);
         setServerPriceBreakdownKey(null);
+        setQuoteRefused(isPricingNotConfiguredError(err) ? { key: quoteKey, message: err.message } : null);
         setQuoteSettledKey(quoteKey);
       });
     return () => controller.abort();
@@ -1858,9 +1864,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     [effectiveDailyPricing, showOnlinePaymentProcessing],
   );
 
+  // TASK-1040051: the API refused to price THIS stay (409 PRICING_NOT_CONFIGURED). The calendar's own numbers must not
+  // stand in for a quote (they read "Accommodation INR 0 / Total INR 1"): show the API's sentence, no amount, no Reserve.
+  const pricingRefusedMessage: string | null =
+    hasSelectedRange && quoteKey != null && quoteRefused != null && quoteRefused.key === quoteKey ? quoteRefused.message : null;
+
   // Keep the navigation shortcut tied to the authoritative form eligibility.
   const reserveDisabled =
     isSubmitting ||
+    // TASK-1040051: no quote exists for this stay, so there is nothing to reserve at.
+    pricingRefusedMessage != null ||
     isBookingDisabled ||
     (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
     // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
@@ -1876,6 +1889,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     // TASK-4729: guard against NaN pricing (non-numeric server response)
     (hasSelectedRange && !rangePricingPending && isNaN(finalTotal));
   const canReviewBooking = hasSelectedRange && !reserveDisabled && !calendarOpenPricingPending && displayFinalTotal > 0;
+  // TASK-1040051: the total a guest may be shown — never a calendar fallback for a stay the server refused to price.
+  const shownFinalTotal = pricingRefusedMessage != null ? 0 : displayFinalTotal;
 
   // A disabled Reserve must always say why. Every other blocker already speaks for itself (availability failed -> alert + Retry;
   // dates unavailable -> headline + alert; pricing pending -> status; pricing failed -> alert + Try again; service down -> banner;
@@ -1898,7 +1913,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       canReviewBooking,
       // DESIGN-030: never feed the sticky a bookable total for unavailable dates.
       totalAmount:
-        hasSelectedRange && !datesUnavailable && displayFinalTotal > 0 ? displayFinalTotal : null,
+        hasSelectedRange && !datesUnavailable && shownFinalTotal > 0 ? shownFinalTotal : null,
       pricingPending: !datesUnavailable && (rangePricingPending || calendarOpenPricingPending),
       freeCancelUntil: datesUnavailable
         ? null
@@ -1927,7 +1942,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     canReviewBooking,
     hasSelectedRange,
     datesUnavailable,
-    displayFinalTotal,
+    shownFinalTotal,
     rangePricingPending,
     calendarOpenPricingPending,
     freeCancellationCopy?.deadlineFormatted,
@@ -2266,6 +2281,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
             <p className="lv-booking-sub" role="status">Fetching latest prices…</p>
           </>
+        ) : hasSelectedRange && !invalidIstStayRange && pricingRefusedMessage != null ? (
+          // TASK-1040051: the server refused to price this stay. No amount at all (it used to read "Total INR 1").
+          <div className="lv-booking-total" data-testid="bw-pricing-not-configured-headline">
+            <b style={{ fontWeight: 600 }}>Not bookable online yet</b>
+          </div>
         ) : hasSelectedRange && !invalidIstStayRange && calendarPricingFailed ? (
           <div role="alert" data-testid="bw-pricing-error-alert">
             <div className="lv-booking-total">
@@ -2631,6 +2651,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       {plan.cancellationSummary}
                     </div>
                   </div>
+                  {/* TASK-1040051: no INR figure on a card while the server refuses to price this stay. */}
+                  {pricingRefusedMessage == null && (
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
                       {displayPrice(planQuoteTotal ?? plan.effectiveNightlyRate)}
@@ -2639,6 +2661,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       {planQuoteTotal != null ? 'total, all fees included' : '/ night'}
                     </div>
                   </div>
+                  )}
                 </button>
               );
             })}
@@ -2687,7 +2710,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             These dates would be ~{displayPrice(displayFinalTotal)} — pick available dates to book.
           </p>
         )}
-        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && pricingRefusedMessage != null && (
+          <p
+            role="alert"
+            data-testid="bw-pricing-not-configured"
+            className="text-sm text-support-error"
+            style={{ marginTop: 8, lineHeight: 1.45 }}
+          >
+            {pricingRefusedMessage}
+          </p>
+        )}
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && pricingRefusedMessage == null && (
         <div className="lv-price-rows">
           {/* TASK-1039948 / TASK-10299208: Direct booking pricing tier public display — only when the guest chose between options, in plain words (never internal ratePlanName) */}
           {publicRatePlans.length > 1 && selectedRatePlan && (
