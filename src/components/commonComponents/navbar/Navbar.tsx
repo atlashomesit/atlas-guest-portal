@@ -215,7 +215,7 @@ const Navbar = () => {
                   className="util-bar-locale lang-switcher"
                   onClick={() => setLangMenuOpen(!langMenuOpen)}
                   onBlur={() => window.setTimeout(() => setLangMenuOpen(false), 150)}
-                  aria-label="Change language"
+                  aria-label={`${language.toUpperCase()} - Change language`}
                   aria-expanded={langMenuOpen}
                 >
                   {language.toUpperCase()}

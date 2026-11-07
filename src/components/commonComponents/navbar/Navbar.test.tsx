@@ -271,6 +271,15 @@ describe("Navbar CTA", () => {
     }
   });
 
+  it("a11y label-content-name-mismatch: the language button's accessible name starts with its visible code", () => {
+    renderNavbar();
+
+    const toggle = screen.getByRole("button", { name: /change language/i });
+    const visible = (toggle.textContent ?? "").trim();
+    expect(visible).not.toBe("");
+    expect(toggle.getAttribute("aria-label")!.toLowerCase()).toContain(visible.toLowerCase());
+  });
+
   it("TASK-8103: selecting a stub locale (Marathi) does not blank the switcher — it stays a real language code", () => {
     renderNavbar();
 
