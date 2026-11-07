@@ -151,6 +151,26 @@ describe.each([
     expect(document.body.textContent ?? '').not.toMatch(/3,751/);
   });
 
+  it('keeps the skeleton (not the lone cover photo) while the listing detail is pending', async () => {
+    mockUseTenantListings.mockReturnValue({
+      listings: [],
+      properties: [{ ...LIST_ROW, property_img: ['https://cdn.example.com/cover.jpg'] }],
+      state: 'success',
+      refetch: vi.fn(),
+    });
+    mockResolveListing.mockReturnValue({ ...LIST_ROW, property_img: ['https://cdn.example.com/cover.jpg'] });
+    mount();
+    await settle();
+    expect(screen.getByTestId('gallery-skeleton')).toBeTruthy();
+    expect(document.querySelector('.pp-cell-hero img')).toBeNull();
+    await act(async () => {
+      resolveDetail({ ...LIST_ROW, photoUrls: ['https://cdn.example.com/a.jpg', 'https://cdn.example.com/b.jpg'] });
+    });
+    await settle();
+    expect(screen.queryByTestId('gallery-skeleton')).toBeNull();
+    expect(document.querySelector('.pp-cell-hero img')).not.toBeNull();
+  });
+
   it('shows "Photos coming soon" only once the listing has answered with no photos', async () => {
     mount();
     await settle();

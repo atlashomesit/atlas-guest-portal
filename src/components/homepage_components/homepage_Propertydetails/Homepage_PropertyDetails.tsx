@@ -1892,6 +1892,9 @@ useEffect(() => {
     const ppPhotoLookupId = Number(resolvedListingId ?? data?.listingId ?? listingId ?? NaN);
     const ppPhotosPending =
       Number.isFinite(ppPhotoLookupId) && ppPhotoLookupId > 0 && photoDetailSettledFor !== ppPhotoLookupId;
+    // GUEST-064: the public list row carries only the cover, so until the detail answers the hero is a
+    // skeleton (card rule) rather than one photo that is then joined by the rest of the gallery.
+    const ppHeroUrl = ppPhotosPending ? undefined : galleryUrls[0];
 
     return (
         <>
@@ -2087,15 +2090,15 @@ useEffect(() => {
                     Fancybox anchor + <img alt> carry semantics, and role="img" here
                     would nest an interactive inside img (axe nested-interactive). */}
                 <div
-                  className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
-                  role={galleryUrls[0] ? undefined : 'img'}
-                  aria-label={galleryUrls[0] ? undefined : ppPhotosPending ? 'Loading photos' : `${data.property_name} — photo coming soon`}
+                  className={`pp-cell pp-cell-hero${ppHeroUrl ? ' pp-cell--photo' : ''}`}
+                  role={ppHeroUrl ? undefined : 'img'}
+                  aria-label={ppHeroUrl ? undefined : ppPhotosPending ? 'Loading photos' : `${data.property_name} — photo coming soon`}
                 >
-                {galleryUrls[0] ? (
+                {ppHeroUrl ? (
                   <button onClick={(e) => { e.preventDefault(); setLightboxIndex(0); setShowLightbox(true); }} className="block w-full h-full p-0 border-0 bg-transparent cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-accent transition-shadow">
                     <img
-                      src={getGalleryTransformedUrl(galleryUrls[0], 768)}
-                      srcSet={getGallerySrcSet(galleryUrls[0])}
+                      src={getGalleryTransformedUrl(ppHeroUrl, 768)}
+                      srcSet={getGallerySrcSet(ppHeroUrl)}
                       sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 600px"
                       alt={`${data.property_name} — main photo`}
                       loading="eager"
@@ -2120,7 +2123,7 @@ useEffect(() => {
                   "Living/Kitchen/Bedroom/Balcony" placeholder tiles for sparse listings. */}
               {([1, 2, 3, 4] as const).map((i) => {
                 const photo = galleryUrls[i];
-                if (!photo) return null;
+                if (!photo || ppPhotosPending) return null;
                 return (
                   <div
                     key={i}
