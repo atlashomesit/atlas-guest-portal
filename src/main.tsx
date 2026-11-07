@@ -165,10 +165,9 @@ const bootstrapApp = async () => {
     }
 
     // TASK-4903 (ADR-0081 D2/D3/D5/D6a): resolve the layout-theme + color-preset axes once
-    // tenant resolution completes. `resolved.effectiveThemeId`/`effectiveColorPresetId` are
-    // undefined until TASK-4904 lands the server-side DTO fields — resolving here already
-    // stubs "classic"/"default" in that case, so this wiring needs no further change once
-    // TASK-4904 ships. Marketplace apex skips this — it isn't a single resolved tenant and
+    // tenant resolution completes. `resolved.effectiveThemeId`/`effectiveColorPresetId` are the
+    // server-resolved DTO fields (TASK-4904, shipped); an older or partial response that omits them
+    // still resolves to "classic"/"default" here. Marketplace apex skips this — it isn't a single resolved tenant and
     // already renders with the boot-time DEFAULT_THEME applied above.
     const effectiveThemeId = resolveLayoutThemeId(getDevLayoutThemeOverride() ?? resolved?.effectiveThemeId)
     setCurrentLayoutThemeId(effectiveThemeId)

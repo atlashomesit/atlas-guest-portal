@@ -28,9 +28,10 @@ import { getCurrentLayoutThemeId, loadLayoutTheme } from "./themes/registry"
 // resolved from the boot-resolved layout theme's package instead of a fixed page-file path.
 // `getCurrentLayoutThemeId()` is read lazily inside each loader — safe because React only
 // invokes a `React.lazy()` loader on first render, well after `src/main.tsx`'s boot sequence
-// has already called `setCurrentLayoutThemeId()`. Stubbed to "classic" until TASK-4904 lands
-// `effectiveThemeId` server-side — today this resolves identically to the pre-4903 direct
-// imports below (classic re-exports the same page components verbatim).
+// has already called `setCurrentLayoutThemeId()`. The id comes from the tenant's server-resolved
+// `effectiveThemeId` (TASK-4904 shipped it on `/tenants/from-domain`); it falls back to "classic" only
+// when the tenant sets nothing, which renders the same page components as the pre-4903 direct
+// imports below (classic re-exports them verbatim).
 const Home = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Home })))
 const ContactUs = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Contact })))
 const Homepage_PropertyDetails = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.PropertyDetails })))
