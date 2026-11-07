@@ -12,6 +12,8 @@ import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { getTenantSlug, isMarketplaceMode } from '../../../tenant/tenantResolver';
+import PoweredByAtlasLink from '../../PoweredByAtlasLink';
+import { getPoweredBySlug } from '../../../tenant/poweredByAtlas';
 import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getGuestFacingPhone, getWhatsAppPhone } from '../../../config/contact';
 
@@ -63,6 +65,11 @@ const Footer = () => {
         ? (tenant?.tagline?.trim() || "Comfortable stays with responsive support.")
         : (tenant?.tagline?.trim() || "Thoughtfully curated stays in Hyderabad");
     const year = new Date().getFullYear();
+    // TASK-10299421: every published host site carries the link (ships ON, no hide switch until the founder rules);
+    // the Atlas marketplace itself is Atlas, not a host site, so it does not credit itself.
+    // The check-in page carries its own utm_medium=checkin line, so the footer skips that route.
+    const poweredBySlug = location.pathname.startsWith('/check-in') ? null : getPoweredBySlug();
+    const showPoweredBy = Boolean(poweredBySlug) && !isMarketplaceNav;
 
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
 
@@ -236,6 +243,10 @@ const Footer = () => {
                     <Link to="/privacy" className='hover:text-[var(--footer-link-hover)] transition-colors'>Privacy</Link>
                     <span>|</span>
                     <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>
+                    {showPoweredBy && (<>
+                        <span>|</span>
+                        <PoweredByAtlasLink slug={poweredBySlug} medium="tenant-site" />
+                    </>)}
                 </div>
             </div>
 

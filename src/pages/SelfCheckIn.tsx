@@ -4,6 +4,8 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import ArrivalDetailsEditor, { type ArrivalDetailsDraft } from "../components/ArrivalDetailsEditor";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import PoweredByAtlasLink from "../components/PoweredByAtlasLink";
+import { getPoweredBySlug } from "../tenant/poweredByAtlas";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
@@ -250,6 +252,7 @@ const ISO_NATIONALITIES = [
 
 export default function SelfCheckIn() {
   const brandName = getTenantBrandName();
+  const poweredBySlug = getPoweredBySlug();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
   const [searchParams] = useSearchParams();
   const token = (searchParams.get("t") ?? searchParams.get("token") ?? "").trim();
@@ -1960,6 +1963,13 @@ export default function SelfCheckIn() {
               </a>
             </div>
           </div>
+        )}
+
+        {/* TASK-10299422: one quiet credit line, tagged utm_medium=checkin (the page footer skips this route so there is exactly one). */}
+        {poweredBySlug && (
+          <p className="mt-8 text-center text-xs text-text-muted" data-testid="checkin-powered-by">
+            <PoweredByAtlasLink slug={poweredBySlug} medium="checkin" className="underline-offset-2 hover:underline" />
+          </p>
         )}
       </div>
     </div>
