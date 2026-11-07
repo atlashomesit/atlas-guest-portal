@@ -103,6 +103,7 @@ import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '@/utils/guestHistory';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '@/components/apartments/SkeletonCard';
+import { getTodayBreakdownFromListing } from '@/api/pricingClient';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
 import ListingWhatsAppFloat, { buildListingWhatsAppUrl } from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
@@ -781,11 +782,14 @@ const PropertyDetails = () => {
         return dailyPricing.data?.listings?.find((l) => l.listingId === listingNumericForPricing);
     }, [dailyPricing.data?.listings, listingNumericForPricing]);
 
+    // GUEST-064: ONE from-price, the one the search card and the booking box show
+    // (getTodayBreakdownFromListing().actualPrice). No synthetic estimate: until the real rate has
+    // loaded this is 0 and the mobile bar shows a skeleton instead of a number that changes.
     const directBookingNightly = useMemo(() => {
-        const fromApi = dailyPricingRow?.finalAmount;
-        if (fromApi != null && Number(fromApi) > 0) return Math.round(Number(fromApi));
-        return nightlyPrice?.finalNightlyPrice ?? 0;
-    }, [dailyPricingRow?.finalAmount, nightlyPrice?.finalNightlyPrice]);
+        if (!dailyPricingRow) return 0;
+        const actual = getTodayBreakdownFromListing(dailyPricingRow).actualPrice;
+        return Number.isFinite(actual) && actual > 0 ? actual : 0;
+    }, [dailyPricingRow]);
 
 
     useEffect(() => {
@@ -860,6 +864,7 @@ const PropertyDetails = () => {
     // object, re-ran the effect, and stacked 2–6 identical GET /listings/{id} calls. Depend on
     // listing-id primitives only; `dedupedJsonFetch` still collapses this caller with resolveListing.
     const detailPhotosHydratedRef = React.useRef<number | null>(null);
+    const [photoDetailSettledFor, setPhotoDetailSettledFor] = useState<number | null>(null);
     const hasPropertyRow = data != null;
     const dataListingId = data?.listingId ?? null;
     useEffect(() => {
@@ -890,6 +895,7 @@ const PropertyDetails = () => {
                 );
                 const hydratedImages = photoUrls.length > 0 ? photoUrls : (coverUrl ? [coverUrl] : []);
                 detailPhotosHydratedRef.current = lid;
+                setPhotoDetailSettledFor(lid);
 
                 setData((prev) => {
                     if (!prev) return prev;
@@ -917,7 +923,10 @@ const PropertyDetails = () => {
                     return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
                 });
             })
-            .catch(() => {});
+            .catch(() => {
+                // A failed detail call is a settled answer too: show what we have, not a skeleton forever.
+                if (!ac.signal.aborted) setPhotoDetailSettledFor(lid);
+            });
         return () => ac.abort();
     }, [hasPropertyRow, resolvedListingId, dataListingId, listingId]);
 
@@ -1824,10 +1833,13 @@ useEffect(() => {
       typeof data.longitude === 'number' &&
       Number.isFinite(data.latitude) &&
       Number.isFinite(data.longitude);
-    const ppStickyNightly =
-      directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
-    const directBookingNightlyIsSynthetic =
-      !(dailyPricingRow?.finalAmount != null && Number(dailyPricingRow.finalAmount) > 0);
+    const ppStickyNightly = directBookingNightly;
+    const ppStickyNightlyPending = dailyPricing.loading && directBookingNightly <= 0;
+    // GUEST-064: hero shows a skeleton (not "Photos coming soon") until GET /listings/{id} has
+    // answered; the "N photos" count waits for the same answer so it never reads 1 and then 8.
+    const ppPhotoLookupId = Number(resolvedListingId ?? data?.listingId ?? listingId ?? NaN);
+    const ppPhotosPending =
+      Number.isFinite(ppPhotoLookupId) && ppPhotoLookupId > 0 && photoDetailSettledFor !== ppPhotoLookupId;
 
     return (
         <>
@@ -2014,7 +2026,7 @@ useEffect(() => {
                 className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
                 
                 role={galleryUrls[0] ? undefined : 'img'}
-                aria-label={galleryUrls[0] ? undefined : `${data.property_name} — photo coming soon`}
+                aria-label={galleryUrls[0] ? undefined : ppPhotosPending ? 'Loading photos' : `${data.property_name} — photo coming soon`}
               >
                 {galleryUrls[0] ? (
                   <button onClick={(e) => { e.preventDefault(); setLightboxIndex(0); setShowLightbox(true); }} className="block w-full h-full p-0 border-0 bg-transparent cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-accent transition-shadow">
@@ -2030,6 +2042,8 @@ useEffect(() => {
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                   </button>
+                ) : ppPhotosPending ? (
+                  <div className="pp-gallery-skeleton" data-testid="gallery-skeleton" aria-busy="true" />
                 ) : (
                   <div className="pp-cell-overlay">
                     <span className="pp-dot" aria-hidden="true" />
@@ -2923,7 +2937,7 @@ useEffect(() => {
 
               {/* ===== RIGHT COLUMN — sticky booking ===== */}
               <aside className="pp-booking-col" aria-label="Booking">
-                {galleryUrls.length > 0 && (
+                {galleryUrls.length > 0 && !ppPhotosPending && (
                   <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>
                     {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''}
                   </p>
@@ -3124,7 +3138,8 @@ useEffect(() => {
           <PropertyMobileStickyBar
             bookable={ppIsBookable}
             nightlyFallback={ppStickyNightly}
-            nightlyIsSynthetic={directBookingNightlyIsSynthetic}
+            nightlyIsSynthetic={false}
+            nightlyPending={ppStickyNightlyPending}
             summary={stickyBookingSummary}
             onReserveClick={() => {
               const widget = document.querySelector('[data-testid="guest-booking-form"]');

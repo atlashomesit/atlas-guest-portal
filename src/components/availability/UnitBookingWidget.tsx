@@ -2334,7 +2334,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
                     : perNightForDisplay > 0
                       ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
-                      : '—'}
+                      : dailyPricingLoading
+                        ? (
+                          <span
+                            className="inline-block h-5 w-16 animate-pulse rounded bg-[#f0e6dc] align-middle"
+                            data-testid="bw-from-price-skeleton"
+                            aria-busy="true"
+                            aria-label="Loading price"
+                          />
+                        )
+                        : '—'}
               </b>
               <span> / night</span>
             </div>

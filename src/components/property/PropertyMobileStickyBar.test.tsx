@@ -100,6 +100,35 @@ describe("PropertyMobileStickyBar", () => {
     expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 
+  it("shows a skeleton and no price while the real nightly rate is loading (GUEST-064)", () => {
+    render(
+      <PropertyMobileStickyBar
+        bookable
+        nightlyFallback={0}
+        nightlyIsSynthetic={false}
+        nightlyPending
+        summary={null}
+        onReserveClick={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("mobile-sticky-price-skeleton")).toBeTruthy();
+    expect(document.body.textContent ?? "").not.toMatch(/₹|Rs\s?\d|\/ night|all fees included/);
+  });
+
+  it("shows no price at all (not Rs 0) when the rate never loaded (GUEST-064)", () => {
+    render(
+      <PropertyMobileStickyBar
+        bookable
+        nightlyFallback={0}
+        nightlyIsSynthetic={false}
+        summary={null}
+        onReserveClick={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("mobile-sticky-select-dates")).toBeTruthy();
+    expect(document.body.textContent ?? "").not.toMatch(/₹\s?0/);
+  });
+
   it("is visible from the first view with price and next step (TOP10-2026-10-27-01-C)", () => {
     render(
       <>

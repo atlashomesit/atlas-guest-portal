@@ -34,6 +34,8 @@ type Props = {
   bookable: boolean;
   nightlyFallback: number;
   nightlyIsSynthetic: boolean;
+  /** GUEST-064: the real nightly rate has not loaded yet: show a skeleton, never an interim price. */
+  nightlyPending?: boolean;
   summary: BookingStickySummary | null;
   /** Fallback when the date-picker sheet cannot be triggered (scrolls to the booking form). */
   onReserveClick: () => void;
@@ -81,6 +83,7 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
   bookable,
   nightlyFallback,
   nightlyIsSynthetic,
+  nightlyPending = false,
   summary,
   onReserveClick,
   hostWhatsAppUrl = "",
@@ -366,12 +369,21 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
             <b style={{ fontWeight: 600 }}>Calculating…</b>
             <span className="pp-m-sticky-taxes">Updating your total</span>
           </>
-        ) : (
+        ) : nightlyPending ? (
+          <span
+            className="pp-m-sticky-skeleton"
+            data-testid="mobile-sticky-price-skeleton"
+            aria-busy="true"
+            aria-label="Loading price"
+          />
+        ) : nightlyFallback > 0 ? (
           <>
             <b>{nightlyIsSynthetic ? "from " : ""}{formatCurrency(nightlyFallback, { maximumFractionDigits: 0 })}</b>
             <span>/ night</span>
             <span className="pp-m-sticky-taxes">all fees included</span>
           </>
+        ) : (
+          <b style={{ fontWeight: 600 }} data-testid="mobile-sticky-select-dates">Select dates for price</b>
         )}
       </div>
       <button
