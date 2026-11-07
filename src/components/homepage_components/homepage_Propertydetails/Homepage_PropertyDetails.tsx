@@ -85,6 +85,7 @@ import {
 } from '../../../api/listingClient';
 import SEO from '../../SEO';
 import StateMessage from '../../StateMessage';
+import { useMarketplaceListingUnavailable } from '@/hooks/useMarketplaceListingUnavailable';
 import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import EmbeddedListingMap from '../../map/EmbeddedListingMap';
@@ -1627,6 +1628,32 @@ useEffect(() => {
         listingTenantCtx,
         hostDescription.text,
     ]);
+
+    // TASK-10299419 (founder ruling 2026-11-06): on atlastays.com a listing whose host is hidden by billing (a cancelled
+    // subscription past its period end, Closed, Blocked) answers 404 LISTING_UNAVAILABLE. Show "not taking bookings" with a
+    // way back to search, never the bookable page (no Book or Pay control). The server refuses payment for that host anyway.
+    const marketplaceListingUnavailable = useMarketplaceListingUnavailable(
+        resolvedListingId ?? data?.listingId ?? null,
+        isMarketplaceDetail,
+    );
+    if (marketplaceListingUnavailable) {
+        return (
+            <>
+                <SEO
+                    title={`Not taking bookings | ${getTenantBrandName()}`}
+                    description={`This property is not taking bookings right now. Browse other homes on ${getTenantBrandName()}.`}
+                    robots="noindex, nofollow"
+                />
+                <StateMessage
+                    data-testid="listing-unavailable-marketplace"
+                    icon="🏠"
+                    title="This property is not taking bookings right now"
+                    message={`Browse other homes on ${getTenantBrandName()}.`}
+                    primaryAction={{ label: "Browse available homes", to: "/" }}
+                />
+            </>
+        );
+    }
 
     if (!data) {
         // TASK-7195 four-state rule: check the FAILURE state before the absent state. A load that
