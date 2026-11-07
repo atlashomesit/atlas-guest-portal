@@ -22,6 +22,7 @@ import { reportUpiPaid } from '@/api/payment';
 import { isMobileCheckoutUserAgent } from '@/utils/razorpayCheckoutOptions';
 import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
 import { isPricingNotConfiguredError } from '@/utils/pricingNotConfigured';
+import PoweredByAtlasLink from '@/components/PoweredByAtlasLink';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -1275,7 +1276,9 @@ export default function EmbedPage() {
       )}
 
       {/* Footer */}
-      <div className="mt-4 text-center text-[10px] text-text-muted">Powered by Atlas</div>
+      <div className="mt-4 text-center text-[10px] text-text-muted">
+        <PoweredByAtlasLink slug={config.tenantSlug} medium="embed" className="underline-offset-2 hover:underline" />
+      </div>
     </div>
   );
 }
