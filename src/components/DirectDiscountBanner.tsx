@@ -87,10 +87,11 @@ export default function DirectDiscountBanner() {
           type="button"
           onClick={handleCopy}
           className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-white px-3 py-2 text-sm font-mono font-bold tracking-widest text-emerald-700 ring-1 ring-emerald-300 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-600"
-          aria-label={`Copy promo code ${PROMO_CODE}`}
+          // label-content-name-mismatch: the accessible name starts with the visible text ("DIRECT5 Copy" / "DIRECT5 Copied!").
+          aria-label={copied ? `${PROMO_CODE} Copied!` : `${PROMO_CODE} Copy promo code`}
           title="Click to copy"
         >
-          {PROMO_CODE}
+          {PROMO_CODE}{" "}
           <span className="ml-1 text-xs font-normal text-emerald-700">{copied ? "Copied!" : "Copy"}</span>
         </button>
         <span className="text-xs text-emerald-800">at checkout — auto-applied when you tap &quot;Book now&quot;</span>
