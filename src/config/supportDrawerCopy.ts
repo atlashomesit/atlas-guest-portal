@@ -9,7 +9,7 @@ export const SUPPORT_DRAWER_COPY = {
   },
   trustMicrocopy: "Fast support on WhatsApp",
   trigger: {
-    ariaLabel: "Chat with us",
+    ariaLabel: "Chat with us: WhatsApp, call, FAQs",
     label: "Chat with us",
     helper: "WhatsApp, call, FAQs",
   },
