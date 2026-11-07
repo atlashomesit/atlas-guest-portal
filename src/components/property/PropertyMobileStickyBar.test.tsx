@@ -83,7 +83,7 @@ describe("PropertyMobileStickyBar", () => {
     expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 
-  it("shows all fees included on per-night fallback when dates are incomplete (GUEST-020)", () => {
+  it("per-night fallback never claims all fees are included: the checkout total adds fees (GUEST-064 follow-up, price shown = charged)", () => {
     render(
       <PropertyMobileStickyBar
         bookable
@@ -96,7 +96,8 @@ describe("PropertyMobileStickyBar", () => {
 
     expect(screen.queryByTestId("mobile-sticky-total")).not.toBeInTheDocument();
     expect(screen.getByText(/\/ night/i)).toBeInTheDocument();
-    expect(screen.getByText(/all fees included/i)).toBeInTheDocument();
+    expect(screen.queryByText(/all fees included/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("mobile-sticky-total-after-dates")).toHaveTextContent("total shown once you pick dates");
     expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 

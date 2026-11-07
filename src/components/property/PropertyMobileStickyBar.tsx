@@ -380,7 +380,10 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
           <>
             <b>{nightlyIsSynthetic ? "from " : ""}{formatCurrency(nightlyFallback, { maximumFractionDigits: 0 })}</b>
             <span>/ night</span>
-            <span className="pp-m-sticky-taxes">all fees included</span>
+            {/* GUEST-064 follow-up: this is the bare nightly rate. The checkout total adds the payment
+                processing fee (online rail) and any tourist tax, cleaning fee or breakfast extra, so
+                "all fees included" is only true once dates are picked and the live total shows. */}
+            <span className="pp-m-sticky-taxes" data-testid="mobile-sticky-total-after-dates">total shown once you pick dates</span>
           </>
         ) : (
           <b style={{ fontWeight: 600 }} data-testid="mobile-sticky-select-dates">Select dates for price</b>
