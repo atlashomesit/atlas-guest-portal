@@ -6,6 +6,7 @@ import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { resolveReviewLinkParams } from "./reviewLinkParams";
 
 interface ReviewEligibility {
   bookingId: number;
@@ -107,9 +108,11 @@ const emptySubRatings = (): Record<SubKey, number> => ({
 
 export default function ReviewSubmitPage() {
   const brandName = getTenantBrandName();
-  const { bookingId } = useParams<{ bookingId: string }>();
+  const { bookingId: rawBookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("t");
+  // NOTIF-074: the access code may arrive in the query string or, if WhatsApp encoded the button suffix, inside the path tail.
+  const { bookingId, token } = resolveReviewLinkParams(rawBookingId, searchParams.get("t"));
+  const [missingCode, setMissingCode] = useState(false);
 
   const [eligibility, setEligibility] = useState<ReviewEligibility | null>(null);
   const [funnelConfig, setFunnelConfig] = useState<ReviewFunnelConfig | null>(null);
@@ -133,7 +136,9 @@ export default function ReviewSubmitPage() {
 
   useEffect(() => {
     if (!bookingId || !token) {
-      setError("Invalid review link. Please use the link from your check-out message.");
+      // NOTIF-074: no dead end. Say what is missing and offer the ways that still work.
+      setMissingCode(true);
+      setError("This review link is missing its access code, so we cannot open your review form from it.");
       setLoading(false);
       return;
     }
@@ -288,8 +293,21 @@ export default function ReviewSubmitPage() {
       <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-4">
           <div className="text-4xl">🔍</div>
-          <h1 className="text-xl font-bold text-text-primary">Link not found</h1>
+          <h1 className="text-xl font-bold text-text-primary">{missingCode ? "This review link is incomplete" : "Link not found"}</h1>
           <p className="text-sm text-text-secondary">{error ?? "We could not find this review link."}</p>
+          {missingCode && (
+            <div className="space-y-2 text-sm text-text-secondary" data-testid="review-link-missing-code">
+              <p>You can still leave your review:</p>
+              <ul className="space-y-1">
+                <li>open the review link in your check-out email, or</li>
+                <li>
+                  sign in and open{" "}
+                  <Link to="/my-bookings" className="text-brand-primary underline underline-offset-2">My bookings</Link>
+                  , where your stay has a Review button.
+                </li>
+              </ul>
+            </div>
+          )}
           <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
         </div>
       </div>
