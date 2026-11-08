@@ -91,7 +91,7 @@ type BookingState = {
   ratePlanMealPlan?: string | null;
   ratePlanCancellationPolicy?: string | null;
   /** TASK-1040087: Marketplace booking origin channel ('marketplace') forwarded from UnitBookingWidget. */
-  holdBookingChannel?: 'marketplace' | null;
+  holdBookingChannel?: 'marketplace' | 'ai_receptionist' | null;
 };
 
 type BookingContextValue = {

@@ -108,12 +108,18 @@ const KEY = 'atlas_guest_promo_code';
 const LINK_KEY = 'atlas_guest_promo_from_link';
 
 type Validate = { valid: boolean; message: string; discountAmount?: number; discountType?: string; discountValue?: number };
+type Quote = { valid: boolean; message: string; percent?: number; discountAmount?: number; totalReduction?: number; finalAmount?: number };
+// The hold is INR 4,479. The promo is INR 870; the fee/tax on the lower price shrink by INR 30 more: the server says 900 comes off.
+const GOOD_QUOTE: Quote = { valid: true, message: '20% off applied', percent: 20, discountAmount: 870, totalReduction: 900, finalAmount: 3579 };
 const GOOD: Validate = { valid: true, message: '20% off applied', discountAmount: 870, discountType: 'Percent', discountValue: 20 };
 
-function mockFetch(validate: Validate | 'down') {
+function mockFetch(quote: Quote | 'down', validate: Validate = GOOD) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((async (url: unknown) => {
+    if (typeof url === 'string' && url.includes('/api/promo-codes/quote')) {
+      if (quote === 'down') throw new Error('offline');
+      return { ok: true, json: async () => quote } as Response;
+    }
     if (typeof url === 'string' && url.includes('/api/promo-codes/validate')) {
-      if (validate === 'down') throw new Error('offline');
       return { ok: true, json: async () => validate } as Response;
     }
     return { ok: false, json: async () => ({}) } as Response;
@@ -121,6 +127,8 @@ function mockFetch(validate: Validate | 'down') {
 }
 const validateCalls = (spy: ReturnType<typeof vi.spyOn>) =>
   spy.mock.calls.filter((c) => String(c[0]).includes('/api/promo-codes/validate'));
+const quoteCalls = (spy: ReturnType<typeof vi.spyOn>) =>
+  spy.mock.calls.filter((c) => String(c[0]).includes('/api/promo-codes/quote'));
 
 function mockOrderApi(post: ReturnType<typeof vi.spyOn>, amount: number, promo: { code: string; discount: number } | null) {
   post.mockImplementation((async (_url: string, body: unknown) => {
@@ -176,23 +184,27 @@ describe('GuestDetailsPage - AGT-003 promo from a checkout link', () => {
 
   it('applies a link code on load with no tap: discounted total, saving as its own line', async () => {
     seedLinkCode();
-    const f = mockFetch(GOOD);
+    const f = mockFetch(GOOD_QUOTE);
     await renderPage();
-    expect(validateCalls(f)).toHaveLength(1);
-    expect(JSON.parse(String((validateCalls(f)[0][1] as RequestInit).body))).toMatchObject({ code: 'AI12345678', listingId: 637, subtotal: 4350 });
+    expect(validateCalls(f)).toHaveLength(0); // link codes use the server quote, not validate
+    expect(quoteCalls(f)).toHaveLength(1);
+    expect(JSON.parse(String((quoteCalls(f)[0][1] as RequestInit).body))).toEqual({
+      code: 'AI12345678', listingId: 637, checkIn: '2026-10-20', checkOut: '2026-10-21', guests: 2,
+    });
     expect(screen.getByTestId('promo-confirmed-row')).toHaveTextContent('Promo discount');
     expect(screen.getByTestId('promo-confirmed-row')).toHaveTextContent('−₹870');
-    expect(screen.getByTestId('checkout-total-amount')).toHaveTextContent('₹3,609'); // 4,479 - 870
+    expect(screen.getByTestId('promo-fee-shrink-row')).toHaveTextContent('−₹30');
+    expect(screen.getByTestId('checkout-total-amount')).toHaveTextContent('₹3,579'); // hold final 4,479 - totalReduction 900
   });
 
   it('the total shown is the amount the order charges (no "Total updated" gate) and the order carries the code', async () => {
     seedLinkCode();
-    mockFetch(GOOD);
+    mockFetch(GOOD_QUOTE);
     const post = vi.spyOn(axios, 'post');
-    mockOrderApi(post, 3609, { code: 'AI12345678', discount: 870 });
+    mockOrderApi(post, 3579, { code: 'AI12345678', discount: 870 });
     await renderPage();
     const shown = screen.getByTestId('checkout-total-amount').textContent;
-    expect(shown).toContain('₹3,609');
+    expect(shown).toContain('₹3,579');
     fillDetails();
     fireEvent.click(screen.getByTestId('guest-booking-consent'));
     await act(async () => {
@@ -204,7 +216,7 @@ describe('GuestDetailsPage - AGT-003 promo from a checkout link', () => {
     expect(chargeBody.promoCode).toBe('AI12345678');
     expect(screen.queryByTestId('guest-checkout-total-updated')).toBeNull();
     expect(rzp.opened).toBe(1);
-    expect(rzp.options?.amount).toBe(360900); // paise charged == INR 3,609 shown
+    expect(rzp.options?.amount).toBe(357900); // paise charged == INR 3,579 shown
     expect(screen.getByTestId('checkout-total-amount').textContent).toBe(shown);
   });
 
@@ -241,14 +253,16 @@ describe('GuestDetailsPage - AGT-003 promo from a checkout link', () => {
 
   it("a code typed or copied by hand keeps today's behaviour: not applied on load, only on Apply, total unchanged until the order", async () => {
     window.localStorage.setItem(KEY, 'FIRSTSTAY'); // no link key: banner or hand-typed
-    const f = mockFetch(GOOD);
+    const f = mockFetch(GOOD_QUOTE);
     await renderPage();
     expect(validateCalls(f)).toHaveLength(0);
+    expect(quoteCalls(f)).toHaveLength(0);
     expect(screen.queryByTestId('promo-confirmed-row')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /promo code/i }));
     fireEvent.click(screen.getByRole('button', { name: /^apply$/i }));
     await settle();
     expect(validateCalls(f)).toHaveLength(1);
+    expect(quoteCalls(f)).toHaveLength(0);
     expect(screen.getByTestId('promo-savings-chip')).toBeInTheDocument();
     expect(screen.queryByTestId('promo-confirmed-row')).toBeNull();
     expect(screen.getByTestId('checkout-total-amount')).toHaveTextContent('₹4,479');
@@ -256,7 +270,7 @@ describe('GuestDetailsPage - AGT-003 promo from a checkout link', () => {
 
   it('a stored code that fails for this home is cleared so it cannot follow the guest on', async () => {
     window.localStorage.setItem(KEY, 'FIRSTSTAY');
-    mockFetch({ valid: false, message: 'Promo code is not valid for this listing.' });
+    mockFetch(GOOD_QUOTE, { valid: false, message: 'Promo code is not valid for this listing.' });
     await renderPage();
     fireEvent.click(screen.getByRole('button', { name: /promo code/i }));
     fireEvent.click(screen.getByRole('button', { name: /^apply$/i }));
@@ -266,9 +280,9 @@ describe('GuestDetailsPage - AGT-003 promo from a checkout link', () => {
 
   it('the code is cleared after a successful booking', async () => {
     seedLinkCode();
-    mockFetch(GOOD);
+    mockFetch(GOOD_QUOTE);
     const post = vi.spyOn(axios, 'post');
-    mockOrderApi(post, 3609, { code: 'AI12345678', discount: 870 });
+    mockOrderApi(post, 3579, { code: 'AI12345678', discount: 870 });
     await renderPage();
     fillDetails();
     fireEvent.click(screen.getByTestId('guest-booking-consent'));
@@ -288,5 +302,57 @@ describe('GuestDetailsPage - AGT-003 promo from a checkout link', () => {
     await settle();
     expect(window.localStorage.getItem(KEY)).toBeNull();
     expect(window.localStorage.getItem(LINK_KEY)).toBeNull();
+  });
+
+  describe('AGT-005 attribution: src=ai_receptionist', () => {
+    async function payAndGetBodies(search: string, preloadChannel?: 'ai_receptionist') {
+      if (preloadChannel) {
+        const raw = JSON.parse(window.sessionStorage.getItem('atlas_guest_checkout_hold') as string);
+        window.sessionStorage.setItem('atlas_guest_checkout_hold', JSON.stringify({ ...raw, holdBookingChannel: preloadChannel }));
+      }
+      const post = vi.spyOn(axios, 'post');
+      mockOrderApi(post, 4479, null);
+      mockFetch(GOOD_QUOTE);
+      render(
+        <MemoryRouter initialEntries={[`/book/grove-co/penthouse/details?tenant=grove-and-co${search}`]}>
+          <BookingProvider>
+            <GuestDetailsPage />
+          </BookingProvider>
+        </MemoryRouter>,
+      );
+      await settle();
+      await settle();
+      fillDetails();
+      fireEvent.click(screen.getByTestId('guest-booking-consent'));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('guest-booking-submit'));
+      });
+      await settle();
+      await settle();
+      return post.mock.calls.map((c) => c[1] as { bookingDraft: { channel?: string } });
+    }
+
+    it('sends bookingDraft.channel = ai_receptionist on the hold and the order when the link says so', async () => {
+      const bodies = await payAndGetBodies('&src=ai_receptionist');
+      expect(bodies).toHaveLength(2);
+      expect(bodies[0].bookingDraft.channel).toBe('ai_receptionist');
+      expect(bodies[1].bookingDraft.channel).toBe('ai_receptionist');
+    });
+
+    it('keeps it through the hop from the home page (no src in the checkout URL, channel carried by the booking)', async () => {
+      const bodies = await payAndGetBodies('', 'ai_receptionist');
+      expect(bodies[1].bookingDraft.channel).toBe('ai_receptionist');
+    });
+
+    it('sends no channel without src, or with any other value', async () => {
+      for (const search of ['', '&src=ai', '&src=AI_RECEPTIONIST', '&src=ai_receptionist_x']) {
+        cleanup();
+        window.sessionStorage.clear();
+        seedDraft();
+        const bodies = await payAndGetBodies(search);
+        expect(bodies[1].bookingDraft.channel).toBeUndefined();
+        vi.restoreAllMocks();
+      }
+    });
   });
 });

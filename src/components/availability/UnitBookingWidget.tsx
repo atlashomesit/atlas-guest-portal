@@ -702,32 +702,43 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // AGT-003: a checkout link's ?promo= code that validates for THIS listing gets one plain line by the price.
   // Display only: no price on this page is computed from it; checkout applies the code itself.
   const [linkOfferLine, setLinkOfferLine] = useState<string | null>(null);
+  const bookingRef = useRef(booking);
+  bookingRef.current = booking;
   useEffect(() => {
     if (listingId == null) return;
     let promo = '';
     try { promo = normalizePromoCodeSubmit(new URL(window.location.href).searchParams.get('promo') || ''); } catch { /* ignore */ }
-    if (!promo) { setLinkOfferLine(null); return; }
+    if (!promo || !booking.checkIn || !booking.checkOut) { setLinkOfferLine(null); return; }
     const ac = new AbortController();
     void (async () => {
       try {
-        const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
+        const bk = bookingRef.current;
+        const dayOf = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : toCalendarISO(getIstCalendarDate(new Date(v))));
+        // AGT-005: the same server quote checkout uses; the line shows its percent.
+        const res = await fetch(buildApiUrl('/api/promo-codes/quote'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getApiHeaders(verifiedTenantSlug) },
-          body: JSON.stringify({ code: promo, listingId: Number(listingId), subtotal: 0 }),
+          body: JSON.stringify({
+            code: promo,
+            listingId: Number(listingId),
+            checkIn: dayOf(bk.checkIn as string),
+            checkOut: dayOf(bk.checkOut as string),
+            guests: bk.guests ?? 2,
+          }),
           signal: ac.signal,
         });
         if (!res.ok) { setLinkOfferLine(null); return; }
-        const data = (await res.json()) as { valid?: boolean; discountType?: string | null; discountValue?: number };
+        const data = (await res.json()) as { valid?: boolean; percent?: number };
         if (!data.valid) { setLinkOfferLine(null); return; }
         setLinkOfferLine(
-          data.discountType === 'Percent' && Number(data.discountValue) > 0
-            ? `Your ${Number(data.discountValue)}% offer is applied at checkout.`
+          Number(data.percent) > 0
+            ? `Your ${Number(data.percent)}% offer is applied at checkout.`
             : 'Your offer is applied at checkout.',
         );
       } catch { if (!ac.signal.aborted) setLinkOfferLine(null); }
     })();
     return () => ac.abort();
-  }, [listingId, verifiedTenantSlug]);
+  }, [listingId, verifiedTenantSlug, booking.checkIn, booking.checkOut, booking.guests]);
 
   // TASK-2630: Listen for custom event from bottom Availability calendar (BUG-15b).
   // When user clicks a date in the AvailabilityCalendar, it dispatches atlas:set-checkin with the date (ISO string).
@@ -2158,7 +2169,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdTenantSlug,
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
-        holdBookingChannel: isMarketplaceOrigin ? 'marketplace' : null,
+        // AGT-005: the AI sales agent's link carries src=ai_receptionist; keep it across the hop to checkout (exact value only).
+        holdBookingChannel: isMarketplaceOrigin
+          ? 'marketplace'
+          : new URLSearchParams(currentSearch).get('src') === 'ai_receptionist' ? 'ai_receptionist' : null,
         holdPriceBreakdown: {
           paymentFeeDisplay: {
             percent: feePercent(Number((convenienceFeePercent * 100).toFixed(2))),

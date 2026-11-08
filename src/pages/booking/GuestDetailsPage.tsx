@@ -236,7 +236,7 @@ type CheckoutHoldCache = {
   /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
   holdSecurityDepositAmount?: number | null;
   /** TASK-1040087: marketplace booking origin channel preserved across refreshes. */
-  holdBookingChannel?: 'marketplace' | null;
+  holdBookingChannel?: 'marketplace' | 'ai_receptionist' | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
@@ -389,6 +389,8 @@ const GuestDetailsPage: React.FC = () => {
     const rawRatePlanId = sp.get('ratePlanId') || sp.get('listingRatePlanId');
     const rawBrand = sp.get('brand')?.trim().toLowerCase() ?? '';
     const isMarketplaceBrand = rawBrand === 'atlastays' || rawBrand === 'marketplace';
+    // AGT-005: only this exact value marks a checkout that came from the AI sales agent's link.
+    const isAiReceptionistSrc = sp.get('src') === 'ai_receptionist';
     return {
       checkIn: normalizeDateParam(rawCheckIn),
       checkOut: normalizeDateParam(rawCheckOut),
@@ -397,6 +399,7 @@ const GuestDetailsPage: React.FC = () => {
       listingId: rawListingId && !isNaN(Number(rawListingId)) ? Number(rawListingId) : null,
       ratePlanId: rawRatePlanId && !isNaN(Number(rawRatePlanId)) ? Number(rawRatePlanId) : null,
       isMarketplaceBrand,
+      isAiReceptionistSrc,
     };
   }, [location.search]);
 
@@ -425,7 +428,7 @@ const GuestDetailsPage: React.FC = () => {
         holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
-        holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
+        holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : urlParams.isAiReceptionistSrc ? 'ai_receptionist' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
       });
 
       if (!effectiveListingId && unitSlug) {
@@ -499,6 +502,8 @@ const GuestDetailsPage: React.FC = () => {
     urlParams.isMarketplaceBrand ||
     isMarketplaceMode() ||
     isMarketplaceHostname();
+  const isAiReceptionistCheckout =
+    !isMarketplaceCheckout && (booking.holdBookingChannel === 'ai_receptionist' || urlParams.isAiReceptionistSrc);
 
   // Synchronize BookingContext and window.location query string if one was populated and the other missing
   useEffect(() => {
@@ -798,7 +803,7 @@ const GuestDetailsPage: React.FC = () => {
       holdGraceHours: booking.holdGraceHours ?? null,
       holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
       holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
-      holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : (booking.holdBookingChannel ?? null),
+      holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : isAiReceptionistCheckout ? 'ai_receptionist' : (booking.holdBookingChannel ?? null),
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
@@ -813,7 +818,7 @@ const GuestDetailsPage: React.FC = () => {
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
     booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
     booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount,
-    booking.holdBookingChannel, isMarketplaceCheckout,
+    booking.holdBookingChannel, isMarketplaceCheckout, isAiReceptionistCheckout,
     booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
@@ -834,7 +839,9 @@ const GuestDetailsPage: React.FC = () => {
   /** TASK-2880: true once `/api/Razorpay/order` returned the authoritative promo discount. */
   const [serverPromoLocked, setServerPromoLocked] = useState(false);
   /** AGT-003: a code from a checkout link (`?promo=`) is validated on load and counted in the shown total; a typed code is not. */
-  const [linkPromoActive, setLinkPromoActive] = useState(false);
+  /** AGT-005: the server's own quote for a link code. `reduction` is everything that comes off the total (promo + the fee/tax that shrink with it). */
+  const [linkQuote, setLinkQuote] = useState<{ discount: number; reduction: number } | null>(null);
+  const linkPromoActive = linkQuote != null;
   const linkPromoCodeRef = useRef<string>(readLinkPromo());
   const linkPromoTriedRef = useRef(false);
 
@@ -1014,7 +1021,10 @@ const GuestDetailsPage: React.FC = () => {
       : 0;
   // TASK-5204: client-side promo validate is advisory only — subtract from the total once
   // `/api/Razorpay/order` echoes the authoritative discount (`serverPromoLocked`).
-  const confirmedPromoDiscount = serverPromoLocked || linkPromoActive ? promoDiscountAmount : 0;
+  const confirmedPromoDiscount = linkQuote ? linkQuote.reduction : serverPromoLocked ? promoDiscountAmount : 0;
+  // The "Promo discount" line is the promo alone; what the fee and taxes shrink by is its own plain line.
+  const promoRowAmount = linkQuote ? linkQuote.discount : confirmedPromoDiscount;
+  const promoFeeShrink = linkQuote ? Math.max(0, linkQuote.reduction - linkQuote.discount) : 0;
 
   const { perNight, displayTotal } =
     computeCheckoutTotal({
@@ -1327,6 +1337,7 @@ const GuestDetailsPage: React.FC = () => {
     setPromoValidating(true);
     setPromoMessage(null);
     const trimmedEmail = formData.email.trim();
+    const calendarDay = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : toCalendarISO(getIstCalendarDate(new Date(v))));
     // AGT-003: a link code that cannot be used says so in one plain sentence, drops the code (so a dead
     // discount never follows the guest to another home) and leaves the normal price. Checkout is never blocked.
     const rejectLinkCode = () => {
@@ -1335,10 +1346,36 @@ const GuestDetailsPage: React.FC = () => {
       setPromoCode('');
       setAppliedPromoCode(null);
       setPromoDiscountAmount(0);
-      setLinkPromoActive(false);
+      setLinkQuote(null);
       clearStoredPromo();
     };
     try {
+      if (fromLink && booking.checkIn && booking.checkOut) {
+        // AGT-005: the server prices the stay with the code (fee, GST and tourist tax included): use its numbers as they are.
+        const qres = await fetch(buildApiUrl('/api/promo-codes/quote'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getApiHeaders(effectiveTenantSlug) },
+          body: JSON.stringify({
+            code,
+            listingId: Number(holdListingId),
+            checkIn: calendarDay(booking.checkIn),
+            checkOut: calendarDay(booking.checkOut),
+            guests: booking.guests ?? 2,
+            ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          }),
+        });
+        if (!qres.ok) { rejectLinkCode(); return; }
+        const q = (await qres.json()) as { valid?: boolean; message?: string; discountAmount?: number; totalReduction?: number };
+        if (!q.valid || !(Number(q.discountAmount) > 0)) { rejectLinkCode(); return; }
+        const discount = Number(q.discountAmount);
+        const reduction = Math.max(discount, Number(q.totalReduction) || 0);
+        setPromoMessage(q.message || null);
+        setAppliedPromoCode(code);
+        setServerPromoLocked(false);
+        setPromoDiscountAmount(discount);
+        setLinkQuote({ discount, reduction });
+        return;
+      }
       const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getApiHeaders(effectiveTenantSlug) },
@@ -1354,15 +1391,12 @@ const GuestDetailsPage: React.FC = () => {
         return;
       }
       const data = (await res.json()) as { valid: boolean; message: string; discountAmount?: number };
-      if (fromLink && !data.valid) { rejectLinkCode(); return; }
       setPromoMessage(data.message);
       if (data.valid) {
         setAppliedPromoCode(code);
         setServerPromoLocked(false);
         if (typeof data.discountAmount === 'number' && data.discountAmount > 0) {
           setPromoDiscountAmount(data.discountAmount);
-          // Same figure the order will stamp: show it in the total now, as its own line.
-          if (fromLink) setLinkPromoActive(true);
         }
       } else if (code === (window.localStorage.getItem('atlas_guest_promo_code') || '').toUpperCase()) {
         // A remembered code that fails for this home must not keep following the guest.
@@ -1373,7 +1407,7 @@ const GuestDetailsPage: React.FC = () => {
     } finally {
       setPromoValidating(false);
     }
-  }, [holdListingId, baseAmount, effectiveTenantSlug, formData.email]);
+  }, [holdListingId, baseAmount, effectiveTenantSlug, formData.email, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId]);
 
   const handlePromoBlur = useCallback(() => validatePromo(promoCode, false), [validatePromo, promoCode]);
 
@@ -1399,7 +1433,7 @@ const GuestDetailsPage: React.FC = () => {
     setAppliedPromoCode(null);
     setPromoDiscountAmount(0);
     setServerPromoLocked(false);
-    setLinkPromoActive(false);
+    setLinkQuote(null);
     clearStoredPromo();
   }, []);
 
@@ -1455,6 +1489,7 @@ const GuestDetailsPage: React.FC = () => {
           ...(bringingPet ? { pets: 1, hasPets: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
+          ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
         },
         ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         currency: 'INR',
@@ -1479,7 +1514,7 @@ const GuestDetailsPage: React.FC = () => {
     };
     updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
     return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
-  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, includeBreakfast, bringingPet, isMarketplaceCheckout, effectiveTenantSlug, updateBooking]);
+  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, includeBreakfast, bringingPet, isMarketplaceCheckout, isAiReceptionistCheckout, effectiveTenantSlug, updateBooking]);
 
   // ── PAY-010: UPI_QR / UPI_DEEPLINK checkout ──────────────────────────────────
   const [upiCheckout, setUpiCheckout] = useState<{
@@ -1652,6 +1687,7 @@ const GuestDetailsPage: React.FC = () => {
           ...(bringingPet ? { pets: 1, hasPets: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
+          ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
         },
       });
 
@@ -1751,6 +1787,7 @@ const GuestDetailsPage: React.FC = () => {
             setPromoDiscountAmount(Number(serverPromoDiscount) > 0 ? Number(serverPromoDiscount) : 0);
             setServerPromoLocked(true);
             if (!(Number(serverPromoDiscount) > 0)) {
+              setLinkQuote(null);
               setPromoMessage(`Promo ${serverPromoCode.trim()} could not be applied`);
               setPromoOpen(true);
             }
@@ -1759,6 +1796,7 @@ const GuestDetailsPage: React.FC = () => {
           } else if (appliedPromoCode && promoDiscountAmount > 0) {
             setPromoDiscountAmount(0);
             setAppliedPromoCode(null);
+            setLinkQuote(null);
             setServerPromoLocked(true);
             setPromoMessage(`Promo ${appliedPromoCode} could not be applied`);
             setPromoOpen(true);
@@ -2844,7 +2882,7 @@ const GuestDetailsPage: React.FC = () => {
                           setPromoMessage(null);
                           setAppliedPromoCode(null);
                           setPromoDiscountAmount(0);
-                          setLinkPromoActive(false);
+                          setLinkQuote(null);
                         }}
                         onBlur={() => void handlePromoBlur()}
                         data-testid="guest-booking-promo"
@@ -3560,7 +3598,13 @@ const GuestDetailsPage: React.FC = () => {
             {confirmedPromoDiscount > 0 && (
               <div className="gd-price-row save" data-testid="promo-confirmed-row">
                 <span>Promo discount{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}</span>
-                <span className="num">−{displayPrice(confirmedPromoDiscount)}</span>
+                <span className="num">−{displayPrice(promoRowAmount)}</span>
+              </div>
+            )}
+            {promoFeeShrink > 0 && (
+              <div className="gd-price-row save" data-testid="promo-fee-shrink-row">
+                <span>Fee and tax on the lower price</span>
+                <span className="num">−{displayPrice(promoFeeShrink)}</span>
               </div>
             )}
             {referralDiscountAmount > 0 && (

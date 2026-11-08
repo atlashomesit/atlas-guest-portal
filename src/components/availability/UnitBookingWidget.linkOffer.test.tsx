@@ -78,7 +78,7 @@ const LINK_KEY = 'atlas_guest_promo_from_link';
 
 function mockValidate(result: Record<string, unknown> | null, ok = true) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((async (url: unknown) => {
-    if (typeof url === 'string' && url.includes('/api/promo-codes/validate')) {
+    if (typeof url === 'string' && url.includes('/api/promo-codes/quote')) {
       if (result == null) throw new Error('offline');
       return { ok, json: async () => result } as Response;
     }
@@ -103,6 +103,8 @@ describe('UnitBookingWidget - AGT-003 link offer line', () => {
     mocks.fetchGuestPriceBreakdown.mockResolvedValue(null);
     mocks.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
     window.localStorage.clear();
+    mocks.booking.checkIn = '2026-06-10';
+    mocks.booking.checkOut = '2026-06-14';
   });
   afterEach(() => {
     cleanup();
@@ -113,11 +115,11 @@ describe('UnitBookingWidget - AGT-003 link offer line', () => {
 
   it('shows "Your 15% offer is applied at checkout." when the link code validates, and remembers it as a link code', async () => {
     window.history.pushState({}, '', '/homes/p/u?promo=AI12345678&utm_source=ai');
-    const spy = mockValidate({ valid: true, discountType: 'Percent', discountValue: 15, discountAmount: 0, message: '15% off applied' });
+    const spy = mockValidate({ valid: true, percent: 15, discountAmount: 870, totalReduction: 900, finalAmount: 3579, message: '15% off applied' });
     await renderWidget();
     expect(screen.getByTestId('bw-link-offer-line')).toHaveTextContent('Your 15% offer is applied at checkout.');
-    const call = spy.mock.calls.find((c) => String(c[0]).includes('/api/promo-codes/validate'))!;
-    expect(JSON.parse(String((call[1] as RequestInit).body))).toMatchObject({ code: 'AI12345678', listingId: 7 });
+    const call = spy.mock.calls.find((c) => String(c[0]).includes('/api/promo-codes/quote'))!;
+    expect(JSON.parse(String((call[1] as RequestInit).body))).toMatchObject({ code: 'AI12345678', listingId: 7, checkIn: '2026-06-10', checkOut: '2026-06-14', guests: 2 });
     expect(window.localStorage.getItem(KEY)).toBe('AI12345678');
     expect(window.localStorage.getItem(LINK_KEY)).toBe('AI12345678');
   });
@@ -138,9 +140,9 @@ describe('UnitBookingWidget - AGT-003 link offer line', () => {
 
   it('makes no promo call and shows no line without ?promo=', async () => {
     window.history.pushState({}, '', '/homes/p/u?checkIn=2026-06-10');
-    const spy = mockValidate({ valid: true, discountType: 'Percent', discountValue: 15, message: 'x' });
+    const spy = mockValidate({ valid: true, percent: 15, message: 'x' });
     await renderWidget();
     expect(screen.queryByTestId('bw-link-offer-line')).toBeNull();
-    expect(spy.mock.calls.some((c) => String(c[0]).includes('/api/promo-codes/validate'))).toBe(false);
+    expect(spy.mock.calls.some((c) => String(c[0]).includes('/api/promo-codes/quote'))).toBe(false);
   });
 });
