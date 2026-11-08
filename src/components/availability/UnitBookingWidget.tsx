@@ -33,6 +33,7 @@ import {
 import { describeIncludedGuests } from '@/utils/includedGuests';
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
+import { rememberLinkPromo } from '@/utils/linkPromo';
 import { formatCurrency } from '@/utils/formatting';
 import { isPricingNotConfiguredError } from '@/utils/pricingNotConfigured';
 import { isSmallParty, SMALL_PARTY_HINT_DEFAULT } from '@/utils/smallParty';
@@ -692,11 +693,41 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     try {
       const url = new URL(window.location.href);
       const promo = normalizePromoCodeSubmit(url.searchParams.get('promo') || '');
-      if (promo) window.localStorage.setItem('atlas_guest_promo_code', promo);
+      if (promo) rememberLinkPromo(promo);
     } catch {
       // no-op
     }
   }, []);
+
+  // AGT-003: a checkout link's ?promo= code that validates for THIS listing gets one plain line by the price.
+  // Display only: no price on this page is computed from it; checkout applies the code itself.
+  const [linkOfferLine, setLinkOfferLine] = useState<string | null>(null);
+  useEffect(() => {
+    if (listingId == null) return;
+    let promo = '';
+    try { promo = normalizePromoCodeSubmit(new URL(window.location.href).searchParams.get('promo') || ''); } catch { /* ignore */ }
+    if (!promo) { setLinkOfferLine(null); return; }
+    const ac = new AbortController();
+    void (async () => {
+      try {
+        const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getApiHeaders(verifiedTenantSlug) },
+          body: JSON.stringify({ code: promo, listingId: Number(listingId), subtotal: 0 }),
+          signal: ac.signal,
+        });
+        if (!res.ok) { setLinkOfferLine(null); return; }
+        const data = (await res.json()) as { valid?: boolean; discountType?: string | null; discountValue?: number };
+        if (!data.valid) { setLinkOfferLine(null); return; }
+        setLinkOfferLine(
+          data.discountType === 'Percent' && Number(data.discountValue) > 0
+            ? `Your ${Number(data.discountValue)}% offer is applied at checkout.`
+            : 'Your offer is applied at checkout.',
+        );
+      } catch { if (!ac.signal.aborted) setLinkOfferLine(null); }
+    })();
+    return () => ac.abort();
+  }, [listingId, verifiedTenantSlug]);
 
   // TASK-2630: Listen for custom event from bottom Availability calendar (BUG-15b).
   // When user clicks a date in the AvailabilityCalendar, it dispatches atlas:set-checkin with the date (ISO string).
@@ -2349,6 +2380,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
             <p className="lv-booking-sub">Select dates to see total price</p>
           </>
+        )}
+        {linkOfferLine && (
+          <p className="lv-booking-sub" data-testid="bw-link-offer-line" role="status">{linkOfferLine}</p>
         )}
         {reviewCount != null && reviewCount > 0 && reviewRating != null && (
           <div className="bw-rating" data-testid="bw-rating-block" style={{ marginTop: 6 }}>

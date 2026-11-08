@@ -30,6 +30,7 @@ import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContex
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { normalizePromoCodeInput } from '@/utils/promoCodeInput';
+import { clearStoredPromo, readLinkPromo } from '@/utils/linkPromo';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -832,6 +833,10 @@ const GuestDetailsPage: React.FC = () => {
   const [promoDiscountAmount, setPromoDiscountAmount] = useState(0);
   /** TASK-2880: true once `/api/Razorpay/order` returned the authoritative promo discount. */
   const [serverPromoLocked, setServerPromoLocked] = useState(false);
+  /** AGT-003: a code from a checkout link (`?promo=`) is validated on load and counted in the shown total; a typed code is not. */
+  const [linkPromoActive, setLinkPromoActive] = useState(false);
+  const linkPromoCodeRef = useRef<string>(readLinkPromo());
+  const linkPromoTriedRef = useRef(false);
 
   const [referralCode, setReferralCode] = useState(() => {
     try { return (window.localStorage.getItem('atlas_guest_referral_code') || '').slice(0, 32); } catch { return ''; }
@@ -1009,7 +1014,7 @@ const GuestDetailsPage: React.FC = () => {
       : 0;
   // TASK-5204: client-side promo validate is advisory only — subtract from the total once
   // `/api/Razorpay/order` echoes the authoritative discount (`serverPromoLocked`).
-  const confirmedPromoDiscount = serverPromoLocked ? promoDiscountAmount : 0;
+  const confirmedPromoDiscount = serverPromoLocked || linkPromoActive ? promoDiscountAmount : 0;
 
   const { perNight, displayTotal } =
     computeCheckoutTotal({
@@ -1316,12 +1321,23 @@ const GuestDetailsPage: React.FC = () => {
   }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted, depositRequired, depositAccepted]);
 
   // ── Promo blur handler ────────────────────────────────────────────────────
-  const handlePromoBlur = useCallback(async () => {
-    const code = promoCode.trim();
+  const validatePromo = useCallback(async (rawCode: string, fromLink: boolean) => {
+    const code = rawCode.trim();
     if (!code || !holdListingId) return;
     setPromoValidating(true);
     setPromoMessage(null);
     const trimmedEmail = formData.email.trim();
+    // AGT-003: a link code that cannot be used says so in one plain sentence, drops the code (so a dead
+    // discount never follows the guest to another home) and leaves the normal price. Checkout is never blocked.
+    const rejectLinkCode = () => {
+      setPromoMessage("That offer can't be used for this stay, so the normal price applies.");
+      setPromoOpen(true);
+      setPromoCode('');
+      setAppliedPromoCode(null);
+      setPromoDiscountAmount(0);
+      setLinkPromoActive(false);
+      clearStoredPromo();
+    };
     try {
       const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
         method: 'POST',
@@ -1333,22 +1349,42 @@ const GuestDetailsPage: React.FC = () => {
           guestEmail: trimmedEmail || undefined,
         }),
       });
-      if (!res.ok) { setPromoMessage('Could not validate code — try again.'); return; }
+      if (!res.ok) {
+        if (fromLink) rejectLinkCode(); else setPromoMessage('Could not validate code — try again.');
+        return;
+      }
       const data = (await res.json()) as { valid: boolean; message: string; discountAmount?: number };
+      if (fromLink && !data.valid) { rejectLinkCode(); return; }
       setPromoMessage(data.message);
       if (data.valid) {
         setAppliedPromoCode(code);
         setServerPromoLocked(false);
         if (typeof data.discountAmount === 'number' && data.discountAmount > 0) {
           setPromoDiscountAmount(data.discountAmount);
+          // Same figure the order will stamp: show it in the total now, as its own line.
+          if (fromLink) setLinkPromoActive(true);
         }
+      } else if (code === (window.localStorage.getItem('atlas_guest_promo_code') || '').toUpperCase()) {
+        // A remembered code that fails for this home must not keep following the guest.
+        clearStoredPromo();
       }
     } catch {
-      setPromoMessage('Could not validate code — check your connection.');
+      if (fromLink) rejectLinkCode(); else setPromoMessage('Could not validate code — check your connection.');
     } finally {
       setPromoValidating(false);
     }
-  }, [promoCode, holdListingId, baseAmount, effectiveTenantSlug, formData.email]);
+  }, [holdListingId, baseAmount, effectiveTenantSlug, formData.email]);
+
+  const handlePromoBlur = useCallback(() => validatePromo(promoCode, false), [validatePromo, promoCode]);
+
+  // AGT-003: apply a code that came from a checkout link, once, as soon as the quote gives a subtotal.
+  useEffect(() => {
+    if (linkPromoTriedRef.current) return;
+    const linkCode = linkPromoCodeRef.current;
+    if (!linkCode || promoCode !== linkCode || !holdListingId || !(baseAmount > 0)) return;
+    linkPromoTriedRef.current = true;
+    void validatePromo(linkCode, true);
+  }, [promoCode, holdListingId, baseAmount, validatePromo]);
 
   // ── Promo remove (TASK-102118) ──────────────────────────────────────────
   // 1-click remove behind the savings chip's (x) button. No dedicated
@@ -1363,7 +1399,8 @@ const GuestDetailsPage: React.FC = () => {
     setAppliedPromoCode(null);
     setPromoDiscountAmount(0);
     setServerPromoLocked(false);
-    try { window.localStorage.removeItem('atlas_guest_promo_code'); } catch { /* ignore */ }
+    setLinkPromoActive(false);
+    clearStoredPromo();
   }, []);
 
   const handleReferralBlur = useCallback(() => {
@@ -1892,6 +1929,7 @@ const GuestDetailsPage: React.FC = () => {
                         sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
                         sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
                       } catch { /* ignore */ }
+                      clearStoredPromo(); // AGT-003: the discount was used; it must not follow the guest to another home.
                       // TASK-4536: Clear the attempt's idempotency key on successful payment.
                       currentAttemptIdempotencyKeyRef.current = null;
                       // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
@@ -1948,6 +1986,7 @@ const GuestDetailsPage: React.FC = () => {
                           if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
                             pollTimerRef.current = null;
                             setChargedUnconfirmedPollExhausted(false);
+                            clearStoredPromo();
                             navigate(
                               pollToken ? `/booking/${bookingId}?t=${encodeURIComponent(pollToken)}` : `/booking/${bookingId}`,
                               { replace: true },
@@ -2245,6 +2284,7 @@ const GuestDetailsPage: React.FC = () => {
         const s = d?.status;
         if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
           setChargedUnconfirmedPollExhausted(false);
+          clearStoredPromo();
           navigate(
             ctx.pollToken
               ? `/booking/${ctx.bookingId}?t=${encodeURIComponent(ctx.pollToken)}`
@@ -2777,10 +2817,10 @@ const GuestDetailsPage: React.FC = () => {
                       {promoValidating && (
                         <span className="gd-pill">Checking code…</span>
                       )}
-                      {!promoValidating && serverPromoLocked && promoDiscountAmount > 0 && (
+                      {!promoValidating && (serverPromoLocked || linkPromoActive) && promoDiscountAmount > 0 && (
                         <span className="gd-pill">−{displayPrice(promoDiscountAmount)}</span>
                       )}
-                      {!promoValidating && !serverPromoLocked && appliedPromoCode && promoDiscountAmount > 0 && (
+                      {!promoValidating && !serverPromoLocked && !linkPromoActive && appliedPromoCode && promoDiscountAmount > 0 && (
                         <span className="gd-pill">Pending confirmation</span>
                       )}
                     </span>
@@ -2804,6 +2844,7 @@ const GuestDetailsPage: React.FC = () => {
                           setPromoMessage(null);
                           setAppliedPromoCode(null);
                           setPromoDiscountAmount(0);
+                          setLinkPromoActive(false);
                         }}
                         onBlur={() => void handlePromoBlur()}
                         data-testid="guest-booking-promo"
@@ -3518,7 +3559,7 @@ const GuestDetailsPage: React.FC = () => {
             )}
             {confirmedPromoDiscount > 0 && (
               <div className="gd-price-row save" data-testid="promo-confirmed-row">
-                <span>Promo{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}</span>
+                <span>Promo discount{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}</span>
                 <span className="num">−{displayPrice(confirmedPromoDiscount)}</span>
               </div>
             )}
