@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import * as featureFlags from '../../config/featureFlags';
 import SupportWidget from './SupportWidget';
 import { settle } from '../../test/settle';
@@ -17,15 +17,23 @@ const open = (route = '/homes/quiet-house/271?tenant=quiet-house', hideChatbot =
   fireEvent.click(screen.getByRole('button', { name: /chat with us/i }));
 };
 
+// TASK-10299465: the chat is a lazy chunk now (it pulls in react-markdown, about 110 KB), so the module is loaded once up front and React resolves it right after the click.
+beforeAll(async () => { await import('../support-drawer/AtlasChat'); });
+const openAssistant = async () => {
+  fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+  await settle();
+};
+
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 
 describe('GUEST-004 Stay assistant', () => {
-  test.each([true, false])('both flag states expose one working assistant entry; flag=%s', (hideChatbot) => {
+  test.each([true, false])('both flag states expose one working assistant entry; flag=%s', async (hideChatbot) => {
     open(undefined, hideChatbot);
     const entry = screen.getByRole('button', { name: /stay assistant/i });
     expect(screen.getAllByRole('button', { name: /stay assistant/i })).toHaveLength(1);
     entry.focus();
     fireEvent.click(entry);
+    await settle();
     expect(screen.getByRole('heading', { name: /stay assistant/i })).toBeVisible();
     expect(screen.getByRole('textbox', { name: /ask the stay assistant/i })).toHaveFocus();
     expect(screen.getByText(/automated help from stay FAQs and AI/i)).toBeVisible();
@@ -38,7 +46,7 @@ describe('GUEST-004 Stay assistant', () => {
     const fetchMock = vi.fn(() => new Promise<Response>((r) => { resolve = r; }));
     vi.stubGlobal('fetch', fetchMock);
     open();
-    fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+    await openAssistant();
     fireEvent.change(screen.getByRole('textbox', { name: /ask the stay assistant/i }), { target: { value: 'Parking?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
     expect(screen.getByRole('textbox', { name: /ask the stay assistant/i })).toBeDisabled();
@@ -58,7 +66,7 @@ describe('GUEST-004 Stay assistant', () => {
   test('failure keeps the question editable for retry', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     open('/faq');
-    fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+    await openAssistant();
     const input = screen.getByRole('textbox', { name: /ask the stay assistant/i });
     fireEvent.change(input, { target: { value: 'Can I check in early?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
@@ -69,7 +77,7 @@ describe('GUEST-004 Stay assistant', () => {
     expect(input).toHaveFocus();
   });
 
-  test('voice input fills a draft without sending, and stops when leaving the assistant', () => {
+  test('voice input fills a draft without sending, and stops when leaving the assistant', async () => {
     const start = vi.fn();
     const stop = vi.fn();
     let recognition!: SpeechRecognition;
@@ -81,7 +89,7 @@ describe('GUEST-004 Stay assistant', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     open();
-    fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+    await openAssistant();
     fireEvent.click(screen.getByRole('button', { name: 'Start voice input' }));
     expect(start).toHaveBeenCalledOnce();
     const result = { results: [[{ transcript: 'Parking?' }]] } as unknown as SpeechRecognitionEvent;
@@ -94,7 +102,7 @@ describe('GUEST-004 Stay assistant', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  test('switching listing aborts an in-flight answer and starts an empty transcript', () => {
+  test('switching listing aborts an in-flight answer and starts an empty transcript', async () => {
     let pendingSignal!: AbortSignal;
     vi.stubGlobal('fetch', vi.fn((_url, init: RequestInit) => {
       pendingSignal = init.signal as AbortSignal;
@@ -104,7 +112,7 @@ describe('GUEST-004 Stay assistant', () => {
     window.history.replaceState(null, '', '/homes/quiet-house/271?tenant=quiet-house');
     render(<MemoryRouter initialEntries={['/homes/quiet-house/271?tenant=quiet-house']}><SupportWidget /><ChangeListing /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /chat with us/i }));
-    fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+    await openAssistant();
     fireEvent.change(screen.getByRole('textbox', { name: /ask the stay assistant/i }), { target: { value: 'Old listing?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
     expect(pendingSignal.aborted).toBe(false);
@@ -117,7 +125,7 @@ describe('GUEST-004 Stay assistant', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ reply: 'Help', source: 'faq' }) });
     vi.stubGlobal('fetch', fetchMock);
     open('/homes/quiet-house/9007199254740992?tenant=quiet-house');
-    fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+    await openAssistant();
     const input = screen.getByRole('textbox', { name: /ask the stay assistant/i });
     fireEvent.change(input, { target: { value: 'x'.repeat(2001) } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
@@ -136,7 +144,7 @@ describe('GUEST-004 Stay assistant', () => {
   ])('labels %s replies without implying a human answered', async (source, label) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ reply: 'Please check with the host.', source }) }));
     open('/faq');
-    fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+    await openAssistant();
     fireEvent.change(screen.getByRole('textbox', { name: /ask the stay assistant/i }), { target: { value: 'Question?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
     await settle();
@@ -148,7 +156,7 @@ describe('GUEST-004 Stay assistant', () => {
   const askFallback = async (body: Record<string, unknown>) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => body }));
     open('/homes/quiet-house/271?tenant=quiet-house');
-    fireEvent.click(screen.getByRole('button', { name: /stay assistant/i }));
+    await openAssistant();
     fireEvent.change(screen.getByRole('textbox', { name: /ask the stay assistant/i }), { target: { value: 'Helicopter?' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
     await settle();
