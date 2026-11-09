@@ -1,5 +1,6 @@
 import { getTenantContext } from '../tenant/tenantContext';
 import { getTenantOverrides } from '../tenant/tenantOverrides';
+import { currentUrlTenantInput, isUrlTenantOverridingHost } from '../tenant/urlTenantGuard';
 
 export type ContactChannel = "business" | "owner";
 
@@ -30,7 +31,9 @@ function tenantContact() {
  */
 export function isWhiteLabelTenant(): boolean {
   const ctx = getTenantContext();
-  return Boolean(ctx?.legalContactPack?.isCustomDomain) || ctx?.guestCommsBrandingMode === "Neutral";
+  // TASK-1040055: a honoured ?tenant= for a tenant other than the host's means the page chrome belongs to the host tenant while the data belongs to another one:
+  // the platform default (and the host tenant's own details) must not stand in as that other tenant's contact.
+  return Boolean(ctx?.legalContactPack?.isCustomDomain) || ctx?.guestCommsBrandingMode === "Neutral" || isUrlTenantOverridingHost(currentUrlTenantInput());
 }
 
 /**
