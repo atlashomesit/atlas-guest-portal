@@ -50,7 +50,7 @@ import {
   buildPropertyDetailBackHref,
   buildSimilarStayHref,
   extractSimilarStayMeta,
-  formatSimilarStayPrice,
+  SIMILAR_STAY_PRICE_HINT,
   hasPropertyDetailSearchFilters,
   selectSimilarStaysForParty,
   keepSimilarStaysInSameCity,
@@ -2970,7 +2970,7 @@ useEffect(() => {
                                   <p style={{ fontSize: 12.5, color: 'var(--text-muted, #6b5a55)', margin: '0 0 6px' }}>{String(it.propertyAddress).slice(0, 60)}</p>
                                 )}
                                 {(meta.maxGuests != null || meta.rating != null) && (
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginBottom: meta.nightlyRate != null ? 6 : 0 }}>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginBottom: 6 }}>
                                     {meta.maxGuests != null && (
                                       <span data-testid="similar-stay-guests">Up to {meta.maxGuests} {meta.maxGuests === 1 ? 'guest' : 'guests'}</span>
                                     )}
@@ -2982,11 +2982,9 @@ useEffect(() => {
                                     )}
                                   </div>
                                 )}
-                                {meta.nightlyRate != null && (
-                                  <p data-testid="similar-stay-price" style={{ fontWeight: 700, color: 'var(--text-primary, #4a3535)', fontSize: 13.5, margin: 0 }}>
-                                    {formatSimilarStayPrice(meta.nightlyRate, meta.currency)}
-                                  </p>
-                                )}
+                                <p data-testid="similar-stay-price-hint" style={{ fontWeight: 700, color: 'var(--text-primary, #4a3535)', fontSize: 13.5, margin: 0 }}>
+                                  {SIMILAR_STAY_PRICE_HINT}
+                                </p>
                               </div>
                             </Link>
                           );

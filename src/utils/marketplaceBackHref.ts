@@ -188,6 +188,14 @@ export function keepSimilarStaysInSameCity<T extends Record<string, unknown>>(
   });
 }
 
+/**
+ * GUEST-065: what a similar-stay card says about price. It used to print the home's listed base rate
+ * ("from ₹3,500 / night"), which is not what the guest pays (the real price takes the direct-booking
+ * discount off and depends on the dates), so it disagreed with the price the same home shows on the
+ * home page. The card names no number; the home's own page prices the guest's dates.
+ */
+export const SIMILAR_STAY_PRICE_HINT = 'See the price for your dates';
+
 export function formatSimilarStayPrice(nightlyRate: number, currency = 'INR'): string {
   if (currency === 'INR') {
     return `from ₹${nightlyRate.toLocaleString('en-IN')} / night`;

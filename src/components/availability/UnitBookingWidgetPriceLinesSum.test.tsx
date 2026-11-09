@@ -402,7 +402,9 @@ describe('UnitBookingWidget — TASK-10298998: the booking box total is what thi
     expect(r.lineTotal).toBe(10300);
     expect(r.feeRow).not.toBeNull();
     expect(money(r.feeRow?.querySelector('.lv-num')?.textContent)).toBe(300);
-    expect(r.boxSub).toContain('all fees included');
+    // GUEST-065: the box ties the claim to the fee lines the guest can see (it used to say "all fees included" beside a Payment processing line).
+    expect(r.boxSub).toContain('includes all fees listed below');
+    expect(screen.getByTestId('bw-charge-note')).toHaveTextContent("You won't be charged yet");
   });
 
   it('ONLINE host, 25% direct discount: box = sticky = breakdown = quote finalAmount, fee line shown', async () => {
@@ -425,6 +427,9 @@ describe('UnitBookingWidget — TASK-10298998: the booking box total is what thi
     expect(r.lineTotal).toBe(10000);
     expect(r.feeRow).toBeNull();
     expect(r.labels.join(' ')).not.toMatch(/payment processing/i);
+    // GUEST-065: no online payment, so no "not charged yet", and no "listed below" claim with no fee line to point at.
+    expect(screen.getByTestId('bw-charge-note')).toHaveTextContent('Nothing is charged online. The host confirms your booking.');
+    expect(r.boxSub).toContain('all fees included');
   });
 
   it('WhatsApp hand-off host (no gateway), 25% direct discount: box shows the discounted room price, no fee', async () => {

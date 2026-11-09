@@ -1734,6 +1734,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // (pay-on-arrival) as no-gateway, which the previous inline predicate missed.
   const showOnlinePaymentProcessing = hasOnlinePaymentRail(tenantContext !== undefined ? tenantContext : undefined);
 
+  // GUEST-065: with a Payment processing line on screen the box ties "included" to the lines below it; a host with no
+  // online payment has no such line, so the plain words stay.
+  const feesIncludedWords = showOnlinePaymentProcessing ? 'includes all fees listed below' : 'all fees included';
+
   const convenienceFeePercent = !showOnlinePaymentProcessing
     ? 0
     : serverGstMatchesSelection && serverPriceBreakdown && serverPriceBreakdown.convenienceFeePercent > 0
@@ -2312,6 +2316,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div className="lv-booking-total" data-testid="bw-dates-unavailable-headline">
               <b style={{ fontWeight: 600 }}>Dates unavailable</b>
             </div>
+            {/* GUEST-065: "all fees included" sat next to a separate "Payment processing (3%)" line and read as a
+                contradiction. The total does include that line; say so, tied to the lines the guest can see. */}
             <p className="lv-booking-sub">
               {dateRange.startDate && dateRange.endDate
                 ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · pick different nights`
@@ -2364,8 +2370,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
             <p className="lv-booking-sub">
               {dateRange.startDate && dateRange.endDate
-                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · all fees included`
-                : 'all fees included'}
+                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · ${feesIncludedWords}`
+                : feesIncludedWords}
             </p>
           </>
         ) : (
@@ -3141,7 +3147,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
       {!datesUnavailable && (
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>
-        You won&apos;t be charged yet
+        {/* GUEST-065: a host with no online payment charges nothing here at all; "not charged yet" implies a later online charge. */}
+        {showOnlinePaymentProcessing ? "You won't be charged yet" : 'Nothing is charged online. The host confirms your booking.'}
       </p>
       )}
 

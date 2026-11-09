@@ -228,11 +228,16 @@ describe('TASK-1039953 — Safe fallback back navigation on Marketplace Detail P
     render(renderPage('/homes/comfort-cove/450?tenant=atlas&brand=atlastays&guests=5'));
     await settle();
 
-    const cards = screen.getAllByTestId('similar-stay-price');
+    // GUEST-065: a similar-stay card names no number (its listed base rate disagreed with the price the same home shows
+    // elsewhere); it says where the price is. Party-fitting order is still checked below through the guest labels.
+    const cards = screen.getAllByTestId('similar-stay-price-hint');
     expect(cards.length).toBe(2);
+    for (const card of cards) {
+      expect(card.textContent).toBe('See the price for your dates');
+      expect(card.textContent).not.toMatch(/₹|from/);
+    }
+    expect(screen.queryByTestId('similar-stay-price')).toBeNull();
     // Party-fitting Grand Family Villa (maxGuests=6 >= 5) must be sorted FIRST ahead of Cozy Studio (maxGuests=2)
-    expect(cards[0].textContent).toContain('from ₹6,800 / night');
-    expect(cards[1].textContent).toContain('from ₹2,500 / night');
 
     const guestLabels = screen.getAllByTestId('similar-stay-guests');
     expect(guestLabels[0].textContent).toBe('Up to 6 guests');
