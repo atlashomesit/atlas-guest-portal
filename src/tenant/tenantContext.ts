@@ -242,10 +242,18 @@ export function getInternalTenantRobots(): string | undefined {
  * brand-neutral "site not set up" page instead of falling back to the Atlas-branded default.
  */
 export class SubdomainNotActivatedError extends Error {
-  constructor() {
+  /** True when the host is a real, previously-live tenant that is blocked (not taking bookings). */
+  readonly notTakingBookings: boolean;
+  constructor(notTakingBookings = false) {
     super('SUBDOMAIN_NOT_ACTIVATED');
     this.name = 'SubdomainNotActivatedError';
+    this.notTakingBookings = notTakingBookings;
   }
+}
+
+/** Reads the from-domain 404 body: blocker NOT_TAKING_BOOKINGS_RIGHT_NOW or notTakingBookings === true. */
+export function isNotTakingBookingsBody(body: { blocker?: unknown; notTakingBookings?: unknown } | null | undefined): boolean {
+  return body?.blocker === 'NOT_TAKING_BOOKINGS_RIGHT_NOW' || body?.notTakingBookings === true;
 }
 
 export async function resolveFromDomain(apiBaseUrl: string, domain: string): Promise<TenantInfo | null> {
@@ -281,7 +289,7 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
           try {
             const body = await res.json();
             if (body?.error === 'SUBDOMAIN_NOT_ACTIVATED') {
-              throw new SubdomainNotActivatedError();
+              throw new SubdomainNotActivatedError(isNotTakingBookingsBody(body));
             }
           } catch (bodyErr) {
             if (bodyErr instanceof SubdomainNotActivatedError) throw bodyErr;
