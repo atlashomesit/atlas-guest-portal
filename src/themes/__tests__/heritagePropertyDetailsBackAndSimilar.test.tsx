@@ -128,9 +128,13 @@ describe('Heritage PropertyDetails — TASK-1040085 & GUEST-051', () => {
       expect(href).toContain('utm_campaign=monsoon');
     }
 
-    const prices = screen.getAllByTestId('similar-stay-price');
-    expect(prices[0].textContent).toContain('from ₹5,500 / night');
-    expect(prices[1].textContent).toContain('from ₹2,200 / night');
+    // GUEST-065: no listed base rate on a similar-stay card; one sentence says where the price is.
+    const prices = screen.getAllByTestId('similar-stay-price-hint');
+    expect(prices).toHaveLength(2);
+    for (const price of prices) {
+      expect(price.textContent).toBe('See the price for your dates');
+    }
+    expect(screen.queryByTestId('similar-stay-price')).toBeNull();
     expect(screen.getAllByTestId('similar-stay-rating')).toHaveLength(1);
   });
 });
