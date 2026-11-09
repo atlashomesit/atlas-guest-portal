@@ -1,5 +1,6 @@
 import type { PaymentFeeDisplay } from "../utils/paymentFeeCopy";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { getIstCalendarDate } from '../utils/date';
 import type { CancellationTier } from '@/utils/cancellationPolicy';
 import type { DormGenderPolicy } from '@/utils/dormListing';
 
@@ -142,6 +143,29 @@ const defaultState: BookingState = {
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
 export const BookingContext = createContext<BookingContextValue | undefined>(undefined);
 
+/**
+ * TASK-10299460: before the fix, SearchAvailabilityWidget wrote its untouched today -> tomorrow
+ * default range into this context on mount, and it was persisted here. A guest who never chose
+ * those nights then saw every home that is booked tonight open as "Dates unavailable".
+ *
+ * Saved state written by the fixed code carries `datesChosen` (dates are only ever written by a
+ * guest action now). Saved state WITHOUT the marker predates the fix; its dates are kept unless
+ * they look like that default: a single night starting today or earlier (a past check-in is of
+ * no use to anyone). A legacy range that is multi-night or starts in the future is a real search
+ * and still restores.
+ */
+const isLikelyUnchosenLegacyRange = (checkIn: string | null | undefined, checkOut: string | null | undefined): boolean => {
+  if (!checkIn || !checkOut) return false;
+  const start = new Date(checkIn);
+  const end = new Date(checkOut);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+  const startDay = getIstCalendarDate(start);
+  const endDay = getIstCalendarDate(end);
+  const today = getIstCalendarDate();
+  const nights = Math.round((endDay.getTime() - startDay.getTime()) / 86_400_000);
+  return nights === 1 && startDay.getTime() <= today.getTime();
+};
+
 const loadState = (): BookingState => {
   if (typeof window === 'undefined') return defaultState;
 
@@ -149,13 +173,16 @@ const loadState = (): BookingState => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (!saved) return defaultState;
 
-    const parsed = JSON.parse(saved) as Partial<BookingState>;
+    const parsed = JSON.parse(saved) as Partial<BookingState> & { datesChosen?: boolean };
+
+    const dropLegacyDates =
+      typeof parsed.datesChosen !== 'boolean' && isLikelyUnchosenLegacyRange(parsed.checkIn, parsed.checkOut);
 
     return {
       propertyId: parsed.propertyId ?? null,
       propertyName: parsed.propertyName ?? null,
-      checkIn: parsed.checkIn ?? null,
-      checkOut: parsed.checkOut ?? null,
+      checkIn: dropLegacyDates ? null : parsed.checkIn ?? null,
+      checkOut: dropLegacyDates ? null : parsed.checkOut ?? null,
       guests: typeof parsed.guests === 'number' && parsed.guests > 0 ? parsed.guests : defaultState.guests,
       listingDetailPath:
         typeof parsed.listingDetailPath === 'string' && parsed.listingDetailPath.trim()
@@ -198,6 +225,10 @@ function persistedSlice(b: BookingState) {
     checkOut: b.checkOut,
     guests: b.guests,
     listingDetailPath: b.listingDetailPath,
+    // TASK-10299460: dates in this context are only ever written by a guest action (picking a
+    // date, Check availability, a URL/prefill carrying dates); this marks the slice as written
+    // by the fixed code so loadState does not second-guess its dates.
+    datesChosen: Boolean(b.checkIn || b.checkOut),
   };
 }
 
