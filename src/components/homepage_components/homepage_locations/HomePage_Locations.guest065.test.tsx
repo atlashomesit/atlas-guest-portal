@@ -82,6 +82,15 @@ describe('HomePage_Locations — sold tonight (GUEST-065)', () => {
     spy.mockRestore();
   });
 
+  it('names the next open night when the API sends it as a UTC timestamp, which is how it really sends it', async () => {
+    // Real answer of GET /availability/summary (seen on a local stack 2026-11-09): "2026-11-11T00:00:00.0000000Z", not a bare date.
+    const spy = stubFetch([{ listingId: 101, isAvailableTonight: false, nextAvailableDate: '2026-11-11T00:00:00.0000000Z' }]);
+    renderCards();
+    await settle();
+    expect(screen.getByTestId('home-card-sold-tonight-hint')).toHaveTextContent('Next open night: 11 Nov. Pick your dates to see the price.');
+    spy.mockRestore();
+  });
+
   it('a home sold tonight with no known open night still says one clear thing', async () => {
     const spy = stubFetch([{ listingId: 101, isAvailableTonight: false, nextAvailableDate: null }]);
     renderCards();
