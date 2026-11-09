@@ -1,5 +1,6 @@
 import { getApiBaseUrl, hasRuntimeConfig, getRuntimeConfig } from '@/runtime-config';
 import { getTenantSlug, isMarketplaceMode } from '@/tenant/tenantResolver';
+import { currentUrlTenantInput, resolveHonoredUrlTenant } from '@/tenant/urlTenantGuard';
 
 const resolveApiBaseUrl = (): string | null => {
   const baseUrl = getApiBaseUrl();
@@ -33,10 +34,9 @@ export const getApiHeaders = (explicitTenant?: string | null): Record<string, st
   }
 
   // Marketplace detail pages pass ?tenant=<slug> so cross-host listings resolve the correct host tenant.
+  // TASK-1040055: on a host's OWN site the host's tenant wins (see urlTenantGuard), so data and chrome never come from two tenants.
   if (typeof window !== 'undefined') {
-    const urlTenant = toResolvableTenantSlug(
-      new URLSearchParams(window.location.search).get('tenant'),
-    );
+    const urlTenant = toResolvableTenantSlug(resolveHonoredUrlTenant(currentUrlTenantInput()));
     if (urlTenant) {
       return { 'X-Tenant-Slug': urlTenant };
     }

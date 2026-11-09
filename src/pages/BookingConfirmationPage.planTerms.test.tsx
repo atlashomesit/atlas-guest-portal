@@ -69,8 +69,8 @@ describe("GUEST-029 booking confirmation plan terms", () => {
     await renderWith({ ratePlanName: "Atlas501_PH . Double", mealPlanCode: "CP", cancellationPolicy: "Strict" });
     expect(screen.getByTestId("confirmation-meal-plan").textContent).toContain("Breakfast included");
     const cancel = screen.getByTestId("confirmation-cancellation-terms");
-    expect(cancel.textContent).toContain("Full refund if cancelled 7+ days before check-in");
-    expect(cancel.textContent).toContain("No refund within 7 days of check-in.");
+    expect(cancel.textContent).toContain("Free cancellation up to 7 days before check-in");
+    expect(cancel.textContent).toContain("After that, the booking is non-refundable.");
     expect(document.body.textContent).not.toContain("Atlas501_PH");
     expect(screen.getByTestId("confirmation-total").textContent).toContain("5,000");
   });
@@ -83,7 +83,7 @@ describe("GUEST-029 booking confirmation plan terms", () => {
 
   test("Firm is shown with the Strict terms (the server treats Firm as Strict)", async () => {
     await renderWith({ cancellationPolicy: "Firm" });
-    expect(screen.getByTestId("confirmation-cancellation-terms").textContent).toContain("7+ days");
+    expect(screen.getByTestId("confirmation-cancellation-terms").textContent).toContain("up to 7 days before check-in");
   });
 
   test("hides the whole block when the summary carries none of the fields", async () => {

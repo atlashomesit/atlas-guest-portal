@@ -202,6 +202,11 @@ export type PublicListingRatePlanDto = {
   guests: number;
   cancellationPolicy: string | null;
   cancellationSummary: string | null;
+  /**
+   * TASK-1040050: the free-cancellation deadline the SERVER will stamp for this plan and these dates (the same resolver the hold uses at Pay), quoted before any hold exists, so every
+   * pre-pay screen shows the same date. ISO instant; null without dates or from an API that predates the field.
+   */
+  refundFreeUntilUtc: string | null;
   mealPlanCode: string | null;
   mealPlanLabel: string | null;
   isDerived: boolean;
@@ -247,6 +252,7 @@ export async function fetchPublicListingRatePlans(
     const totalStayRaw = r.totalStayRate ?? r.TotalStayRate ?? r.totalStayAmount ?? r.TotalStayAmount;
     const cancelPolicyRaw = r.cancellationPolicy ?? r.CancellationPolicy;
     const cancelSummaryRaw = r.cancellationSummary ?? r.CancellationSummary;
+    const refundFreeUntilRaw = r.refundFreeUntilUtc ?? r.RefundFreeUntilUtc;
     const mealCodeRaw = r.mealPlanCode ?? r.MealPlanCode;
     const mealLabelRaw = r.mealPlanLabel ?? r.MealPlanLabel;
     return {
@@ -264,6 +270,8 @@ export async function fetchPublicListingRatePlans(
         typeof cancelPolicyRaw === 'string' && cancelPolicyRaw.trim() ? cancelPolicyRaw : null,
       cancellationSummary:
         typeof cancelSummaryRaw === 'string' && cancelSummaryRaw.trim() ? cancelSummaryRaw : null,
+      refundFreeUntilUtc:
+        typeof refundFreeUntilRaw === 'string' && refundFreeUntilRaw.trim() && !Number.isNaN(Date.parse(refundFreeUntilRaw)) ? refundFreeUntilRaw : null,
       mealPlanCode: typeof mealCodeRaw === 'string' && mealCodeRaw.trim() ? mealCodeRaw : null,
       mealPlanLabel: typeof mealLabelRaw === 'string' && mealLabelRaw.trim() ? mealLabelRaw : null,
       isDerived: Boolean(r.isDerived ?? r.IsDerived),

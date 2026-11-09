@@ -11,7 +11,7 @@ import { hasRuntimeConfig, getRuntimeConfig } from '../runtime-config';
 export const POWERED_BY_ATLAS_LABEL = 'Powered by Atlas';
 export const POWERED_BY_ATLAS_BASE_URL = 'https://atlaspms.in/';
 
-export type PoweredByAtlasMedium = 'tenant-site' | 'embed' | 'checkin';
+export type PoweredByAtlasMedium = 'tenant-site' | 'embed' | 'checkin' | 'your-booking';
 
 /** Slugs are lower-case subdomain labels; anything else is dropped so no stray value can ride in the URL. */
 export function sanitizePoweredBySlug(slug: string | null | undefined): string | null {

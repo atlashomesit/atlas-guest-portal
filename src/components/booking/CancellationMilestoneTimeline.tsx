@@ -3,6 +3,7 @@ import {
   type CancellationTier,
   computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
+  parseServerDeadline,
   isFreeCancellationDeadlineActive,
   resolveEffectiveCancellationTier,
 } from '@/utils/cancellationPolicy';
@@ -13,6 +14,8 @@ export interface CancellationMilestoneTimelineProps {
   cancellationTier?: CancellationTier | string | null;
   windowHoursOverride?: number | null;
   graceHours?: number | null;
+  /** TASK-1040050: the deadline the server quoted for the selected plan; when present it is the cutoff shown, the same date as every other screen. */
+  refundFreeUntilUtc?: Date | string | null;
   bookingCreatedAt?: Date;
   className?: string;
 }
@@ -22,6 +25,7 @@ export default function CancellationMilestoneTimeline({
   cancellationTier,
   windowHoursOverride,
   graceHours,
+  refundFreeUntilUtc,
   bookingCreatedAt = new Date(),
   className = '',
 }: CancellationMilestoneTimelineProps) {
@@ -36,13 +40,9 @@ export default function CancellationMilestoneTimeline({
   // listing or plan with no named tier gets the platform 7-day window). Passing the Flexible fallback here used to put
   // "Full refund cutoff: 8 Dec" (48 h) beside "Free cancellation until 3 Dec" for the same stay. The tier label and fee
   // wording below still use effectiveTier, which is how the refund calculator names an untiered stay.
-  const deadline = computeEffectiveCancellationDeadline(
-    checkIn,
-    cancellationTier,
-    windowHoursOverride,
-    bookingCreatedAt,
-    graceHours,
-  );
+  const deadline =
+    parseServerDeadline(refundFreeUntilUtc) ??
+    computeEffectiveCancellationDeadline(checkIn, cancellationTier, windowHoursOverride, bookingCreatedAt, graceHours);
 
   const isActive = isFreeCancellationDeadlineActive(deadline);
   const deadlineFormatted = formatCancellationDeadline(deadline);

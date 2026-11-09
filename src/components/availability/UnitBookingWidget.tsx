@@ -1577,10 +1577,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       bookingCreatedAt: new Date(),
       graceHours: resolvedGraceHours,
       planSummary: selectedRatePlan?.cancellationSummary ?? null,
+      serverDeadlineUtc: selectedRatePlan?.refundFreeUntilUtc ?? null, // TASK-1040050
     });
   }, [
     isSelectedRatePlanNonRefundable,
     selectedRatePlan?.cancellationSummary,
+    selectedRatePlan?.refundFreeUntilUtc,
     dateRange.startDate,
     effectiveRatePlanCancellationTier,
     selectedRatePlan?.cancellationPolicy,
@@ -2214,6 +2216,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         },
         holdCancellationTier: effectiveRatePlanCancellationTier,
         holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
+        holdRefundFreeUntilUtc: selectedRatePlan?.refundFreeUntilUtc ?? null, // TASK-1040050: the server-quoted deadline, shown identically at checkout
         holdGraceHours: isSelectedRatePlanNonRefundable ? null : resolvedGraceHours,
         // TASK-1039977 / PAY-006: refundable security deposit forwarded to checkout
         holdSecurityDepositAmount:

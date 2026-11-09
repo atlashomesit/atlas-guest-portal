@@ -79,6 +79,8 @@ type BookingState = {
   /** TASK-5179: resolved cancellation policy forwarded from UnitBookingWidget (session-only). */
   holdCancellationTier: CancellationTier | null;
   holdCancellationWindowHours: number | null;
+  /** TASK-1040050: the free-cancellation deadline the server quoted for the selected rate plan (ISO instant), forwarded so checkout shows the same date as the booking box (session-only). */
+  holdRefundFreeUntilUtc?: string | null;
   holdGraceHours: number | null;
   /** HSL-011: the dorm's gender rule (from the listing API) forwarded from UnitBookingWidget; null for a non-dorm or a mixed-unstated listing (session-only). */
   holdDormGenderPolicy?: DormGenderPolicy | null;
@@ -127,6 +129,7 @@ const defaultState: BookingState = {
   holdListingName: null,
   holdCancellationTier: null,
   holdCancellationWindowHours: null,
+  holdRefundFreeUntilUtc: null,
   holdGraceHours: null,
   holdSecurityDepositAmount: null,
   listingRatePlanId: null,
@@ -172,6 +175,7 @@ const loadState = (): BookingState => {
       holdListingName: null,
       holdCancellationTier: null,
       holdCancellationWindowHours: null,
+      holdRefundFreeUntilUtc: null,
       holdGraceHours: null,
       holdSecurityDepositAmount: null,
       listingRatePlanId: null,

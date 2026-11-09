@@ -12,6 +12,7 @@ import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-co
 import { getApiHeaders } from './api/client'
 import { getTenantSlug, isAtlastaysMarketplaceSurface, isMarketplaceMode, setMarketplaceMode } from './tenant/tenantResolver'
 import { validateTenant, resolveFromDomain, getTenantContext, SubdomainNotActivatedError, type TenantInfo } from './tenant/tenantContext'
+import { currentUrlTenantInput, isUrlTenantOverridingHost, resolveHonoredUrlTenant } from './tenant/urlTenantGuard'
 import SubdomainNotActivatedScreen from './components/SubdomainNotActivatedScreen'
 import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
@@ -146,6 +147,19 @@ const bootstrapApp = async () => {
       } else if (!import.meta.env.DEV && tenantSlug !== 'marketplace' && !isAtlastaysMarketplaceSurface()) {
         throw new Error('Tenant could not be resolved. Check /.well-known/atlas-runtime-config.json (tenantKey) or ensure the domain is registered in the Atlas tenant table.');
       }
+    }
+
+    // TASK-1040055 (tenant isolation): when a honoured ?tenant= names a tenant other than the host's (non-production shared hosts only, see urlTenantGuard), the API reads THAT tenant's
+    // data, so the page chrome (brand name, logo, colours) must come from that tenant too, never from the host tenant. A failed lookup keeps the host chrome; contact details are
+    // already withheld for this case (isWhiteLabelTenant), so nothing of the host tenant is shown as the data tenant's.
+    try {
+      const urlTenantInput = currentUrlTenantInput();
+      if (isUrlTenantOverridingHost(urlTenantInput)) {
+        const honored = resolveHonoredUrlTenant(urlTenantInput);
+        if (honored) await validateTenant(honored);
+      }
+    } catch (e) {
+      console.warn('[Atlas] ?tenant= chrome lookup failed — keeping the host chrome:', e);
     }
 
     activateMarketplaceSurface(config.tenantKey, domainResolved);
