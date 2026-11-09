@@ -123,7 +123,7 @@ const bootstrapApp = async () => {
       // brand-neutral "not activated" page and STOP — do not fall back to validateTenant(),
       // which would leak Atlas branding onto a stranger's branded subdomain.
       if (e instanceof SubdomainNotActivatedError) {
-        root.render(<SubdomainNotActivatedScreen />);
+        root.render(<SubdomainNotActivatedScreen notTakingBookings={e.notTakingBookings} />);
         return;
       }
       throw e;

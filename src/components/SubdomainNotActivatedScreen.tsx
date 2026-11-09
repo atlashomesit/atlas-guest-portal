@@ -4,7 +4,34 @@
  * (there is no trusted tenant context here), system font only, no analytics. Renders before any
  * tenant branding is applied so a non-paying tenant's subdomain never leaks Atlas branding.
  */
-export default function SubdomainNotActivatedScreen() {
+import { NOT_TAKING_BOOKINGS_COPY } from '../tenant/paymentRail';
+
+const screenStyle = {
+  minHeight: '100vh',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '16px',
+  padding: '24px',
+  textAlign: 'center',
+  fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+  color: '#1f2937',
+  background: '#ffffff',
+} as const;
+
+/**
+ * `notTakingBookings` = the from-domain 404 said the host is a real, blocked tenant. Guests then
+ * get a plain guest-facing message: no owner pitch, no button, no link.
+ */
+export default function SubdomainNotActivatedScreen({ notTakingBookings = false }: { notTakingBookings?: boolean } = {}) {
+  if (notTakingBookings) {
+    return (
+      <div data-testid="subdomain-not-taking-bookings" style={screenStyle}>
+        <h1 style={{ fontSize: '22px', fontWeight: 600, margin: 0 }}>{NOT_TAKING_BOOKINGS_COPY}</h1>
+      </div>
+    );
+  }
   return (
     <div
       data-testid="subdomain-not-activated"
