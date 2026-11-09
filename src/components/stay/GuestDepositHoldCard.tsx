@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { HOLD_ENDS_SENTENCE, coversSentence } from "./depositHoldCopy";
 
 /**
  * PAY-006 box 3 (guest half): the guest's own view of the refundable security-deposit card hold on the booking confirmation page.
@@ -11,6 +12,8 @@ export type GuestDepositHold = {
   capturedAmountInr?: number | null;
   /** ISO time the bank's authorization lapses (Authorized holds only). */
   holdExpiresAtUtc?: string | null;
+  /** PAY-028: ISO time of the last moment the host can still charge this hold. Optional: an older API does not send it. */
+  coversUntilUtc?: string | null;
 };
 
 const formatInr = (n: number): string => `₹${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(n)}`;
@@ -35,16 +38,16 @@ function describe(hold: GuestDepositHold): { label: string; detail: string } {
   const amount = formatInr(hold.amountInr);
   switch (hold.status) {
     case "Authorized":
-      return { label: "Held on your card", detail: `${amount} is held on your card, not charged. It is released after your stay if there is no damage.` };
+      return { label: "Held on your card", detail: `${amount} is held on your card, not charged. ${coversSentence(hold.coversUntilUtc)} ${HOLD_ENDS_SENTENCE}` };
     case "Captured":
       return {
         label: "Part of the hold was charged",
         detail: hold.capturedAmountInr != null
-          ? `${formatInr(hold.capturedAmountInr)} of the ${amount} hold was charged for damage. The rest is released.`
-          : `Part of the ${amount} hold was charged for damage. The rest is released.`,
+          ? `${formatInr(hold.capturedAmountInr)} of the ${amount} hold was charged for damage. The rest of the hold is not charged.`
+          : `Part of the ${amount} hold was charged for damage. The rest of the hold is not charged.`,
       };
     case "Released":
-      return { label: "Released", detail: `The ${amount} hold on your card has been released. Nothing was charged.` };
+      return { label: "Released", detail: `Your host has released the ${amount} hold. Nothing was charged. Your bank frees the money and may take a few more days to show it.` };
     case "Voided":
     case "Expired":
       return { label: "Hold ended", detail: `The ${amount} hold on your card has ended. Nothing was charged.` };

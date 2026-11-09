@@ -121,6 +121,49 @@ describe('SecurityDepositPage (TASK-10299239)', () => {
     expect(calls[0].url).toBe('https://api.example.test/api/guest/bookings/42/summary?t=NONCE-1');
   });
 
+  // PAY-028 (guest half): no "released after check-out" promise on the pay screen; it says what the hold covers and how it ends.
+  it('before paying, says the hold covers damage claims for a while and that the bank frees it afterwards (no release-after-check-out promise)', async () => {
+    stubApi();
+    renderPage();
+    await settle();
+
+    const text = document.body.textContent ?? '';
+    expect(text).toMatch(/hold on your card, not a charge/i);
+    expect(text).toContain('covers damage claims for about 3 nights from the day before check-in');
+    expect(text).toContain('your bank frees it. Your bank may take a few more days to show it.');
+    expect(text).not.toMatch(/released after check-?out|The rest is released/i);
+  });
+
+  it('after the hold is placed, names the date the hold covers damage claims until when the API sends it', async () => {
+    stubApi({ verify: () => json({ depositHoldId: 7, status: 'Authorized', amountInr: 5000, coversUntilUtc: '2026-11-14T08:30:00Z' }) });
+    renderPage();
+    await settle();
+    fireEvent.click(screen.getByTestId('deposit-pay'));
+    await settle();
+    lastOptions!.handler({ razorpay_payment_id: 'pay_TEST1', razorpay_order_id: 'order_TEST1', razorpay_signature: 'sig_TEST1' });
+    await settle();
+
+    const done = screen.getByTestId('deposit-done');
+    expect(done).toHaveTextContent(/hold of ₹5,000 is in place/i);
+    expect(done).toHaveTextContent(/It covers damage claims until 14 Nov 2026/);
+    expect(done).toHaveTextContent('After that, or when your host releases it, your bank frees it; your bank may take a few more days to show it.');
+    expect(done.textContent).not.toMatch(/released after check-?out/i);
+  });
+
+  it('after the hold is placed with no date from the API, says it covers damage claims while it lasts', async () => {
+    stubApi();
+    renderPage();
+    await settle();
+    fireEvent.click(screen.getByTestId('deposit-pay'));
+    await settle();
+    lastOptions!.handler({ razorpay_payment_id: 'pay_TEST1', razorpay_order_id: 'order_TEST1', razorpay_signature: 'sig_TEST1' });
+    await settle();
+
+    const done = screen.getByTestId('deposit-done');
+    expect(done).toHaveTextContent('It covers damage claims while it lasts.');
+    expect(done.textContent).not.toMatch(/until \d|released after check-?out/i);
+  });
+
   it('creates the order through public-order, opens Razorpay Checkout limited to cards, then verifies through public-verify', async () => {
     stubApi();
     renderPage();

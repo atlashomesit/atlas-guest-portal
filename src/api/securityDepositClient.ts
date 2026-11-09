@@ -23,6 +23,8 @@ export interface PublicDepositStatus {
   status: string;
   amountInr: number;
   holdExpiresAtUtc?: string | null;
+  /** PAY-028: the last moment the host can still charge this hold (ISO). Optional: an older API does not send it. */
+  coversUntilUtc?: string | null;
 }
 
 export interface DepositVerifyPayload {
@@ -126,5 +128,6 @@ export async function verifyPublicDeposit(
     status: String(pick(body, 'status') ?? ''),
     amountInr: Number(pick(body, 'amountInr')),
     holdExpiresAtUtc: (pick(body, 'holdExpiresAtUtc') as string | null | undefined) ?? null,
+    coversUntilUtc: (pick(body, 'coversUntilUtc') as string | null | undefined) ?? null,
   };
 }
