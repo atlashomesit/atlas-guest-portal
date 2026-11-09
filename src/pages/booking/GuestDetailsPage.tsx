@@ -2299,7 +2299,7 @@ const GuestDetailsPage: React.FC = () => {
       availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, adsMeasurementOptIn, consentAccepted,
       houseRulesAccepted, dormAckAccepted, depositRequired, depositAccepted, checkoutInfo, hasDraft, startHoldAtPay,
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, booking.listingRatePlanId,
-      isMarketplaceCheckout, displayTotal,
+      isMarketplaceCheckout, isAiReceptionistCheckout, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
       appliedPromoCode, appliedReferralCode, bringingPet, includeBreakfast,
       promoDiscountAmount, referralDiscountAmount,
