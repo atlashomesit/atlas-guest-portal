@@ -230,6 +230,7 @@ type CheckoutHoldCache = {
   holdPriceBreakdown?: BookingPriceBreakdown | null;
   holdCancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
   holdCancellationWindowHours?: number | null;
+  holdRefundFreeUntilUtc?: string | null; // TASK-1040050
   holdGraceHours?: number | null;
   /** HSL-011: the dorm's gender rule, so a reload keeps asking the tick. */
   holdDormGenderPolicy?: DormGenderPolicy | null;
@@ -425,6 +426,7 @@ const GuestDetailsPage: React.FC = () => {
         holdPriceBreakdown: cached?.holdPriceBreakdown ?? booking.holdPriceBreakdown ?? null,
         holdCancellationTier: cached?.holdCancellationTier ?? booking.holdCancellationTier ?? null,
         holdCancellationWindowHours: cached?.holdCancellationWindowHours ?? booking.holdCancellationWindowHours ?? null,
+        holdRefundFreeUntilUtc: cached?.holdRefundFreeUntilUtc ?? booking.holdRefundFreeUntilUtc ?? null,
         holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
@@ -458,6 +460,7 @@ const GuestDetailsPage: React.FC = () => {
           holdPriceBreakdown: cached.holdPriceBreakdown ?? booking.holdPriceBreakdown ?? null,
           holdCancellationTier: cached.holdCancellationTier ?? booking.holdCancellationTier ?? null,
           holdCancellationWindowHours: cached.holdCancellationWindowHours ?? booking.holdCancellationWindowHours ?? null,
+          holdRefundFreeUntilUtc: cached.holdRefundFreeUntilUtc ?? booking.holdRefundFreeUntilUtc ?? null,
           holdGraceHours: cached.holdGraceHours ?? booking.holdGraceHours ?? null,
           holdDormGenderPolicy: cached.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
           holdSecurityDepositAmount: cached.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
@@ -800,6 +803,7 @@ const GuestDetailsPage: React.FC = () => {
       holdPriceBreakdown: priceBreakdown ?? null,
       holdCancellationTier: booking.holdCancellationTier ?? null,
       holdCancellationWindowHours: booking.holdCancellationWindowHours ?? null,
+      holdRefundFreeUntilUtc: booking.holdRefundFreeUntilUtc ?? null,
       holdGraceHours: booking.holdGraceHours ?? null,
       holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
       holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
@@ -816,7 +820,7 @@ const GuestDetailsPage: React.FC = () => {
   }, [
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
-    booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
+    booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours, booking.holdRefundFreeUntilUtc,
     booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount,
     booking.holdBookingChannel, isMarketplaceCheckout, isAiReceptionistCheckout,
     booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
@@ -1141,12 +1145,14 @@ const GuestDetailsPage: React.FC = () => {
       windowHoursOverride: booking.holdCancellationWindowHours,
       bookingCreatedAt: new Date(),
       graceHours: booking.holdGraceHours,
+      serverDeadlineUtc: booking.holdRefundFreeUntilUtc ?? null, // TASK-1040050: the date the server quoted at the booking box
     });
   }, [
     booking.checkIn,
     booking.holdCancellationTier,
     booking.holdCancellationWindowHours,
     booking.holdGraceHours,
+    booking.holdRefundFreeUntilUtc,
   ]);
 
   // ── Submit state ──────────────────────────────────────────────────────────
@@ -3094,6 +3100,7 @@ const GuestDetailsPage: React.FC = () => {
                 cancellationTier={booking.holdCancellationTier}
                 windowHoursOverride={booking.holdCancellationWindowHours}
                 graceHours={booking.holdGraceHours}
+                refundFreeUntilUtc={booking.holdRefundFreeUntilUtc}
               />
             </div>
 
@@ -3857,6 +3864,7 @@ const GuestDetailsPage: React.FC = () => {
             cancellationTier={booking.holdCancellationTier}
             windowHoursOverride={booking.holdCancellationWindowHours}
             graceHours={booking.holdGraceHours}
+            refundFreeUntilUtc={booking.holdRefundFreeUntilUtc}
             className="mb-4"
           />
 

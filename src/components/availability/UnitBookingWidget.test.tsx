@@ -1365,7 +1365,7 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
     const strip = screen.getByTestId('bw-trust-strip-text');
     // The refund the server would actually issue here is nil — the copy must not promise otherwise.
     expect(strip.textContent).toBe(
-      'Strict policy: Full refund if cancelled 7+ days before check-in. No refund within 7 days of check-in.',
+      'Strict policy: this stay is inside the 7 days before check-in, so the booking is non-refundable.',
     );
     expect(strip.textContent).not.toMatch(/standard cancellation/i);
     expect(strip.textContent).not.toMatch(/free cancellation/i);
