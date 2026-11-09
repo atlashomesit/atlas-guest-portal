@@ -59,10 +59,20 @@ describe('securityDepositClient (TASK-10299239)', () => {
 
     const status = await verifyPublicDeposit(55, 'tok', { depositHoldId: 3, razorpayOrderId: 'o', razorpayPaymentId: 'p', razorpaySignature: 's' });
 
-    expect(status).toEqual({ depositHoldId: 3, status: 'Authorized', amountInr: 2500, holdExpiresAtUtc: '2026-11-20T00:00:00Z' });
+    expect(status).toEqual({ depositHoldId: 3, status: 'Authorized', amountInr: 2500, holdExpiresAtUtc: '2026-11-20T00:00:00Z', coversUntilUtc: null });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('https://api.example.test/api/deposit-holds/public-verify/55?t=tok');
     expect(JSON.parse(String(init.body))).toEqual({ depositHoldId: 3, razorpayOrderId: 'o', razorpayPaymentId: 'p', razorpaySignature: 's' });
     expect(init.headers).toMatchObject({ 'Content-Type': 'application/json' });
+  });
+
+  it('PAY-028: carries coversUntilUtc when the API sends it (camelCase or PascalCase) and null when it does not', async () => {
+    const payload = { depositHoldId: 3, razorpayOrderId: 'o', razorpayPaymentId: 'p', razorpaySignature: 's' };
+    vi.stubGlobal('fetch', vi.fn(async () => json({ depositHoldId: 3, status: 'Authorized', amountInr: 2500, coversUntilUtc: '2026-11-14T08:30:00Z' })));
+    expect((await verifyPublicDeposit(55, 'tok', payload)).coversUntilUtc).toBe('2026-11-14T08:30:00Z');
+    vi.stubGlobal('fetch', vi.fn(async () => json({ DepositHoldId: 3, Status: 'Authorized', AmountInr: 2500, CoversUntilUtc: '2026-11-15T08:30:00Z' })));
+    expect((await verifyPublicDeposit(55, 'tok', payload)).coversUntilUtc).toBe('2026-11-15T08:30:00Z');
+    vi.stubGlobal('fetch', vi.fn(async () => json({ depositHoldId: 3, status: 'Authorized', amountInr: 2500 })));
+    expect((await verifyPublicDeposit(55, 'tok', payload)).coversUntilUtc).toBeNull();
   });
 });

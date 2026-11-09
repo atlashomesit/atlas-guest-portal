@@ -10,6 +10,7 @@ import {
   type PublicDepositOrder,
 } from "../api/securityDepositClient";
 import SEO from "../components/SEO";
+import { HOLD_ENDS_SENTENCE, coversSentence } from "../components/stay/depositHoldCopy";
 
 /**
  * TASK-10299239: the guest's security-deposit page, reached from the pre-arrival message (or the booking link) at
@@ -75,6 +76,7 @@ export default function SecurityDepositPage() {
   const [stay, setStay] = useState<StaySummary | null>(null);
   const [depositInr, setDepositInr] = useState<number | null>(null);
   const [heldInr, setHeldInr] = useState<number | null>(null);
+  const [coversUntilUtc, setCoversUntilUtc] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const doneRef = useRef<HTMLDivElement>(null);
@@ -187,6 +189,7 @@ export default function SecurityDepositPage() {
         const status = await verifyPublicDeposit(bookingId, token, payload);
         if (status.status.toLowerCase() === "authorized") {
           if (status.amountInr > 0) setHeldInr(status.amountInr);
+          setCoversUntilUtc(status.coversUntilUtc ?? null);
           setNotice(null);
           setError(null);
           setPhase("done");
@@ -305,8 +308,9 @@ export default function SecurityDepositPage() {
                   ) : null}
                 </p>
                 <p className="mt-2 text-text-secondary">
-                  This is a hold on your card, not a charge. Nothing is taken from you unless your host files a damage claim after
-                  check-out, and then only up to the amount held. The rest is released.
+                  This is a hold on your card, not a charge. Nothing is taken from you unless your host files a damage claim, and then
+                  only up to the amount held. The hold covers damage claims for about 3 nights from the day before check-in; after that, or
+                  when your host releases it, your bank frees it. Your bank may take a few more days to show it.
                 </p>
                 <p className="mt-2 text-text-secondary">Only a credit or debit card can be used, because only a card can be held.</p>
               </div>
@@ -332,8 +336,8 @@ export default function SecurityDepositPage() {
             >
               {notice ?? (
                 <>
-                  ✓ Your security deposit hold{heldInr !== null ? ` of ${formatInr(heldInr)}` : ""} is in place. It is a hold, not a charge,
-                  and it is released after check-out unless your host files a damage claim.
+                  ✓ Your security deposit hold{heldInr !== null ? ` of ${formatInr(heldInr)}` : ""} is in place. It is a hold, not a charge.{" "}
+                  {coversSentence(coversUntilUtc)} {HOLD_ENDS_SENTENCE}
                 </>
               )}
             </div>
