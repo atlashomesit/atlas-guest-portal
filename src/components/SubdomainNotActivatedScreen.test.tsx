@@ -49,4 +49,20 @@ describe('resolveFromDomain 404 signal', () => {
     expect(err).toBeInstanceOf(SubdomainNotActivatedError);
     expect(err.notTakingBookings).toBe(false);
   });
+
+  // G2 journey 26 (TASK-101721's portal half): the API answers a suspended tenant (IsActive=false) with 404 { error: 'TENANT_SUSPENDED' } so the
+  // guest portal can show the plain "not taking bookings" notice. The portal did not read that code, so the domain of a suspended host fell back
+  // to the default Atlastays page (its brand, its contact address, its listings) instead of saying anything kind.
+  it('TENANT_SUSPENDED (an inactive host) is the plain not-taking-bookings notice, never the fallback site', async () => {
+    mock404({ error: 'TENANT_SUSPENDED', message: 'This property is not taking bookings right now.' });
+    const err = await resolveFromDomain('https://api.test', 'c.example.com').catch((e) => e);
+    expect(err).toBeInstanceOf(SubdomainNotActivatedError);
+    expect(err.notTakingBookings).toBe(true);
+  });
+
+  it('a truly unknown host stays a plain null so boot can show its generic not-found', async () => {
+    mock404({ error: 'Tenant not found for domain.' });
+    const out = await resolveFromDomain('https://api.test', 'd.example.com').catch((e) => e);
+    expect(out).toBeNull();
+  });
 });

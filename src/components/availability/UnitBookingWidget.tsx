@@ -2461,7 +2461,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ref={calendarButtonRef}
             type="button"
             className="lv-date-cell"
-            aria-label="Select check-in date"
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
@@ -2482,7 +2481,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ref={checkoutCellRef}
             type="button"
             className="lv-date-cell"
-            aria-label="Select check-out date"
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
@@ -2540,13 +2538,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             // dead. minHeight restores a 44px hit area (WCAG 2.2 SC 2.5.5 / Apple HIG) without
             // re-introducing double padding. Applies on desktop too — it was ~38px there as well.
             style={{ padding: 0, minHeight: 44, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-            aria-label={isDorm
-              ? `Beds: ${guests} ${guests === 1 ? 'bed' : 'beds'}. Click to change.`
-              : `Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
+            title="Click to change"
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >
             <div>
-              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>{isDorm ? 'Beds' : 'Guests'}</small>
+              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>{isDorm ? 'Beds' : 'Guests'}</small>{' '}
               <span className="lv-guest-val">
                 {isDorm ? `${guests} ${guests === 1 ? 'bed' : 'beds'}` : `${guests} ${guests === 1 ? 'adult' : 'adults'}`}
               </span>

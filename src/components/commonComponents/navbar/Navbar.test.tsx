@@ -204,7 +204,8 @@ describe("Navbar CTA", () => {
 
     const pill = screen.getByTestId("mobile-search-pill");
     expect(pill).toBeInTheDocument();
-    expect(pill).toHaveAttribute("aria-label", "Search stays");
+    // G2 journey 19: the accessible name starts with the visible text (WCAG 2.5.3 label in name).
+    expect(pill).toHaveAttribute("aria-label", "Where to? Search stays");
     expect(pill).toHaveTextContent("Where to?");
   });
 

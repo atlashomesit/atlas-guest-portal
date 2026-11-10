@@ -21,7 +21,7 @@ const MobileSearchPill = () => {
         type="button"
         className="mobile-search-pill lg:hidden"
         onClick={() => setOverlayOpen(true)}
-        aria-label="Search stays"
+        aria-label="Where to? Search stays"
         data-testid="mobile-search-pill"
       >
         <Search size={16} strokeWidth={2.5} aria-hidden="true" />

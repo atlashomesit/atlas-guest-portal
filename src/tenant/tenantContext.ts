@@ -293,6 +293,11 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
             if (body?.error === 'SUBDOMAIN_NOT_ACTIVATED') {
               throw new SubdomainNotActivatedError(isNotTakingBookingsBody(body));
             }
+            // G2 journey 26 (TASK-101721): a real host that is suspended (IsActive=false) answers TENANT_SUSPENDED. It gets the same plain
+            // "not taking bookings" notice, never the fallback site (which carried another brand, its contact address and its listings).
+            if (body?.error === 'TENANT_SUSPENDED') {
+              throw new SubdomainNotActivatedError(true);
+            }
           } catch (bodyErr) {
             if (bodyErr instanceof SubdomainNotActivatedError) throw bodyErr;
             // Non-JSON body / parse failure → fall through to the null return below.
