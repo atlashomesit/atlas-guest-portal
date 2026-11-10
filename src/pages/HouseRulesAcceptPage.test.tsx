@@ -101,3 +101,42 @@ describe('HouseRulesAcceptPage', () => {
     expect(status).toHaveFocus();
   });
 });
+
+describe('HouseRulesAcceptPage after a 409 (G3 journey 11)', () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('says it cannot be accepted AND takes the Accept button away, showing the real outcome', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (typeof url === 'string' && url.includes('/accept-house-rules')) {
+        return new Response(JSON.stringify({ error: 'HOUSE_RULES_NOT_PENDING', status: 'Confirmed', outcome: 'confirmed' }), { status: 409 });
+      }
+      return new Response(JSON.stringify(pendingNotYetAccepted), { status: 200 });
+    }));
+
+    renderPage();
+    await settle();
+    fireEvent.click(screen.getByTestId('house-rules-accept'));
+    await settle();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/no longer awaiting host approval/i);
+    expect(screen.queryByTestId('house-rules-accept')).not.toBeInTheDocument();
+    expect(screen.getByTestId('house-rules-outcome-confirmed')).toBeInTheDocument();
+  });
+
+  it('still takes the button away when the 409 has no readable body', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (typeof url === 'string' && url.includes('/accept-house-rules')) return new Response('conflict', { status: 409 });
+      return new Response(JSON.stringify(pendingNotYetAccepted), { status: 200 });
+    }));
+    renderPage();
+    await settle();
+    fireEvent.click(screen.getByTestId('house-rules-accept'));
+    await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent(/no longer awaiting host approval/i);
+    expect(screen.queryByTestId('house-rules-accept')).not.toBeInTheDocument();
+  });
+});

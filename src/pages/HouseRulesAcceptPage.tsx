@@ -34,6 +34,9 @@ export default function HouseRulesAcceptPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
+  // G3 journey 11: the API said the booking is no longer awaiting approval (409). The rules and the Accept button then go away: a button
+  // that can only fail again, under a message saying it cannot be used, is a dead end.
+  const [noLongerPending, setNoLongerPending] = useState(false);
   // TASK-10174 a11y half: focus target for the acceptance confirmation banner below, so a
   // screen-reader guest whose focus was on the (now-unmounted) Accept button lands somewhere
   // meaningful instead of falling back to <body>.
@@ -79,6 +82,14 @@ export default function HouseRulesAcceptPage() {
       });
       if (res.status === 409) {
         setError("This booking is no longer awaiting host approval, so House Rules cannot be accepted.");
+        setNoLongerPending(true);
+        // The 409 body names the booking's real state; show it through the page's own confirmed / declined banner when it is one.
+        try {
+          const body = (await res.json()) as { status?: string; outcome?: string };
+          setData((prev) => (prev ? { ...prev, bookingStatus: body.status ?? prev.bookingStatus, outcome: body.outcome ?? prev.outcome } : prev));
+        } catch {
+          /* no readable body: the message above and the removed button are enough */
+        }
         return;
       }
       if (!res.ok) {
@@ -163,7 +174,7 @@ export default function HouseRulesAcceptPage() {
                 </div>
               )}
 
-              {pending && !data.alreadyAccepted && (
+              {pending && !data.alreadyAccepted && !noLongerPending && (
                 <>
                   <div className="rounded-lg border border-border-subtle bg-bg-page p-4 mb-6 whitespace-pre-wrap text-sm text-text-primary">
                     {data.houseRulesText || "No specific house rules have been provided for this property."}
