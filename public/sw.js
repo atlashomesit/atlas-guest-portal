@@ -33,7 +33,8 @@ const TENANT_SLUG = (() => {
 
 const CACHE_VERSION = 'v2';
 const SHELL_CACHE = `atlas-guest-shell-${TENANT_SLUG}-${CACHE_VERSION}`;
-const SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest'];
+// G3 journey 16: /sw-register.js is precached too, so the offline notice it carries can run when the page is opened with no connection.
+const SHELL_URLS = ['/', '/index.html', '/manifest.webmanifest', '/sw-register.js'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

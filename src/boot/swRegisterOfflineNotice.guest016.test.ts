@@ -58,3 +58,12 @@ describe('G3 journey 16: the loading shell says so when the page is opened offli
     expect(document.querySelectorAll('#boot-offline-notice').length).toBe(1);
   });
 });
+
+describe('G3 journey 16: the script that carries the notice is itself available offline', () => {
+  it('sw.js precaches /sw-register.js with the shell', () => {
+    const sw = readFileSync(resolve(__dirname, '../../public/sw.js'), 'utf8');
+    const line = sw.split('\n').find((l) => l.startsWith('const SHELL_URLS'));
+    expect(line).toBeDefined();
+    expect(line).toContain("'/sw-register.js'");
+  });
+});
