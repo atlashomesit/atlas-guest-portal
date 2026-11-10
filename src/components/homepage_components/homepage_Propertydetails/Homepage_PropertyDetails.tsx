@@ -89,6 +89,8 @@ import { useMarketplaceListingUnavailable } from '@/hooks/useMarketplaceListingU
 import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import EmbeddedListingMap from '../../map/EmbeddedListingMap';
+import ListingHouseRules from '@/components/listing/ListingHouseRules';
+import { readHostRulesFields } from '@/components/listing/readHostRulesFields';
 import { selectPropertyMapMode } from './propertyMapMode';
 import { centroidForCity } from '../../../utils/mapCoords';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
@@ -388,6 +390,11 @@ interface Property {
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
     /** TASK-4356: free-cancellation window hours before check-in (server-resolved). */
     cancellationWindowHours?: number | null;
+    /** GUEST-069: the host's own rules and map link, from the public listing. */
+    houseRulesText?: string | null;
+    houseRulesPdfUrl?: string | null;
+    houseRulesStructured?: string | null;
+    googleMapsUrl?: string | null;
     /** TASK-4405: server-resolved universal grace-window hours. Null when the flag is off (flag-off parity). */
     graceHours?: number | null;
     /** TASK-5205 / TASK-956: minimum stay nights from listing payload. */
@@ -1330,6 +1337,7 @@ const PropertyDetails = () => {
                                 pub.cancellationWindowHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
                         })(), // TASK-4356 / TASK-5205
+                        ...readHostRulesFields(apiListing as Record<string, unknown>), // GUEST-069
                         ...readIncludedGuestFields(apiListing as Record<string, unknown>), // GUEST-060
                         graceHours: (() => {
                             const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
@@ -2192,6 +2200,14 @@ useEffect(() => {
                 <VirtualTourSection listingId={Number(resolvedListingId)} />
               </Suspense>
             )}
+
+            {/* GUEST-069: the host's house rules, above the booking box and before any date is chosen. */}
+            <ListingHouseRules
+              houseRulesText={data.houseRulesText}
+              houseRulesPdfUrl={data.houseRulesPdfUrl}
+              houseRulesStructured={data.houseRulesStructured}
+              googleMapsUrl={data.googleMapsUrl}
+            />
 
             {/* ---- v2: Location/Map promoted to upper-third (below gallery) ---- */}
             {ppHasLocation && (
