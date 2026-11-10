@@ -71,9 +71,10 @@ describe('HomePage_Locations dorm tiles (TASK-1040089)', () => {
     renderTiles();
     await settle();
 
-    const tiles = screen.getAllByRole('link', { name: /^see /i });
-    const dorm = tiles.find((t) => /female dorm/i.test(t.getAttribute('aria-label') ?? ''));
-    const room = tiles.find((t) => /private room/i.test(t.getAttribute('aria-label') ?? ''));
+    // G2 journey 19: a card's accessible name is its own text now (it started with an aria-label that hid the words on screen).
+    const tiles = screen.getAllByRole('link').filter((t) => t.classList.contains('property-card'));
+    const dorm = tiles.find((t) => /female dorm/i.test(t.textContent ?? ''));
+    const room = tiles.find((t) => /private room/i.test(t.textContent ?? ''));
     expect(dorm).toBeTruthy();
     expect(room).toBeTruthy();
     expect(dorm).toHaveTextContent(/per bed/i);
