@@ -214,8 +214,8 @@ describe('TASK-101875 stale Show-more response is discarded on filter change', (
     // …then the stale old-filter page-2 lands. Without the TASK-101875 guard it appends
     // Listing 21..27 onto the fresh grid and rewinds `page`.
     stalePage2.resolve(pageFor(2));
-    // Give the stale promise a chance to write state if unguarded.
-    await new Promise((r) => setTimeout(r, 100));
+    // Give the stale promise a chance to write state if unguarded (drained, not slept: HEALTH-1110).
+    await settle();
 
     // Only the active filter's results survive and paging tracks the new filter's sequence.
     expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
