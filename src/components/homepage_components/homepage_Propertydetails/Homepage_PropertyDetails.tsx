@@ -450,6 +450,11 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         propertyAddress: item.propertyAddress,
         property_address: item.property_address,
         virtualTourUrl: item.virtualTourUrl,
+        // GUEST-069: the host's rules and map link survive the coercion.
+        houseRulesText: item.houseRulesText,
+        houseRulesPdfUrl: item.houseRulesPdfUrl,
+        houseRulesStructured: item.houseRulesStructured,
+        googleMapsUrl: item.googleMapsUrl,
         cancellationTier: item.cancellationTier,
         cancellationWindowHours: item.cancellationWindowHours,
         graceHours: item.graceHours,

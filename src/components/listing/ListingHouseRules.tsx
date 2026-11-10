@@ -83,7 +83,7 @@ export const ListingHouseRules: React.FC<ListingHouseRulesProps> = ({ houseRules
 
       {pdf && safeHttps(pdf) && (
         <p style={{ margin: '0 0 8px' }}>
-          <a href={safeHttps(pdf)!} target="_blank" rel="noopener noreferrer" data-testid="listing-house-rules-pdf">
+          <a href={safeHttps(pdf)!} target="_blank" rel="noopener noreferrer" data-testid="listing-house-rules-pdf" style={{ textDecoration: 'underline' }}>
             Open the house rules (PDF)
           </a>
         </p>
@@ -91,7 +91,7 @@ export const ListingHouseRules: React.FC<ListingHouseRulesProps> = ({ houseRules
 
       {map && (
         <p style={{ margin: 0 }}>
-          <a href={map} target="_blank" rel="noopener noreferrer" data-testid="listing-host-map-link">
+          <a href={map} target="_blank" rel="noopener noreferrer" data-testid="listing-host-map-link" style={{ textDecoration: 'underline' }}>
             Open the host&rsquo;s map link
           </a>
         </p>
