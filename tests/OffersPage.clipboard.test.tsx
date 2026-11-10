@@ -12,7 +12,7 @@ const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard"
 const originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
 const writeText = vi.fn();
 const scrollIntoView = vi.fn();
-const copyButton = () => screen.getByRole("button", { name: "Copy DIRECT5 promo code" });
+const copyButton = () => screen.getByRole("button", { name: /^DIRECT5 (Copy|Copied!) promo code$/ });
 const clickCopy = async () => { await act(async () => { fireEvent.click(copyButton()); }); };
 
 describe("approved DIRECT5 clipboard recovery (UXD-2026-11-03-05-A)", () => {

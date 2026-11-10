@@ -582,7 +582,6 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   }
                 }}
                 className="ahv2-card property-card"
-                aria-label={`See ${cardTitle}`}
               >
                 {/* Photo — 4:5 portrait, dusty-rose wash, dots reveal on hover/focus */}
                 <div className="ahv2-card-photo-wrap">

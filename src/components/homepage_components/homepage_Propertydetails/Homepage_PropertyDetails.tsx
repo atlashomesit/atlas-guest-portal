@@ -2001,7 +2001,7 @@ useEffect(() => {
                         href="#reviews"
                         className="pp-rating hover:opacity-80 transition-opacity"
                         data-testid="property-header-rating"
-                        aria-label="View guest reviews"
+                        title="View guest reviews"
                         onClick={() => {
                           // TASK-102616: native fragment nav scrolls but never moves
                           // keyboard focus — move it explicitly (WCAG 2.4.3).
@@ -2148,7 +2148,6 @@ useEffect(() => {
               <button
                 type="button"
                 className="pp-gallery-more"
-                aria-label="View all photos"
                 onClick={() => {
                   if (galleryUrls.length === 0) return;
                   setLightboxIndex(0);
@@ -2310,7 +2309,7 @@ useEffect(() => {
                           className="pp-btn pp-btn-whatsapp pp-btn-sm"
                           style={{ minHeight: 44 }}
                           data-testid="chat-with-host-btn"
-                          aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                          aria-label={`Message on WhatsApp: ${data.property_name}`}
                           onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
                         >
                           <PpWhatsAppIcon size={14} /> Message on WhatsApp
@@ -2323,7 +2322,7 @@ useEffect(() => {
                           rel="noopener noreferrer"
                           className={`pp-btn pp-btn-sm${ppIsDraft ? ' pp-btn-whatsapp' : ' pp-btn-ghost'}`}
                           style={{ minHeight: 44 }}
-                          aria-label="Ask host a question on WhatsApp"
+                          aria-label="Ask a question to the host on WhatsApp"
                           data-testid={ppIsDraft ? 'draft-listing-ask-host' : undefined}
                         >
                           {ppIsDraft ? (
@@ -3138,7 +3137,7 @@ useEffect(() => {
                         rel="noopener noreferrer"
                         className="pp-btn pp-btn-whatsapp pp-btn-block"
                         data-testid="chat-with-host-btn"
-                        aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                        aria-label={`Chat with host about ${data.property_name} on WhatsApp`}
                         onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
                       >
                         <PpWhatsAppIcon size={16} />

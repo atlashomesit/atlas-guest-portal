@@ -25,7 +25,7 @@ const SupportWidgetTrigger = ({ bottomSpacing, onOpen, triggerRef, placement = "
       <FiMessageCircle aria-hidden="true" />
     </span>
     <span className="flex flex-col leading-tight text-left">
-      <span className="text-sm font-semibold">{SUPPORT_DRAWER_COPY.trigger.label}</span>
+      <span className="text-sm font-semibold">{SUPPORT_DRAWER_COPY.trigger.label}</span>{" "}
       <span className="text-[11px] text-text-muted">{SUPPORT_DRAWER_COPY.trigger.helper}</span>
     </span>
   </button>

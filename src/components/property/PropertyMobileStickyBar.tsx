@@ -462,7 +462,7 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
         data-testid="mobile-sticky-book-now"
         onClick={handleReserve}
         tabIndex={isVisible ? 0 : -1}
-        aria-label={canReviewBooking ? `Reserve and continue to checkout, ${formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })} total` : datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
+        aria-label={canReviewBooking ? `Reserve — ${formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })}. Continue to checkout` : datesUnavailable ? "Change dates. Open the date picker" : "Reserve. Open the date picker to book"}
       >
         {canReviewBooking ? `Reserve — ${formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })}` : datesUnavailable ? "Change dates" : "Reserve"}
       </button>
