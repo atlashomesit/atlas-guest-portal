@@ -34,7 +34,11 @@
    Both var namespaces must be pinned: inline styles consume the raw tokens (resolved
    at the element, so this scope wins), while Tailwind v4 utilities consume the
    @theme --color-* mirrors, whose var() indirection is computed at :root (non-inline
-   @theme) and therefore needs the mirror itself re-declared here with literal values. */
+   @theme) and therefore needs the mirror itself re-declared here with literal values.
+   2026-11-10 UX audit: the noir LAYOUT with no preset paints its own dark default palette via
+   html:root[data-layout-theme="noir"] (theme.ts) — same leak, 128 axe nodes at 1.55-3.01:1 —
+   so it is pinned here too. */
+:root[data-layout-theme="noir"] .pp-root,
 :root[data-theme="privateIslandNoir"] .pp-root,
 :root[data-theme="emeraldDynasty"] .pp-root {
   --bg-primary: #fff8e7;
@@ -66,6 +70,9 @@
   /* On-CTA label must follow the pinned coral fill, not the noir preset's dark ink
      (#04120b / #0b0c10 measured 3.76-3.83:1 on coral). White on #c04528 = 5.2:1. */
   --text-on-cta: #ffffff;
+  /* Light page, light status text (base.css values) — the dark palettes override these. */
+  --status-positive-text: #047857;
+  --status-negative-text: #be123c;
   --accent-primary-rgb: 184 71 47;
   --accent-soft-rgb: 242 225 235;
   --cta-primary-rgb: 184 71 47;

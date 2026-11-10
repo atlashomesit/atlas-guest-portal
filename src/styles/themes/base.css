@@ -39,6 +39,14 @@ html {
      dark default, which would itself fail against a dark footer. See
      `footer-success-text-contrast.test.ts` for the full computed ratio table. */
   --support-success-text: #065f46;
+  /* 2026-11-10 UX audit (slot A) — small status TEXT on the theme's own surface (first consumer:
+     the cancellation timeline's refund / non-refundable dates on the guest details page). Tuned
+     for LIGHT surfaces: #047857 on #ffffff = 5.48:1, #be123c on #ffffff = 6.09:1. Every palette
+     that paints a DARK --bg-surface overrides both (noir default tokens, privateIslandNoir,
+     emeraldDynasty). Not --support-success-text: that one follows the FOOTER, which is dark on
+     several light-page presets. See `status-text-contrast.test.ts`. */
+  --status-positive-text: #047857;
+  --status-negative-text: #be123c;
   /* TASK-4908 gate fix — same "-text" text-role pattern as --accent-text/--lavender-text
      above, generalized for any layout that needs a small-TEXT-safe variant of its CTA/brand
      hue (first consumer: `coastal/ListingsGallery.tsx`'s price + "View stay" link, which were

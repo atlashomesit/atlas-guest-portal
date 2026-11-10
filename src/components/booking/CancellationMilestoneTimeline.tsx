@@ -85,7 +85,7 @@ export default function CancellationMilestoneTimeline({
           <div>
             <div className="text-xs font-semibold text-text-primary flex items-center gap-1.5 flex-wrap">
               <span>Full refund cutoff:</span>
-              <span className="font-bold text-emerald-700">{deadlineFormatted}</span>
+              <span className="font-bold text-[color:var(--status-positive-text)]">{deadlineFormatted}</span>
             </div>
             <div className="text-[11px] text-text-secondary mt-0.5">
               {effectiveTier === 'Strict' && (
@@ -109,7 +109,7 @@ export default function CancellationMilestoneTimeline({
           <div>
             <div className="text-xs font-semibold text-text-primary flex items-center gap-1.5 flex-wrap">
               <span>Non-refundable cutoff:</span>
-              <span className="font-bold text-rose-700">
+              <span className="font-bold text-[color:var(--status-negative-text)]">
                 {effectiveTier === 'Strict' ? deadlineFormatted : checkInFormatted}
               </span>
             </div>
