@@ -2754,7 +2754,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             className="text-xs text-text-secondary"
             style={{ marginTop: 8 }}
           >
-            Select your check-out date (minimum one night after check-in).
+            Select your check-out date (minimum {effectiveMinStayNights > 1 ? `${effectiveMinStayNights} nights` : 'one night'} after check-in).
           </p>
         )}
         {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
