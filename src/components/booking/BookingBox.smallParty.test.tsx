@@ -85,7 +85,7 @@ describe('BookingBox small-party discount hint (TASK-10299183)', () => {
     expect(screen.getByTestId('booking-small-party-hint')).toBeInTheDocument();
 
     // Open guests popover and increase to 3
-    const trigger = screen.getByLabelText(/Guests: 2 guests/i);
+    const trigger = screen.getByRole('button', { name: /^Guests[ ]*2 adults/i });
     fireEvent.click(trigger);
 
     const increaseBtn = screen.getByLabelText('Increase guests');

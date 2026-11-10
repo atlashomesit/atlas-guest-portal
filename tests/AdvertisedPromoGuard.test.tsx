@@ -50,7 +50,7 @@ describe("TASK-8016 advertised promo choke-point", () => {
 
     await settle();
     expect(screen.queryByTestId("offers-direct5-card")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/copy DIRECT5 promo code/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/DIRECT5 copy promo code/i)).not.toBeInTheDocument();
   });
 
   it("OffersPage shows DIRECT5 card when validate returns valid:true", async () => {
@@ -68,7 +68,7 @@ describe("TASK-8016 advertised promo choke-point", () => {
 
     await settle();
     expect(screen.getByTestId("offers-direct5-card")).toBeInTheDocument();
-    expect(screen.getByLabelText(/copy DIRECT5 promo code/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/DIRECT5 copy promo code/i)).toBeInTheDocument();
   });
 
   it("DirectDiscountBanner renders nothing when validate returns valid:false", async () => {
