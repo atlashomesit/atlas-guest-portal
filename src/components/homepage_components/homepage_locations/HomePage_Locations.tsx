@@ -35,6 +35,7 @@ import {
 
 import { resolveHomesPlace } from "../../../utils/listingCities";
 import "./homepage_location.css";
+import { sameHands } from '@/utils/sameHandsCopy';
 import "../atlas-home-v2.css";
 
 type HomePageLocationsProps = {
@@ -540,9 +541,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 tenant?.legalContactPack?.city,
               );
               if (hideAtlasBranding) {
-                return `${sortedListings.length} owner-run ${noun}${city ? ` in ${city}` : ''}. Same hands clean them, restock them, and answer the door.`;
+                return `${sortedListings.length} owner-run ${noun}${city ? ` in ${city}` : ''}. ${sameHands(sortedListings.length)}`;
               }
-              return `${sortedListings.length} owner-run ${noun} in this neighbourhood. Same hands clean them, restock them, and answer the door.`;
+              return `${sortedListings.length} owner-run ${noun} in this neighbourhood. ${sameHands(sortedListings.length)}`;
             })()}
           </p>
         </div>

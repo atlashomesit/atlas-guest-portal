@@ -16,6 +16,7 @@ import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityW
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { resolveHomesPlace } from '../../../utils/listingCities';
 import '../atlas-home-v2.css';
+import { sameHands } from '@/utils/sameHandsCopy';
 import '../home-first-glance.css';
 
 // Ivory seam (left 120px) + a soft 8% coral wash over the hero photo. Kept as a
@@ -62,7 +63,7 @@ const Slider = () => {
   // TASK-7194 #4: Atlas subcopy uses the live listing count, not a hardcoded "Seven".
   const atlasHeroSub =
     listingCount > 0
-      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in this neighbourhood. Same hands clean them, restock them, answer the door.`
+      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in this neighbourhood. ${sameHands(listingCount)}`
       : 'Owner-run homes in this neighbourhood. Same hands clean them, restock them, answer the door.';
 
   // CSS-driven animations replace the manual headlineIn state
