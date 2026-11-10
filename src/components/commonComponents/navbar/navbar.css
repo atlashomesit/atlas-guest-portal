@@ -192,6 +192,19 @@
   }
 }
 
+/* A long run-together brand must truncate with an ellipsis and leave room for the menu button. */
+.navbar-brand-link {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.navbar-brand-link .navbar-logo-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Navigation Links */
 .navbar-center .nav-link {
   padding: 0.5rem 0;

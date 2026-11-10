@@ -20,11 +20,6 @@ vi.mock("../../../components/homepage_components/homepage_locations/HomePage_Loc
   default: () => <div>Home Locations</div>,
 }));
 
-vi.mock("../../../components/home/ServicesSection", () => ({
-  __esModule: true,
-  default: () => <div>Discover Our Exclusive Services</div>,
-}));
-
 vi.mock("../../../components/home/TestimonialsSection", () => ({
   __esModule: true,
   default: () => <div>Hear What Our Happy Guests Are Saying</div>,
@@ -65,9 +60,8 @@ describe("Home per-section Suspense (TASK-101858)", () => {
     // (FooterCtaStrip needs no stub: enableFooterMiniCtaAboveFooter is false,
     // so it never mounts.)
     await settle();
-    expect(
-      screen.getByText(/Discover Our Exclusive Services/i),
-    ).toBeInTheDocument();
+    // ServicesSection is real here and renders nothing on host sites (no made-up services).
+    expect(screen.queryByText(/Discover Our Exclusive Services/i)).not.toBeInTheDocument();
     await settle();
     expect(
       screen.getByText(/Hear What Our Happy Guests Are Saying/i),

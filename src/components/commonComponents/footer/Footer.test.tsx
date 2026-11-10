@@ -146,3 +146,14 @@ describe('TASK-7428: MOR footer disclosure is gated by half', () => {
     expect(stays.every((l) => l.getAttribute('href') === '/#our-homes')).toBe(true);
   });
 });
+
+describe('renderEmailWrappableAfterAt', () => {
+  it('breaks only after the @ and keeps the address text intact', async () => {
+    const { renderEmailWrappableAfterAt } = await import('./Footer');
+    const { render } = await import('@testing-library/react');
+    const { container } = render(<p>{renderEmailWrappableAfterAt('atlashomeskphb@gmail.com')}</p>);
+    expect(container.textContent).toBe('atlashomeskphb@gmail.com');
+    expect(container.querySelectorAll('wbr')).toHaveLength(1);
+    expect(container.querySelector('p')!.innerHTML).toBe('atlashomeskphb@<wbr>gmail.com');
+  });
+});

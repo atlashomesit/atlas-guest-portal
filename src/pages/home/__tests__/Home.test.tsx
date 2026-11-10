@@ -20,11 +20,6 @@ vi.mock("../../../components/homepage_components/homepage_locations/HomePage_Loc
   default: () => <div>Home Locations</div>,
 }));
 
-vi.mock("../../../components/home/ServicesSection", () => ({
-  __esModule: true,
-  default: () => <div>Discover Our Exclusive Services</div>,
-}));
-
 vi.mock("../../../components/home/TestimonialsSection", () => ({
   __esModule: true,
   default: () => <div>Hear What Our Happy Guests Are Saying</div>,
@@ -117,10 +112,9 @@ describe("Home", () => {
     };
 
     expect(
-      await timedFindByText("ServicesSection", /Discover Our Exclusive Services/i),
-    ).toBeInTheDocument();
-    expect(
       await timedFindByText("TestimonialsSection", /Hear What Our Happy Guests Are Saying/i),
     ).toBeInTheDocument();
+    // First-impression fix 2026-11-10: host sites no longer render the made-up services boilerplate.
+    expect(screen.queryByText(/Discover Our Exclusive Services/i)).not.toBeInTheDocument();
   });
 });

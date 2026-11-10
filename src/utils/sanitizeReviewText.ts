@@ -10,9 +10,26 @@
 
 const HTML_TAG_REGEX = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/gi;
 
+const PRIVATE_FEEDBACK_REGEX = /private\s+feedback\s*:[\s\S]*$/i;
+
+/**
+ * Privacy: imported Airbnb reviews can carry the guest's private note to the host after a
+ * "Private feedback:" marker. Cut from the marker onwards and trim. Shared by every review
+ * display path (they all go through stripHtmlPreservingEmoticons).
+ */
+export function stripPrivateFeedback(raw?: string | null): string {
+  if (!raw) return '';
+  return raw.replace(PRIVATE_FEEDBACK_REGEX, '').trim();
+}
+
 export function stripHtmlPreservingEmoticons(raw?: string | null): string {
   if (!raw) return '';
-  return raw.replace(HTML_TAG_REGEX, '');
+  return stripPrivateFeedback(raw.replace(HTML_TAG_REGEX, ''));
+}
+
+/** Raw Booking.com scrapes look like "Positive: ... Negative: ..."; not fit for a featured card. */
+export function isRawPositiveNegativeReview(raw?: string | null): boolean {
+  return !!raw && /negative\s*:/i.test(raw);
 }
 
 export function sanitizeReviewText(raw?: string | null): string {

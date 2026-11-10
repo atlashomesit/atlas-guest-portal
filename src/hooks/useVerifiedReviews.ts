@@ -4,7 +4,7 @@ import { buildApiUrl, getApiHeaders } from "@/api/client";
 
 import { normalizeReviewLocale, normalizeReviewSource, resolveReviewerName } from "@/components/property/reviewMerge";
 import { normalizeGuestFeedback, type GuestFeedbackItem } from "@/components/property/guestFeedback";
-import { stripHtmlPreservingEmoticons } from "@/utils/sanitizeReviewText";
+import { isRawPositiveNegativeReview, stripHtmlPreservingEmoticons } from "@/utils/sanitizeReviewText";
 
 /**
  * TASK-2872 / REV-019: real verified reviews for the homepage testimonials section.
@@ -180,7 +180,7 @@ export function useVerifiedReviews(
         for (const ext of res.externalReviews) {
           const rating = Number(ext.rating);
           const text = stripHtmlPreservingEmoticons(ext.body ?? "").trim();
-          if (!isNaN(rating) && rating >= 4 && text.length > 0) {
+          if (!isNaN(rating) && rating >= 4 && text.length > 0 && !isRawPositiveNegativeReview(ext.body)) {
             const cleanSource = normalizeReviewSource(ext.source) ?? (ext.sourceUrl?.includes("google") ? "Google" : undefined);
             collected.push({
               id: -(collected.length + 1),

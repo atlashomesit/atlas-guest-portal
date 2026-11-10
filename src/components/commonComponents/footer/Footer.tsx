@@ -28,6 +28,20 @@ const iconMap = {
     IoIosArrowForward
 };
 
+/** Wrap an e-mail address only after the "@" (never mid-word). */
+// eslint-disable-next-line react-refresh/only-export-components -- tiny helper co-located with Footer
+export function renderEmailWrappableAfterAt(email: string): ReactNode {
+    const at = email.indexOf('@');
+    if (at < 0) return email;
+    return (
+        <>
+            {email.slice(0, at + 1)}
+            <wbr />
+            {email.slice(at + 1)}
+        </>
+    );
+}
+
 const Footer = () => {
     const tenant = getTenantContext();
     const location = useLocation();
@@ -93,8 +107,8 @@ const Footer = () => {
             key: "email",
             icon: <IoIosMail className="shrink-0 text-lg" aria-hidden />,
             content: (
-                <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
-                    {email}
+                <a href={`mailto:${email}`} className="break-normal text-left hover:text-[var(--footer-link-hover)]">
+                    {renderEmailWrappableAfterAt(email)}
                 </a>
             ),
         });

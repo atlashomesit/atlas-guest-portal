@@ -293,7 +293,7 @@ const Navbar = () => {
           {!isTenantHome && <MobileSearchPill />}
 
           {/* Mobile Menu Button - Only visible on mobile */}
-          <div className="lg:hidden">
+          <div className="lg:hidden shrink-0">
             <button
               type="button"
               className={`mobile-menu-button ${isMenuOpen ? 'open' : ''}`}
