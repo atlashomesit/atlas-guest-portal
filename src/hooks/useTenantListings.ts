@@ -56,6 +56,13 @@ export type TenantPropertyRecord = {
   longitude?: number | null;
   /** DESIGN-028: listing cancellation tier for card trust chips. */
   cancellationTier?: "Flexible" | "Moderate" | "Strict" | null;
+  /** GUEST-070: minimum nights a guest can book direct (null = no minimum above one night). */
+  minStay?: number | null;
+  /** GUEST-069: the host's rules and map link from the public listing. */
+  houseRulesText?: string | null;
+  houseRulesPdfUrl?: string | null;
+  houseRulesStructured?: string | null;
+  googleMapsUrl?: string | null;
   /** TASK-102020: listing check-in/out times for property page display. */
   checkInTime?: string | null;
   checkOutTime?: string | null;
@@ -170,6 +177,12 @@ export const mapDtoToProperty = (dto: PublicListing): TenantPropertyRecord => {
     latitude: dto.latitude ?? null,
     longitude: dto.longitude ?? null,
     cancellationTier: dto.cancellationTier ?? null,
+    // GUEST-070: the direct minimum stay must reach the booking widget; it was dropped here, so a link with fewer nights quoted a price and enabled Reserve.
+    minStay: typeof dto.minStay === 'number' && dto.minStay > 1 ? dto.minStay : null,
+    houseRulesText: dto.houseRulesText ?? null, // GUEST-069
+    houseRulesPdfUrl: dto.houseRulesPdfUrl ?? null,
+    houseRulesStructured: dto.houseRulesStructured ?? null,
+    googleMapsUrl: dto.googleMapsUrl ?? null,
     checkInTime: dto.checkInTime?.trim() || null,
     checkOutTime: dto.checkOutTime?.trim() || null,
     accommodationType: dto.accommodationType ?? null,

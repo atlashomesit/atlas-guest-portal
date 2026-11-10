@@ -208,7 +208,7 @@ const Home = () => {
                 </section>
 
                 <WaveDivider tone="lavender" className="px-[8%] md:px-[18%]" />
-                <AtlasNeighbourhoodRibbon variant="closer" />
+                <AtlasNeighbourhoodRibbon variant="closer" homeCount={propertyData.length} />
 
                 {/* Why-direct 2-pillar strip — tighter, centred columns (layout fix from screen 2) */}
                 <section

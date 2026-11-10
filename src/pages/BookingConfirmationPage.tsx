@@ -228,6 +228,9 @@ interface BookingSummary {
   ratePlanName?: string | null;
   mealPlanCode?: string | null;
   cancellationPolicy?: string | null;
+  /** GUEST-068: the server's one wording of this booking's cancellation rule (same as the "Your booking" page). */
+  cancellationHeadline?: string | null;
+  cancellationDetail?: string | null;
   /** BNB-009: saved meal choices + whether to ask + the API's one list of options. Absent on older API builds (selector hidden). */
   mealPreferences?: GuestMealPreferences | null;
   /** PAY-009: refunds on this booking (newest first); empty/absent = no tracker. */
@@ -551,6 +554,8 @@ export default function BookingConfirmationPage() {
             nearbyLandmarks: b.nearbyLandmarks,
             mealPlanCode: b.mealPlanCode,
             cancellationPolicy: b.cancellationPolicy,
+            cancellationHeadline: b.cancellationHeadline,
+            cancellationDetail: b.cancellationDetail,
             savedAtUtc: new Date().toISOString(),
           };
           const serialized = JSON.stringify(snapshot);
@@ -836,7 +841,10 @@ export default function BookingConfirmationPage() {
   }
 
   const isCancelled = booking.status === "Cancelled";
-  const planTerms = resolveBookingPlanTerms(booking.mealPlanCode, booking.cancellationPolicy);
+  const planTerms = resolveBookingPlanTerms(booking.mealPlanCode, booking.cancellationPolicy, {
+    headline: booking.cancellationHeadline,
+    detail: booking.cancellationDetail,
+  });
   // TASK-2071: pick language strings from guest profile preference
   const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
   const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
