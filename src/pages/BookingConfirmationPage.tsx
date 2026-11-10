@@ -42,6 +42,18 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+/**
+ * G3 journey 12: the API stores a guest's cancellation reason as "CANCELLATION_REQUEST — <reason>" (an internal marker for the host
+ * queue), and "Guest requested cancellation" when none was typed. The guest sees only what they typed.
+ */
+function guestFacingRequestNote(note: string | null | undefined): string | null {
+  const raw = (note ?? "").trim();
+  if (!raw) return null;
+  const stripped = raw.replace(/^CANCELLATION_REQUEST\s*[—–-]\s*/, "").trim();
+  if (!stripped || stripped === "Guest requested cancellation") return null;
+  return stripped;
+}
+
 /** Guest summary API returns ISO dates or formatted strings (e.g. "Sat, 3 May 2026") — normalize for ICS. */
 function summaryDisplayDateToIso(displayDate: string): string {
   const t = displayDate.trim();
@@ -372,7 +384,7 @@ export default function BookingConfirmationPage() {
   const [modNote, setModNote] = useState("");
   const [modSubmitting, setModSubmitting] = useState(false);
   const [modMessage, setModMessage] = useState<string>("");
-  interface ModRequestSummary { id: number; requestedCheckinDateUtc: string; requestedCheckoutDateUtc: string; requestedGuestCount?: number | null; note?: string | null; status: string; decisionNote?: string | null; decisionMadeAtUtc?: string | null; createdAtUtc: string; }
+  interface ModRequestSummary { id: number; requestedCheckinDateUtc: string; requestedCheckoutDateUtc: string; requestedGuestCount?: number | null; note?: string | null; status: string; decisionNote?: string | null; decisionMadeAtUtc?: string | null; createdAtUtc: string; isCancellation?: boolean; }
   const [modRequests, setModRequests] = useState<ModRequestSummary[]>([]);
   // TASK-350: guest self-service cancellation request
   const [cancelReason, setCancelReason] = useState("");
@@ -890,6 +902,9 @@ export default function BookingConfirmationPage() {
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
   const hasPendingModRequest = modRequests.some((r) => r.status === "Pending");
+  // G3 journey 12: a cancellation request already sent (this visit or an earlier one) is shown as received; the form is not offered a second time.
+  // The guest list endpoint has sent isCancellation=false for these rows, so the stored marker in the note counts too.
+  const hasPendingCancellationRequest = modRequests.some((r) => (r.isCancellation === true || /^CANCELLATION_REQUEST/.test(r.note ?? "")) && r.status === "Pending");
 
   const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
@@ -2132,7 +2147,7 @@ export default function BookingConfirmationPage() {
                       {fmtDate(r.requestedCheckinDateUtc)} – {fmtDate(r.requestedCheckoutDateUtc)}
                       {r.requestedGuestCount ? ` · ${r.requestedGuestCount} guests` : ""}
                     </p>
-                    {r.note && <p className="text-xs text-text-muted">Your note: {r.note}</p>}
+                    {guestFacingRequestNote(r.note) && <p className="text-xs text-text-muted">Your note: {guestFacingRequestNote(r.note)}</p>}
                     {!isPending && r.decisionNote && (
                       <p className="text-xs text-text-secondary">Host note: {r.decisionNote}</p>
                     )}
@@ -2210,7 +2225,7 @@ export default function BookingConfirmationPage() {
         )}
 
         {/* TASK-350: guest self-service cancellation request */}
-        {canRequestModification && !cancelRequested && (
+        {canRequestModification && !cancelRequested && !hasPendingCancellationRequest && (
           <div className="rounded-2xl border border-red-100 bg-red-50/40 p-5 space-y-3">
             <h2 className="text-sm font-semibold text-red-800">Request cancellation</h2>
             <p className="text-sm text-red-700">
@@ -2278,7 +2293,7 @@ export default function BookingConfirmationPage() {
             )}
           </div>
         )}
-        {cancelRequested && (
+        {(cancelRequested || hasPendingCancellationRequest) && (
           <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-base text-green-800 space-y-2" role="status" aria-live="polite">
             <p>✅ {REFUND_CANCELLATION_RECEIVED_MESSAGE}</p>
             <Link
