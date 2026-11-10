@@ -163,16 +163,48 @@ describe('UnitBookingWidget - GUEST-060: guest count above the maximum, and what
   it('shows what the price includes from the listings own numbers, for two different hosts', async () => {
     stubPlansEndpoint([plan({ id: 25, name: 'Standard', isDefault: true })]);
     await renderWidget({ maxGuests: 8, includedGuests: 2, extraGuestRate: 500 });
-    expect(screen.getByTestId('bw-included-guests').textContent).toMatch(/Includes 2 guests, then .*500.* per extra guest per night/);
+    expect(screen.getByTestId('bw-included-guests').textContent).toMatch(/Price includes up to 2 guests, then .*500.* for each extra guest per night/);
     cleanup();
+    mocks.booking.guests = 4; // GUEST-065: the line shows from the included count up (a party of 2 under "up to 4" shows none)
     await renderWidget({ maxGuests: 6, includedGuests: 4, extraGuestRate: null });
-    expect(screen.getByTestId('bw-included-guests').textContent).toBe('Includes 4 guests');
+    expect(screen.getByTestId('bw-included-guests').textContent).toBe('Price includes up to 4 guests');
   });
 
   it('WALK2-2: rows that are not one plain amount say the price changes with the guests, with no number', async () => {
     stubPlansEndpoint([plan({ id: 27, name: 'Standard', isDefault: true })]);
     await renderWidget({ maxGuests: 4, includedGuests: 2, extraGuestRate: null, priceChangesWithGuests: true });
-    expect(screen.getByTestId('bw-included-guests').textContent).toBe('Includes 2 guests. Price changes with the number of guests');
+    expect(screen.getByTestId('bw-included-guests').textContent).toBe('Price includes up to 2 guests. It changes with the number of guests');
+  });
+
+  // GUEST-065 item 3: "1 adult" sat above "INCLUDES 2 GUESTS, THEN ₹600 PER EXTRA GUEST PER NIGHT" in the booking box, two guest
+  // counts that disagree. The line now names its subject and a ceiling, and a party BELOW the included count shows no line.
+  it('GUEST-065: a party smaller than the included count shows no included-guests line; from the included count up it does', async () => {
+    stubPlansEndpoint([plan({ id: 28, name: 'Standard', isDefault: true })]);
+    mocks.booking.guests = 1;
+    await renderWidget({ maxGuests: 4, includedGuests: 2, extraGuestRate: 600 });
+    expect(screen.getByText('1 adult')).toBeTruthy();
+    expect(screen.queryByTestId('bw-included-guests')).toBeNull();
+    cleanup();
+
+    mocks.booking.guests = 2;
+    await renderWidget({ maxGuests: 4, includedGuests: 2, extraGuestRate: 600 });
+    expect(screen.getByTestId('bw-included-guests').textContent).toMatch(/^Price includes up to 2 guests, then .*600.* for each extra guest per night$/);
+    cleanup();
+
+    mocks.booking.guests = 3;
+    await renderWidget({ maxGuests: 4, includedGuests: 2, extraGuestRate: 600 });
+    expect(screen.getByTestId('bw-included-guests').textContent).toMatch(/^Price includes up to 2 guests, then .*600.* for each extra guest per night$/);
+  });
+
+  it('GUEST-065: the price-changes-with-guests wording is hidden below the included count too, and no line starts with a bare "Includes"', async () => {
+    stubPlansEndpoint([plan({ id: 29, name: 'Standard', isDefault: true })]);
+    mocks.booking.guests = 1;
+    await renderWidget({ maxGuests: 4, includedGuests: 2, extraGuestRate: null, priceChangesWithGuests: true });
+    expect(screen.queryByTestId('bw-included-guests')).toBeNull();
+    cleanup();
+    mocks.booking.guests = 3;
+    await renderWidget({ maxGuests: 4, includedGuests: 2, extraGuestRate: null, priceChangesWithGuests: true });
+    expect(screen.getByTestId('bw-included-guests').textContent).not.toMatch(/^Includes/);
   });
 
   it('shows nothing when the listing sends no included-guest count', async () => {
