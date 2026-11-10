@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   getCookieConsent,
@@ -8,6 +8,7 @@ import {
 import { getTenantContext } from "../tenant/tenantContext";
 import { getGuestDataProcessingEntityName } from "../tenant/displayBrand";
 import { getTenantOverrides } from "../tenant/tenantOverrides"; // TASK-1877
+import { STICKY_BAR_OFFSET_VAR } from "./property/propertyHelpEvents"; // GUEST-065
 
 const DISMISS_KEY = "atlas:cookie-banner-dismissed";
 const readSessionDismissed = (): boolean => {
@@ -23,6 +24,56 @@ const writeSessionDismissed = () => {
   } catch {
     /* storage blocked: the bar still hides for this page view via component state */
   }
+};
+
+// GUEST-065: a tenant's OWN consent wording can run to ten lines. In the floating bar on a phone it showed all of them (a
+// 240 px card) over the sticky Reserve bar. The wording stays complete (every word is in the page, read in full by a screen
+// reader, and "Read more" shows it all); on a phone the bar shows two lines of it, then the privacy link and "Read more".
+// From 768 px up nothing is clamped. Consent logic is untouched: this only changes how much of the notice is visible.
+const TenantNoticeText = ({ text, privacyUrl, privacyLinkLabel }: { text: string; privacyUrl: string; privacyLinkLabel: string }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const textId = useId();
+  useLayoutEffect(() => {
+    if (expanded) return undefined; // the collapsed measurement decides whether "Show less" is offered
+    const el = textRef.current;
+    if (!el) return undefined;
+    const measure = () => setOverflows(el.scrollHeight > el.clientHeight + 1);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [text, expanded]);
+  return (
+    <p id="cookie-consent-desc" className="text-xs md:text-sm text-text-muted">
+      <span
+        ref={textRef}
+        id={textId}
+        data-testid="cookie-consent-tenant-text"
+        className={expanded ? "block max-h-[40vh] overflow-y-auto md:inline md:max-h-none md:overflow-visible" : "line-clamp-2 md:line-clamp-none"}
+      >
+        {text}{" "}
+      </span>
+      <Link to={privacyUrl} className="text-primary underline font-semibold">
+        {privacyLinkLabel}
+      </Link>
+      <span className={expanded ? undefined : "hidden md:inline"}>
+        {" "}for details. You can change your choice any time.
+      </span>
+      {(overflows || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((open) => !open)}
+          aria-expanded={expanded}
+          aria-controls={textId}
+          data-testid="cookie-consent-read-more"
+          className="ml-2 inline-flex min-h-6 items-center align-baseline font-semibold text-text-primary underline md:hidden"
+        >
+          {expanded ? "Show less" : "Read more"}
+        </button>
+      )}
+    </p>
+  );
 };
 
 // DPDP-compliant cookie consent banner.
@@ -94,7 +145,10 @@ const CookieConsentBanner = ({ inline = false }: { inline?: boolean }) => {
       aria-labelledby="cookie-consent-title"
       aria-describedby="cookie-consent-desc"
       data-testid="cookie-consent-banner"
-      className={inline ? "home-privacy-choice" : "fixed inset-x-0 bottom-0 z-[9999] px-3 pb-3 md:px-4 md:pb-6"}
+      className={inline ? "home-privacy-choice" : "fixed inset-x-0 z-[9999] px-3 pb-3 md:px-4 md:pb-6 motion-safe:transition-[bottom] motion-safe:duration-300"}
+      // GUEST-065: on a listing page the phone Reserve bar is fixed to the bottom edge. It publishes its live height here
+      // (0px when it is hidden or not shown at this width), and this bar sits on top of it instead of over it.
+      style={inline ? undefined : { bottom: `var(${STICKY_BAR_OFFSET_VAR}, 0px)` }}
     >
       <div className="relative max-w-3xl mx-auto bg-bg-surface border border-border-subtle rounded-2xl shadow-level2 p-3 md:p-6">
         {!inline && (
@@ -113,22 +167,26 @@ const CookieConsentBanner = ({ inline = false }: { inline?: boolean }) => {
             <h2 id="cookie-consent-title" className={inline ? "text-base md:text-lg font-bold text-text-primary" : "sr-only md:not-sr-only text-base md:text-lg font-bold text-text-primary"}>
               {bannerTitle}
             </h2>
-            <p id="cookie-consent-desc" className="text-xs md:text-sm text-text-muted">
-              {useCompactCopy && !inline && (
-                <span className="md:hidden" data-testid="cookie-consent-compact-copy">
-                  {compactText}
+            {useCompactCopy || inline ? (
+              <p id="cookie-consent-desc" className="text-xs md:text-sm text-text-muted">
+                {useCompactCopy && !inline && (
+                  <span className="md:hidden" data-testid="cookie-consent-compact-copy">
+                    {compactText}
+                  </span>
+                )}
+                <span className={useCompactCopy && !inline ? "hidden md:inline" : undefined}>
+                  {bannerText}{" "}
                 </span>
-              )}
-              <span className={useCompactCopy && !inline ? "hidden md:inline" : undefined}>
-                {bannerText}{" "}
-              </span>
-              <Link to={privacyUrl} className="text-primary underline font-semibold">
-                {privacyLinkLabel}
-              </Link>
-              <span className={useCompactCopy && !inline ? "hidden md:inline" : undefined}>
-                {" "}for details. You can change your choice any time.
-              </span>
-            </p>
+                <Link to={privacyUrl} className="text-primary underline font-semibold">
+                  {privacyLinkLabel}
+                </Link>
+                <span className={useCompactCopy && !inline ? "hidden md:inline" : undefined}>
+                  {" "}for details. You can change your choice any time.
+                </span>
+              </p>
+            ) : (
+              <TenantNoticeText text={bannerText} privacyUrl={privacyUrl} privacyLinkLabel={privacyLinkLabel} />
+            )}
           </div>
           <div className="flex flex-row gap-2 md:flex-col md:items-stretch shrink-0">
             <button

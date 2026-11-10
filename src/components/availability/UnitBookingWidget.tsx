@@ -2566,7 +2566,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   {`You asked for ${guestsOverLimit} ${isDorm ? 'beds' : 'guests'}, but this home allows up to ${effectiveMaxGuests}. We've set ${effectiveMaxGuests}.`}
                 </small>
               )}
-              {!isDorm && includedGuestsLine && (
+              {/* GUEST-065: a party SMALLER than what the price includes ("1 adult" under "Price includes up to 2 guests") read as two
+                  different guest counts. The line stays at the included count and above, where the extra-guest rule matters. */}
+              {!isDorm && includedGuestsLine && !(includedGuests != null && guests < includedGuests) && (
                 <small
                   data-testid="bw-included-guests"
                   style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}

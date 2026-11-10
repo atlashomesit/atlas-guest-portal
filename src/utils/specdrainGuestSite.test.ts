@@ -66,13 +66,13 @@ describe('GUEST-059: one cancellation answer per rate plan', () => {
 describe('GUEST-060: included guests line', () => {
   const inr = (n: number) => `₹${n}`;
   it('names the included count and the extra-guest rate for the host that set them', () => {
-    expect(describeIncludedGuests(2, 500, 8, inr)).toBe('Includes 2 guests, then ₹500 per extra guest per night');
-    expect(describeIncludedGuests(4, 1200, 6, inr)).toBe('Includes 4 guests, then ₹1200 per extra guest per night');
+    expect(describeIncludedGuests(2, 500, 8, inr)).toBe('Price includes up to 2 guests, then ₹500 for each extra guest per night');
+    expect(describeIncludedGuests(4, 1200, 6, inr)).toBe('Price includes up to 4 guests, then ₹1200 for each extra guest per night');
   });
   it('no extra-guest clause when none is set or the home sleeps only the included guests', () => {
-    expect(describeIncludedGuests(2, null, 8, inr)).toBe('Includes 2 guests');
-    expect(describeIncludedGuests(3, 500, 3, inr)).toBe('Includes 3 guests');
-    expect(describeIncludedGuests(1, null, 2, inr)).toBe('Includes 1 guest');
+    expect(describeIncludedGuests(2, null, 8, inr)).toBe('Price includes up to 2 guests');
+    expect(describeIncludedGuests(3, 500, 3, inr)).toBe('Price includes up to 3 guests');
+    expect(describeIncludedGuests(1, null, 2, inr)).toBe('Price includes 1 guest');
   });
   it('says nothing when the API sends no included count', () => {
     expect(describeIncludedGuests(null, 500, 8, inr)).toBeNull();
@@ -125,7 +125,7 @@ describe('GUEST-062: similar stays are the same city', () => {
 describe('WALK2-2: a plan saved in the Price Per Guest editor with uneven or percent rows', () => {
   const inr = (n: number) => `₹${n}`;
   it('says the price changes with the guests and shows no number', () => {
-    expect(describeIncludedGuests(2, null, 4, inr, true)).toBe('Includes 2 guests. Price changes with the number of guests');
+    expect(describeIncludedGuests(2, null, 4, inr, true)).toBe('Price includes up to 2 guests. It changes with the number of guests');
     expect(readIncludedGuestFields({ includedGuests: 2, priceChangesWithGuests: true })).toEqual({
       includedGuests: 2,
       extraGuestRate: null,
@@ -133,7 +133,7 @@ describe('WALK2-2: a plan saved in the Price Per Guest editor with uneven or per
     });
   });
   it('a plain per-extra-guest amount still wins, and a home that sleeps only the included guests says nothing extra', () => {
-    expect(describeIncludedGuests(2, 500, 4, inr, true)).toBe('Includes 2 guests, then ₹500 per extra guest per night');
-    expect(describeIncludedGuests(2, null, 2, inr, true)).toBe('Includes 2 guests');
+    expect(describeIncludedGuests(2, 500, 4, inr, true)).toBe('Price includes up to 2 guests, then ₹500 for each extra guest per night');
+    expect(describeIncludedGuests(2, null, 2, inr, true)).toBe('Price includes up to 2 guests');
   });
 });

@@ -46,10 +46,13 @@ export function pickIncludedGuestFacts(
 }
 
 /**
- * "Includes 2 guests, then ₹500 per extra guest per night". The extra-guest clause appears only when the host set
- * a rate and the home sleeps more people than the price includes. When the API says the price follows the guest count
- * in a way one number cannot describe, the line says that instead and shows no number. Returns null when the included
- * count is unknown.
+ * "Price includes up to 2 guests, then ₹500 for each extra guest per night". The extra-guest clause appears only when the
+ * host set a rate and the home sleeps more people than the price includes. When the API says the price follows the guest
+ * count in a way one number cannot describe, the line says that instead and shows no number. Returns null when the
+ * included count is unknown.
+ *
+ * GUEST-065: the old wording ("Includes 2 guests, ...") had no subject, so under a picked "1 adult" it read as a second,
+ * different guest count. It now says what includes them (the price) and that 2 is a ceiling ("up to").
  */
 export function describeIncludedGuests(
   includedGuests: number | null | undefined,
@@ -59,11 +62,11 @@ export function describeIncludedGuests(
   priceChangesWithGuests?: boolean | null,
 ): string | null {
   if (includedGuests == null || !Number.isFinite(includedGuests) || includedGuests < 1) return null;
-  const base = `Includes ${includedGuests} guest${includedGuests === 1 ? '' : 's'}`;
+  const base = includedGuests === 1 ? 'Price includes 1 guest' : `Price includes up to ${includedGuests} guests`;
   const canHaveExtra = maxGuests == null || maxGuests > includedGuests;
   if (extraGuestRate != null && extraGuestRate > 0 && canHaveExtra) {
-    return `${base}, then ${formatAmount(extraGuestRate)} per extra guest per night`;
+    return `${base}, then ${formatAmount(extraGuestRate)} for each extra guest per night`;
   }
-  if (priceChangesWithGuests && canHaveExtra) return `${base}. Price changes with the number of guests`;
+  if (priceChangesWithGuests && canHaveExtra) return `${base}. It changes with the number of guests`;
   return base;
 }
