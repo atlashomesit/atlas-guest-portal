@@ -76,6 +76,18 @@ describe("G3 journey 12: a cancellation request already sent, seen on a later vi
     expect(screen.queryByText(/Your note:/)).not.toBeInTheDocument();
   });
 
+  test("GUEST-075: a pending cancellation request never reads as a pending change request", async () => {
+    await renderWith([pendingCancellation("CANCELLATION_REQUEST — Change of plans")]);
+    expect(screen.queryByText(/pending change request/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("change-request-paused-by-cancellation")).toHaveTextContent("cancellation request is with our team");
+  });
+
+  test("GUEST-075: a real pending date change still reads as a change request", async () => {
+    await renderWith([{ ...pendingCancellation("Please move us a day"), id: 10 }]);
+    expect(screen.getByText(/You have a pending change request/)).toBeInTheDocument();
+    expect(screen.queryByTestId("change-request-paused-by-cancellation")).not.toBeInTheDocument();
+  });
+
   test("with no request on file the request button is still offered", async () => {
     await renderWith([]);
     expect(screen.getByTestId("request-cancellation-btn")).toBeInTheDocument();
