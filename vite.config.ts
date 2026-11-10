@@ -236,7 +236,7 @@ export default defineConfig({
         // chunks, so the entry file imported both statically and every page, the home page included, downloaded 200 KB of
         // map code and 115 KB of markdown code it never uses. includeDependenciesRecursively:false keeps each route-only group to
         // its own modules, and the shared code stays in "vendor" (TASK-7839: one vendor chunk, not 10 tiny splits).
-        advancedChunks: {
+        codeSplitting: {
           includeDependenciesRecursively: false,
           groups: [
             // Heavy, route-level only: keep off the homepage graph.

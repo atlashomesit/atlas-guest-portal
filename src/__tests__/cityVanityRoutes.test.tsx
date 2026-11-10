@@ -80,7 +80,7 @@ describe("MKT-034: city directory routes", () => {
 });
 
 describe("MKT-034: naked city slugs redirect to the city guide on the marketplace surface", () => {
-  it.each([...CITY_LANDING_SLUGS])("/%s -> /homestays-in-%s", async (slug) => {
+  it.each(CITY_LANDING_SLUGS.map((s) => [s, s]))("/%s -> /homestays-in-%s", async (slug) => {
     await openRoute(`/${slug}`);
     expect(window.location.pathname).toBe(`/homestays-in-${slug}`);
     expect(screen.getByTestId("city-guide-route-probe")).toHaveTextContent(slug);

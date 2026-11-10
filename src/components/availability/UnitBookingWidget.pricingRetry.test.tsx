@@ -106,11 +106,13 @@ async function renderWidget() {
   await settle();
 }
 
-const sleep = (ms: number) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+// HEALTH-1110: the widget's automatic re-fetch waits PRICING_AUTO_RETRY_DELAY_MS (1500) on setTimeout. This used to be a real 1.8 s
+// sleep, four times (7+ s of wall clock). The clock is faked now and moved by the same 1.8 s, so the re-fetch still has to fire on its own timer.
+const sleep = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
 
 describe('UnitBookingWidget - a failed price never leaves Reserve as a silent dead end', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     vi.setSystemTime(FIXED_NOW);
     mocks.fetchGuestPriceBreakdown.mockResolvedValue(null);
     mocks.booking.checkIn = RANGE_IN;
