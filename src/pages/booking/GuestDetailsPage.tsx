@@ -72,6 +72,7 @@ import {
   type FreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useStickyBarOffset } from '@/hooks/useStickyBarOffset';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
@@ -689,6 +690,9 @@ const GuestDetailsPage: React.FC = () => {
   const [validationSummary, setValidationSummary] = useState('');
   const [consentFlash, setConsentFlash] = useState(false);
   const consentRowRef = useRef<HTMLDivElement>(null);
+  /** G2 journey 25: the phone Pay bar publishes its height so the privacy banner sits on top of it, not over the Pay button. */
+  const [mobileBarEl, setMobileBarEl] = useState<HTMLDivElement | null>(null);
+  useStickyBarOffset(mobileBarEl);
 
   // FOUNDER RULED 2026-10-19: the house rules the guest must accept, and the host's OWN WhatsApp / phone for the
   // failed-payment fallback, both come from the LISTING OWNER (checkout-info) — never from the site's tenant, which on
@@ -3879,7 +3883,7 @@ const GuestDetailsPage: React.FC = () => {
       </main>
 
       {/* ── Mobile sticky bottom bar — TASK-8048: offline tenants show WhatsApp CTA, not a pay rail. */}
-      <div className="gd-mobile-bar">
+      <div className="gd-mobile-bar" ref={setMobileBarEl}>
         {holdLive && (
           <div className="gd-mobile-bar-clock">
             <b>{countdown}</b>
