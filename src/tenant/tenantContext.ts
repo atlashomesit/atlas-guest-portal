@@ -10,6 +10,7 @@ import { getApiHeaders, buildApiUrl } from '@/api/client';
 import { hasRuntimeConfig, getRuntimeConfig, isProductionEnvironment } from '@/runtime-config';
 import { setDomainResolvedSlug, setMarketplaceMode, isAtlastaysMarketplaceSurface } from '@/tenant/tenantResolver';
 import { normalizeHostForDomainLookup } from '@/tenant/normalizeHostForDomainLookup';
+import { fetchWithEarly } from '@/boot/earlyFetch';
 
 export interface TenantInfo {
   id?: number;
@@ -279,7 +280,8 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
         import.meta.env.DEV && typeof window !== 'undefined'
           ? `/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`
           : `${apiBaseUrl.replace(/\/$/, '')}/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`;
-      const res = await fetch(url); // No auth headers — this is the bootstrap endpoint
+      // TASK-10299465: public/boot-prefetch.js starts this exact request while the scripts download; take it when it is there.
+      const res = await fetchWithEarly(url); // No auth headers — this is the bootstrap endpoint
 
       if (!res.ok) {
         // TASK-2642: a 404 SUBDOMAIN_NOT_ACTIVATED means the slug is a real tenant that hasn't bought

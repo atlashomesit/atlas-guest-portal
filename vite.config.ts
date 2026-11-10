@@ -155,6 +155,21 @@ function devManifestJsonAliasPlugin() {
   };
 }
 
+/**
+ * TASK-10299465 (b): production builds only. Adds `<script async src="/boot-prefetch.js">` first in <head> so the runtime-config request and the tenant
+ * lookup start while the app's scripts download (see public/boot-prefetch.js and src/boot/earlyFetch.ts). `vite dev` never serves it, so the dev
+ * server's requests and console are unchanged.
+ */
+function bootPrefetchScriptPlugin() {
+  return {
+    name: "boot-prefetch-script",
+    apply: "build" as const,
+    transformIndexHtml() {
+      return [{ tag: "script", attrs: { src: "/boot-prefetch.js", async: true }, injectTo: "head-prepend" as const }];
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     tailwindcss(),
@@ -162,6 +177,7 @@ export default defineConfig({
     devRuntimeConfigPlugin(),
     devGuestImageProxyPlugin(),
     devManifestJsonAliasPlugin(),
+    bootPrefetchScriptPlugin(),
   ],
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   resolve: {
