@@ -221,7 +221,10 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
     const form =
       document.querySelector<HTMLElement>(STICKY_BAR_BOOKING_FORM_SELECTOR) ??
       document.querySelector<HTMLElement>("[data-booking-widget]");
-    if (canReviewBooking) {
+    // GUEST-070: a stay the widget has marked invalid (for example shorter than the host's minimum) must not be "reserved" by a tap
+    // that then shows nothing: the invalid date cell is brought into view below, next to its own message.
+    const hasInvalidField = Boolean(form?.querySelector('[aria-invalid="true"]'));
+    if (canReviewBooking && !hasInvalidField) {
       const submit = form?.querySelector<HTMLButtonElement>('[data-testid="guest-booking-submit"]');
       // GUEST-040: one tap goes straight to checkout. The form's own Reserve handler hands the stay to the details page
       // (dates, guests, rate plan, quote, add-ons) with no network call, so the sticky bar presses that same button

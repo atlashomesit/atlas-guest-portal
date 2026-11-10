@@ -1914,8 +1914,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // TASK-1040051: the API refused to price THIS stay (409 PRICING_NOT_CONFIGURED). The calendar's own numbers must not
   // stand in for a quote (they read "Accommodation INR 0 / Total INR 1"): show the API's sentence, no amount, no Reserve.
-  const pricingRefusedMessage: string | null =
+  const pricingRefusedByApi: string | null =
     hasSelectedRange && quoteKey != null && quoteRefused != null && quoteRefused.key === quoteKey ? quoteRefused.message : null;
+  // G3 journey 16 / price shown = price charged: when the server quote for THIS stay could not be fetched (network drop), the page falls
+  // back to the calendar's per-night sum, which has no extra-guest charge in it. For a home that charges more above its included guests,
+  // that sum is lower than the checkout total, so show no number and no Reserve (the same sentence the page already uses for an
+  // unreadable price) rather than a total the guest would then be charged more than. Homes with no guest-count pricing keep the fallback.
+  const quoteFailedForSelection =
+    hasSelectedRange && quoteKey != null && quoteSettledKey === quoteKey && serverPriceBreakdownKey !== quoteKey && quoteRefused == null;
+  const guestCountChangesPrice =
+    includedGuests != null && guests > includedGuests && ((extraGuestRate ?? 0) > 0 || priceChangesWithGuests === true);
+  const pricingRefusedMessage: string | null =
+    pricingRefusedByApi ??
+    (quoteFailedForSelection && guestCountChangesPrice
+      ? "We couldn’t work out the price for these dates. Please pick them again or try again in a moment."
+      : null);
 
   // Keep the navigation shortcut tied to the authoritative form eligibility.
   const reserveDisabled =

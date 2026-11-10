@@ -314,3 +314,22 @@ describe("one-tap reserve from the sticky bar (GUEST-040, supersedes the UXV-202
     HTMLElement.prototype.scrollIntoView = oldScroll;
   });
 });
+
+describe("GUEST-070: a tap on Reserve never does nothing for a stay the widget marked invalid", () => {
+  it("brings the invalid date cell into view and does not press Reserve, even though a total is on the bar", () => {
+    const trigger = document.createElement("button"); trigger.id = "unit-booking-dates";
+    const openDates = vi.fn(); trigger.addEventListener("click", openDates);
+    const form = document.createElement("form"); form.dataset.testid = "guest-booking-form"; form.dataset.canReviewBooking = "true";
+    const reserve = document.createElement("button"); reserve.dataset.testid = "guest-booking-submit"; reserve.type = "submit"; form.append(reserve);
+    const reserveClick = vi.fn(); reserve.addEventListener("click", reserveClick);
+    const invalidCell = document.createElement("button"); invalidCell.setAttribute("aria-invalid", "true"); invalidCell.scrollIntoView = vi.fn();
+    form.append(invalidCell);
+    document.body.append(trigger, form);
+    render(<PropertyMobileStickyBar bookable nightlyFallback={2500} nightlyIsSynthetic={false} onReserveClick={vi.fn()} summary={{ hasCompleteDates: true, totalAmount: 5050, pricingPending: false, freeCancelUntil: null, canReviewBooking: true }} />);
+    fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
+    expect(reserveClick).not.toHaveBeenCalled();
+    expect(invalidCell.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    expect(invalidCell).toHaveFocus();
+    form.remove(); trigger.remove();
+  });
+});
