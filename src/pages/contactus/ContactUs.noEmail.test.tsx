@@ -30,6 +30,16 @@ function renderPage() {
   );
 }
 
+describe("ContactUs page head (G2 journey 21)", () => {
+  it("names the page in its title and og:title, like FAQs and Policies do (it was just the brand)", () => {
+    contact.email = "stay@seabreeze.example";
+    renderPage();
+    expect(document.title).toBe("Contact Us | Sea Breeze");
+    expect(document.querySelector('meta[property="og:title"]')?.getAttribute("content")).toBe("Contact Us | Sea Breeze");
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href") ?? "").toMatch(/contact$/);
+  });
+});
+
 describe("ContactUs without a saved e-mail address", () => {
   it("shows no e-mail link, no Email us button and no empty Email block", () => {
     contact.email = "";

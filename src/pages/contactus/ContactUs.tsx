@@ -14,6 +14,7 @@ import { logUserAction, reportError } from "../../lib/monitoring";
 import { messageFromApiResponse } from "../../utils/serverErrorFromResponse";
 import { getTenantBrandName } from "../../tenant/displayBrand";
 import { useTenantListings } from "../../hooks/useTenantListings";
+import SEO from "../../components/SEO";
 
 import "./ContactUs.css";
 
@@ -118,6 +119,11 @@ const ContactUs = () => {
 
     return (
         <section className="contact-page">
+            <SEO
+                title={`Contact Us | ${tenantLabel}`}
+                description={`Contact ${tenantLabel} about a booking, a question or a special request.`}
+                url="/contact"
+            />
             <div className="contact-title"><CommonBanner image="" PageName="Contact Us" /></div>
             <div className="contact-grid">
 <div className="contact-intro flex flex-col justify-between space-y-8">
