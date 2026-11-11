@@ -114,7 +114,7 @@ describe('UnitBookingWidget - GUEST-074: the minimum stay is named where the gue
     expect(screen.getByTestId('guest-booking-incomplete-dates')).toHaveTextContent('minimum one night after check-in');
   });
 
-  it('a day inside the minimum window is refused in words (pins the existing behaviour: the check-in stays, nothing restarts)', async () => {
+  it('a day inside the minimum window is refused in words, inside the date sheet too (the check-in stays, nothing restarts)', async () => {
     const checkIn = await renderAndPickCheckIn(3);
     fireEvent.click(document.getElementById('unit-booking-dates') as HTMLElement);
     await settle();
@@ -126,5 +126,7 @@ describe('UnitBookingWidget - GUEST-074: the minimum stay is named where the gue
     const msg = screen.getByTestId('guest-booking-date-error');
     expect(msg).toHaveTextContent('Minimum stay is 3 nights');
     expect(screen.getByTestId('guest-booking-incomplete-dates')).toBeInTheDocument();
+    // The sheet says it itself: on a phone it covers the message under the dates.
+    expect(screen.getByTestId('booking-calendar-notice')).toHaveTextContent('Minimum stay is 3 nights');
   });
 });

@@ -2527,6 +2527,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             fallbackPrice={effectiveDailyPricing?.actualPrice ?? null}
             pricingLoading={calendarPricingLoading}
             shownDate={shownDate}
+            notice={dateError && dateError.startsWith('Minimum stay is ') ? dateError : null}
             onShownDateChange={(date) => {
               const nextShownDate = startOfMonth(date);
               if (
