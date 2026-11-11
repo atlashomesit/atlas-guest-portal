@@ -15,7 +15,7 @@ const read = (rel: string) => readFileSync(path.join(root, rel), 'utf8');
 describe('guest portal boot graph', () => {
   it('keeps the route-only chunk groups to their own modules (includeDependenciesRecursively: false)', () => {
     const config = read('vite.config.ts');
-    expect(config).toContain('advancedChunks');
+    expect(config).toContain('codeSplitting');
     expect(config).toContain('includeDependenciesRecursively: false');
     for (const group of ['maps', 'markdown', 'payment', 'vendor']) {
       expect(config).toContain(`name: "${group}"`);
