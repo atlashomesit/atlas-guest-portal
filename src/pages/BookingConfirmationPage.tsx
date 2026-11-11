@@ -901,10 +901,12 @@ export default function BookingConfirmationPage() {
     : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
-  const hasPendingModRequest = modRequests.some((r) => r.status === "Pending");
+  const isCancellationRequestRow = (r: ModRequestSummary) => r.isCancellation === true || /^CANCELLATION_REQUEST/.test(r.note ?? "");
+  // GUEST-075: only a date or guest change counts as a "change request"; a cancellation request is its own thing.
+  const hasPendingModRequest = modRequests.some((r) => r.status === "Pending" && !isCancellationRequestRow(r));
   // G3 journey 12: a cancellation request already sent (this visit or an earlier one) is shown as received; the form is not offered a second time.
   // The guest list endpoint has sent isCancellation=false for these rows, so the stored marker in the note counts too.
-  const hasPendingCancellationRequest = modRequests.some((r) => (r.isCancellation === true || /^CANCELLATION_REQUEST/.test(r.note ?? "")) && r.status === "Pending");
+  const hasPendingCancellationRequest = modRequests.some((r) => isCancellationRequestRow(r) && r.status === "Pending");
 
   const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
@@ -2166,6 +2168,8 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary">Request booking changes</h2>
             {hasPendingModRequest
               ? <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 border border-yellow-200">You have a pending change request. Our team will review it shortly.</p>
+              : (cancelRequested || hasPendingCancellationRequest)
+              ? <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 border border-yellow-200" data-testid="change-request-paused-by-cancellation">Your cancellation request is with our team. Date changes can wait for their answer.</p>
               : <p className="text-sm text-text-secondary">Need a different date or guest count? Send a request and we will review it.</p>
             }
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2214,7 +2218,7 @@ export default function BookingConfirmationPage() {
             <button
               type="button"
               onClick={submitModificationRequest}
-              disabled={modSubmitting || modDatesInvalid || hasPendingModRequest}
+              disabled={modSubmitting || modDatesInvalid || hasPendingModRequest || hasPendingCancellationRequest}
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
               data-testid="mod-request-submit"
             >

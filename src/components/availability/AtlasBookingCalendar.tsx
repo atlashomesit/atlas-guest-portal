@@ -69,6 +69,11 @@ export interface AtlasBookingCalendarProps {
    */
   shownDate: Date;
   onShownDateChange: (date: Date) => void;
+  /**
+   * GUEST-074: a refusal for the pick just made (for example the home's minimum stay). The sheet covers the booking box on a
+   * phone, so a message that only lives under the dates is never seen; the sheet says it itself.
+   */
+  notice?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -451,6 +456,7 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
   pricingLoading,
   shownDate,
   onShownDateChange,
+  notice,
 }) => {
   const [hover, setHover] = useState<Date | null>(null);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -906,6 +912,11 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         {calendarDailyPrices.size > 0 && (
           <p className="bc-price-note" data-testid="booking-calendar-price-note" style={{ margin: '0 0 8px', fontSize: 11, lineHeight: 1.4, color: 'var(--text-muted, #6b5a55)' }}>
             Prices per night are a guide. The price you pay is shown in the booking box once you pick your dates.
+          </p>
+        )}
+        {notice && (
+          <p className="bc-notice" role="alert" data-testid="booking-calendar-notice">
+            {notice}
           </p>
         )}
         <div className="bc-footer">

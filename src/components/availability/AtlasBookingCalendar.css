@@ -694,3 +694,6 @@
 }
 .bc-popover { scroll-padding-bottom: 80px; }
 .bc-popover .bc-cell:focus-visible { outline-offset: -2px; }
+
+/* GUEST-074: the refusal for the pick just made, shown inside the sheet (it covers the booking box on a phone). */
+.bc-popover .bc-notice { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.4; color: var(--support-error, #b42318); background: var(--bg-error-subtle, #fef3f2); border: 1px solid var(--support-error, #b42318); }
