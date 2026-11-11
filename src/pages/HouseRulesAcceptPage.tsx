@@ -224,7 +224,7 @@ export default function HouseRulesAcceptPage() {
                     data-testid="house-rules-accept"
                     onClick={handleAccept}
                     disabled={accepting}
-                    className="w-full rounded-lg bg-brand text-white font-semibold py-3 text-sm disabled:opacity-60"
+                    className="w-full min-h-11 rounded-lg bg-cta-primary text-white font-semibold py-3 text-sm disabled:opacity-60"
                   >
                     {accepting ? "Submitting…" : "I Accept the House Rules"}
                   </button>
