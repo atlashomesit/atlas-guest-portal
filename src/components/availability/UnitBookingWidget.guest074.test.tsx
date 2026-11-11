@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { addDays, nextFriday } from 'date-fns';
+import { addDays } from 'date-fns';
 import { toISODate } from '@/utils/dateRange';
 import { getIstStartOfDay } from '@/utils/date';
 import { clearAgentCode } from '@/lib/agentCode';
-import type { BookingStickySummary } from './UnitBookingWidget';
 import { settle } from '../../test/settle';
 
 const mocks = vi.hoisted(() => ({

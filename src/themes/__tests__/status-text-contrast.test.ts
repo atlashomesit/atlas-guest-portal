@@ -12,11 +12,13 @@
  *     128 axe nodes, 1.55:1 to 3.01:1.
  *
  * Every colour is read from the sources; only the 4.5:1 threshold is fixed here.
+ *
+ * Lives under src/themes/__tests__ so themeRegistry import respects the layout-theme boundary.
  */
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import { themeRegistry } from "../../../themes/registry";
+import { themeRegistry } from "../registry";
 
 type Rgb = [number, number, number];
 const channel = (c: number) => {
@@ -36,7 +38,7 @@ const ratio = (a: string, b: string) => {
 };
 
 const AA = 4.5;
-const SRC = resolve(__dirname, "../../..");
+const SRC = resolve(__dirname, "../..");
 const THEMES = resolve(SRC, "styles/themes");
 const read = (p: string) => readFileSync(p, "utf-8");
 
