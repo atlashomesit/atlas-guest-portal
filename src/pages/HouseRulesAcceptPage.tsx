@@ -33,6 +33,9 @@ export default function HouseRulesAcceptPage() {
   const [data, setData] = useState<HouseRulesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [canRetryLoad, setCanRetryLoad] = useState(false);
+  const rulesHeadingRef = useRef<HTMLHeadingElement>(null);
   const [accepting, setAccepting] = useState(false);
   // G3 journey 11: the API said the booking is no longer awaiting approval (409). The rules and the Accept button then go away: a button
   // that can only fail again, under a message saying it cannot be used, is a dead end.
@@ -43,6 +46,12 @@ export default function HouseRulesAcceptPage() {
   const acceptedConfirmationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setData(null);
+    setCanRetryLoad(false);
+    setNoLongerPending(false);
     if (!bookingRef || !lastName) {
       setError("This link is missing information. Please use the link from your booking email.");
       setLoading(false);
@@ -55,18 +64,32 @@ export default function HouseRulesAcceptPage() {
           `/api/public/checkin/${encodeURIComponent(bookingRef)}/house-rules?lastName=${encodeURIComponent(lastName)}${tokenQuery}`,
         );
         const res = await fetch(url, { headers: getApiHeaders() });
+        if (cancelled) return;
         if (!res.ok) {
-          setError("We couldn't find this booking. Please check the link from your booking email.");
+          const temporary = res.status >= 500 || res.status === 408 || res.status === 429;
+          setCanRetryLoad(temporary);
+          setError(temporary
+            ? "We could not load your booking right now. Please try again."
+            : "We couldn't find this booking. Please check the link from your booking email.");
           return;
         }
-        setData(await res.json());
+        const loaded = await res.json();
+        if (!cancelled) setData(loaded);
       } catch {
-        setError("Something went wrong loading your booking. Please try again.");
+        if (!cancelled) {
+          setCanRetryLoad(true);
+          setError("We could not load your booking right now. Please try again.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [bookingRef, lastName, token]);
+    return () => { cancelled = true; };
+  }, [bookingRef, lastName, token, loadAttempt]);
+
+  useEffect(() => {
+    if (loadAttempt > 0 && !loading && data && !(normalizeOutcome(data) === "pending" && data.alreadyAccepted)) rulesHeadingRef.current?.focus();
+  }, [loadAttempt, loading, data]);
 
   const handleAccept = async () => {
     if (!bookingRef) return;
@@ -132,6 +155,13 @@ export default function HouseRulesAcceptPage() {
             </p>
           )}
 
+          {!loading && !data && canRetryLoad && (
+            <button type="button" onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+              className="w-full min-h-11 rounded-lg bg-cta-primary text-white font-semibold py-3 text-sm">
+              Try again
+            </button>
+          )}
+
           {/* TASK-10174: this used to be gated on `!error` too, so a FAILED accept attempt
               (handleAccept sets `error` but never clears `data`) unmounted the house-rules
               text and the Accept button entirely, leaving only the alert above with no way
@@ -141,7 +171,7 @@ export default function HouseRulesAcceptPage() {
               is still there as the retry control. */}
           {!loading && data && (
             <>
-              <h1 className="text-2xl font-bold text-text-primary mb-1">House Rules</h1>
+              <h1 ref={rulesHeadingRef} tabIndex={-1} className="text-2xl font-bold text-text-primary mb-1">House Rules</h1>
               <p className="text-text-secondary text-sm mb-6">{data.listingName}</p>
 
               {outcome === "declined" && (
@@ -194,7 +224,7 @@ export default function HouseRulesAcceptPage() {
                     data-testid="house-rules-accept"
                     onClick={handleAccept}
                     disabled={accepting}
-                    className="w-full rounded-lg bg-brand text-white font-semibold py-3 text-sm disabled:opacity-60"
+                    className="w-full min-h-11 rounded-lg bg-cta-primary text-white font-semibold py-3 text-sm disabled:opacity-60"
                   >
                     {accepting ? "Submitting…" : "I Accept the House Rules"}
                   </button>

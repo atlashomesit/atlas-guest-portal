@@ -140,3 +140,52 @@ describe('HouseRulesAcceptPage after a 409 (G3 journey 11)', () => {
     expect(screen.queryByTestId('house-rules-accept')).not.toBeInTheDocument();
   });
 });
+
+
+describe('approved House Rules GET recovery', () => {
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  it.each([503, 408, 429, 'network'])('retries temporary %s with the same credentials and focuses recovered rules without POST', async (failure) => {
+    const fetchMock = vi.fn().mockImplementationOnce(() => {
+      if (failure === 'network') return Promise.reject(new Error('offline'));
+      return Promise.resolve(new Response('', { status: Number(failure) }));
+    }).mockResolvedValue(new Response(JSON.stringify(pendingNotYetAccepted), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderPage('/house-rules/BR-1?lastName=O%26Guest&t=a%2Bb%26c');
+    await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent('could not load');
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await settle();
+    expect(screen.getByRole('heading', { name: 'House Rules' })).toHaveFocus();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]).toEqual(fetchMock.mock.calls[0]);
+    expect(fetchMock.mock.calls[1][0]).toContain('lastName=O%26Guest&t=a%2Bb%26c');
+    expect(fetchMock.mock.calls.every((call) => !call[1]?.method)).toBe(true);
+  });
+  it.each([400, 401, 403, 404])('keeps %s terminal', async (status) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status })));
+    renderPage(); await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent("couldn't find");
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  });
+  it('does not request an incomplete link', async () => {
+    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
+    renderPage('/house-rules/BR-1'); await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent('missing information');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+});
+
+
+describe('recovered House Rules outcome focus', () => {
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  it.each(['confirmed', 'declined', 'pending'])('focuses an appropriate recovered %s outcome when already accepted', async (outcome) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ...pendingNotYetAccepted, alreadyAccepted: true, outcome }), { status: 200 })));
+    renderPage(); await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' })); await settle();
+    if (outcome === 'pending') expect(screen.getByRole('status')).toHaveFocus();
+    else expect(screen.getByRole('heading', { name: 'House Rules' })).toHaveFocus();
+    expect(screen.queryByTestId('house-rules-accept')).not.toBeInTheDocument();
+  });
+});
