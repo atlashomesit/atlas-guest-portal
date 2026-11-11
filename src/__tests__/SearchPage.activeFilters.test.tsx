@@ -2,15 +2,17 @@
  * TASK-1456: Active filter chips + badge on SearchPage.
  */
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import { CurrencyProvider } from '../contexts/CurrencyContext';
 import SearchPage from '../pages/SearchPage';
+import { settle } from '../test/settle';
 
 vi.mock('../api/listingClient', () => ({
   fetchPublicListings: vi.fn(() => Promise.reject(new Error('network'))),
+  resolveStaticMaxGuests: (property: any) => property?.maxGuests ?? property?.max_guests ?? 2,
 }));
 
 vi.mock('../runtime-config', async (importOriginal) => {
@@ -40,12 +42,8 @@ describe('SearchPage — active filter chips (TASK-1456)', () => {
       </CurrencyProvider>,
     );
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
-      },
-      { timeout: 15_000 },
-    );
+    await settle();
+    expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
 
     const chipStrip = screen.getByTestId('search-active-filter-chips');
     expect(chipStrip).toBeInTheDocument();
@@ -55,9 +53,8 @@ describe('SearchPage — active filter chips (TASK-1456)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Remove filter WiFi$/i }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('2');
-    });
+    await settle();
+    expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('2');
     expect(screen.getByTestId('search-active-filter-chips')).not.toHaveTextContent('WiFi');
   });
 
@@ -70,19 +67,59 @@ describe('SearchPage — active filter chips (TASK-1456)', () => {
       </CurrencyProvider>,
     );
 
-    await waitFor(
-      () => {
-        expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
-      },
-      { timeout: 15_000 },
-    );
+    await settle();
+    expect(screen.getByTestId('search-active-filter-badge')).toHaveTextContent('3');
 
     fireEvent.click(screen.getByRole('button', { name: /^clear filters$/i }));
 
     // Single click clears all: badge + chip strip disappear together.
-    await waitFor(() => {
-      expect(screen.queryByTestId('search-active-filter-badge')).not.toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.queryByTestId('search-active-filter-badge')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('search-active-filter-chips')).not.toBeInTheDocument();
+  });
+
+  function renderAt(url: string) {
+    return render(
+      <CurrencyProvider>
+        <MemoryRouter initialEntries={[url]}>
+          <SearchPage />
+        </MemoryRouter>
+      </CurrencyProvider>,
+    );
+  }
+
+  it('qa-scout: removing the guests chip clears a marketplace adults/children search', async () => {
+    renderAt('/search?adults=2&children=1&guests=3');
+    await settle();
+    expect(screen.getByTestId('search-active-filter-chips')).toHaveTextContent(/3 guests/i);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Remove filter 3 guests$/i }));
+    await settle();
+    expect(screen.queryByTestId('search-active-filter-chips')).not.toBeInTheDocument();
+  });
+
+  it('qa-scout: editing the Guests box overrides a marketplace adults/children search', async () => {
+    renderAt('/search?adults=2&children=1&guests=3');
+    await settle();
+
+    fireEvent.change(screen.getByLabelText('Guests'), { target: { value: '2' } });
+    await settle();
+    expect(screen.getByLabelText('Guests')).toHaveValue(2);
+    expect(screen.getByTestId('search-active-filter-chips')).toHaveTextContent(/2 guests/i);
+  });
+
+  it('qa-scout: "Clear filters" also clears a marketplace adults/children search', async () => {
+    renderAt('/search?adults=2&children=1&guests=3');
+    await settle();
+
+    fireEvent.click(screen.getByRole('button', { name: /^clear filters$/i }));
+    await settle();
+    expect(screen.queryByTestId('search-active-filter-chips')).not.toBeInTheDocument();
+  });
+
+  it('qa-scout: a negative guests param is ignored, not shown as a filter', async () => {
+    renderAt('/search?guests=-2');
+    await settle();
     expect(screen.queryByTestId('search-active-filter-chips')).not.toBeInTheDocument();
   });
 });

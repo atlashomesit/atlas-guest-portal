@@ -38,7 +38,7 @@ export const termsSections: TermsSection[] = [
     number: "3",
     title: "Guests",
     paragraphs: [
-      "Base price includes 2 guests. Extra guests \u20b9400–\u20b9600 per night depending on unit.",
+      "The price covers the number of guests included for the home you book, shown on its listing. Extra guests, where allowed, may cost more per night.",
       "All guests must show valid Govt. ID at check-in. Guests <21 yrs must be with guardian.",
     ],
   },
@@ -118,7 +118,7 @@ export function getPaymentDataSharingNote(): string {
 
 export const inlinePolicySnippets = {
   guestId: "Govt ID required for all adult guests; guests under 21 must stay with a guardian.",
-  extraGuests: "Base stay covers 2 guests. Extra guests are charged \u20b9400–\u20b9600/night depending on the unit.",
+  extraGuests: "The price covers the guests included for the home you book (shown on its listing). Extra guests, where allowed, may cost more per night.",
   // TASK-7819: this snippet is rendered as generic inline policy text and has NO listing in
   // scope, so it must not assert any refund outcome — the outcome depends on the listing's tier
   // and is computed server-side. It previously hardcoded "No refunds ... within 7 days", which

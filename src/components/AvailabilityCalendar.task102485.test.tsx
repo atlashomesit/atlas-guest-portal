@@ -10,7 +10,7 @@
  *  3. AvailabilityCalendar happy path still renders the grid with no error.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, fireEvent, render, screen, act, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, act } from '@testing-library/react';
 
 const availabilityMock = vi.hoisted(() => ({ fetch: vi.fn() }));
 
@@ -29,6 +29,7 @@ vi.mock('@/contexts/BookingContext', () => ({
 }));
 
 import AvailabilityCalendar from './AvailabilityCalendar';
+import { settle } from '../test/settle';
 
 const okEmpty = () =>
   new Response(JSON.stringify([]), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -51,7 +52,8 @@ describe('AvailabilityCalendar - TASK-102485: fetch failure fail-closes with err
     render(<AvailabilityCalendar listingId={7} />);
 
     // Fail-closed: error surfaced with a retry affordance …
-    await screen.findByTestId('availability-calendar-error');
+    await settle();
+    screen.getByTestId('availability-calendar-error');
     expect(screen.getByTestId('availability-calendar-retry')).toBeInTheDocument();
   });
 
@@ -62,20 +64,18 @@ describe('AvailabilityCalendar - TASK-102485: fetch failure fail-closes with err
       .mockImplementation(() => Promise.resolve(okEmpty()));
 
     render(<AvailabilityCalendar listingId={7} />);
-    const retry = await screen.findByTestId('availability-calendar-retry');
+    await settle();
+    const retry = screen.getByTestId('availability-calendar-retry');
 
     await act(async () => {
       fireEvent.click(retry);
     });
 
     // A second GET went out …
-    await waitFor(() => {
-      expect(availabilityMock.fetch).toHaveBeenCalledTimes(2);
-    });
+    await settle();
+    expect(availabilityMock.fetch).toHaveBeenCalledTimes(2);
     // … and once it succeeds the error clears (grid back, no alert).
-    await waitFor(() => {
-      expect(screen.queryByTestId('availability-calendar-error')).toBeNull();
-    });
+    expect(screen.queryByTestId('availability-calendar-error')).toBeNull();
   });
 
   it('renders nothing (no stuck skeleton) for a falsy listingId', () => {
@@ -88,7 +88,8 @@ describe('AvailabilityCalendar - TASK-102485: fetch failure fail-closes with err
     render(<AvailabilityCalendar listingId={7} />);
 
     // Month headings prove the grid rendered …
-    const headings = await screen.findAllByText(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}$/);
+    await settle();
+    const headings = screen.getAllByText(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4}$/);
     expect(headings.length).toBe(2);
     // … with no error UI.
     expect(screen.queryByTestId('availability-calendar-error')).toBeNull();

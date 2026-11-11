@@ -4,10 +4,11 @@
 // RED before the fix: the `guests` total param (the only guest param the `/` homepage
 // search writes) is ignored by the URL prefill, so Back-navigation resets Who to "2 guests".
 import { describe, expect, it } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 import AirbnbSearchBar from '../AirbnbSearchBar';
+import { settle } from '../../../../test/settle';
 
 function LocationProbe() {
   const location = useLocation();
@@ -27,14 +28,14 @@ describe('TASK-102058 AirbnbSearchBar URL sync', () => {
     renderBarAt('/?city=Goa&checkIn=2026-12-10&checkOut=2026-12-12&guests=4');
 
     // Destination restores into the Where input.
-    await waitFor(() =>
-      expect(screen.getByTestId('airbnb-search-destination')).toHaveValue('Goa'),
-    );
+    await settle();
+    expect(screen.getByTestId('airbnb-search-destination')).toHaveValue('Goa');
     // Dates restore into the When trigger.
     expect(screen.getByTestId('airbnb-search-when')).toHaveTextContent(/10 Dec.*12 Dec/);
     // Guest TOTAL restores into the Who summary — the `/` search writes only `guests`,
     // never adults/children, so the prefill must honour it.
-    await waitFor(() => expect(screen.getByText('4 guests')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText('4 guests')).toBeInTheDocument();
   });
 
   it('keeps adult/child breakdown when the URL carries it (/search form)', async () => {
@@ -42,10 +43,9 @@ describe('TASK-102058 AirbnbSearchBar URL sync', () => {
       '/search?destination=Goa&checkIn=2026-12-10&checkOut=2026-12-12&adults=3&children=1&infants=0&pets=0&guests=4',
     );
 
-    await waitFor(() =>
-      expect(screen.getByTestId('airbnb-search-destination')).toHaveValue('Goa'),
-    );
-    await waitFor(() => expect(screen.getByText('3 adults • 1 child')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('airbnb-search-destination')).toHaveValue('Goa');
+    expect(screen.getByText('3 adults • 1 child')).toBeInTheDocument();
   });
 
   it('performing a search writes checkIn/checkOut/guests/city to the browser URL', async () => {
@@ -53,18 +53,18 @@ describe('TASK-102058 AirbnbSearchBar URL sync', () => {
 
     // Destination is typed (not in the URL yet); dates + guests hydrate from the URL.
     fireEvent.change(screen.getByTestId('airbnb-search-destination'), { target: { value: 'Goa' } });
-    await waitFor(() => expect(screen.getByText('4 guests')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText('4 guests')).toBeInTheDocument();
 
     fireEvent.submit(screen.getByTestId('airbnb-search-bar'));
 
-    await waitFor(() => {
-      const probe = screen.getByTestId('location-probe').textContent ?? '';
-      const params = new URLSearchParams(probe.split('?')[1] ?? '');
-      expect(params.get('city')).toBe('Goa');
-      expect(params.get('checkIn')).toBe('2026-12-10');
-      expect(params.get('checkOut')).toBe('2026-12-12');
-      expect(params.get('guests')).toBe('4');
-    });
+    await settle();
+    const probe = screen.getByTestId('location-probe').textContent ?? '';
+    const params = new URLSearchParams(probe.split('?')[1] ?? '');
+    expect(params.get('city')).toBe('Goa');
+    expect(params.get('checkIn')).toBe('2026-12-10');
+    expect(params.get('checkOut')).toBe('2026-12-12');
+    expect(params.get('guests')).toBe('4');
   });
 
   it('does not clobber an in-progress guest edit when the URL carries no guest params', async () => {
@@ -72,9 +72,48 @@ describe('TASK-102058 AirbnbSearchBar URL sync', () => {
     // when the URL has no guest criteria at all.
     renderBarAt('/?city=Goa');
 
-    await waitFor(() =>
-      expect(screen.getByTestId('airbnb-search-destination')).toHaveValue('Goa'),
-    );
+    await settle();
+    expect(screen.getByTestId('airbnb-search-destination')).toHaveValue('Goa');
     expect(screen.getByText('2 guests')).toBeInTheDocument();
   });
+
+  it('TASK-10298931 destination-only search on / updates / in-place preserving brand=atlastays without dumping to /search', async () => {
+    renderBarAt('/?brand=atlastays');
+
+    await settle();
+    fireEvent.change(screen.getByTestId('airbnb-search-destination'), { target: { value: 'Manali' } });
+    await settle();
+
+    fireEvent.submit(screen.getByTestId('airbnb-search-bar'));
+    await settle();
+
+    const probe = screen.getByTestId('location-probe').textContent ?? '';
+    expect(probe.startsWith('/?')).toBe(true);
+    expect(probe).not.toContain('/search');
+    const params = new URLSearchParams(probe.split('?')[1] ?? '');
+    expect(params.get('city')).toBe('Manali');
+    expect(params.get('brand')).toBe('atlastays');
+    expect(params.get('guests')).toBe('2');
+    expect(params.get('checkIn')).toBeNull();
+    expect(params.get('checkOut')).toBeNull();
+  });
+
+  it('destination-only search from /search preserves brand=atlastays and includes location', async () => {
+    renderBarAt('/search?brand=atlastays');
+
+    await settle();
+    fireEvent.change(screen.getByTestId('airbnb-search-destination'), { target: { value: 'Goa' } });
+    await settle();
+
+    fireEvent.submit(screen.getByTestId('airbnb-search-bar'));
+    await settle();
+
+    const probe = screen.getByTestId('location-probe').textContent ?? '';
+    expect(probe.startsWith('/search?')).toBe(true);
+    const params = new URLSearchParams(probe.split('?')[1] ?? '');
+    expect(params.get('brand')).toBe('atlastays');
+    expect(params.get('destination')).toBe('Goa');
+    expect(params.get('location')).toBe('Goa');
+  });
 });
+

@@ -1,0 +1,153 @@
+/**
+ * Founder ruling 2026-10-21 (website price honesty): the first price a guest sees is the price they pay,
+ * with the direct-booking saving shown —
+ *
+ *   ₹5,998 (struck)  ₹4,499 / night
+ *   25% off — booked direct
+ *   ₹4,633 total · 1 night · all fees included
+ *
+ * Every number comes from the checkout quote (`GET /api/pricing/guest-breakdown`, or the daily-summary row the
+ * API now builds from that same quote). Before this, cards showed the standard rate (₹5,998) and the 25% only
+ * came off on the last screen, so guests left believing the higher price was real.
+ */
+export type DirectPriceDisplay = {
+  /** Standard nightly rate before the direct-booking discount — shown struck through. Null when there is no saving. */
+  standardNightly: number | null;
+  /** What one night really costs the guest, before the payment fee. */
+  realNightly: number;
+  /** Whole-percent saving against the standard rate; 0 when there is none. */
+  savingsPercent: number;
+  /** All-in total the guest is charged for the stay (payment fee and any tourist tax included). */
+  total: number;
+  nights: number;
+  /** DYN-005 / TASK-1040117: Genuine server/rule-set promotion label when active (e.g. "Last-Minute Deal (10% off)"). */
+  appliedPromotionLabel?: string;
+};
+
+export type DirectPriceQuote = {
+  /** Stay price before the direct-booking discount (the quote's BaseAmount). */
+  baseAmount: number;
+  /** The direct-booking discount the quote applies (the quote's DiscountAmount). */
+  discountAmount: number;
+  /** The quote's all-in FinalAmount. Falls back to base − discount when missing. */
+  finalAmount: number | null | undefined;
+  nights: number;
+  /**
+   * TASK-10298998: false when no online gateway will charge this guest (`hasOnlinePaymentRail()` — a
+   * WhatsApp hand-off or pay-at-property host). The quote's FinalAmount still carries the 3% payment fee
+   * (`feeMode` CustomerPays), but nothing on the site ever charges it, so the all-in total must leave it out
+   * — exactly as the booking box does (TASK-7428: no processor, no fee). Defaults to true.
+   */
+  paymentFeeCharged?: boolean;
+  /** The payment fee inside `finalAmount` (the quote's ConvenienceFeeAmount); removed when `paymentFeeCharged` is false. */
+  paymentFeeAmount?: number | null;
+  /** DYN-005 / TASK-1040117: Pre-rule/pre-promotion nightly rate from server PriceBreakdownDto. */
+  originalNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: Post-promotion nightly rate from server PriceBreakdownDto. */
+  discountedNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: Genuine promotion label from server PriceBreakdownDto. */
+  appliedPromotionLabel?: string | null;
+};
+
+export function directPriceDisplay(quote: DirectPriceQuote | null | undefined): DirectPriceDisplay | null {
+  if (!quote) return null;
+  const nights = Math.max(1, Math.round(Number(quote.nights) || 1));
+  const base = Number(quote.baseAmount) || 0;
+  if (base <= 0) return null;
+  const discount = Math.min(base, Math.max(0, Number(quote.discountAmount) || 0));
+  const net = base - discount;
+  const final = Number(quote.finalAmount);
+  const quotedTotal = Number.isFinite(final) && final > 0 ? final : net;
+  const fee = Math.max(0, Number(quote.paymentFeeAmount) || 0);
+  // No gateway, no fee: take the payment fee back out of the quote's all-in total (never below the room price).
+  const total =
+    quote.paymentFeeCharged === false && Number.isFinite(final) && final > 0
+      ? Math.max(net, final - fee)
+      : quotedTotal;
+  const realNightly = Math.round(net / nights);
+  let savingsPercent = discount > 0 ? Math.round((discount / base) * 100) : 0;
+  let standardNightly: number | null = savingsPercent > 0 ? Math.round(base / nights) : null;
+
+  // DYN-005 / TASK-1040117: Surface genuine rule-set / LOS / last-minute / promotional strike-through rate
+  // when server `originalNightlyRate` exceeds `realNightly` (pre-BaseAmount rules aren't in `discountAmount`).
+  const origNightly = Number(quote.originalNightlyRate);
+  if (Number.isFinite(origNightly) && Math.round(origNightly) > realNightly && realNightly > 0) {
+    const candidateStandard = Math.max(standardNightly ?? 0, Math.round(origNightly));
+    const candidatePct = Math.round(((candidateStandard - realNightly) / candidateStandard) * 100);
+    if (candidatePct > 0) {
+      standardNightly = candidateStandard;
+      savingsPercent = candidatePct;
+    }
+  }
+
+  // TASK-10299258: the label's "(N% off)" is always the saving this same display shows, never a configured rule percent.
+  const trimmedPromo = alignPromotionLabelPercent(
+    typeof quote.appliedPromotionLabel === 'string' ? quote.appliedPromotionLabel.trim() : '',
+    standardNightly,
+    realNightly,
+  );
+  const hasGenuineSaving = standardNightly != null && standardNightly > realNightly && savingsPercent > 0;
+
+  return {
+    standardNightly,
+    realNightly,
+    savingsPercent,
+    total: Math.round(total),
+    nights,
+    ...(trimmedPromo && hasGenuineSaving ? { appliedPromotionLabel: trimmedPromo } : {}),
+  };
+}
+
+/**
+ * TASK-10299258: a discount label states the percentage that the struck and charged prices really give.
+ * The API names the promotion ("Direct Booking Special (25% off)"); this rewrites the "(N% off)" part to
+ * round((struck - charged) / struck) of the quote on screen, so a stale or rule-configured percent can never
+ * be shown next to a different real saving (25% label, 8% saving). With no genuine saving the percent is
+ * dropped and only the promotion name remains. Labels without a percent are returned unchanged.
+ */
+export function alignPromotionLabelPercent(
+  label: string,
+  struckNightly: number | null | undefined,
+  chargedNightly: number | null | undefined,
+): string {
+  const PAREN_PERCENT_PART = /\s*\(\s*\d+(?:\.\d+)?\s*%\s*off\s*\)/i;
+  const BARE_PERCENT_PART = /\s+\b\d+(?:\.\d+)?\s*%\s*off\b/i;
+  const hasParen = Boolean(label) && PAREN_PERCENT_PART.test(label);
+  const hasBare = Boolean(label) && !hasParen && BARE_PERCENT_PART.test(label);
+  if (!label || (!hasParen && !hasBare)) return label;
+  const struck = Number(struckNightly);
+  const charged = Number(chargedNightly);
+  const pct =
+    Number.isFinite(struck) && Number.isFinite(charged) && struck > 0 && charged < struck
+      ? Math.round(((struck - charged) / struck) * 100)
+      : 0;
+  if (hasParen) {
+    return pct > 0 ? label.replace(PAREN_PERCENT_PART, ` (${pct}% off)`) : label.replace(PAREN_PERCENT_PART, '').trim();
+  }
+  return pct > 0 ? label.replace(BARE_PERCENT_PART, ` ${pct}% off`) : label.replace(BARE_PERCENT_PART, '').trim();
+}
+
+/** "25% off — booked direct" — the one wording every surface uses for the saving. */
+export function directSavingsLabel(savingsPercent: number): string {
+  return `${savingsPercent}% off — booked direct`;
+}
+
+/** "₹4,633 total · 1 night · all fees included" */
+export function allInTotalLabel(totalFormatted: string, nights: number): string {
+  return `${totalFormatted} total · ${nights} ${nights === 1 ? 'night' : 'nights'} · all fees included`;
+}
+
+/**
+ * Plain words for a plan's meals (founder ruling 2026-10-21: no "Room Only" / "CP" / "MAP" jargon).
+ * Takes the API's MealPlanLabel ("Room Only", "Breakfast Included", "Half Board (Breakfast & Dinner)", …)
+ * or raw MealPlanCode ("RO", "EP", "CP", "BB", "MAP", "HB", "AP", "FB", "AI").
+ */
+export function plainMealLabel(label: string | null | undefined): string {
+  const l = (label ?? '').trim().toLowerCase();
+  if (!l || l === 'room only' || l === 'ro' || l === 'ep' || l === 'none') return 'Room only, no meals';
+  if (l === 'cp' || l === 'bb' || l.startsWith('breakfast') || l.startsWith('continental')) return 'Breakfast included';
+  if (l === 'map' || l === 'hb' || l.startsWith('half board')) return 'Breakfast and dinner included';
+  if (l === 'ap' || l === 'fb' || l.startsWith('full board')) return 'All meals included';
+  if (l === 'ai' || l.startsWith('all inclusive') || l.startsWith('all-inclusive')) return 'All meals and drinks included';
+  return (label ?? '').trim();
+}

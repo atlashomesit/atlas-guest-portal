@@ -12,6 +12,7 @@ import { useState, type ComponentProps } from "react";
 import Subheading from "../../commonComponents/subheading/Subheading";
 import Homepage_form from "../hotelBooking_form/BookingCard";
 import { filterGuestImageUrls } from "../../../utils/guestImageUrl";
+import { repairMojibake } from "../../../utils/textUtils";
 
 type LocationProperty = {
     id?: number;
@@ -286,7 +287,7 @@ const Homepage_LocationDetails = () => {
 
                                         {/* Description */}
                                         {data.property_description && (
-                                            <p className="text-xs text-text-muted line-clamp-3">{data.property_description}</p>
+                                            <p className="text-xs text-text-muted line-clamp-3">{repairMojibake(data.property_description)}</p>
                                         )}
 
                                         {/* Amenities */}

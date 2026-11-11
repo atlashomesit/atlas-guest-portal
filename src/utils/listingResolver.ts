@@ -4,6 +4,7 @@ import { dedupedJsonFetch } from '@/api/dedupedJsonFetch';
 import { getTenantContext } from '@/tenant/tenantContext';
 import { getTenantOverrides, getTenantListingAddress } from '@/tenant/tenantOverrides';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { getListingDisplayName } from '@/lib/listingDisplayName';
 
 const normalizeListingPayload = (
   payload: Record<string, unknown>,
@@ -78,8 +79,9 @@ const isAbortLikeError = (error: unknown, signal?: AbortSignal) => {
 export const resolveListing = async (
   param: string,
   signal?: AbortSignal,
+  tenantSlug?: string | null,
 ): Promise<ListingDetail | null> => {
-  const headers = getApiHeaders();
+  const headers = getApiHeaders(tenantSlug);
 
   const attemptResolveListing = async (): Promise<{
     listing: ListingDetail | null;
@@ -145,27 +147,43 @@ export const resolveListing = async (
 
         if (!name) return false;
 
-        const normalizedName = normalizeMatchValue(name);
+        const rawDisplayName = (payload.displayName ?? payload.DisplayName) as string | undefined;
+        const resolvedDisplayName = getListingDisplayName(
+          (payload.id ?? payload.listingId) as string | number | undefined,
+          name,
+          rawDisplayName,
+        );
+        const atlasDigitsMatch = name.trim().match(/^atlas[-_\s]*(\d{3})\b/i);
+        const candidateNames = [
+          name,
+          rawDisplayName,
+          resolvedDisplayName,
+          ...(atlasDigitsMatch ? [`room${atlasDigitsMatch[1]}`, `atlashomesroom${atlasDigitsMatch[1]}`] : []),
+        ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
 
-        // Try different matching strategies:
-        // 1. Exact match with the provided param
-        if (normalizedName === normalizedParam) return true;
+        return candidateNames.some((candidate) => {
+          const normalizedName = normalizeMatchValue(candidate);
+          if (!normalizedName) return false;
 
-        // 2. Match with "atlas" prefix
-        if (normalizedName === atlasParam) return true;
+          // 1. Exact match with the provided param
+          if (normalizedName === normalizedParam) return true;
 
-        // 3. Match when param is a substring of the name (e.g., "501" matches "Atlas501_PH")
-        if (allowLooseNameIncludesParam && normalizedName.includes(normalizedParam)) return true;
+          // 2. Match with "atlas" prefix
+          if (normalizedName === atlasParam) return true;
 
-        // 4. Match when name is a substring of the param (strict min length — avoids "in"/"id" in "invalid-…")
-        if (
-          normalizedName.length >= MIN_NORMALIZED_NAME_LEN_FOR_PARAM_INCLUDES &&
-          normalizedParam.includes(normalizedName)
-        ) {
-          return true;
-        }
+          // 3. Match when param is a substring of the name (e.g., "501" matches "Atlas501_PH")
+          if (allowLooseNameIncludesParam && normalizedName.includes(normalizedParam)) return true;
 
-        return false;
+          // 4. Match when name is a substring of the param (strict min length — avoids "in"/"id" in "invalid-…")
+          if (
+            normalizedName.length >= MIN_NORMALIZED_NAME_LEN_FOR_PARAM_INCLUDES &&
+            normalizedParam.includes(normalizedName)
+          ) {
+            return true;
+          }
+
+          return false;
+        });
       }) as Record<string, unknown> | undefined;
 
       const resolved = match ? normalizeListingPayload(match, param) : null;

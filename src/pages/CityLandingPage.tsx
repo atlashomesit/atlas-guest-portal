@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import ListingCard from "@/components/apartments/ListingCard";
 import SEO from "@/components/SEO";
 import { fetchPublicListings, type PublicListing } from "@/api/listingClient";
 import { buildApiUrl } from "@/api/client";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "@/utils/guestImageUrl";
+import { getListingDisplayName } from "@/lib/listingDisplayName";
 import { buildHomeUnitPath, getPropertySlug } from "@/utils/navigation";
 import { listingMatchesCityKeywords, marketplaceListingMatchesCityKeywords } from "@/utils/cityListingFilter";
 import { withTenantBrandInCopy } from "@/tenant/displayBrand";
@@ -17,6 +18,11 @@ import coorgContent from "@/content/cities/coorg.json";
 import goaContent from "@/content/cities/goa.json";
 import hyderabadContent from "@/content/cities/hyderabad.json";
 import manaliContent from "@/content/cities/manali.json";
+import bengaluruContent from "@/content/cities/bengaluru.json";
+import gurugramContent from "@/content/cities/gurugram.json";
+import nashikContent from "@/content/cities/nashik.json";
+import guwahatiContent from "@/content/cities/guwahati.json";
+import jalandharContent from "@/content/cities/jalandhar.json";
 import { type CityLandingSlug } from "@/content/cities/cityLandingSlugs";
 
 export type CityLandingPageProps = {
@@ -45,6 +51,13 @@ const CITY_CONTENT: Record<CityLandingSlug, CityLandingJson> = {
   coorg: coorgContent as CityLandingJson,
   hyderabad: hyderabadContent as CityLandingJson,
   manali: manaliContent as CityLandingJson,
+  // MKT-014 / MKT-017: city guides for live marketplace supply. Content follows the existing shape and
+  // keywords match the stored city values — see each JSON file's `listingKeywords`.
+  bengaluru: bengaluruContent as CityLandingJson,
+  gurugram: gurugramContent as CityLandingJson,
+  nashik: nashikContent as CityLandingJson,
+  guwahati: guwahatiContent as CityLandingJson,
+  jalandhar: jalandharContent as CityLandingJson,
 };
 
 function toListingCardModel(listing: PublicListing) {
@@ -59,6 +72,7 @@ function toListingCardModel(listing: PublicListing) {
     listingId: listing.id,
     id: String(listing.id),
     name: listing.name || listing.propertyName || "Homestay",
+    displayName: listing.displayName ?? listing.name,
     location: listing.propertyAddress || listing.propertyName || "",
     neighborhoods: [] as string[],
     image,
@@ -67,6 +81,9 @@ function toListingCardModel(listing: PublicListing) {
     rating: hasVerifiedReviews ? rating : 0,
     reviews: hasVerifiedReviews ? reviews : 0,
     propertyType: "Homestay",
+    // HSL-011: dorm facts straight from the API payload (undefined for every non-dorm listing).
+    accommodationType: listing.accommodationType ?? undefined,
+    dormGenderPolicy: listing.dormGenderPolicy ?? null,
     guests: listing.maxGuests > 0 ? listing.maxGuests : 2,
     bedrooms: null as number | null,
     hasWifi: (listing.wifiSpeedMbps ?? 0) > 0,
@@ -81,6 +98,11 @@ function toListingCardModel(listing: PublicListing) {
     cancellationTier: listing.cancellationTier ?? null,
     // MKT-004: undefined on tenant-scoped sites — same-tenant navigation needs no ?tenant= hint.
     tenantSlug: undefined as string | undefined,
+    hostIdentityVerified: false,
+    marketplace: false,
+    isGstRegistered: true as boolean | undefined,
+    chargesOnlinePaymentFee: undefined as boolean | undefined,
+    convenienceFeePercent: undefined as number | null | undefined,
   };
 }
 
@@ -88,15 +110,24 @@ type CityLandingCard = ReturnType<typeof toListingCardModel>;
 
 /** MKT-004: subset of `MarketplaceListingDto` (`GET /marketplace/listings`) this page needs. */
 type MarketplaceCityListingRow = {
+  hostIdentityVerified?: unknown;
   id: number;
   tenantSlug: string;
   title: string;
+  displayName?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
   city?: string | null;
   pricePerNight: number;
   maxGuests: number;
   coverImageUrl?: string | null;
   rating?: number | null;
   reviewCount?: number | null;
+  accommodationType?: string | null;
+  amenityCodes?: string[] | null;
+  isGstRegistered?: boolean | null;
+  chargesOnlinePaymentFee?: boolean | null;
+  convenienceFeePercent?: number | null;
 };
 
 type MarketplaceListingsResponse = {
@@ -131,7 +162,15 @@ async function fetchAllMarketplaceListings(signal: AbortSignal): Promise<Marketp
 }
 
 function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCard {
-  const propertySlug = getPropertySlug({ name: item.title });
+  const displayTitle = getListingDisplayName(
+    item.id,
+    item.displayName?.trim() || item.title?.trim() || item.nameFormatted?.trim() || item.name?.trim() || "Homestay",
+    item.displayName,
+  );
+  // TASK-10299207: keep the URL slug anchored to the canonical listing title (`item.title` / `item.name`)
+  // while showing `displayTitle` on the card.
+  const rawSlugSource = item.title?.trim() || item.name?.trim() || displayTitle;
+  const propertySlug = getPropertySlug({ name: rawSlugSource });
   const image = sanitizeGuestImageUrl(item.coverImageUrl) ?? "";
   const rating = item.rating ?? 0;
   const reviews = item.reviewCount ?? 0;
@@ -140,8 +179,9 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     propertySlug,
     listingId: item.id,
     id: String(item.id),
-    name: item.title || "Homestay",
-    location: item.city || item.title || "",
+    name: displayTitle,
+    displayName: item.displayName ?? displayTitle,
+    location: item.city || displayTitle || item.title || "",
     neighborhoods: [],
     image,
     price: item.pricePerNight ?? 0,
@@ -149,12 +189,15 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     rating: hasVerifiedReviews ? rating : 0,
     reviews: hasVerifiedReviews ? reviews : 0,
     propertyType: "Homestay",
+    // MKT-042: forward accommodationType, amenityCodes, and per-tenant fee/GST flags from GET /marketplace/listings.
+    accommodationType: item.accommodationType ?? undefined,
+    dormGenderPolicy: null,
     guests: item.maxGuests > 0 ? item.maxGuests : 2,
     bedrooms: null,
     hasWifi: false,
     hasParking: false,
     petFriendly: false,
-    amenityCodes: [],
+    amenityCodes: Array.isArray(item.amenityCodes) ? item.amenityCodes : [],
     lastBookedAt: undefined,
     losDiscountMinNights: undefined,
     losDiscountPercent: undefined,
@@ -164,11 +207,28 @@ function toMarketplaceCardModel(item: MarketplaceCityListingRow): CityLandingCar
     // MKT-004: cross-tenant card — navigation must carry the owning tenant so the detail page
     // resolves the right listing instead of defaulting to the marketplace host's own tenant.
     tenantSlug: item.tenantSlug,
+    hostIdentityVerified: item.hostIdentityVerified === true,
+    marketplace: true,
+    isGstRegistered: Boolean(item.isGstRegistered),
+    chargesOnlinePaymentFee: typeof item.chargesOnlinePaymentFee === "boolean" ? item.chargesOnlinePaymentFee : undefined,
+    convenienceFeePercent: typeof item.convenienceFeePercent === "number" ? item.convenienceFeePercent : undefined,
   };
 }
 
 const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const forwardedParams = useMemo(() => {
+    const winParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    const out = new URLSearchParams();
+    for (const key of ["brand", "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"]) {
+      const val = searchParams.get(key) ?? winParams.get(key);
+      if (val != null && val !== "") {
+        out.set(key, val);
+      }
+    }
+    return out;
+  }, [searchParams]);
   const content = CITY_CONTENT[citySlug];
   const pageCopy = useMemo(
     () => ({
@@ -318,44 +378,60 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
             aria-label={`Homestays in ${content.cityName}`}
             data-testid="city-landing-listings"
           >
-            {cardList.map((c) => (
-              <ListingCard
-                key={c.id}
-                id={c.id}
-                name={c.name}
-                location={c.location}
-                neighborhoods={c.neighborhoods}
-                image={c.image}
-                price={c.price}
-                pricingBreakdown={c.pricingBreakdown}
-                rating={c.rating}
-                reviews={c.reviews}
-                propertyType={c.propertyType}
-                guests={c.guests}
-                bedrooms={c.bedrooms}
-                hasWifi={c.hasWifi}
-                hasParking={c.hasParking}
-                petFriendly={c.petFriendly}
-                amenityCodes={c.amenityCodes}
-                lastBookedAt={c.lastBookedAt}
-                losDiscountMinNights={c.losDiscountMinNights ?? null}
-                losDiscountPercent={c.losDiscountPercent ?? null}
-                losDiscount2MinNights={c.losDiscount2MinNights ?? null}
-                losDiscount2Percent={c.losDiscount2Percent ?? null}
-                cancellationTier={c.cancellationTier ?? null}
-                estimateNights={1}
-                onClick={() =>
-                  navigate(
-                    // MKT-004: a cross-tenant marketplace card must carry ?tenant= so the detail
-                    // page resolves the owning tenant's listing (mirrors MarketplaceHomepage.tsx's
-                    // marketplaceListingPath) instead of defaulting to the marketplace host tenant.
-                    c.tenantSlug
-                      ? `${buildHomeUnitPath(c.propertySlug, c.listingId)}?tenant=${encodeURIComponent(c.tenantSlug)}`
-                      : buildHomeUnitPath(c.propertySlug, c.listingId),
-                  )
-                }
-              />
-            ))}
+            {cardList.map((c) => {
+              // MKT-014 / MKT-042: city-page cards carry an `<a href>` so non-JS crawlers can follow a city
+              // page to its homes. Mirrors MarketplaceHomepage.tsx's `marketplaceListingPath` and
+              // the MKT-004 cross-tenant `?tenant=` carry + active `brand` / `utm_*` params.
+              const basePath = buildHomeUnitPath(c.propertySlug, c.listingId);
+              const cardParams = new URLSearchParams();
+              if (c.tenantSlug) {
+                cardParams.set("tenant", c.tenantSlug);
+              }
+              if (c.marketplace) {
+                forwardedParams.forEach((val, key) => {
+                  cardParams.set(key, val);
+                });
+              }
+              const queryStr = cardParams.toString();
+              const href = queryStr ? `${basePath}?${queryStr}` : basePath;
+              return (
+                <ListingCard
+                  key={c.id}
+                  marketplace={c.marketplace}
+                  hostIdentityVerified={c.hostIdentityVerified}
+                  id={c.id}
+                  name={c.name}
+                  displayName={c.displayName}
+                  location={c.location}
+                  neighborhoods={c.neighborhoods}
+                  image={c.image}
+                  price={c.price}
+                  pricingBreakdown={c.pricingBreakdown}
+                  rating={c.rating}
+                  reviews={c.reviews}
+                  propertyType={c.propertyType}
+                  accommodationType={c.accommodationType}
+                  dormGenderPolicy={c.dormGenderPolicy}
+                  guests={c.guests}
+                  bedrooms={c.bedrooms}
+                  hasWifi={c.hasWifi}
+                  hasParking={c.hasParking}
+                  petFriendly={c.petFriendly}
+                  amenityCodes={c.amenityCodes}
+                  lastBookedAt={c.lastBookedAt}
+                  losDiscountMinNights={c.losDiscountMinNights ?? null}
+                  losDiscountPercent={c.losDiscountPercent ?? null}
+                  losDiscount2MinNights={c.losDiscount2MinNights ?? null}
+                  losDiscount2Percent={c.losDiscount2Percent ?? null}
+                  cancellationTier={c.cancellationTier ?? null}
+                  isGstRegistered={c.isGstRegistered}
+                  chargesOnlinePaymentFee={c.chargesOnlinePaymentFee}
+                  convenienceFeePercent={c.convenienceFeePercent}
+                  estimateNights={1}
+                  href={href}
+                />
+              );
+            })}
           </section>
         )}
 

@@ -3,12 +3,13 @@
  * 40-wide listing-availability fan-out, and must fail-open on a 500.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import { CurrencyProvider } from '../contexts/CurrencyContext';
 import SearchPage from '../pages/SearchPage';
+import { settle } from '../test/settle';
 
 const mockFetchPublicListings = vi.fn();
 vi.mock('../api/listingClient', () => ({
@@ -65,12 +66,20 @@ describe('SearchPage — Available tonight (TASK-8351)', () => {
       </CurrencyProvider>,
     );
 
-    await waitFor(() => {
-      const avail = availabilityCalls();
-      expect(avail).toHaveLength(1);
-      expect(String(avail[0][0])).toContain('/api/public/listings/availability-batch');
-      expect(String(avail[0][0])).not.toContain('listing-availability');
-    });
+    // The mount effect issues the batch request inside render()'s act, so this snapshot needs no wait: it is the
+    // moment the old waitFor passed at (its first synchronous check). Draining first would let the follow-up
+    // /availability/summary call, made once the batch answers, match the '/availability' filter below - that is a
+    // different request, not a second batch.
+    const avail = availabilityCalls();
+    expect(avail).toHaveLength(1);
+    expect(String(avail[0][0])).toContain('/api/public/listings/availability-batch');
+    expect(String(avail[0][0])).not.toContain('listing-availability');
+
+    // Once everything has settled: still exactly one batch request, and never the per-listing fan-out.
+    await settle();
+    const urls = availabilityCalls().map((args) => String(args[0]));
+    expect(urls.filter((u) => u.includes('/availability-batch'))).toHaveLength(1);
+    expect(urls.filter((u) => u.includes('listing-availability'))).toHaveLength(0);
   });
 
   it('fail-open: a 500 from the batch leaves listings visible', async () => {
@@ -88,9 +97,8 @@ describe('SearchPage — Available tonight (TASK-8351)', () => {
       </CurrencyProvider>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId('guest-search-results')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId('guest-search-results')).toBeInTheDocument();
     // Fail-open: a 500 must not empty the grid. SearchPage paginates (visibleCount),
     // so assert cards remain rather than requiring all 40 titles in the DOM.
     expect(screen.getAllByTestId('guest-listing-card').length).toBeGreaterThan(0);

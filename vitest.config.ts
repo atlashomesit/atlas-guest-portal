@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { readdirSync, readFileSync } from "node:fs";
@@ -105,7 +105,7 @@ const testFiles = ["src", "tests", "functions", "eslint-rules"]
   .flatMap((d) => {
     let entries: unknown[];
     try {
-      entries = readdirSync(path.resolve(__dirname, d), { recursive: true });
+      entries = readdirSync(path.resolve(import.meta.dirname, d), { recursive: true });
     } catch {
       return []; // scan root absent — same as globSync matching nothing
     }
@@ -137,7 +137,7 @@ const TZ_EAST_ZONE = "Asia/Tokyo"; // +09:00
 
 const usesModuleMocks = new Set(
   testFiles.filter((f) =>
-    /\bvi\.(mock|doMock)\(/.test(readFileSync(path.resolve(__dirname, f), "utf8"))
+    /\bvi\.(mock|doMock)\(/.test(readFileSync(path.resolve(import.meta.dirname, f), "utf8"))
   )
 );
 const tzEastFiles = testFiles.filter((f) => TZ_EAST_RE.test(f));
@@ -196,10 +196,17 @@ const workerCap =
       ? { maxWorkers: 2 }
       : {};
 
+// Setup files are re-executed for EVERY test file in every project. The reset file goes FIRST (TASK-102734): a worker
+// that is reused across files (`shared-fast`, and `mocked-isolated` under the gate's batch pool) keeps its jsdom, so the
+// URL, web storage, cookies, window stubs, queued `vi.mock`s and in-flight route imports of the previous file are still
+// there, and modules that read them while being evaluated must see them reset. See src/test/sharedWorkerHygiene.ts for
+// the measured victims and scripts/vitest-gate-batch-hygiene.self-test.mjs (run by `npm run test:gate`) for the guard.
+const sharedWorkerSetupFiles = ["./src/test/sharedWorkerResetSetup.ts", "./src/test/setup.ts"];
+
 const baseTest = {
   environment: "jsdom" as const,
   globals: true,
-  setupFiles: ["./src/test/setup.ts"],
+  setupFiles: sharedWorkerSetupFiles,
   deps: {
     inline: ["react-router", "react-router-dom"],
   },
@@ -215,13 +222,14 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      react: path.resolve(__dirname, "node_modules/react"),
-      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
-      "react-router-dom": path.resolve(__dirname, "node_modules/react-router-dom"),
-      "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime.js"),
-      "react-router-dom/node_modules/react": path.resolve(__dirname, "node_modules/react"),
-      "react-router-dom/node_modules/react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      "@": path.resolve(import.meta.dirname, "./src"),
+      vitest: path.resolve(import.meta.dirname, "node_modules/vitest"),
+      react: path.resolve(import.meta.dirname, "node_modules/react"),
+      "react-dom": path.resolve(import.meta.dirname, "node_modules/react-dom"),
+      "react-router-dom": path.resolve(import.meta.dirname, "node_modules/react-router-dom"),
+      "react/jsx-runtime": path.resolve(import.meta.dirname, "node_modules/react/jsx-runtime.js"),
+      "react-router-dom/node_modules/react": path.resolve(import.meta.dirname, "node_modules/react"),
+      "react-router-dom/node_modules/react-dom": path.resolve(import.meta.dirname, "node_modules/react-dom"),
     },
     dedupe: ["react", "react-dom", "react-router-dom"],
   },

@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import MyBookingsPage from "./MyBookingsPage";
 import { GuestAuthProvider } from "../contexts/GuestAuthContext";
+import { settle } from "../test/settle";
 
 // TASK-6061: `filteredBookings` bucketed a booking into "Upcoming"/"Past" by comparing
 // `parseBookingDate(b.checkoutDate)` (previously UTC-midnight, per `new Date("YYYY-MM-DD")`)
@@ -76,7 +77,8 @@ describe("MyBookingsPage — TASK-6061 tab bucketing is time-zone invariant", ()
 
     // Default tab is Upcoming — a same-day checkout must still classify as upcoming/in-progress,
     // never silently reclassified into Past a day early.
-    expect(await screen.findByText("Checkout Today Suite")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText("Checkout Today Suite")).toBeInTheDocument();
     expect(screen.getByTestId("my-bookings-in-stay-badge")).toBeInTheDocument();
   });
 
@@ -107,11 +109,13 @@ describe("MyBookingsPage — TASK-6061 tab bucketing is time-zone invariant", ()
     renderMagicLink();
 
     // Upcoming tab (default) must NOT show it...
-    await screen.findByTestId("my-bookings-filter-empty");
+    await settle();
+    screen.getByTestId("my-bookings-filter-empty");
     expect(screen.queryByText("Checked Out Yesterday Suite")).not.toBeInTheDocument();
 
     // ...but the Past tab must.
     fireEvent.click(screen.getByRole("tab", { name: "Past" }));
-    expect(await screen.findByText("Checked Out Yesterday Suite")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText("Checked Out Yesterday Suite")).toBeInTheDocument();
   });
 });

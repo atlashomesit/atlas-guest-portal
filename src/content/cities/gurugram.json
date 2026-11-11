@@ -1,0 +1,74 @@
+{
+  "slug": "gurugram",
+  "cityName": "Gurugram",
+  "h1": "Homestays in Gurugram — Cyber Hub work trips and Golf Course Road weekends",
+  "metaTitle": "Gurugram homestays | Cyber Hub, Golf Course Road & Sohna Road | {{TENANT_BRAND}}",
+  "metaDescription": "Find Gurugram homestays near Cyber Hub, Golf Course Road, and Sohna Road. Quiet homes with reliable WiFi—book direct on {{TENANT_BRAND}}.",
+  "listingKeywords": [
+    "gurugram",
+    "gurgaon",
+    "cyber hub",
+    "dlf cyber city",
+    "dlf",
+    "golf course road",
+    "golf course extension",
+    "sohna road",
+    "mg road gurugram",
+    "sector 29",
+    "sector 56",
+    "iffco chowk",
+    "udyog vihar",
+    "south city",
+    "sushant lok"
+  ],
+  "introParagraphs": [
+    "Gurugram moves at corporate speed—cyber parks, glass towers, and dining clusters built around shift changes. Homestays give visiting teams and relocating families a quieter base than hotels, with kitchens for late dinners and dedicated desks for sprint work.",
+    "Pick your sector before comparing nightly rates. Cyber City and Golf Course Road suit business-first itineraries; Sohna Road and Sector 56 offer newer builds at softer price points; Sushant Lok and South City are residential pockets for family visits.",
+    "{{TENANT_BRAND}} focuses on transparent nightly pricing and structured booking confirmations. The cards below filter live listings whose addresses reference Gurugram or its suburbs—verify pin codes and landmarks on the listing page before you pay.",
+    "Traffic is the constraint you plan around. NH-48 and the Golf Course Extension corridor can stretch a 6 km commute past an hour at the wrong window. Hosts familiar with peak hours can advise realistic ETAs.",
+    "Food spans traditional North Indian, modern Asian, and rooftop dining. Ask your host for vetted driver partners and dining recommendations that match your meeting schedule."
+  ],
+  "areasTitle": "Top areas in Gurugram for homestay guests",
+  "areas": [
+    {
+      "title": "Cyber City and DLF Phase 2/5",
+      "body": "Walking distance to the tech parks on the western corridor. Ideal for corporate blocks and conference weeks—listings here typically advertise fibre WiFi and quiet workspaces."
+    },
+    {
+      "title": "Golf Course Road and Extension",
+      "body": "Premium residential pockets with malls and dining clusters. Suited to longer stays where guests want a quieter residential feel while staying close to corporate anchors."
+    },
+    {
+      "title": "Sohna Road and Sector 56/29",
+      "body": "Newer residential corridors with softer nightly pricing. Better for budget-conscious travellers who still need quick access to Cyber City—plan commute times carefully."
+    }
+  ],
+  "seasonTitle": "Best time to visit Gurugram",
+  "seasonParagraphs": [
+    "October to March brings cooler weather and clearer skies—pleasant for outdoor meetings and walking dinners.",
+    "April to June is dry heat; prioritise reliable AC and backup power if your work depends on uptime.",
+    "July to September is the monsoon window. Confirm power backup expectations and check listings for inverter mentions during this period."
+  ],
+  "faq": [
+    {
+      "question": "Are Gurugram homestays suited to month-long remote work?",
+      "answer": "Many hosts offer weekly or monthly discounts when configured. Confirm desk ergonomics, WiFi speeds, and cleaning cadence in writing before extending."
+    },
+    {
+      "question": "How do I pick between Cyber City and Sohna Road?",
+      "answer": "Cyber City suits corporate-first itineraries with walking commutes; Sohna Road offers newer builds at softer prices but with longer drives. Match the sector to your meeting locations."
+    },
+    {
+      "question": "Is parking available at Gurugram homestays?",
+      "answer": "Varies by gated complex. Ask the host whether sedan or SUV height fits the basement ramp and whether visitor parking needs prior arrangement."
+    },
+    {
+      "question": "Can hosts arrange airport pickup?",
+      "answer": "Some do via trusted drivers familiar with IGI Terminal 1/3 logistics. Confirm rates, luggage capacity, and midnight surcharges through booking messaging."
+    },
+    {
+      "question": "Why book Gurugram stays direct on {{TENANT_BRAND}}?",
+      "answer": "Direct booking keeps communication transparent and shows cancellation tiers when configured. Confirmations anchor support if plans change."
+    }
+  ]
+}

@@ -26,6 +26,8 @@
   --cta-primary: #d49a85;
   --cta-primary-hover: #c48a75;
   --cta-secondary: #e6b9a6;
+  /* On-CTA label: white measures 2.39:1 on --cta-primary (#d49a85) — AA fail. Near-black warm ink: >=4.5:1 on primary/hover/secondary. */
+  --text-on-cta: #1f1a17;
   --cta-primary-rgb: 212 154 133;
   --cta-primary-hover-rgb: 196 138 117;
   --cta-secondary-rgb: 230 185 166;

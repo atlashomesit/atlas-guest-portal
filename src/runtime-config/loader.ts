@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import type { AtlasRuntimeConfig } from "./types";
+import { fetchWithEarly } from "../boot/earlyFetch";
 
 const PREFERRED_URL = "/.well-known/atlas-runtime-config.json";
 
@@ -112,7 +113,8 @@ export async function loadRuntimeConfig(): Promise<AtlasRuntimeConfig> {
 
   const tryUrl = async (url: string): Promise<Response> => {
     const base = typeof window !== "undefined" ? window.location.origin : "";
-    return fetch(`${base}${url}`, { cache: "no-store" });
+    // TASK-10299465: public/boot-prefetch.js starts this exact request while the scripts download; take it when it is there.
+    return fetchWithEarly(`${base}${url}`, { cache: "no-store" });
   };
 
   const response = await tryUrl(PREFERRED_URL);

@@ -7,14 +7,18 @@
  * Returns null when the listing has fewer than 3 reviews (API returns 204).
  * Behind Reviews:UseLlmSummary=false flag on the API for future LLM upgrade.
  *
- * TASK-10089: marketplace provenance gating. The summary is computed from native
- * Atlas reviews only, so when the hosting card passes its own `verifiedStayCount`
- * (from GET /marketplace/listings) the chip renders only if the summary's
- * verified-stay count agrees. A mismatch means the card and the chip describe
- * different review sets — rendering either label would be unverified proof — so
- * the chip hides. Surfaces that pass no expectation keep the historical behaviour.
+ * TASK-10089 / REV-015: marketplace provenance gating. The summary is computed from
+ * visible native reviews (>= 4★) and active external reviews (!IsHidden, Rating >= 4).
+ * When the hosting card passes its own `verifiedStayCount` (from GET /marketplace/listings),
+ * the chip renders only if the summary's verified-stay count agrees. A mismatch means the card
+ * and the chip describe different verified review sets — rendering either label would be
+ * unverified proof — so the chip hides. Surfaces that pass no expectation keep the historical behaviour.
+ *
+ * TASK-1039954: a card grid mounts one ReviewSummary per card, which used to be 14-20 summary requests at the
+ * moment the grid rendered (and 20+ net::ERR_ABORTED when the guest left). `lazy` makes a card ask only once it is
+ * near the viewport. Without `lazy`, or where IntersectionObserver does not exist, it fetches at mount as before.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 
 interface ReviewSummaryData {
@@ -37,6 +41,8 @@ interface ReviewSummaryProps {
    * is absent (older API, non-marketplace surface) the chip renders as before.
    */
   verifiedStayCount?: number | null;
+  /** TASK-1039954: defer the request until the card is near the viewport (card grids). Default: fetch at mount. */
+  lazy?: boolean;
 }
 
 const SENTIMENT_STYLES: Record<string, { bg: string; text: string; emoji: string }> = {
@@ -45,38 +51,88 @@ const SENTIMENT_STYLES: Record<string, { bg: string; text: string; emoji: string
   negative: { bg: "bg-red-50",     text: "text-red-700",     emoji: "😕" },
 };
 
-export default function ReviewSummary({ listingId, verifiedStayCount }: ReviewSummaryProps) {
+const reviewSummaryCache = new Map<number, { promise: Promise<ReviewSummaryData | null>; expiresAt: number }>();
+
+// eslint-disable-next-line react-refresh/only-export-components -- test cache reset helper co-located with component
+export function _clearReviewSummaryCacheForTests(): void {
+  reviewSummaryCache.clear();
+}
+
+function fetchReviewSummary(listingId: number): Promise<ReviewSummaryData | null> {
+  const now = Date.now();
+  const cached = reviewSummaryCache.get(listingId);
+  if (cached && cached.expiresAt > now) {
+    return cached.promise;
+  }
+
+  const promise = fetch(buildApiUrl(`/api/listings/${listingId}/reviews/summary`), {
+    headers: getApiHeaders(),
+  })
+    .then((res) => {
+      if (res.status === 204 || !res.ok) return null;
+      return res.json() as Promise<ReviewSummaryData>;
+    })
+    .catch(() => null);
+
+  reviewSummaryCache.set(listingId, { promise, expiresAt: now + 5 * 60 * 1000 });
+  return promise;
+}
+
+/** How close to the viewport (px) a lazy card must be before it asks, so the chip is usually there as it scrolls in. */
+const LAZY_ROOT_MARGIN = "300px 0px";
+
+export default function ReviewSummary({ listingId, verifiedStayCount, lazy = false }: ReviewSummaryProps) {
   const [data, setData] = useState<ReviewSummaryData | null>(null);
+  // Fetch at mount unless the card asked to be lazy AND the browser can tell us when it is near the viewport.
+  const [shouldFetch, setShouldFetch] = useState<boolean>(() => !lazy || typeof IntersectionObserver === "undefined");
+  const sentinelRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
-    if (!listingId) return;
+    if (shouldFetch) return;
+    const el = sentinelRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      setShouldFetch(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldFetch(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: LAZY_ROOT_MARGIN },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shouldFetch]);
+
+  useEffect(() => {
+    if (!listingId || !shouldFetch) return;
     let active = true;
 
-    fetch(buildApiUrl(`/api/listings/${listingId}/reviews/summary`), {
-      headers: getApiHeaders(),
-    })
-      .then((res) => {
-        if (!active) return;
-        if (res.status === 204) {
-          setData(null);
-          return;
-        }
-        if (!res.ok) return;
-        return res.json();
-      })
-      .then((json) => {
-        if (active && json) setData(json as ReviewSummaryData);
-      })
-      .catch(() => {
-        // Non-critical — silently skip if API unavailable or listing has no reviews.
-      });
+    void fetchReviewSummary(listingId).then((json) => {
+      if (active) setData(json);
+    });
 
     return () => {
       active = false;
     };
-  }, [listingId]);
+  }, [listingId, shouldFetch]);
 
-  if (!data || data.topKeywords.length === 0) return null;
+  // Out of the layout flow (absolute) so a not-yet-asked card gets no extra gap from its flex parent.
+  if (!shouldFetch) {
+    return (
+      <span
+        ref={sentinelRef}
+        aria-hidden="true"
+        data-testid="review-summary-sentinel"
+        className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0"
+      />
+    );
+  }
+
+  if (!data || !Array.isArray(data.topKeywords) || data.topKeywords.length === 0) return null;
 
   // TASK-10089: source/count agreement with the hosting card. Gate only when both
   // sides carry the number — an older API without the field must not blank chips.

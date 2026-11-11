@@ -9,7 +9,7 @@ For feature work spanning the guest frontend and API, see workspace root `ATLAS-
 Install once per clone (canonical shared hook):
 
 ```bash
-pwsh ../atlas-e2e/scripts/setup-dev-hooks.ps1
+pwsh ../atlas-e2e/.githooks/setup-dev-hooks.ps1
 # fallback: scripts/hooks/install.sh
 ```
 

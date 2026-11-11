@@ -60,3 +60,24 @@ Everything else (property detail — `Homepage_PropertyDetails.tsx` — checkout
 - Is `Home.tsx` + `SearchPage.tsx` (the "classic" layout, which already renders under the "Atlastays" brand for the `atlas` tenant) the correct production target for this mockup, or was `MarketplaceHomepage.tsx` intended? They're two different code paths gated by `isMarketplaceMode()`.
 - Should the footer's "Get exclusive offers" box be wired to a real subscription endpoint, or dropped, before this leaves prototype status?
 - Is a real multi-photo carousel on listing cards worth the data-plumbing to fully match the mockup's hover-arrow affordance, or is a single hero image per card acceptable long-term?
+
+## Reconciliation — 11 November 2026 (held PR #560)
+
+The September investigation above is retained as historical evidence, including its original local-only status and verification claims. Those claims are not fresh verification of this revision. This branch has since been published as draft PR #560; it remains held for review, with no merge or deployment authorized.
+
+Current base reviewed: `origin/dev` at `24ff7e19a88a11905edc841b8a86e9f169cbb51a`.
+
+### Decisions applied to the branch
+
+- Preserve current dev application code exactly. The four content conflicts in ListingCard, Navbar, MarketplaceHomepage and SearchPage resolve to dev. Also discard the automatically merged old footer and CSS presentation changes, which would otherwise silently reintroduce the prototype.
+- Search uses the later approved responsive layout: horizontal cards at 1024–1599px and three/four columns at larger widths, plus the existing date/party state, selected filters, reset, map/sort, availability/error recovery and tenant-aware contact. The September 901px/1280px column rules do not override those approvals.
+- Keep the current marketplace wordmark and tenant identity precedence, categories and secondary filters, card pricing/provenance and existing marketplace save controls. Preserve current Saved homes/wishlist behavior and sharing. The old extra save overlays on ListingCard/SearchPage are not a replacement for missing functionality: they were prototype additions and are withdrawn with the unapproved spike styling; this reconciliation does not add them to current dev.
+- Remove the spike-only footer email form and its false success message. Current dev has no newsletter form in this footer, and the prototype never persisted or subscribed an email. No new subscription service or feature is introduced. Preserve current tenant contact, legal and platform-credit content unchanged.
+- Preserve current native links, accessible labels/focus, role/eligibility and booking/payment/API behavior through exact application-tree equality to the reviewed dev head. No authentication, permission or approval rules change.
+- Restore `.claude/launch.json` to dev; its old spike launcher is unnecessary. Keep the reference image and the original investigation above for historical review.
+
+### Result and review decision
+
+No product-code delta remains relative to the reviewed dev head. This does not mean every old cosmetic idea was independently implemented: later approved layouts supersede the spike direction, and the remaining unapproved cosmetic/copy changes and extra save overlays are withdrawn. Recommend closing PR #560 as obsolete after the founder reviews this decision, rather than merging a documentation-only spike to imply a new design was approved. This reconciliation does not close, merge, undraft or remove any hold from the PR.
+
+Verification for this reconciliation: no unresolved merge entries; `git diff --check`; application/config tree comparison to the exact dev head above. No new runtime behavior is introduced, so build or broad suites were not rerun. No fresh browser render, visual fidelity, accessibility walkthrough or UX-ready claim is made. Separate final approval remains required for any future product design implementation.

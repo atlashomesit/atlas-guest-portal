@@ -6,6 +6,8 @@ const FAV_KEY = "atlas_favorites_v1";
 
 /** TASK-4515: track if we've synced favorites this session to avoid redundant API calls */
 let favoritesSynced = false;
+/** GUEST-009: track if we've synced recently viewed listings this session */
+let recentlyViewedSynced = false;
 
 export type GuestListingHistoryItem = {
   listingId: number;
@@ -37,6 +39,10 @@ export function addRecentlyViewed(item: Omit<GuestListingHistoryItem, "viewedAtU
   } catch {
     /* non-browser */
   }
+  // GUEST-009: sync to server if guest is authenticated
+  if (getCachedGuestAuthState()?.isAuthenticated) {
+    syncRecentlyViewedToServer(deduped).catch(() => { /* non-critical — fire and forget */ });
+  }
 }
 
 export function getRecentlyViewed(): GuestListingHistoryItem[] {
@@ -53,13 +59,33 @@ export function removeRecentlyViewed(listingId: number): void {
   } catch {
     /* non-browser */
   }
+  // TASK-103034: delete server-side if guest is authenticated
+  if (getCachedGuestAuthState()?.isAuthenticated) {
+    fetch(buildApiUrl(`/api/guest/recently-viewed/${listingId}`), {
+      method: "DELETE",
+      headers: getApiHeaders(),
+    }).catch(() => { /* non-critical — fire and forget */ });
+  }
 }
 
 export function clearRecentlyViewed(): void {
   try {
     localStorage.removeItem(RECENT_KEY);
+    localStorage.removeItem("atlas_recently_viewed");
   } catch {
     /* ignore quota / private mode */
+  }
+  try {
+    window.dispatchEvent(new CustomEvent("atlas-recently-viewed-changed"));
+  } catch {
+    /* non-browser */
+  }
+  // TASK-103034: delete server-side if guest is authenticated
+  if (getCachedGuestAuthState()?.isAuthenticated) {
+    fetch(buildApiUrl("/api/guest/recently-viewed"), {
+      method: "DELETE",
+      headers: getApiHeaders(),
+    }).catch(() => { /* non-critical — fire and forget */ });
   }
 }
 
@@ -148,5 +174,132 @@ export async function loadFavoritesIfAuthenticated(): Promise<void> {
   } catch (err) {
     console.warn("Failed to load server favorites:", err);
   }
+}
+
+/** GUEST-009: sync recently viewed listings to server for authenticated guest */
+export async function syncRecentlyViewedToServer(items: GuestListingHistoryItem[]): Promise<void> {
+  try {
+    const payload = {
+      items: items.map((x) => ({
+        listingId: x.listingId,
+        viewedAtUtc: x.viewedAtUtc,
+      })),
+    };
+    const response = await fetch(buildApiUrl("/api/guest/recently-viewed"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getApiHeaders() },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      console.warn("Failed to sync recently viewed to server:", response.statusText);
+    }
+  } catch (err) {
+    console.warn("Failed to sync recently viewed to server:", err);
+  }
+}
+
+/**
+ * GUEST-009: load recently viewed listings from server if guest is authenticated.
+ * Merges server + local items, deduplicates by listingId (keeping latest timestamp),
+ * caps at 24 newest items, updates localStorage, and syncs merged items back to server.
+ */
+export async function loadRecentlyViewedIfAuthenticated(): Promise<void> {
+  if (recentlyViewedSynced || !getCachedGuestAuthState()?.isAuthenticated) return;
+  recentlyViewedSynced = true;
+
+  try {
+    const response = await fetch(buildApiUrl("/api/guest/recently-viewed"), {
+      headers: getApiHeaders(),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      const serverItems = (data.items ?? []) as Array<{ listingId: number; viewedAtUtc: string }>;
+      const localItems = getRecentlyViewed();
+
+      const localMap = new Map<number, GuestListingHistoryItem>();
+      for (const item of localItems) {
+        localMap.set(item.listingId, item);
+      }
+
+      const mergedMap = new Map<number, GuestListingHistoryItem>();
+      for (const s of serverItems) {
+        const existing = localMap.get(s.listingId);
+        if (existing) {
+          const sTime = new Date(s.viewedAtUtc).getTime();
+          const lTime = new Date(existing.viewedAtUtc).getTime();
+          mergedMap.set(s.listingId, {
+            ...existing,
+            viewedAtUtc: sTime > lTime ? s.viewedAtUtc : existing.viewedAtUtc,
+          });
+        } else {
+          // TASK-103034: resolve listing's /homes/:propertySlug/:unitSlug path or omit when unresolvable
+          const sObj = s as any;
+          const resolvedPath = typeof sObj.path === "string" && sObj.path.startsWith("/homes/")
+            ? sObj.path
+            : (sObj.propertySlug && sObj.unitSlug)
+              ? `/homes/${sObj.propertySlug}/${sObj.unitSlug}`
+              : null;
+
+          if (resolvedPath) {
+            mergedMap.set(s.listingId, {
+              listingId: s.listingId,
+              path: resolvedPath,
+              name: sObj.name,
+              coverPhotoUrl: sObj.coverPhotoUrl,
+              location: sObj.location,
+              pricePerNight: sObj.pricePerNight,
+              viewedAtUtc: s.viewedAtUtc,
+            });
+          }
+        }
+      }
+
+      for (const l of localItems) {
+        if (!mergedMap.has(l.listingId)) {
+          mergedMap.set(l.listingId, l);
+        }
+      }
+
+      const merged = Array.from(mergedMap.values())
+        .sort((a, b) => new Date(b.viewedAtUtc).getTime() - new Date(a.viewedAtUtc).getTime())
+        .slice(0, 24);
+
+      localStorage.setItem(RECENT_KEY, JSON.stringify(merged));
+      try {
+        window.dispatchEvent(new CustomEvent("atlas-recently-viewed-changed"));
+      } catch {
+        /* non-browser */
+      }
+
+      if (localItems.length > 0) {
+        syncRecentlyViewedToServer(merged).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to load server recently viewed:", err);
+  }
+}
+
+/**
+ * TASK-103034: reset local recently-viewed state and sync flag on logout so accounts don't leak history
+ */
+export function resetRecentlyViewedOnLogout(): void {
+  try {
+    localStorage.removeItem(RECENT_KEY);
+    localStorage.removeItem("atlas_recently_viewed");
+  } catch {
+    /* ignore */
+  }
+  recentlyViewedSynced = false;
+  try {
+    window.dispatchEvent(new CustomEvent("atlas-recently-viewed-changed"));
+  } catch {
+    /* non-browser */
+  }
+}
+
+/** Reset sync flag for unit testing */
+export function _resetRecentlyViewedSyncedForTesting(): void {
+  recentlyViewedSynced = false;
 }
 

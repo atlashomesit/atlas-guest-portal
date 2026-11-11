@@ -1,0 +1,17 @@
+.terms-page { padding-top: 32px; }
+.terms-page .legal-layout-header { padding: 24px; }
+.terms-page article { scroll-margin-top: 100px; }
+.terms-topics { border: 1px solid var(--border-subtle); background: var(--bg-surface); border-radius: 16px; padding: 0 16px; }
+.terms-topics > summary { cursor: pointer; min-height: 44px; align-content: center; font-weight: 600; }
+.terms-topics > summary:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+.terms-topics nav { position: static; padding: 8px 0 16px; border: 0; box-shadow: none; }
+@media (min-width: 1024px) {
+  .terms-topics { display: contents; }
+  .terms-topics nav { position: sticky; padding: 24px; border: 1px solid var(--border-subtle); box-shadow: var(--tw-shadow); }
+}
+@media (max-width: 640px) {
+  .terms-page { padding-top: 24px; }
+  .terms-page .legal-layout-header { padding: 20px; }
+  .terms-page .legal-layout-header p.text-lg { font-size: 16px; line-height: 1.55; }
+  .terms-page .legal-layout-content > .grid { gap: 16px; }
+}

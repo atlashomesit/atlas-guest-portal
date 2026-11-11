@@ -12,6 +12,7 @@ import { buildWaLink, defaultPrefill } from "../utils/whatsapp";
 import FaqHighlights from "../components/faq/FaqHighlights";
 import { getFaqHighlights } from "../content/faqHighlights";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import "./FaqPage.css";
 
 const FaqPage = () => {
   const brandName = getTenantBrandName();
@@ -44,6 +45,10 @@ const FaqPage = () => {
   const sectionNav = grouped.map(({ category }) => ({ id: category.toLowerCase().replace(/\s+/g, "-"), label: category }));
 
   const faqHighlights = getFaqHighlights();
+  const query = search.trim().toLowerCase();
+  const matchingHighlights = query
+    ? faqHighlights.filter(item => `${item.question} ${item.answer}`.toLowerCase().includes(query))
+    : faqHighlights;
   const faqStructuredData = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -63,6 +68,7 @@ const FaqPage = () => {
 
   return (
     <LegalLayout
+      className="faq-page"
       current="faq"
       title="Frequently Asked Questions"
       description="Quick answers that link directly to the underlying policy and terms sections."
@@ -74,11 +80,11 @@ const FaqPage = () => {
         jsonLd={faqStructuredData}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-        <SectionNav sections={sectionNav} />
+      <div className={`faq-grid grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 ${sectionNav.length ? "" : "faq-grid--no-topics"}`}>
+        <SectionNav sections={sectionNav} collapsibleOnMobile />
 
-        <div className="space-y-6">
-          <div className="bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-4">
+        <div className="faq-answers space-y-6">
+          <div className="faq-search bg-bg-surface border border-border-subtle rounded-2xl p-6 shadow-level1 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <LegalSearch value={search} onChange={setSearch} placeholder="Search FAQs" />
               <div className="bg-[color:color-mix(in_srgb,var(--accent-soft)_65%,var(--bg-surface))] text-text-primary border border-border-subtle rounded-xl p-4 text-sm">
@@ -87,7 +93,7 @@ const FaqPage = () => {
             </div>
           </div>
 
-          <FaqHighlights />
+          <FaqHighlights items={matchingHighlights} compact />
 
           <div className="space-y-6">
             {grouped.map(({ category, items }) => (
@@ -128,7 +134,7 @@ const FaqPage = () => {
               </section>
             ))}
 
-            {grouped.length === 0 && (
+            {grouped.length === 0 && matchingHighlights.length === 0 && (
               <div className="bg-bg-surface border border-border-subtle rounded-2xl p-6 text-text-muted shadow-level1">
                 No FAQs match your search yet. Try a different keyword.
               </div>

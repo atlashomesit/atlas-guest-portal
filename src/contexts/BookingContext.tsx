@@ -1,8 +1,13 @@
+import type { PaymentFeeDisplay } from "../utils/paymentFeeCopy";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { getIstCalendarDate } from '../utils/date';
 import type { CancellationTier } from '@/utils/cancellationPolicy';
+import type { DormGenderPolicy } from '@/utils/dormListing';
 
 /** Price breakdown forwarded from the widget to GuestDetailsPage (session-only, not persisted). */
 export type BookingPriceBreakdown = {
+  /** Fee wording from the hold response; independent of existing total calculation fallbacks. */
+  paymentFeeDisplay?: PaymentFeeDisplay;
   baseAmount: number;
   discountAmount: number;
   convenienceFeeAmount: number;
@@ -11,6 +16,26 @@ export type BookingPriceBreakdown = {
   currency: string;
   /** TASK-5185: tourism tax included in finalAmount; render as its own line, not as GST. */
   touristTaxAmount?: number;
+  /** GUEST-049 / CLU-016: itemized cleaning fee included in finalAmount. */
+  cleaningFee?: number;
+  /** TASK-10299273: itemized pet fee included in finalAmount when guest brings a pet. */
+  petFee?: number;
+  /** GUEST-049: itemized extra guest fee included in finalAmount. */
+  extraGuestFee?: number;
+  /** GUEST-049: itemized weekend rate differential included in finalAmount. */
+  weekendRateAdjustmentAmount?: number;
+  /** DYN-005 / TASK-1040117: genuine pre-promotion nightly rate from server PriceBreakdownDto. */
+  originalNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: genuine post-promotion nightly rate from server PriceBreakdownDto. */
+  discountedNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: genuine server promotion label (e.g. "Last-Minute Deal (10% off)"). */
+  appliedPromotionLabel?: string | null;
+  /** CFB-009 / BNB-009 / BNB-010: Per-person, per-night breakfast rate when Room-Only. */
+  breakfastPricePerPerson?: number;
+  /** CFB-009 / BNB-009 / BNB-010: True when guest opted in to breakfast add-on on Room-Only rate. */
+  includeBreakfast?: boolean;
+  /** CFB-009 / BNB-009 / BNB-010: Total breakfast extra amount included in finalAmount. */
+  breakfastExtraAmount?: number;
 };
 
 type BookingState = {
@@ -55,7 +80,21 @@ type BookingState = {
   /** TASK-5179: resolved cancellation policy forwarded from UnitBookingWidget (session-only). */
   holdCancellationTier: CancellationTier | null;
   holdCancellationWindowHours: number | null;
+  /** TASK-1040050: the free-cancellation deadline the server quoted for the selected rate plan (ISO instant), forwarded so checkout shows the same date as the booking box (session-only). */
+  holdRefundFreeUntilUtc?: string | null;
   holdGraceHours: number | null;
+  /** HSL-011: the dorm's gender rule (from the listing API) forwarded from UnitBookingWidget; null for a non-dorm or a mixed-unstated listing (session-only). */
+  holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** TASK-1039977 / PAY-006: Refundable security deposit configured on the listing (session-only). */
+  holdSecurityDepositAmount?: number | null;
+  /** MRP-002: Selected rate plan ID and display name forwarded from UnitBookingWidget (session-only). */
+  listingRatePlanId?: number | null;
+  ratePlanName?: string | null;
+  /** TASK-1039948: Selected rate plan meal plan and cancellation policy for direct booking pricing tier display. */
+  ratePlanMealPlan?: string | null;
+  ratePlanCancellationPolicy?: string | null;
+  /** TASK-1040087: Marketplace booking origin channel ('marketplace') forwarded from UnitBookingWidget. */
+  holdBookingChannel?: 'marketplace' | 'ai_receptionist' | null;
 };
 
 type BookingContextValue = {
@@ -91,11 +130,41 @@ const defaultState: BookingState = {
   holdListingName: null,
   holdCancellationTier: null,
   holdCancellationWindowHours: null,
+  holdRefundFreeUntilUtc: null,
   holdGraceHours: null,
+  holdSecurityDepositAmount: null,
+  listingRatePlanId: null,
+  ratePlanName: null,
+  ratePlanMealPlan: null,
+  ratePlanCancellationPolicy: null,
+  holdBookingChannel: null,
 };
 
 // eslint-disable-next-line react-refresh/only-export-components -- context co-located with provider
 export const BookingContext = createContext<BookingContextValue | undefined>(undefined);
+
+/**
+ * TASK-10299460: before the fix, SearchAvailabilityWidget wrote its untouched today -> tomorrow
+ * default range into this context on mount, and it was persisted here. A guest who never chose
+ * those nights then saw every home that is booked tonight open as "Dates unavailable".
+ *
+ * Saved state written by the fixed code carries `datesChosen` (dates are only ever written by a
+ * guest action now). Saved state WITHOUT the marker predates the fix; its dates are kept unless
+ * they look like that default: a single night starting today or earlier (a past check-in is of
+ * no use to anyone). A legacy range that is multi-night or starts in the future is a real search
+ * and still restores.
+ */
+const isLikelyUnchosenLegacyRange = (checkIn: string | null | undefined, checkOut: string | null | undefined): boolean => {
+  if (!checkIn || !checkOut) return false;
+  const start = new Date(checkIn);
+  const end = new Date(checkOut);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+  const startDay = getIstCalendarDate(start);
+  const endDay = getIstCalendarDate(end);
+  const today = getIstCalendarDate();
+  const nights = Math.round((endDay.getTime() - startDay.getTime()) / 86_400_000);
+  return nights === 1 && startDay.getTime() <= today.getTime();
+};
 
 const loadState = (): BookingState => {
   if (typeof window === 'undefined') return defaultState;
@@ -104,13 +173,16 @@ const loadState = (): BookingState => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (!saved) return defaultState;
 
-    const parsed = JSON.parse(saved) as Partial<BookingState>;
+    const parsed = JSON.parse(saved) as Partial<BookingState> & { datesChosen?: boolean };
+
+    const dropLegacyDates =
+      typeof parsed.datesChosen !== 'boolean' && isLikelyUnchosenLegacyRange(parsed.checkIn, parsed.checkOut);
 
     return {
       propertyId: parsed.propertyId ?? null,
       propertyName: parsed.propertyName ?? null,
-      checkIn: parsed.checkIn ?? null,
-      checkOut: parsed.checkOut ?? null,
+      checkIn: dropLegacyDates ? null : parsed.checkIn ?? null,
+      checkOut: dropLegacyDates ? null : parsed.checkOut ?? null,
       guests: typeof parsed.guests === 'number' && parsed.guests > 0 ? parsed.guests : defaultState.guests,
       listingDetailPath:
         typeof parsed.listingDetailPath === 'string' && parsed.listingDetailPath.trim()
@@ -130,7 +202,14 @@ const loadState = (): BookingState => {
       holdListingName: null,
       holdCancellationTier: null,
       holdCancellationWindowHours: null,
+      holdRefundFreeUntilUtc: null,
       holdGraceHours: null,
+      holdSecurityDepositAmount: null,
+      listingRatePlanId: null,
+      ratePlanName: null,
+      ratePlanMealPlan: null,
+      ratePlanCancellationPolicy: null,
+      holdBookingChannel: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);
@@ -146,6 +225,10 @@ function persistedSlice(b: BookingState) {
     checkOut: b.checkOut,
     guests: b.guests,
     listingDetailPath: b.listingDetailPath,
+    // TASK-10299460: dates in this context are only ever written by a guest action (picking a
+    // date, Check availability, a URL/prefill carrying dates); this marks the slice as written
+    // by the fixed code so loadState does not second-guess its dates.
+    datesChosen: Boolean(b.checkIn || b.checkOut),
   };
 }
 

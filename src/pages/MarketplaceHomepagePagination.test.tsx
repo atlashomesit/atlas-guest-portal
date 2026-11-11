@@ -5,7 +5,7 @@
 // These tests are RED before that fix: the pre-fix component renders 20 cards, prints
 // "20 listings" while the API reports 27, and exposes no control to reach the rest.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -23,6 +23,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 }));
 
 import MarketplaceHomepage from './MarketplaceHomepage';
+import { settle } from '../test/settle';
 
 const TOTAL = 27;
 
@@ -84,12 +85,14 @@ describe('TASK-101491 marketplace homepage pagination', () => {
   it('reports the server total, not the number of listings loaded so far', async () => {
     renderPage();
     // Pre-fix this reads "20 listings" — the page under-reports its own inventory.
-    await waitFor(() => expect(screen.getByText(`${TOTAL} listings`)).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText(`${TOTAL} listings`)).toBeInTheDocument();
   });
 
   it('exposes a control to reach listings beyond the first page', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(20));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(20);
     // Pre-fix there is no such control at all, so every listing past the 20th is unreachable.
     expect(screen.getByTestId('marketplace-load-more')).toBeInTheDocument();
     expect(screen.getByTestId('marketplace-load-more-count')).toHaveTextContent('Showing 20 of 27');
@@ -97,11 +100,13 @@ describe('TASK-101491 marketplace homepage pagination', () => {
 
   it('appends the next page and retires the control once everything is loaded', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(20));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(20);
 
     fireEvent.click(screen.getByTestId('marketplace-load-more'));
 
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(TOTAL));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(TOTAL);
     // The tail that was invisible in prod is now rendered.
     expect(screen.getByText('Listing 27')).toBeInTheDocument();
     expect(screen.queryByTestId('marketplace-load-more')).not.toBeInTheDocument();
@@ -126,7 +131,8 @@ describe('TASK-101491 marketplace homepage pagination', () => {
     );
 
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
     expect(screen.queryByTestId('marketplace-load-more')).not.toBeInTheDocument();
     expect(screen.getByText('2 listings')).toBeInTheDocument();
   });
@@ -176,25 +182,24 @@ describe('TASK-101875 stale Show-more response is discarded on filter change', (
     );
 
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(20));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(20);
 
     // Start the stale next-page fetch.
     fireEvent.click(screen.getByTestId('marketplace-load-more'));
-    await waitFor(() =>
-      expect(seenUrls.some((u) => new URL(u).searchParams.get('page') === '2')).toBe(true),
-    );
+    await settle();
+    expect(seenUrls.some((u) => new URL(u).searchParams.get('page') === '2')).toBe(true);
 
     // Change the filter while page-2 is still in flight.
     fireEvent.click(screen.getByTestId('marketplace-filter-homes'));
-    await waitFor(() =>
-      expect(
+    await settle();
+    expect(
         seenUrls.some(
           (u) =>
             new URL(u).searchParams.get('page') === '1' &&
             new URL(u).searchParams.get('category') === 'homes',
         ),
-      ).toBe(true),
-    );
+      ).toBe(true);
 
     // Fresh filter results land first…
     freshPage1.resolve({
@@ -203,20 +208,35 @@ describe('TASK-101875 stale Show-more response is discarded on filter change', (
       page: 1,
       pageSize: 20,
     });
-    await waitFor(() => expect(screen.getByText('Listing 101')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText('Studio 101')).toBeInTheDocument();
 
     // …then the stale old-filter page-2 lands. Without the TASK-101875 guard it appends
     // Listing 21..27 onto the fresh grid and rewinds `page`.
     stalePage2.resolve(pageFor(2));
-    // Give the stale promise a chance to write state if unguarded.
-    await new Promise((r) => setTimeout(r, 100));
+    // Give the stale promise a chance to write state if unguarded (drained, not slept: HEALTH-1110).
+    await settle();
 
     // Only the active filter's results survive and paging tracks the new filter's sequence.
     expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
-    expect(screen.getByText('Listing 101')).toBeInTheDocument();
-    expect(screen.getByText('Listing 102')).toBeInTheDocument();
+    expect(screen.getByText('Studio 101')).toBeInTheDocument();
+    expect(screen.getByText('Studio 102')).toBeInTheDocument();
     expect(screen.queryByText('Listing 21')).not.toBeInTheDocument();
     expect(screen.queryByText('Listing 1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('marketplace-load-more')).not.toBeInTheDocument();
+  });
+
+  it('MKT-016: forwards minPrice and maxPrice to GET /marketplace/listings and resets paging to page 1', async () => {
+    renderPage();
+    await settle();
+
+    fireEvent.change(screen.getByPlaceholderText('Min'), { target: { value: '2500' } });
+    fireEvent.change(screen.getByPlaceholderText('Max'), { target: { value: '6000' } });
+    await settle();
+
+    const lastUrl = new URL(listingRequests[listingRequests.length - 1]);
+    expect(lastUrl.searchParams.get('minPrice')).toBe('2500');
+    expect(lastUrl.searchParams.get('maxPrice')).toBe('6000');
+    expect(lastUrl.searchParams.get('page')).toBe('1');
   });
 });

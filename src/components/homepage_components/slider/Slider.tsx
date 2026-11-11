@@ -1,8 +1,10 @@
+import CookieConsentBanner from "../../CookieConsentBanner";
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { HERO_IMAGE_URL } from '../../../config/hero';
 import { buildGuestImageSrcSet, toTransformedGuestImageUrl } from '../../../utils/guestImageUrl';
 import { getTenantContext } from '../../../tenant/tenantContext';
+import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import {
@@ -12,7 +14,10 @@ import {
 import { resolveHeroRefundProcessingChip } from '../../../utils/cancellationPolicy';
 import { SearchAvailabilityWidget } from '../../availability/SearchAvailabilityWidget';
 import { useTenantListings } from '../../../hooks/useTenantListings';
+import { resolveHomesPlace } from '../../../utils/listingCities';
 import '../atlas-home-v2.css';
+import { sameHands } from '@/utils/sameHandsCopy';
+import '../home-first-glance.css';
 
 // Ivory seam (left 120px) + a soft 8% coral wash over the hero photo. Kept as a
 // single overlay element so its backgroundImage is readable by jsdom-based tests.
@@ -38,9 +43,11 @@ const Slider = () => {
   const { properties: heroListings } = useTenantListings();
   const listingCount = heroListings.length;
   // TASK-7194: never hardcode Hyderabad on white-label — use tenant legal city when present.
+  // GUEST-061: name the cities the listings are really in; the legal-address city is only the fallback
+  // when no listing names one.
   const heroCity = showAtlasContent
     ? 'Hyderabad'
-    : (tenant?.legalContactPack?.city?.trim() || null);
+    : resolveHomesPlace(heroListings, tenant?.legalContactPack?.city);
   const heroImageUrl = showAtlasContent
     ? (toTransformedGuestImageUrl(HERO_IMAGE_URL, 1200) ?? '')
     : '';
@@ -56,7 +63,7 @@ const Slider = () => {
   // TASK-7194 #4: Atlas subcopy uses the live listing count, not a hardcoded "Seven".
   const atlasHeroSub =
     listingCount > 0
-      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in this neighbourhood. Same hands clean them, restock them, answer the door.`
+      ? `${listingCount} owner-run home${listingCount === 1 ? '' : 's'} in this neighbourhood. ${sameHands(listingCount)}`
       : 'Owner-run homes in this neighbourhood. Same hands clean them, restock them, answer the door.';
 
   // CSS-driven animations replace the manual headlineIn state
@@ -72,7 +79,7 @@ const Slider = () => {
   }, []);
 
   return (
-    <section className="ahv2-hero w-full">
+    <section className="ahv2-hero home-first-glance w-full">
       {/* Left — ivory editorial column */}
       <div className="ahv2-hero-left">
         <span className="ahv2-eyebrow ahv2-hero-eyebrow">{getTenantBrandName()}</span>
@@ -89,13 +96,15 @@ const Slider = () => {
         <p className="ahv2-hero-sub">
           {showAtlasContent
             ? atlasHeroSub
-            : 'Direct from the owner — WhatsApp-first support from a team that lives down the street.'}
+            : 'Choose your dates and guests to explore available stays.'}
         </p>
 
         {/* Floating search card — the real, functional availability widget */}
         <div data-testid="hero-widget" className="ahv2-hero-widget">
           <SearchAvailabilityWidget />
         </div>
+
+        <CookieConsentBanner inline />
 
         {directPromo.show ? (
           <div
@@ -133,26 +142,28 @@ const Slider = () => {
 
         {/* Trust strip — DESIGN-028 three-surface model (hero):
             Defer free-cancel deadlines (no listing in scope); assert unconditional refund
-            *processing* from refundPolicyTimelines; keep Instant/Verified as marketing chips.
-            Listing cards + detail disclose the per-tier free-cancel promise. */}
+            *processing* from refundPolicyTimelines. Listing cards + detail disclose the
+            per-tier free-cancel promise.
+            TASK-101317 (reverses DESIGN-028's "keep Instant/Verified as marketing chips"):
+            "Verified homes" is gone — no home verification exists (MKT-002: none ever recorded);
+            "Instant confirmation" shows only when the tenant takes online payment, because
+            WhatsApp/manual-booking tenants confirm by hand. */}
         <ul className="ahv2-chip-row" role="list" aria-label="Booking guarantees">
-          <li role="listitem" className="ahv2-chip">
-            <span className="ahv2-tick" aria-hidden="true">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </span>
-            Instant confirmation
-          </li>
-          <li role="listitem" className="ahv2-chip">
-            <span className="ahv2-tick" aria-hidden="true">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            </span>
-            Verified homes
-          </li>
+          {hasOnlinePaymentRail(tenant) && (
+            <li role="listitem" className="ahv2-chip">
+              <span className="ahv2-tick" aria-hidden="true">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              </span>
+              Instant confirmation
+            </li>
+          )}
+          {/* GUEST-037 & TASK-101317: Atlas approves online refunds within 24h.
+              Pay-at-host / WhatsApp tenants arrange refunds with the host directly. */}
           <li role="listitem" className="ahv2-chip" data-testid="hero-refund-processing-chip">
             <span className="ahv2-tick" aria-hidden="true">
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             </span>
-            {resolveHeroRefundProcessingChip()}
+            {hasOnlinePaymentRail(tenant) ? resolveHeroRefundProcessingChip() : "Host-managed refunds"}
           </li>
           <li role="listitem" className="ahv2-chip">
             <span className="ahv2-tick" aria-hidden="true">

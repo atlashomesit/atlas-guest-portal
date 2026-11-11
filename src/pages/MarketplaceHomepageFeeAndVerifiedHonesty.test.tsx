@@ -7,8 +7,8 @@
 // MKT-002 — "N Verified homes" claims a verification that has never happened
 // (`Listings.PhotosVerifiedAt` unset on 0 of 136 prod listings). RED before the fix: the trust
 // strip always rendered "0 Verified homes" rather than omitting the claim.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -26,6 +26,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 }));
 
 import MarketplaceHomepage from './MarketplaceHomepage';
+import { settle } from '../test/settle';
 
 function stubMarketplaceListings(items: unknown[]) {
   vi.stubGlobal(
@@ -52,80 +53,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('MKT-001: marketplace card fee honesty', () => {
-  beforeEach(() => {
-    // Non-GST listing so the est-total is a pure base×nights check unaffected by GST rounding.
-  });
-
-  it('a WHATSAPP-tenant listing (chargesOnlinePaymentFee=false) shows no payment-processing fee text', async () => {
-    stubMarketplaceListings([
-      {
-        id: 45,
-        tenantSlug: 'staybycf',
-        tenantName: 'Stay by City Focus',
-        title: 'Elsiya loft',
-        city: 'Goa',
-        pricePerNight: 5000,
-        maxGuests: 2,
-        slug: '45',
-        isGstRegistered: false,
-        chargesOnlinePaymentFee: false,
-        convenienceFeePercent: 0,
-      },
-    ]);
-
-    renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
-
-    expect(screen.queryByText(/payment processing/i)).not.toBeInTheDocument();
-    // Base ₹5,000 × 2 nights, no GST (unregistered), no fee — total must equal base×nights exactly.
-    expect(screen.getByText(/₹10,000 est\. total/)).toBeInTheDocument();
-  });
-
-  it('an ONLINE-tenant listing (chargesOnlinePaymentFee=true) still shows its processing fee', async () => {
-    stubMarketplaceListings([
-      {
-        id: 1,
-        tenantSlug: 'nightnest',
-        tenantName: 'Nightnest',
-        title: 'City View Suite',
-        city: 'Hyderabad',
-        pricePerNight: 5000,
-        maxGuests: 2,
-        slug: '1',
-        isGstRegistered: false,
-        chargesOnlinePaymentFee: true,
-        convenienceFeePercent: 3,
-      },
-    ]);
-
-    renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
-
-    expect(screen.getByText(/3% payment processing/)).toBeInTheDocument();
-  });
-
-  it('an item with no fee fields yet (API not deployed) falls back to today\'s flat 3%', async () => {
-    stubMarketplaceListings([
-      {
-        id: 2,
-        tenantSlug: 'atlas',
-        tenantName: 'Atlas',
-        title: 'Legacy listing',
-        city: 'Goa',
-        pricePerNight: 5000,
-        maxGuests: 2,
-        slug: '2',
-        isGstRegistered: false,
-      },
-    ]);
-
-    renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1));
-
-    expect(screen.getByText(/3% payment processing/)).toBeInTheDocument();
-  });
-});
+// MKT-001 card-fee cases moved to MarketplaceHomepageCardPrice.test.tsx (TASK-10298999): the card no longer
+// estimates a total from the listing's standard rate + a fee percent; it shows the checkout quote, and a
+// no-gateway host's card leaves out the quote's payment fee ("no processor, no fee", TASK-7428).
 
 describe('MKT-002: marketplace verified-homes trust strip honesty', () => {
   it('omits the "Verified homes" item when the count is 0', async () => {
@@ -144,7 +74,8 @@ describe('MKT-002: marketplace verified-homes trust strip honesty', () => {
     ]);
 
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument();
 
     expect(screen.queryByText(/Verified homes/)).not.toBeInTheDocument();
   });
@@ -165,8 +96,24 @@ describe('MKT-002: marketplace verified-homes trust strip honesty', () => {
     ]);
 
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('marketplace-trust-strip')).toBeInTheDocument();
 
     expect(screen.getByText(/1 Verified homes/)).toBeInTheDocument();
+  });
+});
+
+describe('TASK-101317: the marketplace never calls every host verified', () => {
+  it('describes the marketplace without a blanket "verified hosts" claim', async () => {
+    // No verification is required to list on the marketplace, and host identity checks are not
+    // exposed per listing, so the page cannot say its hosts are verified.
+    stubMarketplaceListings([
+      { id: 1, tenantSlug: 'atlas', tenantName: 'Atlas', title: 'Any listing', city: 'Goa', pricePerNight: 5000, maxGuests: 2, slug: '1', hasVerifiedPhotos: false },
+    ]);
+    renderPage();
+    await settle();
+    expect(screen.getByRole('heading', { level: 1, name: 'Atlastays Marketplace' })).toBeInTheDocument();
+    expect(screen.queryByText(/verified hosts/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Discover homes and rooms across India. Book direct with the owner.')).toBeInTheDocument();
   });
 });

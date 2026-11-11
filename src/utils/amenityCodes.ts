@@ -35,6 +35,8 @@ const AMENITY_CATEGORY_SYNONYMS: Record<string, string[]> = {
   'pet-friendly': ['pet', 'pets', 'dog', 'cat', 'petfriendly'],
   balcony: ['balcony', 'terrace', 'patio', 'deck', 'balconies'],
   workspace: ['workspace', 'workdesk', 'desk', 'study', 'workarea', 'coworking', 'workspace'],
+  beachfront: ['beach', 'sea', 'ocean', 'beachfront', 'beachaccess', 'seaview', 'oceanview'],
+  'mountain-view': ['mountain', 'hill', 'valley', 'mountainview', 'hillview', 'valleyview'],
   // TASK-10086: v1 step-free discovery trio. Exact canonical-code tokens only —
   // no free-text matching, so a missing declaration never implies accessibility.
   'step-free-entrance': ['stepfreeentrance'],

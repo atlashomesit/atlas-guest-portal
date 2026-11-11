@@ -184,24 +184,9 @@ export function getUnitNoun(overrides: TenantOverrides): {
 }
 
 const TENANT_OVERRIDES: Record<string, TenantOverrides> = {
-  // Stay by City Focus — prod branded subdomain staybycf.atlastays.com
-  // (subdomain label == tenant slug, TenantsController from-domain resolution).
-  // Renamed from `devstaybycf` 2026-08-03: the prod tenant (id 45) was re-slugged
-  // gaurav-upreti -> staybycf to serve the customer site, so the old key no longer
-  // matched and the brand mark/favicon silently fell back to the API logo.
-  // Logo artwork ships same-origin in public/images; scoped here so no other
-  // tenant (incl. the atlastays.com marketplace apex) ever renders this mark.
-  staybycf: {
-    logoUrl: '/images/stay-bycityfocus-logo.png',
-    faviconUrl: '/images/stay-bycityfocus-logo.png',
-  },
+  // GUEST-008: staybycf and goan-hideaway branding (logo, favicon, contact) are now
+  // sourced directly from the tenant API/seeder rather than hardcoded client overrides.
   'goan-hideaway': {
-    logoUrl: '/images/goan-hideaway-logo.png',
-    faviconUrl: '/images/goan-hideaway-logo.png',
-    contact: {
-      // Secondary owner/escalation contact; keep the primary API business/WhatsApp number unchanged.
-      ownerPhone: '9899150204',
-    },
     listingAddresses: {
       399: 'Apartment 001, Mint Arcadia, Baman Waddo, Near Shri Laxmi Narayan Temple, Siolim, Goa 403517',
       532: 'C-201, Second Floor, Areia De Goa, Opposite Riviera Palms, Bardez, Arpora, Goa 403516',

@@ -1,23 +1,37 @@
+import HostIdentityLabel from '@/components/property/HostIdentityLabel';
+import { feePercent } from "../utils/paymentFeeCopy";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
+import { fetchAllMarketplacePages } from '@/api/marketplacePaging'; // TASK-1040072
 import { formatCurrency } from '@/utils/formatting'; // TASK-1872
 import { getFavoriteIds, toggleFavorite } from '@/utils/guestHistory'; // TASK-1873
 import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
-import { formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
+import { useMarketplaceCardPrices, type MarketplaceCardPrice } from '@/hooks/useMarketplaceCardPrices'; // TASK-10298999
+import { sizedForPartyFirst } from '@/utils/smallParty'; // GUEST-033
+import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
+import ExploreDestinationsStrip from '@/components/marketplace/ExploreDestinationsStrip'; // MKT-034
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
+import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
+import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
+import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
+import { resolveAmenityLabel } from '@/utils/amenityCodes';
+import { isHostelDormType } from '@/utils/dormListing';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
 import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
+import { OUR_HOMES_ANCHOR_ID } from '@/config/navigation'; // TASK-10299142
+import './marketplace-homepage.css';
+import { useScrollToHash } from '@/hooks/useScrollToHash'; // TASK-10299142
 
 // TL-PROP: shape from GET /marketplace/properties (powers the map view).
 type MarketplacePropertyApi = {
@@ -32,11 +46,16 @@ type MarketplacePropertyApi = {
 };
 
 type MarketplaceItem = {
+  hostIdentityVerified?: unknown;
   id: number;
   tenantSlug: string;
   tenantName: string;
   tenantCategory?: string;
   title: string;
+  displayName?: string | null;
+  publicTitle?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
   city?: string;
   pricePerNight: number;
   maxGuests: number;
@@ -53,18 +72,97 @@ type MarketplaceItem = {
   // render "verified"); externalReviewCount = imported feedback (Google etc.).
   verifiedStayCount?: number | null;
   externalReviewCount?: number | null;
+  // MKT-012: dominant source name and sourceUrl gate for imported reviews
+  externalReviewSource?: string | null;
+  externalReviewSourceUrl?: string | null;
   // MKT-001: server-derived per-tenant payment routing (TenantsController/IPaymentRoutingService).
-  // Not yet deployed on GET /marketplace/listings — undefined falls back to today's behaviour
-  // (see the `?? 3` fallback below) until the API half ships.
+  // Missing metadata must remain unknown, without a platform-wide percentage fallback.
   chargesOnlinePaymentFee?: boolean;
   convenienceFeePercent?: number;
+  // MKT-029: true only when the booking auto-confirms on payment with no host approval (Razorpay, Stripe or
+  // Atlas-managed routing). UPI hosts need to confirm the payment first, so the API sends false for them.
+  // Missing metadata (an older API) is "unknown": no chip, never a guess.
+  isInstantBookable?: boolean;
+  // TASK-10298932: Amenity filtering support
+  amenityCodes?: string[];
+  amenities?: (string | { code?: string; name?: string; title?: string })[];
+  description?: string;
+  propertyType?: string | null;
+  accommodationType?: string | null;
+  category?: string | null;
 };
 
-function marketplaceListingPath(
-  item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'>,
+/**
+ * TASK-1039954: Resolves property type badge ("Homestay", "Villa", "B&B", "Hostel", "Hotel")
+ * for marketplace property cards with clean tag alignment.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace helper
+export function resolvePropertyTypeBadge(item: {
+  propertyType?: string | null;
+  accommodationType?: string | null;
+  category?: string | null;
+  title?: string | null;
+  name?: string | null;
+}): string {
+  const raw = `${item.propertyType || ''} ${item.category || ''} ${item.accommodationType || ''}`.toLowerCase();
+  if (raw.includes('hostel') || raw.includes('dorm') || isHostelDormType(item.accommodationType)) return 'Hostel';
+  if (raw.includes('villa')) return 'Villa';
+  if (raw.includes('b&b') || raw.includes('bnb') || raw.includes('bed & breakfast') || raw.includes('bed and breakfast') || raw.includes('guesthouse') || raw.includes('guest house')) return 'B&B';
+  if (raw.includes('hotel') || raw.includes('resort')) return 'Hotel';
+  if (raw.includes('homestay') || raw.includes('apartment') || raw.includes('home') || raw.includes('cottage') || raw.includes('studio')) return 'Homestay';
+
+  const text = `${item.title || ''} ${item.name || ''}`.toLowerCase();
+  if (text.includes('hostel') || text.includes('dorm')) return 'Hostel';
+  if (text.includes('villa')) return 'Villa';
+  if (text.includes('b&b') || text.includes('bnb')) return 'B&B';
+  if (text.includes('hotel')) return 'Hotel';
+
+  return 'Homestay';
+}
+
+/**
+ * TASK-10299086: Resolves guest-facing display name for marketplace listing cards.
+ * Prefers listing.displayName / listing.title / listing.nameFormatted over internal slug/code,
+ * and maps internal Atlas SKU codes (e.g. Atlas101 -> Studio 101, Atlas501_PH -> Penthouse 501)
+ * using getListingDisplayName.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace helper
+export function resolveMarketplaceListingDisplayName(item: {
+  id?: number | string | null;
+  title?: string | null;
+  displayName?: string | null;
+  publicTitle?: string | null;
+  nameFormatted?: string | null;
+  name?: string | null;
+  slug?: string | null;
+}): string {
+  const explicitGuestName =
+    item.displayName?.trim() ||
+    item.publicTitle?.trim() ||
+    item.nameFormatted?.trim();
+  const rawFallback = item.title?.trim() || item.name?.trim() || item.slug?.trim() || '';
+  const candidate = explicitGuestName || rawFallback;
+  const resolved = getListingDisplayName(item.id, candidate, explicitGuestName || undefined);
+  return resolved || candidate || 'Listing';
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace path helper
+export function marketplaceListingPath(
+  item: Pick<MarketplaceItem, 'id' | 'title' | 'tenantSlug'> & {
+    displayName?: string | null;
+    publicTitle?: string | null;
+    nameFormatted?: string | null;
+    name?: string | null;
+    slug?: string | null;
+  },
   searchSuffix = '',
 ): string {
-  const propertySlug = getPropertySlug({ property_name: item.title });
+  // TASK-10299207: build the route slug from the raw listing name (`item.title` / `item.name`),
+  // never the humanised display name ("Suite 202"), so the link matches `acceptablePropertySlugs`
+  // and `functions/sitemap.xml.ts` (`/homes/atlas202/4?tenant=atlas`).
+  const rawSlugSource =
+    item.title?.trim() || item.name?.trim() || resolveMarketplaceListingDisplayName(item);
+  const propertySlug = getPropertySlug({ property_name: rawSlugSource });
   const base = buildHomeUnitPath(propertySlug, item.id);
   // TASK-102058: carry the active search criteria forward into the details URL
   // (mirrors SearchPage's querySuffix). Without this the details page hydrates
@@ -78,14 +176,44 @@ function marketplaceListingPath(
 // TASK-10089: source-aware provenance labels. "Verified" applies ONLY to completed
 // stays verified by Atlas; imported feedback is labelled by its source. Zero/absent
 // counts render nothing — never "0 verified stays", never a fabricated claim.
+// eslint-disable-next-line react-refresh/only-export-components -- co-located provenance formatter
 export function formatVerifiedStaysLabel(count?: number | null): string | null {
   if (count == null || count <= 0) return null;
   return count === 1 ? '1 verified stay' : `${count} verified stays`;
 }
 
-export function formatExternalReviewsLabel(count?: number | null): string | null {
+// MKT-012 / MKT-015: external review count labelled by its real dominant source, e.g. "54 reviews on Airbnb".
+// Says "Google" only when the source is Google. Normalizes raw sync source codes (e.g. "AtlasSyncBookingCom" -> "Booking.com")
+// and still renders the provenance label as plain text when sourceUrl is null/empty.
+function normalizeExternalReviewSourceName(source?: string | null): string {
+  const raw = source?.trim() || 'Google';
+  const lower = raw.toLowerCase();
+  if (
+    lower === 'atlassyncbookingcom' ||
+    lower === 'booking_com' ||
+    lower === 'booking.com' ||
+    lower === 'bookingcom'
+  ) {
+    return 'Booking.com';
+  }
+  if (lower === 'airbnb') return 'Airbnb';
+  if (lower === 'google') return 'Google';
+  return raw;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- co-located provenance formatter
+export function formatExternalReviewsLabel(
+  count?: number | null,
+  source?: string | null,
+  _sourceUrl?: string | null,
+): string | null {
   if (count == null || count <= 0) return null;
-  return count === 1 ? '1 Google review' : `${count} Google reviews`;
+
+  const normalizedSource = normalizeExternalReviewSourceName(source);
+  if (normalizedSource.toLowerCase() === 'google') {
+    return count === 1 ? '1 Google review' : `${count} Google reviews`;
+  }
+  return count === 1 ? `1 review on ${normalizedSource}` : `${count} reviews on ${normalizedSource}`;
 }
 
 type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
@@ -96,11 +224,24 @@ type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; page
 // moves the cliff and pulls every listing + cover image on first paint.
 const PAGE_SIZE = 20;
 
+export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc';
+
 export default function MarketplaceHomepage() {
-  const [category, setCategory] = useState<'all' | 'homes' | 'rooms'>('all');
+  const navigate = useNavigate();
+  const [wideFilters, setWideFilters] = useState(() => window.innerWidth >= 768);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    const update = () => setWideFilters(window.innerWidth >= 768);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // TASK-102711: a failed fetch used to fall into the "No stays match these filters" empty state,
+  // telling a guest the marketplace was empty during an API blip. Track it separately + retry.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   // TASK-101491: server-reported total + progressive paging state. Before this, the component
   // fetched page 1 only and rendered no pager, so with 27 marketplace-visible listings the last 7
   // were unreachable by any in-page route - silently, with no truncation notice.
@@ -117,7 +258,95 @@ export default function MarketplaceHomepage() {
   const [showMap, setShowMap] = useState(false);
   const [marketplaceProperties, setMarketplaceProperties] = useState<MarketplacePropertyApi[]>([]);
   // TASK-4413: read dates and guest count from URL params (from AirbnbSearchBar)
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // TASK-10299142: an in-app click on "Stays" (/?...#our-homes) does not make the browser scroll; do it once the grid is in the DOM.
+  useScrollToHash();
+
+  // TASK-1039950: sync category and amenity filter pills with URL query parameters
+  const categoryParam = searchParams.get('category')?.toLowerCase();
+  const [category, setCategory] = useState<'all' | 'homes' | 'rooms' | 'villas'>(
+    categoryParam === 'homes' || categoryParam === 'rooms' || categoryParam === 'villas' ? categoryParam : 'all',
+  );
+
+  // MKT-023 / TASK-1039950: Quick amenity filter selection synced with ?amenity= and ?amenities=
+  const [selectedAmenity, setSelectedAmenity] = useState<string | null>(
+    searchParams.get('amenity')?.trim() || searchParams.get('amenities')?.trim() || null,
+  );
+
+  // TASK-1039952: sort dropdown options ("Recommended" | "Price: Low to High" | "Price: High to Low" | "Rating: High to Low")
+  const sortParam = searchParams.get('sort') || searchParams.get('sortBy');
+  const [sortBy, setSortBy] = useState<MarketplaceSortOption>(
+    sortParam === 'price_asc' || sortParam === 'price_desc' || sortParam === 'rating_desc'
+      ? sortParam
+      : 'recommended',
+  );
+
+  useEffect(() => {
+    const cat = searchParams.get('category')?.toLowerCase();
+    if (cat === 'homes' || cat === 'rooms' || cat === 'villas') {
+      setCategory(cat);
+    } else {
+      setCategory('all');
+    }
+    const amen = searchParams.get('amenity')?.trim() || searchParams.get('amenities')?.trim() || null;
+    setSelectedAmenity(amen);
+
+    const s = searchParams.get('sort') || searchParams.get('sortBy');
+    if (s === 'price_asc' || s === 'price_desc' || s === 'rating_desc') {
+      setSortBy(s);
+    } else {
+      setSortBy('recommended');
+    }
+  }, [searchParams]);
+
+  const handleCategoryChange = useCallback((c: 'all' | 'homes' | 'rooms' | 'villas') => {
+    setCategory(c);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (c !== 'all') {
+        next.set('category', c);
+      } else {
+        next.delete('category');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleAmenityChange = useCallback((amenity: string | null) => {
+    setSelectedAmenity(amenity);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (amenity) {
+        next.set('amenity', amenity);
+        next.set('amenities', amenity);
+      } else {
+        next.delete('amenity');
+        next.delete('amenities');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleSortChange = useCallback((newSort: string) => {
+    const valid: MarketplaceSortOption =
+      newSort === 'price_asc' || newSort === 'price_desc' || newSort === 'rating_desc'
+        ? newSort
+        : 'recommended';
+    setSortBy(valid);
+    setPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (valid !== 'recommended') {
+        next.set('sort', valid);
+        next.set('sortBy', valid);
+      } else {
+        next.delete('sort');
+        next.delete('sortBy');
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
   // TASK-102058: the criteria the grid was filtered by, forwarded into every property
   // link (cards + map pins) so details hydrates and Back-navigation restores the bar.
   const searchSuffix = useMemo(() => {
@@ -132,27 +361,49 @@ export default function MarketplaceHomepage() {
       'children',
       'infants',
       'pets',
+      'category',
+      'amenity',
+      'amenities',
+      'sort',
+      'sortBy',
+      // MKT-031: marketplace brand switch (QA/preview) + campaign attribution survive the click-through
+      'brand',
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_term',
+      'utm_content',
     ]) {
       const v = searchParams.get(k);
       if (v != null && v !== '') p.set(k, v);
     }
     return p.toString();
   }, [searchParams]);
-  // TASK-4413: price-range control — client-side filter over the fetched grid, mirroring
-  // SearchPage.tsx's minPrice/maxPrice pattern. Local state (not URL) — the marketplace
-  // grid fetch already covers date/guest/category/city; price narrows the same result set.
+  // TASK-4413 / MKT-016: price-range control — forwarded as minPrice/maxPrice query params to
+  // GET /marketplace/listings so server-side filtering and pagination work across all pages,
+  // while keeping the client-side filter as a safety net.
   const [minPriceInput, setMinPriceInput] = useState('');
   const [maxPriceInput, setMaxPriceInput] = useState('');
+
+  const minPrice = useMemo(() => {
+    const n = Number(minPriceInput);
+    return minPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
+  }, [minPriceInput]);
+  const maxPrice = useMemo(() => {
+    const n = Number(maxPriceInput);
+    return maxPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
+  }, [maxPriceInput]);
 
   // TASK-101491: the FILTER half of the query only - deliberately excludes page/pageSize so that
   // changing a filter produces a new key (resetting paging) while paging does not re-trigger the
   // first-page effect.
+  const serverAmenityCodes = useMemo(() => serverAmenityCodesFor(selectedAmenity), [selectedAmenity]);
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
     if (query.trim()) p.set('city', query.trim());
-    // TASK-4413: pass date/guest filters to API if present
-    const city = searchParams.get('city');
+    // TASK-4413 / MKT-022: pass date/guest/destination filters to API if present
+    const city = searchParams.get('city') || searchParams.get('destination');
     if (city?.trim()) p.set('city', city.trim());
     const checkIn = searchParams.get('checkIn');
     if (checkIn) p.set('checkIn', checkIn);
@@ -160,8 +411,13 @@ export default function MarketplaceHomepage() {
     if (checkOut) p.set('checkOut', checkOut);
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
+    if (minPrice != null) p.set('minPrice', String(minPrice));
+    if (maxPrice != null) p.set('maxPrice', String(maxPrice));
+    // MKT-026: the server filters on real amenity codes before pagination, so page 2+ is filtered too.
+    if (serverAmenityCodes.length > 0) p.set('amenities', serverAmenityCodes.join(','));
+    if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -184,11 +440,13 @@ export default function MarketplaceHomepage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadError(false);
     setPage(1);
     fetch(buildApiUrl(buildPagePath(1)))
-      .then(async (r) =>
-        r.ok ? ((await r.json()) as ApiResponse) : { items: [] as MarketplaceItem[], total: 0 },
-      )
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`marketplace listings ${r.status}`);
+        return (await r.json()) as ApiResponse;
+      })
       .then(async (data) => {
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
         if (cancelled) return;
@@ -203,6 +461,7 @@ export default function MarketplaceHomepage() {
         if (!cancelled) {
           setItems([]);
           setTotal(0);
+          setLoadError(true);
         }
       })
       .finally(() => {
@@ -211,7 +470,7 @@ export default function MarketplaceHomepage() {
     return () => {
       cancelled = true;
     };
-  }, [buildPagePath]);
+  }, [buildPagePath, reloadKey]);
 
   // TASK-101491: everything the server said exists but we have not fetched yet.
   const hasMore = !loading && items.length < total;
@@ -249,26 +508,80 @@ export default function MarketplaceHomepage() {
       .finally(() => setLoadingMore(false));
   }, [buildPagePath, filterQuery, hasMore, items, loadingMore, page]);
 
-  // TASK-4413: client-side price filter over the fetched grid, mirroring SearchPage.tsx's
-  // minPrice/maxPrice behavior. Applying a price filter does not touch `category` state, so
-  // the active category tab selection is preserved.
-  const minPrice = useMemo(() => {
-    const n = Number(minPriceInput);
-    return minPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
-  }, [minPriceInput]);
-  const maxPrice = useMemo(() => {
-    const n = Number(maxPriceInput);
-    return maxPriceInput.trim() !== '' && Number.isFinite(n) ? n : null;
-  }, [maxPriceInput]);
+  // TASK-10298999: one checkout quote per card, for the searched dates when given (tonight otherwise).
+  const cardStay = useMemo(() => {
+    const g = Number(searchParams.get('guests'));
+    return {
+      checkIn: searchParams.get('checkIn'),
+      checkOut: searchParams.get('checkOut'),
+      guests: Number.isFinite(g) && g > 0 ? Math.floor(g) : null,
+    };
+  }, [searchParams]);
+  const cardPrices = useMarketplaceCardPrices(items, cardStay);
 
   const visibleItems = useMemo(() => {
-    if (minPrice == null && maxPrice == null) return items;
-    return items.filter((item) => {
-      if (minPrice != null && item.pricePerNight < minPrice) return false;
-      if (maxPrice != null && item.pricePerNight > maxPrice) return false;
-      return true;
-    });
-  }, [items, minPrice, maxPrice]);
+    let result = items;
+
+    // TASK-1039952 / TASK-1039951: get calculated display/quoted price for listing
+    const getItemPrice = (item: MarketplaceItem): number => {
+      const cardPrice = cardPrices.get(item.id);
+      if (cardPrice && cardPrice.status === 'ready' && cardPrice.display.realNightly != null) {
+        return cardPrice.display.realNightly;
+      }
+      return item.pricePerNight;
+    };
+
+    if (category !== 'all') {
+      result = result.filter((item) => {
+        const cat = resolvePropertyTypeBadge(item).toLowerCase();
+        if (category === 'homes') return cat === 'homestay' || cat === 'home' || cat === 'villa';
+        if (category === 'rooms') return cat === 'room' || cat === 'hotel' || cat === 'b&b' || cat === 'hostel';
+        if (category === 'villas') return cat === 'villa' || (item.title && item.title.toLowerCase().includes('villa'));
+        return true;
+      });
+    }
+
+    if (minPrice != null || maxPrice != null) {
+      result = result.filter((item) => {
+        // TASK-1039951: Price range filtering qualifies positive rates only and uses calculated display/quoted price
+        const price = getItemPrice(item);
+        if (typeof price !== 'number' || price <= 0) return false;
+        if (minPrice != null && price < minPrice) return false;
+        if (maxPrice != null && price > maxPrice) return false;
+        return true;
+      });
+    }
+
+    if (selectedAmenity) {
+      // MKT-026: when this pill maps to master codes AND the item carries amenityCodes (a current
+      // API), match those exact codes - the same set the server filtered on, so nothing the server
+      // returned is dropped and a non-filtering API is still caught. The title/text guess is kept
+      // only for an older API (no amenityCodes) or a client-only pill (Pet Friendly).
+      result = result.filter((item) =>
+        serverAmenityCodes.length > 0 && Array.isArray(item.amenityCodes)
+          ? item.amenityCodes.some((c) => typeof c === 'string' && serverAmenityCodes.includes(c.trim().toLowerCase()))
+          : matchesAmenityFilter(item, selectedAmenity),
+      );
+    }
+
+    if (sortBy === 'price_asc') {
+      return [...result].sort((a, b) => getItemPrice(a) - getItemPrice(b));
+    }
+    if (sortBy === 'price_desc') {
+      return [...result].sort((a, b) => getItemPrice(b) - getItemPrice(a));
+    }
+    if (sortBy === 'rating_desc') {
+      return [...result].sort((a, b) => {
+        const ratingA = a.rating ?? 0;
+        const ratingB = b.rating ?? 0;
+        if (ratingB !== ratingA) return ratingB - ratingA;
+        return (b.reviewCount ?? 0) - (a.reviewCount ?? 0);
+      });
+    }
+
+    // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
+    return sizedForPartyFirst(result, cardStay.guests);
+  }, [items, category, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -277,12 +590,35 @@ export default function MarketplaceHomepage() {
     [items],
   );
 
-  // TL-PROP: separately fetch the canonical marketplace properties endpoint for map pins.
-  // Independent of the card grid — different endpoint shape, different fields.
+  // TL-PROP / MKT-020: fetch the canonical marketplace properties endpoint for map pins,
+  // forwarding active city/location, checkIn, checkOut, and guests query parameters.
+  const propertiesQuery = useMemo(() => {
+    const p = new URLSearchParams();
+    // TASK-1040072: no pageSize here - fetchAllMarketplacePages adds page + pageSize (server max 100).
+    const activeCity =
+      query.trim() ||
+      searchParams.get('city')?.trim() ||
+      searchParams.get('destination')?.trim() ||
+      '';
+    if (activeCity) p.set('location', activeCity);
+    const checkIn = searchParams.get('checkIn');
+    if (checkIn) p.set('checkIn', checkIn);
+    const checkOut = searchParams.get('checkOut');
+    if (checkOut) p.set('checkOut', checkOut);
+    const guests = searchParams.get('guests');
+    if (guests) p.set('guests', guests);
+    return p.toString();
+  }, [query, searchParams]);
+
   useEffect(() => {
     let cancelled = false;
-    fetch(buildApiUrl('/marketplace/properties?pageSize=200'))
-      .then(async (r) => (r.ok ? ((await r.json()) as MarketplacePropertyApi[]) : []))
+    fetchAllMarketplacePages<MarketplacePropertyApi>({
+      buildUrl: (page, pageSize) =>
+        buildApiUrl(`/marketplace/properties?${propertiesQuery}&page=${page}&pageSize=${pageSize}`),
+      readPage: (json) => ({ rows: Array.isArray(json) ? (json as MarketplacePropertyApi[]) : [] }),
+      rowKey: (row) => `${row.propertyId}:${row.listingId}`,
+      shouldStop: () => cancelled,
+    })
       .then((rows) => {
         if (cancelled) return;
         setMarketplaceProperties(rows ?? []);
@@ -293,15 +629,42 @@ export default function MarketplaceHomepage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [propertiesQuery]);
 
-  // TASK-102058: pin hrefs carry the active search criteria (recomputed from rows so a
-  // search submit never refetches the properties endpoint just to rewrite links).
+  // TASK-102058 / MKT-020: pin hrefs carry the active search criteria, and mapPins
+  // intersects with active city, price, and category filters so Map (N) matches active filters.
   const mapPins = useMemo(() => {
+    const activeCityFilter = (
+      query.trim() ||
+      searchParams.get('city')?.trim() ||
+      searchParams.get('destination')?.trim() ||
+      ''
+    ).toLowerCase();
+    const hasPriceOrCategoryFilter =
+      minPrice != null || maxPrice != null || category !== 'all';
+    const visibleListingIds = new Set(visibleItems.map((item) => item.id));
+    const allLoadedListingIds = new Set(items.map((item) => item.id));
+
     const seen = new Map<number, MapPin>();
     for (const row of marketplaceProperties) {
       if (row.latitude == null || row.longitude == null) continue;
       if (seen.has(row.propertyId)) continue;
+
+      if (activeCityFilter) {
+        const rowText = `${row.propertyName ?? ''} ${row.propertyAddress ?? ''} ${row.listingName ?? ''}`.toLowerCase();
+        const matchesCityText = rowText.includes(activeCityFilter);
+        const matchesVisibleListing = visibleListingIds.has(row.listingId);
+        if (allLoadedListingIds.has(row.listingId)) {
+          if (!matchesVisibleListing && !matchesCityText) continue;
+        } else if (!matchesCityText && !matchesVisibleListing) {
+          continue;
+        }
+      }
+
+      if (hasPriceOrCategoryFilter && !loading) {
+        if (!visibleListingIds.has(row.listingId)) continue;
+      }
+
       seen.set(row.propertyId, {
         id: `mp-${row.propertyId}`,
         lat: Number(row.latitude),
@@ -321,10 +684,22 @@ export default function MarketplaceHomepage() {
       });
     }
     return Array.from(seen.values());
-  }, [marketplaceProperties, searchSuffix]);
+  }, [
+    category,
+    items,
+    loading,
+    marketplaceProperties,
+    maxPrice,
+    minPrice,
+    query,
+    searchParams,
+    searchSuffix,
+    visibleItems,
+  ]);
 
   return (
-    <section className="w-full" data-testid="marketplace-homepage">
+    <>
+    <section className="marketplace-homepage" data-testid="marketplace-homepage">
       {/* TASK-1876: SEO meta for marketplace homepage.
           TASK-101960: self-referencing absolute canonical + og:site_name pinned to the
           shipped brand baseline (MARKETPLACE_BRAND_BASELINE), mirroring Home.tsx's
@@ -337,144 +712,152 @@ export default function MarketplaceHomepage() {
         url={`${getPublicSiteOrigin()}/`}
         siteName={MARKETPLACE_BRAND_BASELINE}
       />
+      <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
+      {/* TASK-101317 / MKT-002: no verification is required to list here, so never claim "verified hosts".
+          Matches the SEO description, which MKT-002 already corrected. */}
+      <p className="mt-2 text-text-body">Discover homes and rooms across India. Book direct with the owner.</p>
 
-      {/* DESIGN (atlastays-redesign spike): warm gradient hero band behind the wordmark +
-          search bar, matching the reference mockup and the same --gradient-hero token
-          Home.tsx's hero already uses. */}
-      <div className="w-full px-4 py-10 md:py-14" style={{ background: 'var(--gradient-hero)' }}>
-        <div className="mx-auto w-full max-w-6xl text-center">
-          <h1
-            className="text-3xl md:text-4xl font-medium text-text-primary"
-            style={{ fontFamily: 'var(--font-family-display)' }}
-          >
-            Atlastays Marketplace
-          </h1>
-          <p className="mt-2 text-text-body">Discover homes and rooms across verified hosts.</p>
-
-          {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
-          {!loading && items.length > 0 && (
-            <div
-              data-testid="marketplace-trust-strip"
-              className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-text-secondary"
-            >
-              {/* MKT-002: `Listings.PhotosVerifiedAt` is unset on 0 of 136 prod listings today, so
-                  this item would always read "0 Verified homes" — an unearned trust claim. Omit it
-                  entirely rather than show a zero; it reappears the moment any listing is verified. */}
-              {verifiedHomesCount > 0 && (
-                <>
-                  <span>{verifiedHomesCount} Verified homes</span>
-                  <span aria-hidden>·</span>
-                </>
-              )}
-              {/* TASK-101491: the server's total, not the number loaded so far - this read "20
-                  listings" while the API reported 27. `verifiedHomesCount` above stays a count of
-                  LOADED items on purpose: it is a trust signal, and undercounting it is the safe
-                  direction (never claim verification we have not observed). */}
-              <span>{total || items.length} listings</span>
+      {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
+      {!loading && items.length > 0 && (
+        <div
+          data-testid="marketplace-trust-strip"
+          className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted"
+        >
+          {/* MKT-002: `Listings.PhotosVerifiedAt` is unset on 0 of 136 prod listings today, so
+              this item would always read "0 Verified homes" — an unearned trust claim. Omit it
+              entirely rather than show a zero; it reappears the moment any listing is verified. */}
+          {verifiedHomesCount > 0 && (
+            <>
+              <span>{verifiedHomesCount} Verified homes</span>
               <span aria-hidden>·</span>
-              <span className="font-semibold text-[var(--accent-text)]">Book direct from the owner</span>
-              {hasOnlinePaymentRail() ? (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>Price shown: room + GST + 3% payment-processing fee</span>
-                </>
-              ) : null}
-            </div>
+            </>
           )}
-
-          <div className="mt-8">
-            <AirbnbSearchBar />
-          </div>
+          {/* TASK-101491: the server's total, not the number loaded so far - this read "20
+              listings" while the API reported 27. `verifiedHomesCount` above stays a count of
+              LOADED items on purpose: it is a trust signal, and undercounting it is the safe
+              direction (never claim verification we have not observed). */}
+          <span>{total || items.length} listings</span>
+          <span aria-hidden>·</span>
+          <span className="font-medium text-emerald-700">Book direct from the owner</span>
+          {hasOnlinePaymentRail() ? (
+            <>
+              <span aria-hidden>·</span>
+              <span>Any payment-processing fee is shown before payment</span>
+            </>
+          ) : null}
         </div>
+      )}
+
+      <div className="mt-8">
+        <AirbnbSearchBar />
       </div>
 
-      <div className="mx-auto w-full max-w-6xl px-4 py-8">
-
-      {/* DESIGN (atlastays-redesign spike): secondary filter bar restyled as rounded pills in
-          the site's warm coral palette, matching the reference mockup's Price / Property type
-          / List-Map row — same filters/state as before, visual treatment only. */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="marketplace-controls">
+        <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
+          open={wideFilters || filtersOpen}
+          onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <div className="marketplace-secondary-content">
+            <ExploreDestinationsStrip listings={items} />
+            <div className="marketplace-refinements">
         <input
+          aria-label="Search by city"
           data-testid="marketplace-search"
-          className="min-h-[44px] rounded-full border border-border-subtle bg-bg-surface px-4 py-2 text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-cta-primary"
+          className="min-h-[44px] rounded-xl border border-border px-4 py-2"
           placeholder="Search by city"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <div className="inline-flex rounded-full border border-border-subtle bg-bg-surface p-1 shadow-sm">
-          {(['all', 'homes', 'rooms'] as const).map((c) => (
+      <AmenityFilterPills
+        selectedAmenity={selectedAmenity}
+        onSelectAmenity={handleAmenityChange}
+      />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="marketplace-min-price" className="text-sm font-medium text-text-muted">
+            Price / night
+          </label>
+          <input
+            id="marketplace-min-price"
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="Min"
+            value={minPriceInput}
+            onChange={(e) => setMinPriceInput(e.target.value)}
+            className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
+          />
+          <span aria-hidden className="text-text-muted">–</span>
+          <input
+            id="marketplace-max-price"
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="Max"
+            aria-label="Max price"
+            value={maxPriceInput}
+            onChange={(e) => setMaxPriceInput(e.target.value)}
+            className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
+          />
+          {(minPriceInput !== '' || maxPriceInput !== '') && (
             <button
-              key={c}
-              data-testid={`marketplace-filter-${c}`}
-              className={`min-h-[38px] rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${category === c ? 'bg-cta-primary text-[var(--text-on-cta)]' : 'text-text-primary hover:bg-bg-muted'}`}
-              onClick={() => setCategory(c)}
+              type="button"
+              onClick={() => {
+                setMinPriceInput('');
+                setMaxPriceInput('');
+              }}
+              className="min-h-[40px] rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-muted"
             >
-              {c[0].toUpperCase() + c.slice(1)}
+              Clear price
             </button>
-          ))}
+          )}
         </div>
+
+            </div>
+          </div>
+        </details>
+        <div className="marketplace-primary-controls">
+        {(['all', 'homes', 'rooms', 'villas'] as const).map((c) => (
+          <button
+            key={c}
+            data-testid={`marketplace-filter-${c}`}
+            className={`min-h-[44px] rounded-xl px-4 py-2 ${category === c ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
+            onClick={() => handleCategoryChange(c)}
+          >
+            {c === 'all' ? 'All' : c[0].toUpperCase() + c.slice(1)}
+          </button>
+        ))}
         {/* TL-PROP: map view toggle. Hidden if no properties have lat/lng configured. */}
         {mapPins.length > 0 && (
-          <div className="ml-auto inline-flex rounded-full border border-border-subtle bg-bg-surface p-1 shadow-sm">
-            <button
-              data-testid="marketplace-map-toggle-list"
-              className={`min-h-[38px] rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${!showMap ? 'bg-cta-primary text-[var(--text-on-cta)]' : 'text-text-primary hover:bg-bg-muted'}`}
-              onClick={() => setShowMap(false)}
-              aria-pressed={!showMap}
-            >
-              List
-            </button>
-            <button
-              data-testid="marketplace-map-toggle"
-              className={`min-h-[38px] rounded-full px-4 py-1.5 text-sm font-semibold transition-colors ${showMap ? 'bg-cta-primary text-[var(--text-on-cta)]' : 'text-text-primary hover:bg-bg-muted'}`}
-              onClick={() => setShowMap(true)}
-              aria-pressed={showMap}
-            >
-              {`Map (${mapPins.length})`}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* TASK-4413: price-range control — client-side filter over the fetched grid. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 rounded-full border border-border-subtle bg-bg-surface px-4 py-2 w-fit">
-        <label htmlFor="marketplace-min-price" className="text-sm font-semibold text-text-primary">
-          Price / night
-        </label>
-        <input
-          id="marketplace-min-price"
-          type="number"
-          min={0}
-          inputMode="numeric"
-          placeholder="Min"
-          value={minPriceInput}
-          onChange={(e) => setMinPriceInput(e.target.value)}
-          className="min-h-[36px] w-20 rounded-full border border-border-subtle bg-bg-muted px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cta-primary"
-        />
-        <span aria-hidden className="text-text-muted">–</span>
-        <input
-          id="marketplace-max-price"
-          type="number"
-          min={0}
-          inputMode="numeric"
-          placeholder="Max"
-          aria-label="Max price"
-          value={maxPriceInput}
-          onChange={(e) => setMaxPriceInput(e.target.value)}
-          className="min-h-[36px] w-20 rounded-full border border-border-subtle bg-bg-muted px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cta-primary"
-        />
-        {(minPriceInput !== '' || maxPriceInput !== '') && (
           <button
-            type="button"
-            onClick={() => {
-              setMinPriceInput('');
-              setMaxPriceInput('');
-            }}
-            className="min-h-[36px] rounded-full border border-border-subtle px-3 py-1 text-sm font-medium text-text-primary hover:bg-bg-muted"
+            data-testid="marketplace-map-toggle"
+            className={`ml-auto min-h-[44px] rounded-xl px-4 py-2 ${showMap ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
+            onClick={() => setShowMap((v) => !v)}
+            aria-pressed={showMap}
           >
-            Clear price
+            {showMap ? 'Hide map' : `Map (${mapPins.length})`}
           </button>
         )}
+        {/* TASK-1039952: Missing sort dropdown on Marketplace Homepage */}
+        <div className="flex items-center gap-2" data-testid="marketplace-sort-wrapper">
+          <label htmlFor="marketplace-sort" className="text-sm font-medium text-text-muted whitespace-nowrap">
+            Sort by:
+          </label>
+          <select
+            id="marketplace-sort"
+            data-testid="marketplace-sort-select"
+            aria-label="Sort listings"
+            value={sortBy}
+            onChange={(e) => handleSortChange(e.target.value)}
+            className="min-h-[40px] rounded-lg border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-black cursor-pointer"
+          >
+            <option value="recommended">Recommended</option>
+            <option value="price_asc">Price: Low to High</option>
+            <option value="price_desc">Price: High to Low</option>
+            <option value="rating_desc">Rating: High to Low</option>
+          </select>
+        </div>
+        </div>
       </div>
 
       {showMap && mapPins.length > 0 && (
@@ -483,28 +866,38 @@ export default function MarketplaceHomepage() {
         </div>
       )}
 
-      <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" data-testid="marketplace-grid">
+      {/* TASK-10299142: the header/footer "Stays" link targets #our-homes; on the marketplace that is this grid. */}
+      <div id={OUR_HOMES_ANCHOR_ID} className="marketplace-results-grid scroll-mt-28" data-testid="marketplace-grid">
         {/* TASK-1875: skeleton cards while loading */}
         {loading && Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
 
         {!loading &&
           visibleItems.map((item) => {
             const isFav = favIds.has(item.id);
+            const cardTitle = resolveMarketplaceListingDisplayName(item);
+            const canonicalUrl = marketplaceListingPath(item, searchSuffix);
 
             return (
               <article
                 key={item.id}
-                className="relative flex flex-col overflow-hidden rounded-3xl border border-border-subtle bg-bg-surface shadow-level1 transition hover:-translate-y-0.5 hover:shadow-level2"
+                className="relative flex flex-col overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-sm transition-all hover:border-border-subtle hover:shadow-md cursor-pointer"
                 data-testid="marketplace-card"
+                onClick={() => navigate(canonicalUrl)}
+                onKeyDown={(e) => {
+                  if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    navigate(canonicalUrl);
+                  }
+                }}
               >
                 {/* TASK-1874: OptimizedImage replaces raw <img> */}
                 <div className="h-40 w-full bg-bg-muted">
                   <OptimizedImage
                     src={sanitizeGuestImageUrl(item.coverImageUrl) ?? ''}
-                    alt={item.title || 'Listing photo'}
+                    alt={cardTitle || 'Listing photo'}
                     className="h-full w-full object-cover"
                     wrapperClassName="h-full"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    sizes="(max-width: 639px) 100vw, (max-width: 959px) 50vw, (max-width: 1279px) 33vw, (max-width: 1599px) 25vw, (max-width: 2099px) 20vw, 330px"
                   />
                 </div>
 
@@ -512,10 +905,11 @@ export default function MarketplaceHomepage() {
                 <button
                   type="button"
                   aria-label={isFav ? 'Remove from saved' : 'Save listing'}
-                  className="absolute right-2 top-2 z-10 rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
-                  onClick={() => {
+                  className="absolute right-2 top-2 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
                     toggleFavorite(item.id);
-                    setFavEpoch((e) => e + 1);
+                    setFavEpoch((prev) => prev + 1);
                   }}
                 >
                   {isFav
@@ -525,7 +919,28 @@ export default function MarketplaceHomepage() {
 
                 <div className="flex flex-1 flex-col gap-2 p-4">
                   <div className="text-xs uppercase tracking-wide text-text-muted">{item.tenantName}</div>
-                  <h2 className="text-base font-semibold text-text-primary leading-snug">{item.title}</h2>
+                  <h2 className="text-base font-semibold text-text-primary leading-snug">
+                    <Link
+                      to={canonicalUrl}
+                      onClick={(e) => e.stopPropagation()}
+                      className="hover:underline focus:outline-none"
+                    >
+                      {cardTitle}
+                    </Link>
+                  </h2>
+                  <HostIdentityLabel marketplace verified={item.hostIdentityVerified} />
+
+                  {/* MKT-029: only an explicit `true` from the API earns the chip; a missing field is unknown. */}
+                  {item.isInstantBookable === true && (
+                    <span
+                      data-testid="marketplace-instant-book-chip"
+                      title="Pay online and your booking is confirmed straight away, with no host approval"
+                      className="inline-flex items-center gap-1 self-start rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800"
+                    >
+                      <span aria-hidden>⚡</span>
+                      Instant Book
+                    </span>
+                  )}
 
                   {/* TASK-4511: Trust signal badges */}
                   {(item.hasVerifiedPhotos || item.isGstRegistered) && (
@@ -543,17 +958,68 @@ export default function MarketplaceHomepage() {
                     </div>
                   )}
 
-                  {/* TASK-1873: neighborhood/city chip */}
-                  {item.city && (
-                    <span className="w-fit rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-text-secondary">
-                      {item.city}
-                    </span>
-                  )}
+                  {/* TASK-1039954: Aligned property type badge and amenity chips */}
+                  {(() => {
+                    const propertyTypeBadge = resolvePropertyTypeBadge(item);
+                    // TASK-10299241: "per bed" keys on the API's own accommodationType === 'HostelDorm' ONLY, the same rule
+                    // isHostelDorm() applies on the listing page. The property-type badge above may still say "Hostel" for a
+                    // private room in a Hostel property, but that room is sold by the room. An older API that does not send
+                    // the field means "not a dorm": no per-bed wording, never a guess from the title or category.
+                    const isHostel = isHostelDormType(item.accommodationType);
+                    const rawAmenities: string[] = [
+                      ...(Array.isArray(item.amenityCodes) ? item.amenityCodes : []),
+                      ...(Array.isArray(item.amenities)
+                        ? item.amenities.map((a) => (typeof a === 'string' ? a : a.title || a.name || a.code || ''))
+                        : []),
+                    ].filter(Boolean);
+                    const amenityChips = Array.from(
+                      new Set(
+                        rawAmenities
+                          .map((c) => resolveAmenityLabel(c))
+                          .filter((l): l is string => Boolean(l)),
+                      ),
+                    ).slice(0, 3);
+
+                    return (
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-wrap items-center gap-1.5" data-testid="marketplace-card-tags">
+                          <span
+                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-100 text-neutral-800 border border-neutral-200"
+                            data-testid="property-type-badge"
+                          >
+                            {propertyTypeBadge}
+                          </span>
+                          {item.city && (
+                            <span className="w-fit rounded-full bg-bg-muted px-2.5 py-0.5 text-xs font-medium text-text-secondary" data-testid="marketplace-city-badge">
+                              {item.city}
+                            </span>
+                          )}
+                          {amenityChips.map((chip) => (
+                            <span
+                              key={chip}
+                              className="inline-flex items-center gap-1 rounded-md bg-neutral-50 border border-neutral-200/80 px-2 py-0.5 text-xs text-neutral-600"
+                              data-testid="marketplace-amenity-chip"
+                            >
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
+                        {isHostel && (
+                          <span
+                            className="inline-flex items-center self-start rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-semibold text-indigo-700"
+                            data-testid="hostel-per-bed-indicator"
+                          >
+                            Starting from per bed
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
 
-                  {/* TASK-1873: rating row */}
-                  {item.rating != null && item.rating > 0 && (
+                  {/* TASK-1873 / TASK-10298776: rating row — enforce >= 4★ suppression guard */}
+                  {item.rating != null && item.rating >= 4 && (item.reviewCount == null || item.reviewCount > 0) && (
                     <p className="text-sm font-medium text-[var(--accent-text)]">
                       {'★'.repeat(Math.round(item.rating))}
                       <span className="ml-1 text-text-muted">{item.rating.toFixed(1)}</span>
@@ -563,13 +1029,20 @@ export default function MarketplaceHomepage() {
                     </p>
                   )}
 
-                  {/* TASK-10089: review provenance — verified stays and Google reviews are
+                  {/* TASK-10089 / MKT-012 / MKT-015: review provenance — verified stays and external reviews are
                       distinct labels from distinct counts. External-only cards (no
-                      verifiedStayCount) never claim a verified stay. */}
+                      verifiedStayCount) never claim a verified stay. Renders as an outbound link
+                      when externalReviewSourceUrl is present, and as plain text when null/empty. */}
                   {(() => {
                     const verifiedLabel = formatVerifiedStaysLabel(item.verifiedStayCount);
-                    const externalLabel = formatExternalReviewsLabel(item.externalReviewCount);
+                    const externalLabel = formatExternalReviewsLabel(
+                      item.externalReviewCount,
+                      item.externalReviewSource,
+                      item.externalReviewSourceUrl,
+                    );
                     if (!verifiedLabel && !externalLabel) return null;
+                    const trimmedSourceUrl = item.externalReviewSourceUrl?.trim() ?? '';
+                    const hasValidExternalUrl = /^https?:\/\//i.test(trimmedSourceUrl);
                     return (
                       <p className="text-xs text-text-muted" data-testid="marketplace-review-provenance">
                         {verifiedLabel && (
@@ -577,7 +1050,20 @@ export default function MarketplaceHomepage() {
                         )}
                         {verifiedLabel && externalLabel && <span aria-hidden> · </span>}
                         {externalLabel && (
-                          <span data-testid="marketplace-external-reviews">{externalLabel}</span>
+                          hasValidExternalUrl ? (
+                            <a
+                              href={trimmedSourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="underline hover:text-text-primary"
+                              data-testid="marketplace-external-reviews"
+                            >
+                              {externalLabel}
+                            </a>
+                          ) : (
+                            <span data-testid="marketplace-external-reviews">{externalLabel}</span>
+                          )
                         )}
                       </p>
                     );
@@ -586,40 +1072,23 @@ export default function MarketplaceHomepage() {
                   {/* TASK-4511: keyword-bucketed sentiment chip — matches SearchPage.tsx card treatment.
                       TASK-10089: gated on provenance agreement — the chip (native reviews only)
                       renders only when the summary's verified-stay count agrees with the card. */}
-                  <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} />
+                  <ReviewSummary listingId={item.id} verifiedStayCount={item.verifiedStayCount} lazy />
 
-                  {/* TASK-1872: formatCurrency replaces raw 'INR X' */}
-                  <p className="text-xl font-bold text-text-primary">
-                    {formatCurrency(item.pricePerNight, { maximumFractionDigits: 0 })}
-                    <span className="ml-1 text-sm font-normal text-text-muted">/ night</span>
-                  </p>
-
-                  {/* TASK-1873/TASK-2903: GST-inclusive estimate — use shared utility for consistency; TASK-4312: respect listing GST status */}
-                  <p className="text-xs text-text-muted">
-                    {formatEstTotalInclGst(
-                      item.pricePerNight,
-                      2,
-                      (amount) => formatCurrency(amount, { maximumFractionDigits: 0 }),
-                      // MKT-001 / TASK-7428 "no processor, no fee": a WHATSAPP-tenant listing
-                      // takes no online payment and must not be quoted a processing fee. The
-                      // fields are not deployed on the API yet, so `chargesOnlinePaymentFee`
-                      // undefined preserves today's flat-3% behaviour via the `?? 3` fallback.
-                      item.chargesOnlinePaymentFee === false ? 0 : (item.convenienceFeePercent ?? 3),
-                      item.isGstRegistered,
-                      item.pricePerNight,
-                    )}
-                  </p>
+                  {/* TASK-10298999 (founder ruling 2026-10-21: price shown = price charged): the card reads the
+                      same checkout quote as the listing page and the booking box — never the listing's
+                      standard rate plus a client-side fee estimate. */}
+                  <MarketplaceCardPriceBlock price={cardPrices.get(item.id)} />
 
                   {/* TASK-4511: Owner-share trust badge — no nightlyPrice prop (matches SearchPage.tsx's
                       BUG-7 fix; avoids leaking a fabricated host payout figure). */}
-                  <OwnerShareBadge className="self-start" />
+                  <OwnerShareBadge className="self-start" processingFeePercent={item.chargesOnlinePaymentFee === false ? 0 : feePercent(item.convenienceFeePercent)} />
 
                   <Link
-                    className="mt-auto inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full bg-[var(--cta-primary)] px-4 py-2.5 text-sm font-semibold text-[var(--text-on-cta)] transition hover:-translate-y-0.5 hover:bg-[var(--cta-primary-hover)]"
-                    to={marketplaceListingPath(item, searchSuffix)}
+                    className="mt-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 transition-colors"
+                    to={canonicalUrl}
+                    onClick={(e) => e.stopPropagation()}
                   >
                     View home
-                    <span aria-hidden>→</span>
                   </Link>
                 </div>
               </article>
@@ -637,9 +1106,9 @@ export default function MarketplaceHomepage() {
             data-testid="marketplace-load-more"
             onClick={loadMore}
             disabled={loadingMore}
-            className="min-h-[44px] rounded-full border border-[var(--cta-primary)] bg-bg-surface px-8 py-2.5 text-sm font-semibold text-[var(--cta-primary)] transition hover:bg-[var(--cta-primary)] hover:text-[var(--text-on-cta)] disabled:opacity-60"
+            className="min-h-[44px] rounded-xl bg-black px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-60"
           >
-            {loadingMore ? 'Loading…' : 'Load more'}
+            {loadingMore ? 'Loading…' : 'Show more homes'}
           </button>
           <p className="text-sm text-text-muted" data-testid="marketplace-load-more-count" aria-live="polite">
             Showing {items.length} of {total}
@@ -650,7 +1119,25 @@ export default function MarketplaceHomepage() {
       {/* TASK-4309: explicit empty state so a filter/search with no matches shows a
           message instead of a blank gap between the filter bar and the footer.
           TASK-4413: also covers a price filter that narrows the grid to zero results. */}
-      {!loading && visibleItems.length === 0 && (
+      {!loading && loadError && (
+        <div
+          role="alert"
+          data-testid="marketplace-load-error"
+          className="mt-8 rounded-2xl border border-border bg-bg-surface p-10 text-center"
+        >
+          <p className="text-base font-semibold text-text-primary">We couldn’t load stays right now</p>
+          <p className="mt-1 text-sm text-text-muted">This is a problem on our side, not your filters.</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-4 min-h-[44px] rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-primary hover:bg-bg-muted"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && visibleItems.length === 0 && (
         <div
           data-testid="marketplace-empty"
           className="mt-8 rounded-2xl border border-dashed border-border bg-bg-surface p-10 text-center"
@@ -659,9 +1146,83 @@ export default function MarketplaceHomepage() {
           <p className="mt-1 text-sm text-text-muted">
             Try the “All” tab or a different city to see available homes and rooms.
           </p>
+          <button
+            type="button"
+            data-testid="marketplace-empty-clear-filters"
+            onClick={() => {
+              setQuery('');
+              setCategory('all');
+              setMinPriceInput('');
+              setMaxPriceInput('');
+              setSelectedAmenity(null);
+              setSortBy('recommended');
+              setSearchParams({});
+            }}
+            className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-black px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-gray-800 transition-colors"
+          >
+            Clear all filters
+          </button>
         </div>
       )}
-      </div>
     </section>
+    </>
+  );
+}
+
+/**
+ * TASK-10298999: the marketplace card price, in the same words as the tenant homepage card —
+ * struck standard rate, real nightly price, the direct-booking saving and the all-in total.
+ * Without a quote it shows no number: a guessed price is exactly what this task removed.
+ */
+function MarketplaceCardPriceBlock({ price }: { price: MarketplaceCardPrice | undefined }) {
+  if (!price || price.status === 'loading') {
+    return (
+      <p className="text-sm text-text-muted" data-testid="marketplace-card-price-loading">
+        Loading price…
+      </p>
+    );
+  }
+  if (price.status === 'unavailable') {
+    return (
+      <p className="text-sm text-text-muted" data-testid="marketplace-card-price-unavailable">
+        Choose dates to see the price.
+      </p>
+    );
+  }
+  const { display } = price;
+  return (
+    <div data-testid="marketplace-card-price">
+      {display.appliedPromotionLabel && display.savingsPercent > 0 && (
+        <span
+          className="mb-1 inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800"
+          data-testid="marketplace-card-deal-badge"
+        >
+          {display.appliedPromotionLabel}
+        </span>
+      )}
+      <p className="text-xl font-bold text-text-primary">
+        {display.standardNightly != null && (
+          <span
+            className="mr-2 text-base font-normal text-text-muted line-through"
+            data-testid="marketplace-card-standard-price"
+          >
+            <span className="sr-only">Standard price </span>
+            {formatCurrency(display.standardNightly, { maximumFractionDigits: 0 })}
+          </span>
+        )}
+        <span data-testid="marketplace-card-real-price">
+          {formatCurrency(display.realNightly, { maximumFractionDigits: 0 })}
+        </span>
+        <span className="ml-1 text-sm font-normal text-text-muted">/ night</span>
+      </p>
+      {display.savingsPercent > 0 && (
+        <p className="text-xs font-semibold text-green-700" data-testid="marketplace-card-saving">
+          {directSavingsLabel(display.savingsPercent)}
+        </p>
+      )}
+      <p className="text-xs text-text-muted" data-testid="marketplace-card-total">
+        {allInTotalLabel(formatCurrency(display.total, { maximumFractionDigits: 0 }), display.nights)}
+      </p>
+    </div>
   );
 }

@@ -6,7 +6,7 @@
  */
 
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { TenantInfo } from '@/tenant/tenantContext';
 import { CurrencyProvider } from '../../contexts/CurrencyContext';
 import { BookingProvider } from '../../contexts/BookingContext';
@@ -28,11 +28,12 @@ const baseTenant = (over: Partial<TenantInfo>): TenantInfo => ({
   ...over,
 });
 
-const renderCard = () =>
+const renderCard = (onClick?: () => void) =>
   render(
     <CurrencyProvider>
       <BookingProvider>
         <ListingCard
+          onClick={onClick}
           id="1"
           name="Sunrise Villa"
           location="Hyderabad"
@@ -73,5 +74,143 @@ describe('TASK-101158: ListingCard Razorpay chip is gated by hasOnlinePaymentRai
     renderCard();
 
     expect(screen.getByText(/secure razorpay payments/i)).toBeInTheDocument();
+  });
+});
+
+
+describe('HSL-011: ListingCard dorm badge reads the gender rule from the API only', () => {
+  afterEach(cleanup);
+  const renderDorm = (name: string, extra: { accommodationType?: string; dormGenderPolicy?: string | null }) => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    return render(
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingCard
+            id="9" name={name} location="Goa" image="" price={799} rating={0} reviews={0}
+            propertyType="Homestay" guests={6} petFriendly={false} {...extra}
+          />
+        </BookingProvider>
+      </CurrencyProvider>,
+    );
+  };
+
+  it('shows the API policy chip', () => {
+    renderDorm('6-Bed Dorm', { accommodationType: 'HostelDorm', dormGenderPolicy: 'MaleOnly' });
+    expect(screen.getByTestId('hostel-gender-badge-male')).toBeInTheDocument();
+  });
+
+  it('a name that says Female-Only does not make a chip when the API states no policy', () => {
+    renderDorm('6-Bed Female-Only Dorm', { accommodationType: 'HostelDorm', dormGenderPolicy: null });
+    expect(screen.getByTestId('hostel-dorm-base-badge')).toBeInTheDocument();
+    expect(screen.queryByTestId('hostel-gender-badge-female')).toBeNull();
+  });
+
+  it('a dorm-named listing that is not a HostelDorm shows no dorm badge at all', () => {
+    renderDorm('Bed in Dormitory Villa', {});
+    expect(screen.queryByTestId('hostel-dorm-container')).toBeNull();
+  });
+
+  // TASK-10299109: the badge says "Sold by the Bed", so it may only sit on a listing that really sells beds
+  // (Listing.AccommodationType === "HostelDorm"). A private room of a Hostel PROPERTY is sold by the room.
+  it('TASK-10299109: a private room of a Hostel property shows no dorm badge and no per-bed wording', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    render(
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingCard
+            id="11" name="Private Double Room" location="Goa" image="" price={1800} rating={0} reviews={0}
+            propertyType="Hostel" accommodationType="PrivateRoom" guests={2} petFriendly={false}
+          />
+        </BookingProvider>
+      </CurrencyProvider>,
+    );
+    expect(screen.queryByTestId('hostel-dorm-container')).toBeNull();
+    expect(screen.queryByTestId('hostel-dorm-base-badge')).toBeNull();
+    expect(screen.queryByTestId('hostel-per-bed-indicator')).toBeNull();
+    expect(screen.getByTestId('price-unit-label')).toHaveTextContent('/ night');
+    expect(screen.getByTestId('price-unit-label')).not.toHaveTextContent(/bed/i);
+  });
+
+  it('TASK-10299109: a Hostel-property listing with no accommodationType at all is not a dorm either', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    render(
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingCard
+            id="12" name="Twin Room" location="Goa" image="" price={1500} rating={0} reviews={0}
+            propertyType="Hostel" guests={2} petFriendly={false}
+          />
+        </BookingProvider>
+      </CurrencyProvider>,
+    );
+    expect(screen.queryByTestId('hostel-dorm-container')).toBeNull();
+    expect(screen.queryByTestId('hostel-per-bed-indicator')).toBeNull();
+  });
+
+  it('TASK-10299109: the real HostelDorm listing of the same Hostel property keeps the badge and per-bed wording', () => {
+    renderDorm('6-Bed Mixed Dorm', { accommodationType: 'HostelDorm', dormGenderPolicy: 'Mixed' });
+    expect(screen.getByTestId('hostel-dorm-base-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('hostel-per-bed-indicator')).toBeInTheDocument();
+    expect(screen.getByTestId('price-unit-label')).toHaveTextContent('per bed / night');
+  });
+});
+
+describe('ListingCard independent controls', () => {
+  afterEach(cleanup);
+  it('keeps review keyboard events independent of opening the room', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    const openRoom = vi.fn();
+    const { container } = renderCard(openRoom);
+    const reviews = screen.getByRole('link', { name: 'View guest reviews' });
+    fireEvent.keyDown(reviews, { key: 'Enter' });
+    expect(openRoom).not.toHaveBeenCalled();
+    expect(container.querySelector('article')).not.toHaveAttribute('role', 'button');
+    expect(reviews).toHaveAttribute('href', '/property/1#reviews');
+  });
+  it('toggles total without opening the room and opens once from its CTA', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    const openRoom = vi.fn();
+    renderCard(openRoom);
+    fireEvent.click(screen.getByRole('button', { name: /See total/ }));
+    expect(screen.getByRole('button', { name: 'Hide total' })).toBeInTheDocument();
+    expect(openRoom).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide total' }));
+    expect(openRoom).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'View room Sunrise Villa' }));
+    expect(openRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it('MKT-042: marketplace card uses listing fee/GST props and links rating chip to href#reviews', () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(baseTenant({ bookingMode: 'MANUAL' }));
+    render(
+      <CurrencyProvider>
+        <BookingProvider>
+          <ListingCard
+            marketplace
+            id="724"
+            name="Baga Cottage"
+            location="Goa"
+            image=""
+            price={2000}
+            rating={4.8}
+            reviews={14}
+            propertyType="Homestay"
+            guests={2}
+            petFriendly={false}
+            isGstRegistered={false}
+            chargesOnlinePaymentFee={false}
+            convenienceFeePercent={3}
+            href="/homes/baga-cottage/724?tenant=host-b&brand=atlastays"
+          />
+        </BookingProvider>
+      </CurrencyProvider>,
+    );
+
+    const reviews = screen.getByRole('link', { name: 'View guest reviews' });
+    expect(reviews).toHaveAttribute('href', '/homes/baga-cottage/724?tenant=host-b&brand=atlastays#reviews');
+
+    // OwnerShareBadge receives processingFeePercent=0 (since chargesOnlinePaymentFee=false)
+    const ownerBadge = screen.getByText(/Book direct — host keeps more/i);
+    expect(ownerBadge.getAttribute('title')).toContain('No payment-processing fee.');
   });
 });

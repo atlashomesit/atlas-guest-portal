@@ -220,7 +220,7 @@ describe("Atlas direct-booking hosts: canonical + og:url before JS (TASK-101940)
     expect(new URL(head.canonical, url).host).toContain(new URL(url).host);
     // Atlas hosts never trigger the tenant-site-meta round-trip, and keep Atlas's own tags.
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(head.title).toBe("Atlastays — Book direct with verified hosts");
+    expect(head.title).toBe("Atlastays — Book direct with the owner");
     expectFrameProtected(response);
   });
 
@@ -288,10 +288,12 @@ describe("Atlas direct-booking hosts: canonical + og:url before JS (TASK-101940)
   });
 
   it.each(["https://atlastays.com/", "https://www.atlastays.com/", "https://dev.atlastays.com/"])(
-    "leaves marketplace host %s untouched (not an Atlas direct-booking host)",
+    "rewrites marketplace host %s with marketplace pre-JS meta instead of direct-booking logic (MKT-013)",
     async (url) => {
       const { body } = await serve(url);
-      expect(body).toBe(INDEX_HTML);
+      expect(body).toContain("<title>Atlastays — Book Homestays Directly with Hosts</title>");
+      expect(body).toContain(`<link rel="canonical" href="${url}" />`);
+      expect(body).toContain(`<meta property="og:url" content="${url}" />`);
       expect(fetchSpy).not.toHaveBeenCalled();
     },
   );
@@ -320,6 +322,9 @@ describe("Atlas direct-booking hosts: canonical + og:url before JS (TASK-101940)
   });
 });
 
+// HEALTH-1110: every host below is a distinct fixed name. They used to carry Date.now(), which put a new number in every test TITLE on
+// every run, so no run could be compared with the last one (flake and slow-test history is keyed by title). Distinct names are all the
+// per-host tenant-meta cache needs to keep these cases apart.
 describe("tenant hosts are unchanged (brand isolation)", () => {
   const customDomainMeta = {
     tenantSlug: "starguesthouse",
@@ -337,9 +342,9 @@ describe("tenant hosts are unchanged (brand isolation)", () => {
   }
 
   it.each([
-    `https://star-home-${Date.now()}.example/`,
-    `https://star-deep-${Date.now()}.example/homes/star-guest-house/7?checkin=2026-10-01`,
-    `https://star-search-${Date.now()}.example/search?city=goa`,
+    `https://star-home-fixture.example/`,
+    `https://star-deep-fixture.example/homes/star-guest-house/7?checkin=2026-10-01`,
+    `https://star-search-fixture.example/search?city=goa`,
   ])("custom domain %s: every tag is the tenant rewrite's value", async (url) => {
     metaFetch(customDomainMeta);
     const expected = buildMetaRewriteValues(customDomainMeta, url);
@@ -359,7 +364,7 @@ describe("tenant hosts are unchanged (brand isolation)", () => {
 
   it("white-label subdomain through the router Worker: canonical is the tenant's, never pages.dev or Atlas", async () => {
     metaFetch({ ...customDomainMeta, canonicalUrl: "https://starguesthouse.atlastays.com/" });
-    const publicHost = `wl-${Date.now()}.atlastays.com`;
+    const publicHost = `wl-fixture.atlastays.com`;
 
     const { head } = await serve("https://atlas-guest-portal.pages.dev/homes/star-guest-house/7", {
       headers: { "x-atlas-worker-proxy": WORKER_PROXY_SECRET, "x-forwarded-host": publicHost },
@@ -372,9 +377,9 @@ describe("tenant hosts are unchanged (brand isolation)", () => {
   });
 
   it.each([
-    `https://unresolved-${Date.now()}.example/`,
-    `https://qa.atlashomestays.com.lookalike-${Date.now()}.example/`,
-    `https://atlashomestays-${Date.now()}.example/homes/atlas-homes/1`,
+    `https://unresolved-fixture.example/`,
+    `https://qa.atlashomestays.com.lookalike-fixture.example/`,
+    `https://atlashomestays-fixture.example/homes/atlas-homes/1`,
   ])("tenant-eligible host %s with no tenant meta is served byte-identical (never Atlas-canonicalised)", async (url) => {
     const { body, head } = await serve(url);
     expect(fetchSpy).toHaveBeenCalledTimes(1);

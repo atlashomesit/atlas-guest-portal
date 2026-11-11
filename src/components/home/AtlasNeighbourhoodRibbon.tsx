@@ -7,6 +7,8 @@ import '../homepage_components/atlas-home-v2.css';
 type AtlasNeighbourhoodRibbonProps = {
   /** "ribbon" (default) is the full strip between hero and grid; "closer" is the calm one-liner under the grid. */
   variant?: 'ribbon' | 'closer';
+  /** GUEST-072: how many homes are live. The closer line makes a claim about "the homes", so it is not shown for a single home, and it never prints a fixed number. */
+  homeCount?: number;
 };
 
 /**
@@ -15,7 +17,7 @@ type AtlasNeighbourhoodRibbonProps = {
  * Atlas-specific, so the strip is hidden on white-label tenant subdomains
  * (RA-006) where neighbourhood data isn't yet wired through.
  */
-const AtlasNeighbourhoodRibbon: React.FC<AtlasNeighbourhoodRibbonProps> = ({ variant = 'ribbon' }) => {
+const AtlasNeighbourhoodRibbon: React.FC<AtlasNeighbourhoodRibbonProps> = ({ variant = 'ribbon', homeCount }) => {
   const tenant = getTenantContext();
   // KPHB copy applies to Atlas surfaces (marketplace root + the `atlas` tenant)
   // only — hidden on white-label tenants, matching the rest of the page (RA-006).
@@ -41,11 +43,12 @@ const AtlasNeighbourhoodRibbon: React.FC<AtlasNeighbourhoodRibbonProps> = ({ var
   if (!showAtlasContent) return null;
 
   if (variant === 'closer') {
+    if (typeof homeCount === 'number' && homeCount < 2) return null;
     return (
       <section className="ahv2-ribbon ahv2-ribbon--closer" aria-label="Neighbourhood note">
         <span className="ahv2-ribbon-left">
           <span className="ahv2-dot" aria-hidden="true" />
-          All seven homes are within a 4-minute walk of each other
+          The homes are all within a 4-minute walk of each other
         </span>
       </section>
     );

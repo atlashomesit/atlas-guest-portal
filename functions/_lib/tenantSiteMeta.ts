@@ -27,6 +27,7 @@ const MARKETPLACE_HOSTS = new Set<string>([
   "atlastays.com",
   "www.atlastays.com",
   "dev.atlastays.com",
+  "qa.atlastays.com",
 ]);
 
 /* eslint-disable atlas-brand/no-atlas-string-leak -- canonical first-party Atlas host allowlist for OG rewrite short-circuit; never rendered to guests */
@@ -105,7 +106,7 @@ export function buildMetaRewriteValues(meta: TenantSiteMeta, requestUrl: string)
 
   const description =
     (meta.description ?? "").trim() ||
-    `Book ${propertyName} directly. Verified property, zero booking fees, instant confirmation.`;
+    `Book directly with ${propertyName}.`;
 
   // TASK-7468 #5: white-label/Neutral hosts must not inherit Atlas /og-image.svg.
   const image = (meta.photoUrl ?? "").trim() || NEUTRAL_NO_OG_IMAGE;

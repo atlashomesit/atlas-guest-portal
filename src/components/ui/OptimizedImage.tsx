@@ -17,6 +17,7 @@ const PLACEHOLDER_CLASS =
  * Blob URLs are rewritten through `/img` (see `buildGuestImageSrcSet`) rather than this
  * query-param builder. Only emit decorative ?w= srcset for origins that honour it.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located srcset helper
 export function shouldBuildResponsiveSrcSet(src: string): boolean {
   try {
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
@@ -31,17 +32,26 @@ export function shouldBuildResponsiveSrcSet(src: string): boolean {
   }
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located srcset helper
 export const buildResponsiveSrcSet = (src: string, widths: number[] = RESPONSIVE_WIDTHS) => {
   try {
     if (!shouldBuildResponsiveSrcSet(src)) return undefined;
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
     const url = new URL(src, base);
 
+    // Airbnb's image CDN (muscache.com) ignores ?w= and always returns its full-size photo
+    // (~1180px), so every srcset candidate downloaded the same bytes. It resizes on ?im_w=.
+    const isAirbnbCdn = url.hostname === "muscache.com" || url.hostname.endsWith(".muscache.com");
+
     return widths
       .map((width) => {
         const next = new URL(url);
-        next.searchParams.set("w", String(width));
-        next.searchParams.set("auto", "format");
+        if (isAirbnbCdn) {
+          next.searchParams.set("im_w", String(width));
+        } else {
+          next.searchParams.set("w", String(width));
+          next.searchParams.set("auto", "format");
+        }
         return `${next.toString()} ${width}w`;
       })
       .join(", ");

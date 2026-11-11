@@ -15,7 +15,7 @@
  * spec), same convention as every other layout.
  */
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import {
   layoutThemeIds,
@@ -23,6 +23,7 @@ import {
   resolveLayoutThemeId,
   themeRegistry,
 } from "../registry";
+import { settle } from "../../test/settle";
 
 // ---- Home.tsx's dependency surface (shared by classic/heritage/coastal Home) ----
 vi.mock("@/components/homepage_components/slider/Slider", () => ({
@@ -131,9 +132,8 @@ describe("AC5/AC13 — coastal's Home renders its founder-specified composition 
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("coastal-home")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("coastal-home")).toBeInTheDocument();
     // Booking entry point (Slider hosts the real SearchAvailabilityWidget in prod; stubbed
     // here per the shared-deps mock above, but its presence proves the hero — and therefore
     // the booking entry point — is mounted, same AC5/AC13 shape as the classic/heritage specs).
@@ -155,9 +155,8 @@ describe("AC5/AC13 — coastal's Home renders its founder-specified composition 
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("coastal-home")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("coastal-home")).toBeInTheDocument();
     // classic's grid section renders inside `HomePage_Locations`, which coastal never imports.
     expect(screen.queryByTestId("coastal-listings-gallery")?.querySelector(".grid")).toBeNull();
   });

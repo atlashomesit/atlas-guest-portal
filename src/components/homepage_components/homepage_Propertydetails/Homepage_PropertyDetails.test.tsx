@@ -206,3 +206,19 @@ describe('TASK-8231: amenities modal accessible close + dialog semantics', () =>
     expect(content).toContain('aria-label="Send message"');
   });
 });
+
+describe('GUEST-013: PostalAddress JSON-LD never hardcodes Telangana', () => {
+  const SURFACES: Array<{ label: string; path: string }> = [
+    { label: 'default', path: resolve(__dirname, './Homepage_PropertyDetails.tsx') },
+    { label: 'heritage', path: resolve(__dirname, '../../../themes/heritage/PropertyDetails.tsx') },
+  ];
+
+  for (const { label, path } of SURFACES) {
+    it(`${label}: does not hardcode addressRegion: 'Telangana'`, () => {
+      const content = readFileSync(path, 'utf-8');
+      expect(content).not.toContain("addressRegion: 'Telangana'");
+      expect(content).not.toContain('addressRegion: "Telangana"');
+    });
+  }
+});
+

@@ -19,8 +19,8 @@ import { clampTransformWidth, isAllowedBlobImageUrl } from "./functions/_lib/gue
 // index.html's script tag is simply ignored, not a real credential).
 const devCspNonce = randomBytes(16).toString("base64");
 
-const RUNTIME_CONFIG_PATH = path.resolve(__dirname, "public/.well-known/atlas-runtime-config.json");
-const MANIFEST_PATH = path.resolve(__dirname, "public/manifest.webmanifest");
+const RUNTIME_CONFIG_PATH = path.resolve(import.meta.dirname, "public/.well-known/atlas-runtime-config.json");
+const MANIFEST_PATH = path.resolve(import.meta.dirname, "public/manifest.webmanifest");
 // Dev-server backend target for the vite proxy + dev runtime-config plugin.
 // Resolved, in order: (1) VITE_API_PROXY_TARGET env (explicit override), then
 // (2) the apiBaseUrl already written into atlas-runtime-config.json — non-default
@@ -155,6 +155,21 @@ function devManifestJsonAliasPlugin() {
   };
 }
 
+/**
+ * TASK-10299465 (b): production builds only. Adds `<script async src="/boot-prefetch.js">` first in <head> so the runtime-config request and the tenant
+ * lookup start while the app's scripts download (see public/boot-prefetch.js and src/boot/earlyFetch.ts). `vite dev` never serves it, so the dev
+ * server's requests and console are unchanged.
+ */
+function bootPrefetchScriptPlugin() {
+  return {
+    name: "boot-prefetch-script",
+    apply: "build" as const,
+    transformIndexHtml() {
+      return [{ tag: "script", attrs: { src: "/boot-prefetch.js", async: true }, injectTo: "head-prepend" as const }];
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     tailwindcss(),
@@ -162,11 +177,12 @@ export default defineConfig({
     devRuntimeConfigPlugin(),
     devGuestImageProxyPlugin(),
     devManifestJsonAliasPlugin(),
+    bootPrefetchScriptPlugin(),
   ],
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
     dedupe: ["react", "react-dom", "react-router", "react-router-dom"],
   },
@@ -216,20 +232,19 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks(id: string) {
-          if (!id.includes("node_modules")) return;
-          // Heavy, route-level only — keep off the homepage graph.
-          if (id.includes("node_modules/leaflet") || id.includes("node_modules/react-leaflet")) {
-            return "maps";
-          }
-          if (id.includes("node_modules/react-markdown")) {
-            return "markdown";
-          }
-          if (id.includes("node_modules/axios") || id.includes("node_modules/qrcode.react")) {
-            return "payment";
-          }
-          // TASK-7839: one vendor chunk instead of 10 tiny splits that became 49 requests.
-          return "vendor";
+        // TASK-10299465: with the old manualChunks function Rolldown pulled shared code (React itself) INTO the "maps" and "markdown"
+        // chunks, so the entry file imported both statically and every page, the home page included, downloaded 200 KB of
+        // map code and 115 KB of markdown code it never uses. includeDependenciesRecursively:false keeps each route-only group to
+        // its own modules, and the shared code stays in "vendor" (TASK-7839: one vendor chunk, not 10 tiny splits).
+        codeSplitting: {
+          includeDependenciesRecursively: false,
+          groups: [
+            // Heavy, route-level only: keep off the homepage graph.
+            { name: "maps", test: /node_modules[/\\](leaflet|react-leaflet|@react-leaflet)/, priority: 30 },
+            { name: "markdown", test: /node_modules[/\\](react-markdown|remark-[^/\\]+|rehype-[^/\\]+|unified|mdast-[^/\\]+|micromark[^/\\]*|hast-[^/\\]+|unist-[^/\\]+|vfile[^/\\]*|decode-named-character-reference|character-entities[^/\\]*|property-information|space-separated-tokens|comma-separated-tokens|trim-lines|trough|bail|devlop|estree-util-[^/\\]+|html-url-attributes|style-to-[^/\\]+|inline-style-parser|is-plain-obj|ccount|markdown-table|longest-streak|zwitch)[/\\]/, priority: 30 },
+            { name: "payment", test: /node_modules[/\\](axios|qrcode\.react)[/\\]/, priority: 30 },
+            { name: "vendor", test: /node_modules/, priority: 10 },
+          ],
         },
       },
     },

@@ -95,4 +95,65 @@ describe('TASK-7428: MOR footer disclosure is gated by half', () => {
 
     expect(container.textContent).not.toMatch(/razorpay/i);
   });
+
+  it('TASK-10298995: footer legal disclaimer and terms/privacy/contact links point to valid routes', async () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(
+      customDomainTenant({ paymentProvider: 'RAZORPAY', bookingMode: 'ONLINE' }),
+    );
+
+    await renderFooter();
+
+    const disclaimer = screen.getByTestId('footer-legal-disclaimer');
+    expect(disclaimer).toBeInTheDocument();
+    expect(disclaimer).toHaveTextContent(/Terms & Conditions/);
+    expect(disclaimer).toHaveTextContent(/Privacy Policy/);
+
+    const termsLinks = screen.getAllByRole('link', { name: /Terms/i });
+    expect(termsLinks.some((l) => l.getAttribute('href') === '/terms')).toBe(true);
+
+    const privacyLinks = screen.getAllByRole('link', { name: /Privacy/i });
+    expect(privacyLinks.some((l) => l.getAttribute('href') === '/privacy')).toBe(true);
+
+    const contactLinks = screen.getAllByRole('link', { name: /Contact/i });
+    expect(contactLinks.some((l) => l.getAttribute('href') === '/contact')).toBe(true);
+  });
+
+  it('TASK-10299142: marketplace footer Stays link targets the grid anchor and keeps the active search dates', async () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(
+      customDomainTenant({ paymentProvider: 'RAZORPAY', bookingMode: 'ONLINE' }),
+    );
+    const { default: Footer } = await import('./Footer');
+    render(
+      <MemoryRouter initialEntries={['/search?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2']}>
+        <Footer />
+      </MemoryRouter>,
+    );
+    const stays = screen.getAllByRole('link', { name: /^Stays$/i });
+    expect(stays.length).toBeGreaterThan(0);
+    for (const link of stays) {
+      expect(link.getAttribute('href')).toBe(
+        '/?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2#our-homes',
+      );
+    }
+  });
+
+  it('TASK-10299142: tenant storefront footer Stays link is unchanged', async () => {
+    tenantCtxMock.getTenantContext.mockReturnValue(
+      customDomainTenant({ paymentProvider: 'RAZORPAY', bookingMode: 'ONLINE' }),
+    );
+    await renderFooter();
+    const stays = screen.getAllByRole('link', { name: /^Stays$/i });
+    expect(stays.every((l) => l.getAttribute('href') === '/#our-homes')).toBe(true);
+  });
+});
+
+describe('renderEmailWrappableAfterAt', () => {
+  it('breaks only after the @ and keeps the address text intact', async () => {
+    const { renderEmailWrappableAfterAt } = await import('./Footer');
+    const { render } = await import('@testing-library/react');
+    const { container } = render(<p>{renderEmailWrappableAfterAt('atlashomeskphb@gmail.com')}</p>);
+    expect(container.textContent).toBe('atlashomeskphb@gmail.com');
+    expect(container.querySelectorAll('wbr')).toHaveLength(1);
+    expect(container.querySelector('p')!.innerHTML).toBe('atlashomeskphb@<wbr>gmail.com');
+  });
 });

@@ -68,6 +68,20 @@ afterEach(() => {
 });
 
 describe("Navbar CTA", () => {
+  it("leaves the tenant homepage search to the hero and retains navigation", () => {
+    renderNavbar();
+    expect(screen.queryByTestId('mobile-search-pill')).toBeNull();
+    expect(screen.getByRole('button', { name: /toggle navigation/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Stays$/i })).toHaveAttribute('href', '/#our-homes');
+  });
+  it("TASK-10299142: in marketplace mode Stays targets the grid anchor and keeps the active search dates", () => {
+    renderNavbar(["/search?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2"]);
+    expect(screen.getByRole("link", { name: /^Stays$/i })).toHaveAttribute(
+      "href",
+      "/?brand=atlastays&checkIn=2026-11-05&checkOut=2026-11-07&guests=2#our-homes",
+    );
+  });
+
   it("renders Help navigation as internal link (replaces Contact — Gap 1 simplification)", () => {
     renderNavbar();
 
@@ -186,17 +200,18 @@ describe("Navbar CTA", () => {
 
   it("DESIGN-026: renders a persistent mobile search pill", () => {
     Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 });
-    renderNavbar();
+    renderNavbar(["/search"]);
 
     const pill = screen.getByTestId("mobile-search-pill");
     expect(pill).toBeInTheDocument();
-    expect(pill).toHaveAttribute("aria-label", "Search stays");
+    // G2 journey 19: the accessible name starts with the visible text (WCAG 2.5.3 label in name).
+    expect(pill).toHaveAttribute("aria-label", "Where to? Search stays");
     expect(pill).toHaveTextContent("Where to?");
   });
 
   it("DESIGN-026: mobile search pill opens full-screen overlay", () => {
     Object.defineProperty(window, "innerWidth", { writable: true, configurable: true, value: 375 });
-    renderNavbar();
+    renderNavbar(["/search"]);
 
     const pill = screen.getByTestId("mobile-search-pill");
     fireEvent.click(pill);
@@ -213,7 +228,7 @@ describe("Navbar CTA", () => {
   });
 
   it("DESIGN-026: mobile search overlay navigates to /search on submit", () => {
-    renderNavbar();
+    renderNavbar(["/search"]);
 
     fireEvent.click(screen.getByTestId("mobile-search-pill"));
     const input = screen.getByTestId("mobile-search-destination-input");
@@ -255,6 +270,15 @@ describe("Navbar CTA", () => {
     for (const name of expectedNames) {
       expect(menu).toHaveTextContent(name);
     }
+  });
+
+  it("a11y label-content-name-mismatch: the language button's accessible name starts with its visible code", () => {
+    renderNavbar();
+
+    const toggle = screen.getByRole("button", { name: /change language/i });
+    const visible = (toggle.textContent ?? "").trim();
+    expect(visible).not.toBe("");
+    expect(toggle.getAttribute("aria-label")!.toLowerCase()).toContain(visible.toLowerCase());
   });
 
   it("TASK-8103: selecting a stub locale (Marathi) does not blank the switcher — it stays a real language code", () => {
@@ -378,4 +402,27 @@ describe("Navbar CTA", () => {
     expect(logoImg.src).toContain("atlas-homes-logo.png");
     expect(logoImg.className).toContain("navbar-logo--stacked");
   });
+});
+
+it('uses Atlastays only for the marketplace shell and preserves configured tenant identity', () => {
+  vi.mocked(getTenantContext).mockReturnValue({ name: 'Atlas tenant', slug: 'atlas', logoUrl: '/tenant-fixture.svg', isMarketplaceRoot: true });
+  renderNavbar(['/?brand=atlastays']);
+  expect(screen.getByRole('link', { name: 'Atlastays — home' })).toHaveTextContent('Atlastays');
+  expect(screen.queryByRole('img', { name: 'Fixture Stays' })).toBeNull();
+});
+
+it('keeps the tenant name and logo outside the marketplace shell', () => {
+  vi.mocked(getTenantContext).mockReturnValue({ name: 'Fixture Stays', slug: 'fixture', logoUrl: '/tenant-fixture.svg' });
+  renderNavbar(['/search']);
+  const home = screen.getByRole('link', { name: 'Fixture Stays — home' });
+  expect(home.querySelector('img')).toHaveAttribute('src', '/tenant-fixture.svg');
+  expect(home).toHaveTextContent('Fixture Stays');
+});
+
+it('does not let a marketplace preview query replace a white-label tenant identity', () => {
+  vi.mocked(getTenantContext).mockReturnValue({ name: 'Tenant private name', slug: 'fixture', guestCommsBrandingMode: 'Neutral', logoUrl: '/tenant-fixture.svg', legalContactPack: { displayName: 'Fixture Stays', isCustomDomain: true } });
+  renderNavbar(['/search?brand=atlastays']);
+  const home = screen.getByRole('link', { name: 'Fixture Stays — home' });
+  expect(home.querySelector('img')).toHaveAttribute('src', '/tenant-fixture.svg');
+  expect(screen.queryByRole('link', { name: 'Atlastays — home' })).toBeNull();
 });

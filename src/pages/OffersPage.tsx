@@ -44,6 +44,84 @@ function extractLastMinutePercent(properties: TenantPropertyRecord[]): number {
   return Math.max(0, ...properties.map((p) => p.lastMinuteDiscountPercent ?? 0));
 }
 
+function DirectBookingCodeCopy() {
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [copying, setCopying] = useState(false);
+  const manualCodeRef = useRef<HTMLInputElement>(null);
+
+  function selectCode() {
+    const input = manualCodeRef.current;
+    if (!input) return;
+    input.focus({ preventScroll: true });
+    input.select();
+    input.scrollIntoView({ block: "center", behavior: "instant" });
+  }
+
+  useEffect(() => {
+    if (status === "failed") selectCode();
+    if (status !== "copied") return;
+    const timer = window.setTimeout(() => setStatus("idle"), 2000);
+    return () => window.clearTimeout(timer);
+  }, [status]);
+
+  async function copyCode() {
+    setCopying(true);
+    if (status === "copied") setStatus("idle");
+    try {
+      await navigator.clipboard.writeText(DIRECT5_CODE);
+      setStatus("copied");
+    } catch {
+      setStatus("failed");
+      // A repeated denied retry keeps the same field and restores its selection.
+      selectCode();
+    } finally {
+      setCopying(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => void copyCode()}
+        disabled={copying}
+        aria-busy={copying}
+        className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl bg-white border border-emerald-300 px-4 py-2 font-mono font-bold text-emerald-700 text-sm hover:bg-emerald-50 transition"
+        aria-label={DIRECT5_CODE + " " + (status === "copied" ? "Copied!" : "Copy") + " promo code"}
+      >
+        {DIRECT5_CODE}{" "}
+        <span className="text-xs font-normal text-emerald-700" aria-live="polite">
+          {status === "copied" ? "Copied!" : "Copy"}
+        </span>
+      </button>
+      {status === "failed" && (
+        <div className="w-full basis-full border-t border-emerald-200 pt-3" data-testid="offers-direct5-copy-fallback">
+          <p id="offers-direct5-copy-error" role="alert" className="mb-2 text-sm text-emerald-900">
+            Could not copy the code. Select it below and copy it manually.
+          </p>
+          <label htmlFor="offers-direct5-manual-code" className="text-xs font-semibold text-emerald-900">
+            Promo code to copy
+          </label>
+          <div className="mt-1 flex flex-wrap gap-2">
+            <input
+              ref={manualCodeRef}
+              id="offers-direct5-manual-code"
+              type="text"
+              readOnly
+              value={DIRECT5_CODE}
+              aria-describedby="offers-direct5-copy-error"
+              className="w-32 min-w-0 min-h-11 rounded-lg border border-emerald-600 bg-white p-2 font-mono text-base font-bold text-emerald-900 scroll-mt-[120px] scroll-mb-[120px]"
+            />
+            <button type="button" onClick={selectCode} className="min-h-11 rounded-lg border border-emerald-600 bg-white px-3 py-2 text-emerald-900">
+              Select code
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function OffersPage() {
   const { properties, state, fetchErrorMessage, refetch } = useTenantListings();
   const brandName = getTenantBrandName();
@@ -123,7 +201,7 @@ export default function OffersPage() {
         {direct5State === "active" && (
           <div
             data-testid="offers-direct5-card"
-            className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 flex flex-col sm:flex-row sm:items-center gap-4"
+            className="rounded-2xl bg-emerald-50 border border-emerald-200 p-6 flex flex-wrap flex-col sm:flex-row sm:items-center gap-4"
           >
             <div className="text-3xl">🎁</div>
             <div className="flex-1">
@@ -132,17 +210,7 @@ export default function OffersPage() {
                 Use promo code <strong>{DIRECT5_CODE}</strong> at checkout for 5% off any direct booking.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => handleCopy(DIRECT5_CODE)}
-              className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl bg-white border border-emerald-300 px-4 py-2 font-mono font-bold text-emerald-700 text-sm hover:bg-emerald-50 transition"
-              aria-label={`Copy ${DIRECT5_CODE} promo code`}
-            >
-              {DIRECT5_CODE}
-              <span className="text-xs font-normal text-emerald-700">
-                {copied === DIRECT5_CODE ? "Copied!" : "Copy"}
-              </span>
-            </button>
+            <DirectBookingCodeCopy />
           </div>
         )}
 
@@ -250,16 +318,19 @@ export default function OffersPage() {
         {/* Promo code checker */}
         <div className="rounded-2xl bg-bg-surface border border-border-subtle shadow-level1 p-6 space-y-4">
           <h2 className="font-bold text-text-primary text-xl">Have a Promo Code?</h2>
-          <p className="text-text-muted text-sm">Enter your code below to check its validity before booking.</p>
+          <p id="promo-code-help" className="text-text-muted text-sm">Enter your code below to check its validity before booking.</p>
+          <label htmlFor="guest-promo-code" className="block text-sm font-semibold" style={{ marginBottom: 8 }}>Promo code</label>
           <form onSubmit={handleValidate} className="flex gap-2">
             <input
               ref={inputRef}
+              id="guest-promo-code"
               type="text"
               value={promoCode}
               onChange={(e) => setPromoCode(normalizePromoCodeInput(e.target.value))}
               placeholder="e.g. SUMMER25"
               className="flex-1 rounded-xl border border-border-subtle bg-white px-4 py-2.5 text-sm font-mono uppercase tracking-widest text-text-primary placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-brand-primary"
               aria-label="Promo code"
+              aria-describedby="promo-code-help"
               maxLength={32}
             />
             <button

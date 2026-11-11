@@ -15,6 +15,8 @@ import { usePushNotifications } from "./hooks/usePushNotifications"
 import NativeShellBridge from "./native/NativeShellBridge"
 import { trackEvent } from "./utils/analytics"
 import { isAtlastaysMarketplaceSurface, isMarketplaceMode } from "./tenant/tenantResolver"
+import { getTenantContext } from "./tenant/tenantContext"
+import { isTenantNotTakingBookings, NOT_TAKING_BOOKINGS_COPY } from "./tenant/paymentRail"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
 import InternalTenantRobotsMeta from "./components/InternalTenantRobotsMeta"
 // TASK-4903 (ADR-0081): the theme mount point. Sole allowed import of `./themes/registry`
@@ -26,9 +28,10 @@ import { getCurrentLayoutThemeId, loadLayoutTheme } from "./themes/registry"
 // resolved from the boot-resolved layout theme's package instead of a fixed page-file path.
 // `getCurrentLayoutThemeId()` is read lazily inside each loader — safe because React only
 // invokes a `React.lazy()` loader on first render, well after `src/main.tsx`'s boot sequence
-// has already called `setCurrentLayoutThemeId()`. Stubbed to "classic" until TASK-4904 lands
-// `effectiveThemeId` server-side — today this resolves identically to the pre-4903 direct
-// imports below (classic re-exports the same page components verbatim).
+// has already called `setCurrentLayoutThemeId()`. The id comes from the tenant's server-resolved
+// `effectiveThemeId` (TASK-4904 shipped it on `/tenants/from-domain`); it falls back to "classic" only
+// when the tenant sets nothing, which renders the same page components as the pre-4903 direct
+// imports below (classic re-exports them verbatim).
 const Home = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Home })))
 const ContactUs = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Contact })))
 const Homepage_PropertyDetails = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.PropertyDetails })))
@@ -54,8 +57,11 @@ const SupportWidget = React.lazy(() => import("./components/support/SupportWidge
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
+const SecurityDepositPage = React.lazy(() => import("./pages/SecurityDepositPage")) // TASK-10299239
 const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
 const HouseRulesAcceptPage = React.lazy(() => import("./pages/HouseRulesAcceptPage")) // TASK-guest-automation-phase3
+const YourBookingPage = React.lazy(() => import("./pages/YourBookingPage")) // TASK-10299444
+const PayLinkPage = React.lazy(() => import("./pages/PayLinkPage")) // PAY-016
 const ReviewSubmitPage = React.lazy(() => import("./pages/ReviewSubmitPage"))
 const CommunicationPreferences = React.lazy(() => import("./pages/CommunicationPreferences"))
 const MyDataPage = React.lazy(() => import("./pages/MyDataPage"))
@@ -66,12 +72,17 @@ const RecentlyViewedPage = React.lazy(() => import("./pages/RecentlyViewedPage")
 const CookieConsentBanner = React.lazy(() => import("./components/CookieConsentBanner"))
 const PageNotFound = React.lazy(() => import("./pages/pagenotfound/PageNotFound"))
 const AtlasOnlyCityLanding = React.lazy(() => import("./pages/AtlasOnlyCityLanding"))
+const DestinationsPage = React.lazy(() => import("./pages/DestinationsPage"))
+const CityVanityRedirect = React.lazy(() => import("./components/CityVanityRedirect"))
 // TASK-2612: Two-step booking flow — guest details step after Reserve
 const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
 // TASK-8093: Embeddable booking widget (iframe entry)
 const EmbedPage = React.lazy(() => import("./pages/EmbedPage"))
 // TASK-4017: Guest OTP login
 const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
+const QrMenuPage = React.lazy(() => import("./pages/QrMenuPage"))
+// REV-046: the page a guest reaches by scanning the host's review QR code (`/rate/:tenantSlug/:code`).
+const ReviewQrPage = React.lazy(() => import("./pages/ReviewQrPage"))
 
 function LazyFallback() {
   // TASK-7822: 50vh left the site footer in the first desktop viewport. Home then
@@ -115,9 +126,57 @@ function GuestNativeHooks() {
   return <NativeShellBridge authLoading={isLoading} />;
 }
 
+/** GUEST-043: `/guest/portal` and `/portal` redirect to `/my-bookings` when authenticated, or `/check-in` when unauthenticated. */
+export function GuestPortalAliasRedirect() {
+  const { auth, isLoading } = useGuestAuth();
+  const location = useLocation();
+  if (isLoading) return <LazyFallback />;
+  const target = auth.isAuthenticated ? '/my-bookings' : '/check-in';
+  return <Navigate to={`${target}${location.search}`} replace />;
+}
+
+/** GUEST-052: `/checkin` redirects to `/check-in` preserving query parameters (e.g. `?t=...`). */
+export function CheckinAliasRedirect() {
+  const location = useLocation();
+  return <Navigate to={`/check-in${location.search}`} replace />;
+}
+
+/** GUEST-052: `/checkin/:bookingRef` redirects to `/check-in/:bookingRef` preserving query parameters (e.g. `?t=...`). */
+export function CheckinBookingRefAliasRedirect() {
+  const { bookingRef } = useParams<{ bookingRef: string }>();
+  const location = useLocation();
+  if (!bookingRef) {
+    return <Navigate to={`/check-in${location.search}`} replace />;
+  }
+  return <Navigate to={`/check-in/${encodeURIComponent(bookingRef)}${location.search}`} replace />;
+}
+
+/** Redirects legacy `/property_details/:id`, `/properties/:id`, and `/property/:id` routes to `/homes/:propertySlug/:id`, preserving query and hash (`#reviews`). */
+export function LegacyPropertyRedirect() {
+  const { id } = useParams();
+  const location = useLocation();
+
+  if (!id) {
+    return <Navigate to="/" replace />;
+  }
+
+  const normalizedId = id.toLowerCase();
+  const trailingNumericId = normalizedId.match(/(\d+)$/)?.[1];
+  if (!trailingNumericId) {
+    // TASK-1220: malformed legacy slugs (no numeric listing id) should still land on a
+    // concrete not-found page instead of hanging behind the property-details resolver.
+    return <Navigate to={`/homes/${normalizedId}${location.search}${location.hash}`} replace />;
+  }
+  const idParts = normalizedId.split('-').filter(Boolean);
+  const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
+
+  return <Navigate to={`/homes/${canonicalPropertySlug}/${trailingNumericId}${location.search}${location.hash}`} replace />;
+}
+
 function AppWrapper() {
   const location = useLocation();
   const [, setLanguageVersion] = useState(0);
+  const [tenantSearchEmpty, setTenantSearchEmpty] = useState(false);
 
   // TASK-4018: Listen for language changes across the app
   useEffect(() => {
@@ -133,11 +192,22 @@ function AppWrapper() {
   const hideNavbarRoutes = ['/property_LocationDetails/:id'];
   // TASK-8093: embed widget runs inside an iframe on a host's own site — no Atlas chrome.
   const isEmbedRoute = Boolean(matchPath('/embed/:embedKey', location.pathname));
+  const isQrMenuRoute = Boolean(matchPath('/qr-menu/:tenantSlug', location.pathname));
+  // REV-046: the review QR page is a standalone, one-screen page (no navbar, footer, support widget or cookie banner).
+  const isReviewQrRoute = Boolean(matchPath('/rate/:tenantSlug/:code', location.pathname));
 
-  const shouldHideNavbar = isEmbedRoute || hideNavbarRoutes.some((pattern) =>
+  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || hideNavbarRoutes.some((pattern) =>
     Boolean(matchPath(pattern, location.pathname))
   );
-  const shouldHideFooter = isEmbedRoute;
+  const shouldHideFooter = isEmbedRoute || isQrMenuRoute || isReviewQrRoute;
+  // Classic tenant home owns the inline consent region immediately after its search.
+  // Other themes/routes keep the global consent banner; no tenant resolution changes.
+  const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
+    && !(isMarketplaceMode() && isAtlastaysMarketplaceSurface());
+  // The reviewed marketplace and confirmed tenant empty search keep help in normal flow.
+  const inlineReviewSupport =
+    (location.pathname === '/' && isMarketplaceMode() && isAtlastaysMarketplaceSurface()) ||
+    (location.pathname === '/search' && tenantSearchEmpty);
 
   const withBoundary = (element: React.ReactNode, name: string) => (
     <ErrorBoundary key={`${name}-${location.pathname}`} name={name}>
@@ -149,27 +219,6 @@ function AppWrapper() {
     trackEvent('page_view', { surface: 'router' }, { route: location.pathname });
   }, [location.pathname]);
 
-  const LegacyPropertyRedirect = () => {
-    const { id } = useParams();
-    const location = useLocation();
-
-    if (!id) {
-      return <Navigate to="/" replace />;
-    }
-
-    const normalizedId = id.toLowerCase();
-    const trailingNumericId = normalizedId.match(/(\d+)$/)?.[1];
-    if (!trailingNumericId) {
-      // TASK-1220: malformed legacy slugs (no numeric listing id) should still land on a
-      // concrete not-found page instead of hanging behind the property-details resolver.
-      return <Navigate to={`/homes/${normalizedId}${location.search}`} replace />;
-    }
-    const idParts = normalizedId.split('-').filter(Boolean);
-    const canonicalPropertySlug = idParts.length >= 2 ? idParts.slice(0, 2).join('-') : 'atlas-homes';
-
-    return <Navigate to={`/homes/${canonicalPropertySlug}/${trailingNumericId}${location.search}`} replace />;
-  };
-
   return (
     <>
       <InternalTenantRobotsMeta />
@@ -178,12 +227,29 @@ function AppWrapper() {
         Skip to main content
       </a>
       {!shouldHideNavbar && <Navbar />}
+      {isTenantNotTakingBookings(getTenantContext()) && (
+        <div
+          role="status"
+          data-testid="tenant-not-taking-bookings-banner"
+          style={{
+            background: '#fef3c7',
+            color: '#92400e',
+            borderBottom: '1px solid #f59e0b',
+            padding: '10px 16px',
+            textAlign: 'center',
+            fontWeight: 600,
+            fontSize: '14px',
+          }}
+        >
+          {NOT_TAKING_BOOKINGS_COPY}
+        </div>
+      )}
       <ScrollToTop />
       <ErrorBoundary name="router">
         <main
           id="main-content"
           tabIndex={-1}
-          style={{ paddingTop: shouldHideNavbar ? 0 : 'var(--nav-height)' }}
+          style={{ paddingTop: shouldHideNavbar ? 0 : 'var(--measured-nav-height, var(--nav-height))' }}
         >
         <Suspense fallback={<LazyFallback />} key={`suspense-${location.pathname}`}>
         <Routes key={location.pathname}>
@@ -212,7 +278,24 @@ function AppWrapper() {
               )}
             />
           ))}
-          <Route path="/search" element={withBoundary(<Suspense fallback={<LazyFallback />}><SearchPage /></Suspense>, "search-route")} />
+          {/* MKT-034: city directory hub. /explore is an alias of /destinations. Both MUST stay before /:shortCode. */}
+          <Route path="/destinations" element={withBoundary(<Suspense fallback={<LazyFallback />}><DestinationsPage /></Suspense>, "destinations-route")} />
+          <Route path="/explore" element={withBoundary(<Suspense fallback={<LazyFallback />}><DestinationsPage /></Suspense>, "explore-route")} />
+          {/* MKT-034: naked city slugs (/coorg) redirect to /homestays-in-coorg on the marketplace surface. MUST stay before /:shortCode.
+              No static short link (shortLinkMap) shares a slug with a city (pinned in cityVanityRoutes.test.tsx). */}
+          {CITY_LANDING_SLUGS.map((citySlug) => (
+            <Route
+              key={`vanity-${citySlug}`}
+              path={`/${citySlug}`}
+              element={withBoundary(
+                <Suspense fallback={<LazyFallback />}>
+                  <CityVanityRedirect citySlug={citySlug} />
+                </Suspense>,
+                `city-vanity-${citySlug}-route`,
+              )}
+            />
+          ))}
+          <Route path="/search" element={withBoundary(<Suspense fallback={<LazyFallback />}><SearchPage onEmptyStateChange={setTenantSearchEmpty} /></Suspense>, "search-route")} />
           <Route path="/blog" element={withBoundary(<Suspense fallback={<LazyFallback />}><BlogHome /></Suspense>, "blog-home-route")} />
           {/* TASK-4307: single-segment /blog/:segment is handled by BlogCategory, which
               renders the article when the segment is a post slug (canonical /blog/<slug>)
@@ -228,11 +311,22 @@ function AppWrapper() {
           <Route path="/homes/:roomNo" element={withBoundary(<Suspense fallback={<LazyFallback />}><LegacyHomeRoomRedirect /></Suspense>, "home-details-route")} />
           <Route path="/property_details/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-legacy-route")} />
           <Route path="/properties/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-modern-redirect-route")} />
+          <Route path="/property/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-singular-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Suspense fallback={<LazyFallback />}><Reserve /></Suspense>, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><BookingConfirmationPage /></Suspense>, "booking-confirmation-route")} />
+          {/* TASK-10299239: security-deposit hold page, reached from the pre-arrival message; authorised by the same booking-link token (?t=). */}
+          <Route path="/booking/:bookingId/deposit" element={withBoundary(<Suspense fallback={<LazyFallback />}><SecurityDepositPage /></Suspense>, "security-deposit-route")} />
           <Route path="/check-in/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-route")} />
           <Route path="/check-in" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-noparam-route")} />
+          {/* GUEST-052: Unhyphenated /checkin aliases preserving query params (?t=...) */}
+          <Route path="/checkin/:bookingRef" element={withBoundary(<CheckinBookingRefAliasRedirect />, "self-checkin-alias-ref-route")} />
+          <Route path="/checkin" element={withBoundary(<CheckinAliasRedirect />, "self-checkin-alias-route")} />
+          {/* GUEST-043: /guest/portal and /portal aliases routing to /my-bookings (authenticated) or /check-in (unauthenticated) */}
+          <Route path="/guest/portal" element={withBoundary(<GuestPortalAliasRedirect />, "guest-portal-alias-route")} />
+          <Route path="/portal" element={withBoundary(<GuestPortalAliasRedirect />, "portal-alias-route")} />
+          <Route path="/pay/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><PayLinkPage /></Suspense>, "pay-link-route")} />
           <Route path="/house-rules/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><HouseRulesAcceptPage /></Suspense>, "house-rules-accept-route")} />
+          <Route path="/your-booking/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><YourBookingPage /></Suspense>, "your-booking-route")} />
           <Route path="/review/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewSubmitPage /></Suspense>, "review-submit-route")} />
           <Route path="/communication-preferences" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-route")} />
           <Route path="/preferences/:guestToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-token-route")} />
@@ -251,6 +345,10 @@ function AppWrapper() {
           <Route path="/property_LocationDetails/:id" element={withBoundary(<Suspense fallback={<LazyFallback />}><Homepage_LocationDetails /></Suspense>, "location-details-route")} />
           {/* TASK-2612: Guest details step — MUST be before /:shortCode catch-all */}
           <Route path="/book/:propertySlug/:unitSlug/details" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestDetailsPage /></Suspense>, "guest-details-route")} />
+          {/* TASK-10298855: Guest Room & Table QR Self-Ordering Web App */}
+          <Route path="/qr-menu/:tenantSlug" element={withBoundary(<Suspense fallback={<LazyFallback />}><QrMenuPage /></Suspense>, "qr-menu-route")} />
+          {/* REV-046: review QR page — MUST be before the /:shortCode catch-all, no navbar/footer */}
+          <Route path="/rate/:tenantSlug/:code" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewQrPage /></Suspense>, "review-qr-route")} />
           {/* TASK-4308: human-readable sitemap page — MUST be before /:shortCode catch-all */}
           <Route path="/sitemap" element={withBoundary(<Suspense fallback={<LazyFallback />}><SitemapPage /></Suspense>, "sitemap-route")} />
           <Route path="/:shortCode" element={withBoundary(<Suspense fallback={<LazyFallback />}><ShortLinkRedirect /></Suspense>, "shortlink-route")} />
@@ -259,9 +357,9 @@ function AppWrapper() {
         </Suspense>
         </main>
       </ErrorBoundary>
-      {!shouldHideFooter && <Suspense fallback={null}><SupportWidget /></Suspense>}
+      {!shouldHideFooter && <div className={inlineHomeConsent ? "home-inline-support" : inlineReviewSupport ? "review-inline-support" : undefined}><Suspense fallback={null}><SupportWidget placement={inlineReviewSupport ? "inline" : "floating"} /></Suspense></div>}
       {!shouldHideFooter && <Footer />}
-      {!shouldHideFooter && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
+      {!shouldHideFooter && !inlineHomeConsent && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
     </>
   );

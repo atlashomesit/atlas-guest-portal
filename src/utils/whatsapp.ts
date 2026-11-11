@@ -12,7 +12,7 @@ interface DefaultPrefillArgs {
 }
 
 const normalizePhone = (phoneE164: string) => {
-  const digits = phoneE164.replace(/[^\d]/g, "");
+  const digits = (phoneE164 || "").replace(/[^\d]/g, "");
   // TASK-4300: callers pass CONTACT.business.whatsapp, a 10-digit Indian national number,
   // into this "phoneE164" slot. wa.me needs the full international form, so prepend 91 when
   // we receive a bare 10-digit national number (leave already-prefixed numbers untouched).
@@ -21,6 +21,7 @@ const normalizePhone = (phoneE164: string) => {
 
 export const buildWaLink = ({ phoneE164, text }: BuildWaLinkArgs) => {
   const normalizedPhone = normalizePhone(phoneE164);
+  if (!normalizedPhone) return "";
   const encodedText = encodeURIComponent(text);
   return `https://wa.me/${normalizedPhone}${encodedText ? `?text=${encodedText}` : ""}`;
 };

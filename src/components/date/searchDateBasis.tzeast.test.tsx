@@ -1,6 +1,6 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { format } from 'date-fns';
 
@@ -47,6 +47,7 @@ vi.mock('@/components/homepage_components/hotelBooking_form/DateRangePickerPopov
 import { AtlasDateRangePicker, type AtlasDateRangePickerValue } from './AtlasDateRangePicker';
 import { SearchAvailabilityWidget } from '@/components/availability/SearchAvailabilityWidget';
 import { BookingProvider, useBooking } from '@/contexts/BookingContext';
+import { settle } from '../../test/settle';
 
 // Mid-month and mid-day, so no runner offset can drag the fixed "now" onto a different civil
 // date in either IST or the pinned local zone — every expectation below is unambiguous.
@@ -226,7 +227,8 @@ describe('SearchAvailabilityWidget — the night written to BookingContext is th
     await act(async () => {
       fireEvent.click(screen.getByTestId('hero-date-toggle'));
     });
-    await screen.findByTestId('date-picker-popover');
+    await settle();
+    screen.getByTestId('date-picker-popover');
   };
 
   // mousedown+mouseup, not click — see the note on `selectDay` above.
@@ -247,14 +249,11 @@ describe('SearchAvailabilityWidget — the night written to BookingContext is th
     await selectDay(PICKED_ISO);
 
     // What the guest sees on the field.
-    await waitFor(() => {
-      expect(screen.getByTestId('hero-date-toggle').textContent).toContain('20 Feb 2026');
-    });
+    await settle();
+    expect(screen.getByTestId('hero-date-toggle').textContent).toContain('20 Feb 2026');
 
     // What UnitBookingWidget will hydrate from BookingContext.
-    await waitFor(() => {
-      expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(PICKED_ISO);
-    });
+    expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(PICKED_ISO);
   });
 
   // ?checkIn=/?checkOut= are date-only strings — `new Date('YYYY-MM-DD')` is a UTC-midnight
@@ -262,9 +261,8 @@ describe('SearchAvailabilityWidget — the night written to BookingContext is th
   it('URL-param dates survive the round trip into BookingContext', async () => {
     renderWidget(`/search?checkIn=${PICKED_ISO}&checkOut=${CHECKOUT_ISO}`);
 
-    await waitFor(() => {
-      expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(PICKED_ISO);
-    });
+    await settle();
+    expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(PICKED_ISO);
     expect(wireToCivilDate(screen.getByTestId('probe-checkout').textContent)).toBe(CHECKOUT_ISO);
 
     // And the field the guest reads agrees with it.
@@ -281,20 +279,18 @@ describe('SearchAvailabilityWidget — the night written to BookingContext is th
     await selectDay(PICKED_ISO);
     await selectDay(CHECKOUT_ISO);
 
-    await waitFor(() => {
-      expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(PICKED_ISO);
-    });
+    await settle();
+    expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(PICKED_ISO);
     expect(wireToCivilDate(screen.getByTestId('probe-checkout').textContent)).toBe(CHECKOUT_ISO);
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('hero-search-submit'));
     });
 
-    await waitFor(() => {
-      const search = screen.getByTestId('probe-search').textContent ?? '';
-      expect(search).toContain(`checkIn=${PICKED_ISO}`);
-      expect(search).toContain(`checkOut=${CHECKOUT_ISO}`);
-    });
+    await settle();
+    const search = screen.getByTestId('probe-search').textContent ?? '';
+    expect(search).toContain(`checkIn=${PICKED_ISO}`);
+    expect(search).toContain(`checkOut=${CHECKOUT_ISO}`);
   });
 
   // The preset converts an instant (`new Date()`) to calendar basis; the widget then writes that
@@ -308,20 +304,18 @@ describe('SearchAvailabilityWidget — the night written to BookingContext is th
       fireEvent.click(screen.getByRole('button', { name: 'Tonight' }));
     });
 
-    await waitFor(() => {
-      expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(TODAY_ISO);
-    });
+    await settle();
+    expect(wireToCivilDate(screen.getByTestId('probe-checkin').textContent)).toBe(TODAY_ISO);
     expect(wireToCivilDate(screen.getByTestId('probe-checkout').textContent)).toBe('2026-02-16');
 
     await act(async () => {
       fireEvent.click(screen.getByTestId('hero-search-submit'));
     });
 
-    await waitFor(() => {
-      const search = screen.getByTestId('probe-search').textContent ?? '';
-      expect(search).toContain(`checkIn=${TODAY_ISO}`);
-      expect(search).toContain('checkOut=2026-02-16');
-    });
+    await settle();
+    const search = screen.getByTestId('probe-search').textContent ?? '';
+    expect(search).toContain(`checkIn=${TODAY_ISO}`);
+    expect(search).toContain('checkOut=2026-02-16');
   });
 });
 

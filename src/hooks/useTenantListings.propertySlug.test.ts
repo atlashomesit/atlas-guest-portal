@@ -6,11 +6,15 @@ import { getPropertySlug } from "@/utils/navigation";
 import { propertySlugMatchesListing } from "@/utils/propertySlugMatch";
 
 vi.mock("@/tenant/tenantContext", () => ({ getTenantContext: vi.fn(() => ({ slug: "staybycf" })) }));
-vi.mock("@/tenant/tenantOverrides", () => ({
-  getTenantOverrides: vi.fn(() => ({})),
-  getTenantListingAddress: vi.fn(() => undefined),
-  getTenantPublicListingIdAllowlist: vi.fn(() => new Set<number>()),
-}));
+vi.mock("@/tenant/tenantOverrides", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/tenant/tenantOverrides")>();
+  return {
+    ...actual,
+    getTenantOverrides: vi.fn(() => ({})),
+    getTenantListingAddress: vi.fn(() => undefined),
+    getTenantPublicListingIdAllowlist: vi.fn(() => new Set<number>()),
+  };
+});
 
 /**
  * TASK-7448 (P0): closes the loop end-to-end with NO mocking of the units under test —

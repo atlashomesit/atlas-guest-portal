@@ -1,5 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Bath, BedDouble, Car, Heart, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
+import HostIdentityLabel from '@/components/property/HostIdentityLabel';
+import HostelDormBadge, { isHostelDorm } from '../hostel/HostelDormBadge';
+import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
+import { feePercent } from "../../utils/paymentFeeCopy";
+import React, { useMemo, useState } from "react";
+import { Bath, BedDouble, Car, PawPrint, Snowflake, Users, Wifi } from "lucide-react";
 import { priceDisplayConfig } from "../../config/priceDisplay.config";
 import { type NightlyPriceBreakdown } from "../../utils/pricing";
 import OptimizedImage from "../ui/OptimizedImage";
@@ -14,11 +18,17 @@ import {
   type CancellationTier,
 } from "../../utils/cancellationPolicy";
 import { hasOnlinePaymentRail } from "../../tenant/paymentRail";
-import { isFavorite, toggleFavorite } from "../../utils/guestHistory";
+import { getListingDisplayName } from "../../lib/listingDisplayName";
 
 type ListingCardProps = {
+  hostIdentityVerified?: unknown;
+  marketplace?: boolean;
   id: string;
   name: string;
+  displayName?: string | null;
+  publicTitle?: string | null;
+  nameFormatted?: string | null;
+  title?: string | null;
   location: string;
   neighborhoods?: string[];
   image: string;
@@ -29,6 +39,9 @@ type ListingCardProps = {
   /** TASK-4012: review count for rating chip */
   reviewCount?: number | null;
   propertyType: string;
+  accommodationType?: string;
+  /** HSL-011: `Listing.DormGenderPolicy` from the API (FemaleOnly / MaleOnly / Mixed); never guessed from the name. */
+  dormGenderPolicy?: string | null;
   guests: number;
   bedrooms?: number | null;
   hasWifi?: boolean;
@@ -52,9 +65,21 @@ type ListingCardProps = {
   lastMinuteDiscountPercent?: number | null;
   /** TASK-4312: whether the listing owner is GST-registered. */
   isGstRegistered?: boolean;
+  /** MKT-042: per-listing payment fee flags for cross-tenant marketplace cards. */
+  chargesOnlinePaymentFee?: boolean;
+  convenienceFeePercent?: number | null;
   /** DESIGN-028: listing-scoped cancellation tier for the card trust chip. */
   cancellationTier?: CancellationTier | string | null;
   onClick?: () => void;
+  /**
+   * MKT-014: when set, the card is rendered as a crawlable anchor (`<a href={href}>`) wrapping
+   * the article. Crawlers and AI answer engines need a real `<a>` to follow the card to its
+   * detail page; the previous shape (an `<article>` with three `<button>` children that all
+   * `navigate()` on click) was JS-empty. The click behavior is identical — clicking anywhere in
+   * the card navigates to the listing detail page. `onClick` may still be passed for places that
+   * need an extra side effect, but the anchor's default follows `href` natively.
+   */
+  href?: string;
 };
 
 // TASK-1687: replaced module-level INR-only formatter with the
@@ -62,7 +87,13 @@ type ListingCardProps = {
 
 const ListingCard: React.FC<ListingCardProps> = ({
   id,
+  hostIdentityVerified,
+  marketplace = false,
   name,
+  displayName,
+  publicTitle,
+  nameFormatted,
+  title,
   location,
   neighborhoods = [],
   image,
@@ -72,6 +103,8 @@ const ListingCard: React.FC<ListingCardProps> = ({
   reviews,
   reviewCount,
   propertyType,
+  accommodationType,
+  dormGenderPolicy,
   guests,
   bedrooms,
   hasWifi,
@@ -86,29 +119,32 @@ const ListingCard: React.FC<ListingCardProps> = ({
   estimateNights: estimateNightsProp,
   lastMinuteDiscountPercent,
   isGstRegistered = true, // TASK-4312: default to true for backward compat
+  chargesOnlinePaymentFee,
+  convenienceFeePercent,
   cancellationTier = null,
   onClick,
+  href,
 }) => {
+  const tenantProcessingFeePercent = useTenantProcessingFee(!marketplace);
+  const processingFeePercent = marketplace
+    ? chargesOnlinePaymentFee === false
+      ? 0
+      : feePercent(convenienceFeePercent)
+    : tenantProcessingFeePercent;
+  const reviewsHref = href ? `${href}#reviews` : `/property/${id}#reviews`;
   const cancellationChip = resolveListingCardCancellationChip(cancellationTier);
   // TASK-101158: never claim "Secure Razorpay payments" on a tenant with no online rail
   // (bookingMode WHATSAPP/MANUAL or paymentProvider null) — omit the chip, don't reword it.
   const showRazorpayChip = hasOnlinePaymentRail();
   const { format: formatCurrency } = useCurrency();
   const { booking } = useBooking();
-  // DESIGN (atlastays-redesign spike): reference mockup shows a heart/save toggle on the
-  // card image, mirroring MarketplaceHomepage.tsx's existing save-heart pattern. Reuses the
-  // same localStorage-backed favorites util everywhere else in the app already reads from.
-  const numericId = Number(id);
-  const [favEpoch, setFavEpoch] = useState(0);
-  const saved = useMemo(() => {
-    void favEpoch;
-    return Number.isFinite(numericId) ? isFavorite(numericId) : false;
-  }, [favEpoch, numericId]);
-  useEffect(() => {
-    const sync = () => setFavEpoch((e) => e + 1);
-    window.addEventListener("atlas-favorites-changed", sync);
-    return () => window.removeEventListener("atlas-favorites-changed", sync);
-  }, []);
+
+  /** TASK-10299086: guest-facing display name, preferring displayName/publicTitle/title/nameFormatted over internal code */
+  const resolvedDisplayName = useMemo(() => {
+    const explicitName = displayName?.trim() || publicTitle?.trim() || nameFormatted?.trim();
+    const candidate = explicitName || title?.trim() || name;
+    return getListingDisplayName(id, candidate, explicitName || displayName) || candidate;
+  }, [id, name, displayName, publicTitle, title, nameFormatted]);
   const estimateNights = useMemo(() => {
     if (estimateNightsProp != null) return estimateNightsProp;
     const ci = booking.checkIn ? new Date(booking.checkIn) : null;
@@ -198,54 +234,63 @@ const ListingCard: React.FC<ListingCardProps> = ({
     },
   ].filter((item) => item.visible);
 
+  // TASK-10299109: "per bed" and the dorm badge key on the LISTING's own accommodationType, never on the
+  // property type - a private room in a Hostel property is sold by the room.
+  const isHostel = isHostelDorm({ accommodationType });
+
   return (
     <article
-      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1 md:"
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClick?.();
-        }
-      }}
+      className="group flex flex-col overflow-hidden rounded-2xl border border-border-subtle bg-bg-surface transition duration-200 md:hover:-translate-y-1"
     >
-      <div className="relative h-56 w-full overflow-hidden rounded-t-3xl">
-        <OptimizedImage
-          src={image?.trim() ? image : getPropertyDesignImage(id)}
-          alt={name}
-          className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
-          wrapperClassName="h-full"
-          sizes="(max-width: 768px) 100vw, 33vw"
-        />
-        <span className="absolute left-3 top-3 inline-flex items-center rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary shadow-sm">
-          {propertyType}
-        </span>
-        <button
-          type="button"
-          aria-label={saved ? `Remove ${name} from saved` : `Save ${name}`}
-          aria-pressed={saved}
-          className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_92%,transparent)] text-text-primary shadow-sm transition hover:scale-105"
-          onClick={(event) => {
-            event.stopPropagation();
-            if (Number.isFinite(numericId)) {
-              toggleFavorite(numericId);
-              setFavEpoch((e) => e + 1);
-            }
-          }}
+      {href ? (
+        // MKT-014: a non-interactive image wrapper when the card is itself a link, so the page
+        // contains a single crawlable `<a href>` per card. The anchor (rendered further down) is
+        // the focusable element; clicks on the image area follow it naturally.
+        <a
+          href={href}
+          aria-label={`View photos and room ${resolvedDisplayName}`}
+          className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]"
         >
-          <Heart
-            className={`h-4 w-4 ${saved ? "fill-[color:var(--cta-primary)] text-[color:var(--cta-primary)]" : "text-text-primary"}`}
-            aria-hidden
+          <OptimizedImage
+            src={image?.trim() ? image : getPropertyDesignImage(id)}
+            alt={resolvedDisplayName}
+            className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
+            wrapperClassName="h-full"
+            sizes="(max-width: 768px) 100vw, 33vw"
           />
+          <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary">
+            {propertyType}
+          </span>
+        </a>
+      ) : (
+        <button type="button" onClick={onClick} aria-label={`View photos and room ${resolvedDisplayName}`} className="relative h-56 w-full shrink-0 overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[color:var(--accent-primary)]">
+          <OptimizedImage
+            src={image?.trim() ? image : getPropertyDesignImage(id)}
+            alt={resolvedDisplayName}
+            className="h-full w-full object-cover transition duration-200 md:group-hover:scale-105"
+            wrapperClassName="h-full"
+            sizes="(max-width: 768px) 100vw, 33vw"
+          />
+          <span className="absolute left-3 top-3 rounded-full bg-[color:color-mix(in_srgb,var(--bg-surface)_90%,transparent)] px-3 py-1 text-xs font-semibold text-text-primary">
+            {propertyType}
+          </span>
         </button>
-      </div>
+      )}
 
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="truncate text-lg font-semibold text-text-primary">{name}</h3>
+            <h3 className="text-lg font-semibold text-text-primary">
+              {href ? (
+                <a href={href} className="block min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">
+                  {resolvedDisplayName}
+                </a>
+              ) : (
+                <button type="button" onClick={onClick} className="min-h-11 max-w-full text-left hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]">
+                  {resolvedDisplayName}
+                </button>
+              )}
+            </h3>
             <p className="text-sm text-text-muted">{location}</p>
             {neighborhoods.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-2">
@@ -265,11 +310,11 @@ const ListingCard: React.FC<ListingCardProps> = ({
           <div className="flex flex-shrink-0 items-center">
             {hasVerifiedReviews && (reviewCount ?? 0) > 0 ? (
               <a
-                href={`/property/${id}#reviews`}
+                href={reviewsHref}
                 onClick={(e) => {
                   e.stopPropagation();
                 }}
-                className="inline-flex items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100 transition-colors"
+                className="inline-flex min-h-11 items-center gap-1 rounded-full bg-yellow-50 border border-yellow-200 px-2.5 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100 transition-colors"
                 aria-label="View guest reviews"
               >
                 <span aria-hidden>★</span>
@@ -278,11 +323,11 @@ const ListingCard: React.FC<ListingCardProps> = ({
               </a>
             ) : hasVerifiedReviews ? (
               <a
-                href={`/property/${id}#reviews`}
+                href={reviewsHref}
                 onClick={(e) => {
                   e.stopPropagation();
                 }}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-text-primary hover:opacity-80 transition-opacity"
+                className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-text-primary hover:opacity-80 transition-opacity"
                 aria-label="View guest reviews"
               >
                 <span aria-hidden>★</span>
@@ -294,6 +339,10 @@ const ListingCard: React.FC<ListingCardProps> = ({
             )}
           </div>
         </div>
+
+        <HostIdentityLabel marketplace={marketplace} verified={hostIdentityVerified} />
+
+        <HostelDormBadge accommodationType={accommodationType} genderPolicy={dormGenderPolicy} />
 
         {/* TASK-1360: Last-booked social-proof badge */}
         {lastBookedLabel && (
@@ -347,44 +396,54 @@ const ListingCard: React.FC<ListingCardProps> = ({
                       {formatCurrency(originalPrice)}
                     </span>
                   )}
+                  {isHostel && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-md bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-xs font-semibold text-indigo-700"
+                      data-testid="hostel-per-bed-indicator"
+                    >
+                      Starting from per bed
+                    </span>
+                  )}
                   <div className="text-2xl font-bold leading-tight text-cta-primary">
-                    {showTotal ? (
+                    {showTotal && processingFeePercent !== null ? (
                       <>
                         {/* TASK-4832: use the same est-total helper/inputs as the collapsed
                             estimate so the toggle never shows two different money totals
                             (previously omitted the 3% fee and the GST-registration flag). */}
-                        {formatCurrency(estTotalInclGst(finalPrice, estimateNights, 3, isGstRegistered))}
+                        {formatCurrency(estTotalInclGst(finalPrice, estimateNights, processingFeePercent, isGstRegistered))}
                         <span className="ml-1 text-sm font-semibold text-text-muted">total</span>
                       </>
                     ) : (
                       <>
                         {formatCurrency(finalPrice)}
-                        <span className="ml-1 text-sm font-semibold text-text-muted">/ night</span>
+                        <span className="ml-1 text-sm font-semibold text-text-muted" data-testid="price-unit-label">
+                          {isHostel ? 'per bed / night' : '/ night'}
+                        </span>
                       </>
                     )}
                   </div>
                 </div>
                 {/* TASK-4013: Toggle link for total with taxes; TASK-1645 / TASK-2871: Indian accommodation GST — 5% for ≤₹7,500/night, 18% above (eff. 22 Sep 2025) */}
-                {showTotal ? (
+                {showTotal && processingFeePercent !== null ? (
                   <button
                     type="button"
                     onClick={() => setShowTotal(false)}
-                    className="text-xs text-cta-primary hover:underline font-semibold self-start"
+                    className="min-h-11 text-xs text-cta-primary hover:underline font-semibold self-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]"
                   >
                     Hide total
                   </button>
                 ) : (
                   <div className="flex flex-col gap-1">
                     <span className="text-xs text-text-muted">
-                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency, 3, isGstRegistered)}
+                      {formatEstTotalInclGst(finalPrice, estimateNights, formatCurrency, processingFeePercent, isGstRegistered)}
                     </span>
-                    <button
+                    {processingFeePercent !== null && <button
                       type="button"
                       onClick={() => setShowTotal(true)}
-                      className="text-xs text-cta-primary hover:underline font-semibold self-start"
+                      className="min-h-11 text-xs text-cta-primary hover:underline font-semibold self-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--accent-primary)]"
                     >
                       See total ↓
-                    </button>
+                    </button>}
                   </div>
                 )}
                 {showDiscount && savingsAmount > 0 && (
@@ -440,22 +499,35 @@ const ListingCard: React.FC<ListingCardProps> = ({
                   <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1">
                     {hasVerifiedReviews ? `Avg. rating ${ratingSnippet}` : ratingSnippet}
                   </span>
-                  {/* TASK-1705: Owner-share trust badge */}
-                  <OwnerShareBadge nightlyPrice={finalPrice} />
+                  {/* TASK-1705 / MKT-042: Owner-share trust badge */}
+                  {marketplace ? (
+                    <OwnerShareBadge processingFeePercent={processingFeePercent} />
+                  ) : (
+                    <OwnerShareBadge nightlyPrice={finalPrice} />
+                  )}
                 </div>
               </div>
-              <button
-                type="button"
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full bg-[color:var(--brand)] px-4 py-3 text-sm font-semibold text-[color:var(--text-on-cta)] transition duration-150 hover:-translate-y-0.5  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onClick?.();
-                }}
-                aria-label={`View home ${name}`}
-              >
-                View home
-                <span aria-hidden>→</span>
-              </button>
+              {href ? (
+                <a
+                  href={href}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-3 text-sm font-semibold text-[color:var(--text-on-cta)] transition duration-150 hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
+                  aria-label={`View room ${name}`}
+                >
+                  View room
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-full bg-[color:var(--brand)] px-4 py-3 text-sm font-semibold text-[color:var(--text-on-cta)] transition duration-150 hover:-translate-y-0.5  focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--brand)]"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onClick?.();
+                  }}
+                  aria-label={`View room ${name}`}
+                >
+                  View room
+                </button>
+              )}
               <p className="w-full text-xs font-semibold text-text-muted">Total shown before payment; no hidden charges.</p>
             </div>
           </div>

@@ -71,6 +71,28 @@ describe("listingClient", () => {
     }
   });
 
+  it("HSL-011: fetchPublicListings threads accommodationType + dormGenderPolicy from the API, never from the name", async () => {
+    invalidatePublicListingsCache();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { id: 701, name: "6-Bed Male Dorm", accommodationType: "HostelDorm", dormGenderPolicy: "FemaleOnly", maxGuests: 6 },
+        { id: 702, name: "6-Bed Female-Only Dorm", maxGuests: 6 },
+      ],
+    });
+
+    try {
+      const rows = await fetchPublicListings();
+      expect(rows[0].accommodationType).toBe("HostelDorm");
+      expect(rows[0].dormGenderPolicy).toBe("FemaleOnly");
+      // No API field -> no guess, whatever the name says.
+      expect(rows[1].accommodationType).toBeNull();
+      expect(rows[1].dormGenderPolicy).toBeNull();
+    } finally {
+      invalidatePublicListingsCache();
+    }
+  });
+
   it("TASK-7824: concurrent fetchListingById(2) share one network GET", async () => {
     fetchMock.mockResolvedValue({
       ok: true,

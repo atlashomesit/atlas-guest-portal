@@ -1,3 +1,5 @@
+import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
+import { brandNameForSentence } from '@/utils/guestCopy';
 import Slider from "../../components/homepage_components/slider/Slider";
 import HomePage_Locations from "../../components/homepage_components/homepage_locations/HomePage_Locations";
 import { lazy, Suspense, useEffect, useMemo } from "react";
@@ -81,7 +83,8 @@ const Home = () => {
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
     /** TASK-8055: fee claim follows payment rail; branding still gates Atlas operator voice. */
-    const payDirectBody = directBookingPriceClaim(tenant);
+    const processingFeePercent = useTenantProcessingFee();
+    const payDirectBody = directBookingPriceClaim(tenant, processingFeePercent);
     const whyDirectItems = useMemo(() => {
         const base = hideAtlasBranding ? WHY_DIRECT_ITEMS_TENANT : WHY_DIRECT_ITEMS_ATLAS;
         return base.map((item) =>
@@ -187,7 +190,7 @@ const Home = () => {
                             style={{ fontFamily: 'var(--font-family-display)' }}
                         >
                             {hideAtlasBranding
-                                ? `"Welcome to ${schemaBrandName}. Arrive, settle in, and let us take care of the rest — reach out any time if you need us."`
+                                ? `"Welcome to ${brandNameForSentence(schemaBrandName)}. Arrive, settle in, and let us take care of the rest — reach out any time if you need us."`
                                 : `"Every home on this page is one we clean, restock, and hand over ourselves. Arrive, settle in, and let us take care of the rest — we're just down the street if you need us."`}
                         </blockquote>
                         {/* TASK-4923 pattern — bound to the panel's own lavender text role, not
@@ -205,7 +208,7 @@ const Home = () => {
                 </section>
 
                 <WaveDivider tone="lavender" className="px-[8%] md:px-[18%]" />
-                <AtlasNeighbourhoodRibbon variant="closer" />
+                <AtlasNeighbourhoodRibbon variant="closer" homeCount={propertyData.length} />
 
                 {/* Why-direct 2-pillar strip — tighter, centred columns (layout fix from screen 2) */}
                 <section

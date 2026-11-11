@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearRuntimeConfig, setRuntimeConfig } from '@/runtime-config';
 import {
+  fetchGuestPriceBreakdown,
   fetchGuestGstBreakdown,
   fetchPricingBreakdown,
   netChargeableRoomFare,
   type GuestPriceBreakdown,
 } from './pricingClient';
+import { isPricingNotConfiguredError } from '@/utils/pricingNotConfigured';
 
 const defaultRuntimeConfig = {
   apiBaseUrl: 'https://api.test',
@@ -131,6 +133,35 @@ describe('fetchGuestGstBreakdown — TASK-4331 server-sourced GST slab', () => {
     expect(result.gstAmount).toBeNull();
     expect(result.finalAmount).toBeNull();
   });
+
+  // TASK-10298823: verified tenant slug passed in request headers
+  it('sends X-Tenant-Slug header when explicit tenantSlug is provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ gstPercent: 5, gstAmount: 250, finalAmount: 5250 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchGuestGstBreakdown(42, '2026-08-01', '2026-08-08', undefined, null, null, 'host-tenant-slug');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers['X-Tenant-Slug']).toBe('host-tenant-slug');
+  });
+
+  it('fetchGuestPriceBreakdown sends X-Tenant-Slug header when explicit tenantSlug is provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ baseAmount: 5000, finalAmount: 5000 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchGuestPriceBreakdown(42, '2026-08-01', '2026-08-08', undefined, null, 2, 'host-tenant-slug');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers['X-Tenant-Slug']).toBe('host-tenant-slug');
+  });
 });
 
 /**
@@ -198,5 +229,49 @@ describe('netChargeableRoomFare — TASK-8293 rule discounts are already netted 
 
   it('never returns a negative fare', () => {
     expect(netChargeableRoomFare(quote({ baseAmount: 1000, discountAmount: 5000 }))).toBe(0);
+  });
+});
+
+/**
+ * FOUNDER-RULED 2026-11-03: a room whose host has not set pricing answers 409 PRICING_NOT_CONFIGURED (it used to be a 500). The price client keeps the
+ * code on the error it throws so a screen can show the API's own sentence instead of its generic "could not load pricing".
+ */
+describe('fetchGuestPriceBreakdown — 409 PRICING_NOT_CONFIGURED', () => {
+  const failure = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+
+  it('throws a PricingNotConfiguredError carrying the sentence the API sent', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        failure(409, { code: 'PRICING_NOT_CONFIGURED', message: "This room can't be booked online yet. Please contact the host." }),
+      ),
+    );
+
+    const error = await fetchGuestPriceBreakdown(42, '2026-08-01', '2026-08-03').catch((e: unknown) => e);
+
+    expect(isPricingNotConfiguredError(error)).toBe(true);
+    expect((error as Error).message).toBe("This room can't be booked online yet. Please contact the host.");
+  });
+
+  it('keeps every other failure an ordinary error with its own message (another 409 is not this one)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(failure(409, { code: 'AVAILABILITY_CONFLICT', message: 'Those dates were just taken.' })),
+    );
+
+    const error = await fetchGuestPriceBreakdown(42, '2026-08-01', '2026-08-03').catch((e: unknown) => e);
+
+    expect(isPricingNotConfiguredError(error)).toBe(false);
+    expect((error as Error).message).toBe('Those dates were just taken.');
+  });
+
+  it('a 400 stays a plain error too', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(failure(400, { error: 'Checkout must be after check-in.' })));
+
+    const error = await fetchGuestPriceBreakdown(42, '2026-08-03', '2026-08-01').catch((e: unknown) => e);
+
+    expect(isPricingNotConfiguredError(error)).toBe(false);
+    expect((error as Error).message).toBe('Checkout must be after check-in.');
   });
 });

@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../hooks/useTenantProcessingFee";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
@@ -19,6 +20,7 @@ type LiveListingPrice = {
 export default function RecentlyViewedPage() {
   const brandName = getTenantBrandName();
   const { format: formatDisplayCurrency } = useCurrency();
+  const processingFeePercent = useTenantProcessingFee();
   const estimateNights = estimateStayNights(null, null);
   const [items, setItems] = useState(() => getRecentlyViewed());
   const [favEpoch, setFavEpoch] = useState(0);
@@ -173,7 +175,7 @@ export default function RecentlyViewedPage() {
                               headlinePrice,
                               estimateNights,
                               formatDisplayCurrency,
-                              3,
+                              processingFeePercent,
                               live?.isGstRegistered ?? true,
                               hasCompare && stored != null && stored > headlinePrice ? stored : headlinePrice,
                             )}

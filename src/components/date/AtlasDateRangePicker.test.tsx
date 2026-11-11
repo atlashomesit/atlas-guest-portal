@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { AtlasDateRangePicker } from './AtlasDateRangePicker';
+import { settle } from '../../test/settle';
 
 // Mock the DateRangePickerPopover component
 vi.mock('../homepage_components/hotelBooking_form/DateRangePickerPopover', () => ({
@@ -36,6 +37,10 @@ describe('AtlasDateRangePicker - Navigation Buttons', () => {
 
   it('should render navigation buttons', () => {
     render(<AtlasDateRangePicker {...defaultProps} />);
+    expect(screen.getByRole('button', { name: 'Previous month' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Next month')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Month' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Year' })).toBeInTheDocument();
     
     const navButtons = document.querySelectorAll('.rdrNextPrevButton');
     expect(navButtons.length).toBeGreaterThanOrEqual(2);
@@ -61,9 +66,8 @@ describe('AtlasDateRangePicker - Navigation Buttons', () => {
     }
     
     // The click should propagate (not be stopped)
-    await waitFor(() => {
-      expect(clickHandler).toHaveBeenCalled();
-    });
+    await settle();
+    expect(clickHandler).toHaveBeenCalled();
     
     document.removeEventListener('click', clickHandler);
   });
@@ -79,10 +83,9 @@ describe('AtlasDateRangePicker - Navigation Buttons', () => {
       // The react-date-range library should call onShownDateChange
       // This might not work in the test due to mocking, but we're testing that
       // our code doesn't prevent it
-      await waitFor(() => {
-        // At minimum, the click should not throw an error
-        expect(nextButton).toBeTruthy();
-      }, { timeout: 1000 });
+      await settle();
+      // At minimum, the click should not throw an error
+      expect(nextButton).toBeTruthy();
     }
   });
 
@@ -241,13 +244,13 @@ describe('AtlasDateRangePicker - Navigation Buttons', () => {
         
         fireEvent.click(navButton);
         
-        await waitFor(() => {
-          expect(clickHandler).toHaveBeenCalled();
-        });
+        await settle();
+        expect(clickHandler).toHaveBeenCalled();
         
         document.removeEventListener('click', clickHandler);
       }
     });
   });
 });
+
 

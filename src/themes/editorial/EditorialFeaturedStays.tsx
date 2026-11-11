@@ -42,6 +42,7 @@ import { getUnitNoun, getTenantOverrides } from "../../tenant/tenantOverrides";
 import { getTenantContext } from "../../tenant/tenantContext";
 import { useCurrency } from "../../contexts/CurrencyContext";
 import OptimizedImage from "../../components/ui/OptimizedImage";
+import { repairMojibake } from "../../utils/textUtils";
 
 const resolveCoverImage = (property: TenantPropertyRecord): string => {
   const filtered = filterGuestImageUrls(property.property_img ?? []);
@@ -126,7 +127,7 @@ const EditorialFeaturedStays = () => {
                     <p className="editorial-chapter-location">{property.property_location}</p>
                   )}
                   {property.property_description && (
-                    <p className="editorial-chapter-description">{property.property_description}</p>
+                    <p className="editorial-chapter-description">{repairMojibake(property.property_description)}</p>
                   )}
                   <div className="editorial-chapter-footer">
                     {price != null && (

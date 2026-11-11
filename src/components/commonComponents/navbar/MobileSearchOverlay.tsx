@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, MapPin, Search, Users } from 'lucide-react';
 
@@ -103,7 +104,7 @@ const MobileSearchOverlay = ({ onClose }: MobileSearchOverlayProps) => {
     onClose();
   }, [destination, navigate, onClose]);
 
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
       className="mobile-search-overlay"
@@ -166,10 +167,12 @@ const MobileSearchOverlay = ({ onClose }: MobileSearchOverlayProps) => {
               aria-label="Destination suggestions"
             >
               {filteredDestinations.map((opt) => (
-                <li key={`${opt.kind}-${opt.label}`} role="option" aria-selected={false}>
+                <li key={`${opt.kind}-${opt.label}`} role="none">
                   <button
                     type="button"
                     className="mobile-search-overlay__suggestion"
+                    role="option"
+                    aria-selected={false}
                     onClick={() => selectDestination(opt.label)}
                   >
                     <span className="mobile-search-overlay__suggestion-icon" aria-hidden="true">
@@ -268,7 +271,7 @@ const MobileSearchOverlay = ({ onClose }: MobileSearchOverlayProps) => {
           Search
         </button>
       </div>
-    </div>
+    </div>, document.body
   );
 };
 

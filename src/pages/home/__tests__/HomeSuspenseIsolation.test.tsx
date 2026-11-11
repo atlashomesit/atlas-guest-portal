@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, vi } from "vitest";
 import { BookingProvider } from "../../../contexts/BookingContext";
 import Home from "../Home";
+import { settle } from "../../../test/settle";
 
 vi.mock("../../../tenant/tenantContext", () => ({
   getTenantContext: vi.fn(() => ({ slug: "atlas", isMarketplaceRoot: true })),
@@ -17,11 +18,6 @@ vi.mock("../../../components/homepage_components/slider/Slider", () => ({
 vi.mock("../../../components/homepage_components/homepage_locations/HomePage_Locations", () => ({
   __esModule: true,
   default: () => <div>Home Locations</div>,
-}));
-
-vi.mock("../../../components/home/ServicesSection", () => ({
-  __esModule: true,
-  default: () => <div>Discover Our Exclusive Services</div>,
 }));
 
 vi.mock("../../../components/home/TestimonialsSection", () => ({
@@ -63,11 +59,12 @@ describe("Home per-section Suspense (TASK-101858)", () => {
     // FaqHighlights is suspended forever above; these siblings must still paint.
     // (FooterCtaStrip needs no stub: enableFooterMiniCtaAboveFooter is false,
     // so it never mounts.)
+    await settle();
+    // ServicesSection is real here and renders nothing on host sites (no made-up services).
+    expect(screen.queryByText(/Discover Our Exclusive Services/i)).not.toBeInTheDocument();
+    await settle();
     expect(
-      await screen.findByText(/Discover Our Exclusive Services/i),
-    ).toBeInTheDocument();
-    expect(
-      await screen.findByText(/Hear What Our Happy Guests Are Saying/i),
+      screen.getByText(/Hear What Our Happy Guests Are Saying/i),
     ).toBeInTheDocument();
   });
 });

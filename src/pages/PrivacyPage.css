@@ -1,0 +1,31 @@
+/* Approved daily five 2026-10-16: local privacy layout only. */
+.privacy-page { padding-block: 24px; }
+.privacy-page .legal-layout-content { display: flex; flex-direction: column; gap: 18px; }
+.privacy-page .legal-layout-content > * { margin-block: 0; }
+.privacy-page .legal-layout-header { padding: 20px; }
+.privacy-page .legal-layout-header h1 { font-size: 30px; }
+.privacy-page .legal-layout-header p { font-size: 16px; }
+.privacy-actions { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; padding: 0 6px; }
+.privacy-actions a { display: inline-flex; align-items: center; min-height: 44px; padding: 4px 10px; font: inherit; font-size: 14px; font-weight: 600; color: inherit; text-decoration: underline; box-sizing: border-box; }
+.privacy-page .privacy-topics { padding: 8px 16px; }
+.privacy-topics summary { min-height: 44px; align-content: center; font-weight: 600; cursor: pointer; }
+.privacy-topics a { display: flex; min-height: 40px; align-items: center; }
+.privacy-page section, .privacy-page article, .privacy-page [tabindex="-1"] { scroll-margin-top: 115px; }
+.privacy-page .grid > div { min-width: 0; }
+.privacy-page article header { gap: 16px; }
+.privacy-actions a:focus-visible, .privacy-topics summary:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+@media (min-width: 1024px) {
+  .privacy-topics summary { display: none; }
+  .privacy-page section, .privacy-page article, .privacy-page [tabindex="-1"] { scroll-margin-top: 160px; }
+}
+@media (max-width: 1023px) {
+  .privacy-page .legal-layout-content { gap: 12px; }
+  .privacy-page .legal-layout-header { padding: 18px; }
+  .privacy-page .legal-layout-header h1 { font-size: 26px; }
+  .privacy-page .legal-layout-header p { font-size: 14px; }
+  .privacy-page .privacy-topics { position: static; }
+  .privacy-actions { gap: 0; }
+  .privacy-actions a { font-size: 13px; padding-inline: 8px; }
+  .privacy-page .legal-layout-content > .grid { gap: 12px; }
+  .privacy-topics a { min-height: 44px; }
+}

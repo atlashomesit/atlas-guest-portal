@@ -2,6 +2,7 @@ import { CheckCircle2, HeartHandshake, ShieldCheck, Sparkles, Users, MapPin, Clo
 import SEO from "../components/SEO";
 import { getPublicSiteOrigin } from "../config/siteOrigin";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import "./AboutPage.css";
 
 const stayIllustration = `data:image/svg+xml;utf8,${encodeURIComponent(`
   <svg width="640" height="360" viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
@@ -133,11 +134,23 @@ const AboutPage = () => {
       }}
     />
 
-    <div className="px-4 md:px-10 lg:px-20 py-20 space-y-16">
-      <section className="bg-bg-surface border border-border-subtle shadow-level2 rounded-3xl p-8 md:p-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center" data-testid="mission-section">
+    <div className="about-page px-4 md:px-10 lg:px-20 py-20 space-y-16">
+      <section className="about-intro bg-bg-surface border border-border-subtle shadow-level2 rounded-3xl p-8 md:p-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center" data-testid="mission-section">
         <div className="space-y-6">
           <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight">Where dependable stays meet human hospitality</h1>
+          <nav className="about-topic-links" aria-label="About page topics">
+            {[["about-standards", "Standards"], ["about-host", "Your host"], ["about-promises", "Booking promises"]].map(([id, label]) => (
+              <a key={id} href={`#${id}`} onClick={(event) => {
+                if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                const target = document.getElementById(id);
+                if (!target) return;
+                event.preventDefault();
+                target.focus({ preventScroll: true });
+                target.scrollIntoView({ block: "start" });
+              }}>{label}</a>
+            ))}
+          </nav>
           <p className="text-lg text-text-muted max-w-2xl">
             We are a collective of hosts, designers, and operators who believe every serviced apartment should feel personal—without sacrificing reliability. From the first message to checkout, our mission is to keep guests at ease and make every city feel familiar.
           </p>
@@ -166,7 +179,7 @@ const AboutPage = () => {
         </figure>
       </section>
 
-      <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] items-center" data-testid="hospitality-section">
+      <section id="about-standards" tabIndex={-1} className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] items-center" data-testid="hospitality-section">
         <div className="space-y-4">
           <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Hospitality standards</p>
           <h2 className="text-2xl md:text-3xl font-bold">Standards that travel with you</h2>
@@ -198,7 +211,7 @@ const AboutPage = () => {
           owner-run statement. No headcounts, city names, or department titles are hardcoded here
           — this component is shared across every tenant's guest portal, so the copy is written to
           stay true regardless of which {brandName} is resolved at render time. */}
-      <section className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="team-section">
+      <section id="about-host" tabIndex={-1} className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="team-section">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Who you're booking with</p>
@@ -214,7 +227,7 @@ const AboutPage = () => {
         </div>
       </section>
 
-      <section className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="trust-section">
+      <section id="about-promises" tabIndex={-1} className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="trust-section">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Trust badges</p>

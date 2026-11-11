@@ -1,12 +1,13 @@
 /** @vitest-environment jsdom */
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { addDays, format } from 'date-fns';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getIstCalendarDate } from '@/utils/date';
 import EmbedPage, { readableCtaText, DateGuestPicker } from './EmbedPage';
+import { settle } from '../test/settle';
 
 vi.mock('@/runtime-config', () => ({ getApiBaseUrl: () => 'https://api.example.test' }));
 vi.mock('@/api/client', () => ({
@@ -72,7 +73,8 @@ describe('EmbedPage state semantics', () => {
   it('announces API errors', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('unavailable', { status: 503 })));
     renderEmbed('/embed/failing');
-    expect(await screen.findByRole('alert')).toHaveTextContent('Booking widget unavailable');
+    await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent('Booking widget unavailable');
   });
 
   it('shows not-eligible state when isLiveEligible is false', async () => {
@@ -81,7 +83,8 @@ describe('EmbedPage state semantics', () => {
       isLiveEligible: false, publishedListingsCount: 0, listings: [],
     }), { status: 200 })));
     renderEmbed('/embed/demo');
-    expect(await screen.findByTestId('embed-not-eligible')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId('embed-not-eligible')).toBeInTheDocument();
   });
 
   it('shows no-listings state when listings array is empty', async () => {
@@ -90,7 +93,8 @@ describe('EmbedPage state semantics', () => {
       isLiveEligible: true, publishedListingsCount: 0, listings: [],
     }), { status: 200 })));
     renderEmbed('/embed/demo');
-    expect(await screen.findByTestId('embed-no-listings')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId('embed-no-listings')).toBeInTheDocument();
   });
 
   it('auto-selects single listing and shows date picker', async () => {
@@ -100,7 +104,8 @@ describe('EmbedPage state semantics', () => {
       listings: [{ id: 1, name: 'Studio', propertyId: 1, propertyName: 'Beach House', maxGuests: 4, baseNightlyRate: 5000 }],
     }), { status: 200 })));
     renderEmbed('/embed/demo');
-    expect(await screen.findByTestId('embed-date-guest')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId('embed-date-guest')).toBeInTheDocument();
   });
 
   it('chooses a readable CTA label for light and dark tenant colors', () => {
@@ -123,7 +128,8 @@ describe('EmbedPage state semantics', () => {
     ));
 
     renderEmbed('/embed/demo');
-    await screen.findByTestId('embed-date-guest');
+    await settle();
+    screen.getByTestId('embed-date-guest');
 
     fireEvent.change(screen.getByTestId('embed-checkin-date'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
     fireEvent.change(screen.getByTestId('embed-checkout-date'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
@@ -131,7 +137,8 @@ describe('EmbedPage state semantics', () => {
     // findByRole waits out the "Checking availability..." loading label first, so this only
     // passes once the fetch has actually resolved and the range has actually been evaluated --
     // not merely because the button happened to be disabled while still loading.
-    const cta = await screen.findByRole('button', { name: 'Check pricing' });
+    await settle();
+    const cta = screen.getByRole('button', { name: 'Check pricing' });
     expect(cta).toBeDisabled();
     expect(screen.getByRole('alert')).toHaveTextContent(/selected nights/);
   });
@@ -170,7 +177,8 @@ describe('EmbedPage state semantics', () => {
 
     fireEvent.change(screen.getByTestId('embed-checkin-date'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
     fireEvent.change(screen.getByTestId('embed-checkout-date'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Check pricing' }));
 
     expect(onConfirm).toHaveBeenCalledWith(expect.any(Date), expect.any(Date), 1);
   });
@@ -205,7 +213,8 @@ describe('EmbedPage state semantics', () => {
 
     fireEvent.change(screen.getByTestId('embed-checkin-date'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
     fireEvent.change(screen.getByTestId('embed-checkout-date'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Check pricing' }));
 
     expect(onConfirm).toHaveBeenCalledWith(expect.any(Date), expect.any(Date), 1);
   });
@@ -221,12 +230,14 @@ describe('EmbedPage state semantics', () => {
     // inside the release gate's STEP 1 window, where dotnet build + two portal suites share the
     // box and the default 1s findBy timeout can expire before the rejection flushes through.
     // Same assertion, explicit budget -- the behaviour under test is unchanged.
-    const cta = await screen.findByRole('button', { name: 'Retry availability check' }, { timeout: 5000 });
+    await settle();
+    const cta = screen.getByRole('button', { name: 'Retry availability check' });
     expect(cta).not.toBeDisabled();
     expect(availabilityCalls).toBe(1);
 
     fireEvent.click(cta);
-    await waitFor(() => expect(availabilityCalls).toBe(2), { timeout: 5000 });
+    await settle();
+    expect(availabilityCalls).toBe(2);
   });
 
   it('exposes accessible names for date, guest and contact controls', async () => {
@@ -239,16 +250,19 @@ describe('EmbedPage state semantics', () => {
     ));
 
     renderEmbed('/embed/demo');
-    await screen.findByTestId('embed-date-guest');
+    await settle();
+    screen.getByTestId('embed-date-guest');
     expect(screen.getByLabelText('Check-in')).toBeInTheDocument();
     expect(screen.getByLabelText('Check-out')).toBeInTheDocument();
     expect(screen.getByLabelText('Guests')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
     fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Check pricing' }));
 
-    await screen.findByTestId('embed-guest-details');
+    await settle();
+    screen.getByTestId('embed-guest-details');
     expect(screen.getByLabelText('Full name')).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
     expect(screen.getByLabelText('Phone number')).toBeInTheDocument();
@@ -275,11 +289,14 @@ describe('EmbedPage state semantics', () => {
     }));
 
     renderEmbed('/embed/demo');
-    await screen.findByTestId('embed-date-guest');
+    await settle();
+    screen.getByTestId('embed-date-guest');
     fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
     fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
-    await screen.findByTestId('embed-guest-details');
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Check pricing' }));
+    await settle();
+    screen.getByTestId('embed-guest-details');
 
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Ada Guest' } });
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'ada@example.test' } });
@@ -290,7 +307,8 @@ describe('EmbedPage state semantics', () => {
 
     fireEvent.click(screen.getByTestId('embed-dpdp-consent'));
     fireEvent.click(screen.getByRole('button', { name: 'Pay & book' }));
-    await waitFor(() => expect(chargeBodies.length).toBeGreaterThan(0));
+    await settle();
+    expect(chargeBodies.length).toBeGreaterThan(0);
     expect(chargeBodies[0]).toEqual(expect.objectContaining({ guestConsentAccepted: true }));
   });
 
@@ -303,12 +321,14 @@ describe('EmbedPage state semantics', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(twoListingConfig, { status: 200 })));
 
     renderEmbed('/embed/demo');
-    await screen.findByTestId('embed-listing-select');
+    await settle();
+    screen.getByTestId('embed-listing-select');
     expect(screen.getByRole('status')).toHaveTextContent(/choose a stay/i);
 
     fireEvent.click(screen.getByRole('button', { name: /Studio/ }));
 
-    await screen.findByTestId('embed-date-guest');
+    await settle();
+    screen.getByTestId('embed-date-guest');
     expect(screen.getByRole('status')).toHaveTextContent(/dates and number of guests/i);
   });
 
@@ -343,14 +363,17 @@ describe('EmbedPage state semantics', () => {
     }));
 
     renderEmbed('/embed/demo');
-    await screen.findByTestId('embed-date-guest');
+    await settle();
+    screen.getByTestId('embed-date-guest');
     expect(screen.getByRole('status')).toHaveTextContent(/dates and number of guests/i);
 
     fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
     fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Check pricing' }));
 
-    await screen.findByTestId('embed-guest-details');
+    await settle();
+    screen.getByTestId('embed-guest-details');
     expect(screen.getByRole('status')).toHaveTextContent(/enter your details/i);
 
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Ada Guest' } });
@@ -361,7 +384,8 @@ describe('EmbedPage state semantics', () => {
 
     // "Booking confirmed!" is a plain <h3> with nothing announcing it -- the same status
     // region must pick up the confirmation too.
-    await screen.findByTestId('embed-confirmed');
+    await settle();
+    screen.getByTestId('embed-confirmed');
     expect(screen.getByRole('status')).toHaveTextContent(/booking confirmed/i);
   });
 
@@ -400,20 +424,24 @@ describe('EmbedPage state semantics', () => {
     }));
 
     renderEmbed('/embed/demo');
-    await screen.findByTestId('embed-date-guest');
+    await settle();
+    screen.getByTestId('embed-date-guest');
     fireEvent.change(screen.getByLabelText('Check-in'), { target: { value: format(checkIn, 'yyyy-MM-dd') } });
     fireEvent.change(screen.getByLabelText('Check-out'), { target: { value: format(checkOut, 'yyyy-MM-dd') } });
-    fireEvent.click(await screen.findByRole('button', { name: 'Check pricing' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Check pricing' }));
 
-    await screen.findByTestId('embed-guest-details');
+    await settle();
+    screen.getByTestId('embed-guest-details');
     fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Ada Guest' } });
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'ada@example.test' } });
     fireEvent.change(screen.getByLabelText('Phone number'), { target: { value: '9999999999' } });
     fireEvent.click(screen.getByTestId('embed-dpdp-consent'));
     fireEvent.click(screen.getByRole('button', { name: 'Pay & book' }));
 
-    await screen.findByTestId('embed-confirmed');
-    const link = await screen.findByRole('link', { name: /view or manage your booking/i });
+    await settle();
+    screen.getByTestId('embed-confirmed');
+    const link = screen.getByRole('link', { name: /view or manage your booking/i });
     expect(link).toHaveAttribute('href', `${window.location.origin}/booking/42?t=tok_abc123`);
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
@@ -434,7 +462,8 @@ describe('EmbedPage state semantics', () => {
     }), { status: 200 })));
 
     renderEmbed('/embed/demo');
-    await screen.findByTestId('embed-listing-select');
+    await settle();
+    screen.getByTestId('embed-listing-select');
     expect(screen.getByText(/5,000\/night/)).toBeInTheDocument();
   });
 });

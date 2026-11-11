@@ -31,7 +31,7 @@ Optional tooling:
 - Node **22.13.0** (LTS)
 - npm **10.9.2**
 - Cloudflare Pages build vars → `NODE_VERSION=22.13.0`, `NPM_FLAGS=--no-audit --no-fund`
-- Enforced override → `@jridgewell/sourcemap-codec@1.5.5`
+- Pinned versions → `package.json` `overrides` (and the linux `optionalDependencies`). Each pin is explained in the `//overrides` / `//optionalDependencies` notes right above it: why it is pinned and what to check when the package that pulls it in is bumped. Do not put a `//` key inside `overrides` itself — npm 10.9.2 rejects it (`Override without name: //`).
 
 ## Environment Variables
 The Vite config surfaces variables prefixed with `VITE_` or `NEXT_PUBLIC_`; CRA-style `REACT_APP_*` keys are ignored at runtime. Make sure API hosts use `VITE_API_BASE_URL` rather than the legacy `REACT_APP_API_BASE_URL` name.

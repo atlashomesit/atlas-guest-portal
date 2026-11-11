@@ -21,9 +21,27 @@ type CacheEntry = {
 
 const inflight = new Map<string, CacheEntry>();
 
+function headerValue(headers: HeadersInit | undefined, name: string): string {
+  if (!headers) return "";
+  const lower = name.toLowerCase();
+  if (headers instanceof Headers) {
+    return headers.get(name) ?? "";
+  }
+  if (Array.isArray(headers)) {
+    const found = headers.find(([k]) => k.toLowerCase() === lower);
+    return found ? found[1] : "";
+  }
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === lower && typeof v === "string") return v;
+  }
+  return "";
+}
+
 function cacheKey(url: string, init?: RequestInit): string {
   const method = (init?.method ?? "GET").toUpperCase();
-  return `${method} ${url}`;
+  const auth = headerValue(init?.headers, "Authorization");
+  const tenant = headerValue(init?.headers, "X-Tenant-Slug");
+  return `${method} ${url} auth=${auth ? "1" : "0"} tenant=${tenant}`;
 }
 
 export async function dedupedJsonFetch(url: string, init?: RequestInit): Promise<DedupedJsonResult> {
@@ -64,7 +82,11 @@ export async function dedupedJsonFetch(url: string, init?: RequestInit): Promise
 
   try {
     const result = await promise;
-    entry.settledAt = Date.now();
+    if (result.ok) {
+      entry.settledAt = Date.now();
+    } else {
+      inflight.delete(key);
+    }
     if (callerSignal?.aborted) {
       throw new DOMException("The operation was aborted.", "AbortError");
     }

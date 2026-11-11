@@ -1,3 +1,4 @@
+import { useTenantProcessingFee } from "../../hooks/useTenantProcessingFee";
 /**
  * TASK-4907 / ADR-0081 D8 — "coastal" layout theme's Home page.
  *
@@ -80,7 +81,8 @@ const CoastalHome = () => {
     const primaryOgImage = room101Cover ?? (!overrides.hideLogo ? LOGO_URL : undefined);
     const listingAddress = propertyData.find((property) => property.property_location?.trim())?.property_location?.trim();
     /** TASK-8055: fee claim follows payment rail, not white-label branding alone. */
-    const payDirectBody = directBookingPriceClaim(tenant);
+    const processingFeePercent = useTenantProcessingFee();
+    const payDirectBody = directBookingPriceClaim(tenant, processingFeePercent);
     const whyDirectItems = useMemo(() => {
         const items = hideAtlasBranding
             ? WHY_DIRECT_ITEMS.filter((item) => item.heading !== "We verify every home")

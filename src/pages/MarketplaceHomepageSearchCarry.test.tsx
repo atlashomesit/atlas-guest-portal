@@ -5,7 +5,7 @@
 // city/checkIn/checkOut/guests — SearchPage already propagates its full querySuffix,
 // the homepage grid does not.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -23,6 +23,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 }));
 
 import MarketplaceHomepage from './MarketplaceHomepage';
+import { settle } from '../test/settle';
 
 function listing(id: number) {
   return {
@@ -66,7 +67,8 @@ describe('TASK-102058 marketplace card links preserve search criteria', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => expect(screen.getByText('Listing 1')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByText('Listing 1')).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /view home/i });
     const href = link.getAttribute('href') ?? '';
     const query = href.split('?')[1] ?? '';
@@ -76,5 +78,25 @@ describe('TASK-102058 marketplace card links preserve search criteria', () => {
     expect(params.get('checkIn')).toBe('2026-12-10');
     expect(params.get('checkOut')).toBe('2026-12-12');
     expect(params.get('guests')).toBe('4');
+  });
+  it('MKT-031: View-home href preserves brand=atlastays and utm_* attribution tags', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={['/?brand=atlastays&utm_source=ig&utm_medium=reel&utm_campaign=diwali&utm_term=t&utm_content=c&foo=bar']}
+      >
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const href = screen.getByRole('link', { name: /view home/i }).getAttribute('href') ?? '';
+    const params = new URLSearchParams(href.split('?')[1] ?? '');
+    expect(params.get('brand')).toBe('atlastays');
+    expect(params.get('utm_source')).toBe('ig');
+    expect(params.get('utm_medium')).toBe('reel');
+    expect(params.get('utm_campaign')).toBe('diwali');
+    expect(params.get('utm_term')).toBe('t');
+    expect(params.get('utm_content')).toBe('c');
+    expect(params.get('foo')).toBeNull();
   });
 });

@@ -8,6 +8,7 @@ import {
   resolveApplicableGraceHours,
   resolveFreeCancellationTrustCopy,
   describeCancellationPolicy,
+  describeWindowHours,
 } from './cancellationPolicy';
 
 // TASK-4334: guest-facing cancellation deadline computation/formatting.
@@ -153,7 +154,9 @@ describe('resolveFreeCancellationTrustCopy (TASK-7012)', () => {
       now,
     });
     expect(copy.deadlineFormatted).toBeNull();
-    expect(copy.trustMessage).toBe('Standard cancellation policy applies for this stay.');
+    expect(copy.trustMessage).toBe(
+      'Strict policy: this stay is inside the 7 days before check-in, so the booking is non-refundable.',
+    );
   });
 
   /**
@@ -175,7 +178,9 @@ describe('resolveFreeCancellationTrustCopy (TASK-7012)', () => {
     });
     expect(copy.applicableGraceHours).toBeNull();
     expect(copy.deadlineFormatted).toBeNull();
-    expect(copy.trustMessage).toBe('Standard cancellation policy applies for this stay.');
+    expect(copy.trustMessage).toBe(
+      'Strict policy: this stay is inside the 7 days before check-in, so the booking is non-refundable.',
+    );
     // Whatever we say, it must never read as a free-cancellation promise.
     expect(copy.trustMessage).not.toMatch(/free cancellation/i);
   });
@@ -296,77 +301,70 @@ describe('TASK-7539: Cancellation policy fee table and copy generation', () => {
   });
 
   describe('describeCancellationPolicy: copy generation from fee table', () => {
-    it('Flexible (0% fee): headline makes NO window condition (since refund always 100%)', () => {
+    // TASK-1040050 (CPO money-wording decision): every screen leads with the free-cancellation window the server stamps as the deadline, and what comes after it never
+    // promises a refund amount. Flexible and untiered listings (fee 0%) say nothing after the date, so the copy neither denies nor promises what the server pays.
+    it('Flexible (0% fee): the 48-hour window, nothing said after the date (it must not deny the refund the server pays)', () => {
       const policy = describeCancellationPolicy('Flexible');
-      expect(policy.headline).toBe('Full refund any time before check-in');
-      // No after-window copy for Flexible, since the window is not a gate
+      expect(policy.headline).toBe('Free cancellation up to 48 hours before check-in');
       expect(policy.afterWindowCopy).toBe('');
     });
 
-    it('Moderate (50% fee): headline describes window, afterWindowCopy states 50% refund', () => {
+    it('Moderate (50% fee): the 5-day window, then a late-cancellation fee applies (no percentage repeated)', () => {
       const policy = describeCancellationPolicy('Moderate');
-      expect(policy.headline).toBe('Full refund if cancelled 5+ days before check-in');
-      expect(policy.afterWindowCopy).toContain('50%');
-      expect(policy.afterWindowCopy).toBe(
-        'Partial refund (50%) for cancellations after the 5-day window.'
-      );
+      expect(policy.headline).toBe('Free cancellation up to 5 days before check-in');
+      expect(policy.afterWindowCopy).toBe('After that, a late-cancellation fee applies.');
+      expect(policy.afterWindowCopy).not.toContain('%');
     });
 
-    it('Strict (100% fee): headline describes window, afterWindowCopy states no refund', () => {
+    it('Strict (100% fee): the 7-day window, then non-refundable', () => {
       const policy = describeCancellationPolicy('Strict');
-      expect(policy.headline).toBe('Full refund if cancelled 7+ days before check-in');
-      expect(policy.afterWindowCopy).toBe('No refund within 7 days of check-in.');
+      expect(policy.headline).toBe('Free cancellation up to 7 days before check-in');
+      expect(policy.afterWindowCopy).toBe('After that, the booking is non-refundable.');
     });
 
-    // TASK-7819 (founder ruling 2026-08-11): these two cases previously pinned the vague
-    // 'Flexible cancellation policy applies'. That string described no refund outcome, which is
-    // what allowed callers to substitute their own literal for the untiered case — and the
-    // literal they substituted ("no refunds within 7 days") contradicted the engine, which
-    // resolves a null tier to Flexible and refunds 100%. The fallback now states the outcome
-    // the server actually produces.
-    it('unrecognized tier: resolves to Flexible, exactly as the server does', () => {
+    // TASK-1040050: a listing that names no tier gets the server's DEFAULT window (7 days, RefundDeadlineResolver), the same words the rate card reads.
+    it('unrecognized tier: the server default 7-day window, nothing said after the date', () => {
       const policy = describeCancellationPolicy('UnknownTier');
-      expect(policy.headline).toBe('Full refund any time before check-in');
+      expect(policy.headline).toBe('Free cancellation up to 7 days before check-in');
       expect(policy.afterWindowCopy).toBe('');
     });
 
-    it('null/undefined tier: resolves to Flexible, exactly as the server does', () => {
+    it('null/undefined tier: the server default 7-day window, nothing said after the date', () => {
       const policyNull = describeCancellationPolicy(null);
       const policyUndef = describeCancellationPolicy(undefined);
-      expect(policyNull.headline).toBe('Full refund any time before check-in');
-      expect(policyUndef.headline).toBe('Full refund any time before check-in');
-      expect(policyNull).toEqual(describeCancellationPolicy('Flexible'));
+      expect(policyNull.headline).toBe('Free cancellation up to 7 days before check-in');
+      expect(policyUndef).toEqual(policyNull);
+      expect(policyNull.afterWindowCopy).toBe('');
+    });
+
+    it('never says "any time" or "full refund" (a promise the fee setting could turn false)', () => {
+      for (const tier of ['Flexible', 'Moderate', 'Strict', null]) {
+        const { headline, afterWindowCopy } = describeCancellationPolicy(tier);
+        expect(`${headline} ${afterWindowCopy}`).not.toMatch(/any time|full refund/i);
+      }
     });
   });
 
-  describe('TASK-7539 Defects fixed:', () => {
-    it('Defect 1: Strict early-cancel states 100% refund, NOT 50%', () => {
+  describe('TASK-7539 Defects fixed (restated by TASK-1040050):', () => {
+    it('Defect 1: Strict early-cancel never states a partial refund', () => {
       const strictPolicy = describeCancellationPolicy('Strict');
-      expect(strictPolicy.headline).toContain('Full refund');
       expect(strictPolicy.headline).not.toContain('50%');
-      // The 50% applies AFTER the window, not inside it
       expect(strictPolicy.afterWindowCopy).not.toContain('50%');
     });
 
-    it('Defect 2: Flexible states NO hardcoded window (0% fee means time is not a gate)', () => {
-      const flexiblePolicy = describeCancellationPolicy('Flexible');
-      // No hardcoded hour counts in copy, and no "if cancelled before" condition
-      expect(flexiblePolicy.headline).not.toMatch(/\d+\s*hours?/);
-      expect(flexiblePolicy.headline).not.toMatch(/48|24/);
-      expect(flexiblePolicy.headline).toBe('Full refund any time before check-in');
+    it('Defect 2: the window is the one the server stamps, in the same words the rate card reads', () => {
+      expect(describeCancellationPolicy('Flexible').headline).toBe('Free cancellation up to 48 hours before check-in');
+      expect(describeCancellationPolicy('Moderate').headline).toBe('Free cancellation up to 5 days before check-in');
+      expect(describeCancellationPolicy('Strict').headline).toBe('Free cancellation up to 7 days before check-in');
     });
 
-    it('Defect 4: Flexible copy does NOT present the window as a condition', () => {
-      const flexiblePolicy = describeCancellationPolicy('Flexible');
-      // "any time" and afterWindowCopy="" means no gate at all
-      expect(flexiblePolicy.headline).toContain('any time');
-      expect(flexiblePolicy.afterWindowCopy).toBe('');
-    });
-
-    it('Moderate explicitly states 50% refund after the window', () => {
-      const moderatePolicy = describeCancellationPolicy('Moderate');
-      expect(moderatePolicy.afterWindowCopy).toContain('50%');
-      expect(moderatePolicy.afterWindowCopy).toMatch(/50%/);
+    it('Defect 4: the window hours are the ones in FREE_CANCELLATION_WINDOW_HOURS (the server table), never retyped', () => {
+      for (const tier of ['Flexible', 'Moderate', 'Strict'] as const) {
+        expect(describeCancellationPolicy(tier).headline).toContain(describeWindowHours(FREE_CANCELLATION_WINDOW_HOURS[tier]));
+      }
+      expect(describeWindowHours(48)).toBe('48 hours');
+      expect(describeWindowHours(120)).toBe('5 days');
+      expect(describeWindowHours(168)).toBe('7 days');
     });
   });
 });

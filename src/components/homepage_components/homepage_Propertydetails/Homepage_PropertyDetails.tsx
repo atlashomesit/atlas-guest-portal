@@ -1,14 +1,31 @@
+import MarketplaceHostIdentity from '@/components/property/MarketplaceHostIdentity';
 import './Homepage_PropertyDetails.css';
+import RatingDistribution from '../../property/RatingDistribution';
+import { starDistribution } from '../../property/starDistribution';
 import React from 'react';
 import { toast } from 'react-toastify'; // TASK-4288: share fallback feedback
 import { getListingDisplayName } from '@/lib/listingDisplayName';
-import { getTenantContext as _getTenantCtx } from '@/tenant/tenantContext';
+import {
+  getTenantContext as _getTenantCtx,
+  fetchListingTenantContext,
+  getCachedListingTenantContext,
+  type TenantInfo,
+} from '@/tenant/tenantContext';
+import { useListingTenantName } from '@/hooks/useListingTenantName';
+import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantListingAddress, getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
+import { readClusterListingFields } from '@/utils/clusterListing';
 import { getTenantBrandName } from '@/tenant/displayBrand';
 import { getGuestFacingPhone } from '@/config/contact';
-import { REFUND_INITIATED_STEP_DESC, REFUND_SETTLEMENT_STEP_DESC } from '@/config/refundPolicyTimelines';
+import {
+  REFUND_CONFIRMATION_STEP_DESC,
+  REFUND_INITIATED_STEP_DESC,
+  REFUND_REQUEST_STEP_DESC,
+  REFUND_SETTLEMENT_STEP_DESC,
+} from '@/config/refundPolicyTimelines';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { FaBed, FaShower, FaSwimmingPool, FaCar, FaWifi, FaTv, FaDumbbell } from "react-icons/fa";
 import { TbAirConditioning } from "react-icons/tb";
@@ -23,14 +40,26 @@ import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
 import { useTenantListings } from '../../../hooks/useTenantListings';
 import { usePropertyListings } from '../../../hooks/usePropertyListings';
 import { useFocusTrap } from '../../../hooks/useFocusTrap';
+import { useListingHostDescription } from '../../../hooks/useListingHostDescription';
 import { trackEvent } from '../../../utils/analytics';
 import { Button } from '../../ui/Button';
 import Lightbox from '../../ui/Lightbox';
 import { calculateNightlyPrice, inferUnitType } from '../../../utils/pricing';
-import { buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
+import { appendQuerySuffix, buildHomeUnitPath, getPropertySlug } from '../../../utils/navigation';
+import {
+  buildPropertyDetailBackHref,
+  buildSimilarStayHref,
+  extractSimilarStayMeta,
+  SIMILAR_STAY_PRICE_HINT,
+  hasPropertyDetailSearchFilters,
+  selectSimilarStaysForParty,
+  keepSimilarStaysInSameCity,
+} from '@/utils/marketplaceBackHref';
 import { propertySlugMatchesListing } from '../../../utils/propertySlugMatch';
 import { useBooking } from '../../../contexts/BookingContext';
 import { resolveListing } from '../../../utils/listingResolver';
+import { previewListingDescription, withoutInternalCodeDescription } from '../../../utils/listingDescription';
+import { repairMojibake } from '../../../utils/textUtils';
 import {
   buildGuestImageSrcSet,
   filterGuestImageUrls,
@@ -38,9 +67,13 @@ import {
   sanitizeGuestImageUrl,
   toTransformedGuestImageUrl,
 } from '../../../utils/guestImageUrl';
+import { getStandardStayTimes } from '../../../content/faqHighlights';
+import { formatCurrency } from '../../../utils/formatting';
+import { describeIncludedGuests, pickIncludedGuestFacts, readIncludedGuestFields, type IncludedGuestFields } from '../../../utils/includedGuests';
 import {
   describeCancellationPolicy,
   resolveEffectiveCancellationTier,
+  withRatePlanCancellation,
 } from '../../../utils/cancellationPolicy';
 import type { ListingDetail, PublicListing } from '../../../api/listingClient';
 import {
@@ -52,16 +85,21 @@ import {
 } from '../../../api/listingClient';
 import SEO from '../../SEO';
 import StateMessage from '../../StateMessage';
+import { useMarketplaceListingUnavailable } from '@/hooks/useMarketplaceListingUnavailable';
 import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
 import SinglePinGoogleMap from '../../map/SinglePinGoogleMap';
 import EmbeddedListingMap from '../../map/EmbeddedListingMap';
+import ListingHouseRules from '@/components/listing/ListingHouseRules';
+import { readHostRulesFields } from '@/components/listing/readHostRulesFields';
 import { selectPropertyMapMode } from './propertyMapMode';
+import { centroidForCity } from '../../../utils/mapCoords';
 import { buildApiUrl, getApiHeaders } from '../../../api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '../../../utils/guestHistory';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
+import { getTodayBreakdownFromListing } from '@/api/pricingClient';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
-import ListingWhatsAppFloat from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
+import ListingWhatsAppFloat, { buildListingWhatsAppUrl } from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
 import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
@@ -161,10 +199,10 @@ function PpGridIcon({ size = 14 }: { size?: number }) {
 // ---- Cancellation helpers (pp-* design system) ------------------------------
 
 const PP_REFUND_STEPS = [
-  { title: 'Cancel from your booking', desc: 'One tap from your booking confirmation. No reason needed.' },
+  { title: 'Cancel from your booking', desc: REFUND_REQUEST_STEP_DESC },
   { title: 'Refund initiated', desc: REFUND_INITIATED_STEP_DESC },
   { title: 'Money in your account', desc: REFUND_SETTLEMENT_STEP_DESC },
-  { title: 'Confirmation', desc: 'SMS and WhatsApp when the refund clears. Both.' },
+  { title: 'Confirmation', desc: REFUND_CONFIRMATION_STEP_DESC },
 ];
 
 interface PpCancellationInfo {
@@ -176,7 +214,7 @@ interface PpCancellationInfo {
 function getPpRefundSteps(hasOnlinePayment: boolean): Array<{ title: string; desc: string }> {
   if (!hasOnlinePayment) {
     return [
-      { title: 'Cancel from your booking', desc: 'One tap from your booking confirmation. No reason needed.' },
+      { title: 'Cancel from your booking', desc: REFUND_REQUEST_STEP_DESC },
       { title: 'Refund with your host', desc: 'Your host confirms the refund amount and timing directly with you.' },
       { title: 'Money returned', desc: 'UPI or bank transfer as arranged with the host — timing varies.' },
       { title: 'Confirmation', desc: 'Your host or our team confirms when the refund is complete.' },
@@ -292,7 +330,17 @@ function PropertyDetailsSkeleton() {
                 </div>
 
                 <div className="flex justify-center sm:justify-start">
-                    <Button onClick={() => window.history.back()} className="mt-2" variant="secondary">
+                    <Button
+                      onClick={() => {
+                        if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer) {
+                          window.history.back();
+                        } else {
+                          window.location.href = "/";
+                        }
+                      }}
+                      className="mt-2"
+                      variant="secondary"
+                    >
                         Go Back
                     </Button>
                 </div>
@@ -342,6 +390,11 @@ interface Property {
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
     /** TASK-4356: free-cancellation window hours before check-in (server-resolved). */
     cancellationWindowHours?: number | null;
+    /** GUEST-069: the host's own rules and map link, from the public listing. */
+    houseRulesText?: string | null;
+    houseRulesPdfUrl?: string | null;
+    houseRulesStructured?: string | null;
+    googleMapsUrl?: string | null;
     /** TASK-4405: server-resolved universal grace-window hours. Null when the flag is off (flag-off parity). */
     graceHours?: number | null;
     /** TASK-5205 / TASK-956: minimum stay nights from listing payload. */
@@ -349,6 +402,24 @@ interface Property {
     /** TL-GUEST: from GET /listings/{id} or /listings/public — drives same Google Maps JS path as Location page. */
     latitude?: number | null;
     longitude?: number | null;
+    city?: string | null;
+    state?: string | null;
+    country?: string | null;
+    /** HSL-011: dorm facts from GET /listings/{id} (API only; null for every non-dorm listing). */
+    accommodationType?: string | null;
+    dormGenderPolicy?: DormGenderPolicy | null;
+    /** HSL-011: total beds in the dorm (Listing.Quantity). */
+    dormBedCount?: number | null;
+    /** CLU-011: `PublicListingDto.ClusterRole` / `.ClusterId` (API only). */
+    clusterRole?: string | null;
+    clusterId?: number | null;
+    isParentCluster?: boolean | null;
+    securityDepositAmount?: number | null;
+    hasSmallPartyPricing?: boolean | null;
+    /** GUEST-060: guests the price covers and the host's extra-guest nightly rate (API only; null when not sent). */
+    includedGuests?: number | null;
+    extraGuestRate?: number | null;
+    priceChangesWithGuests?: boolean | null;
 }
 
 function coerceProperty(item: Partial<Property> & { id?: number | string }): Property {
@@ -379,12 +450,29 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         propertyAddress: item.propertyAddress,
         property_address: item.property_address,
         virtualTourUrl: item.virtualTourUrl,
+        // GUEST-069: the host's rules and map link survive the coercion.
+        houseRulesText: item.houseRulesText,
+        houseRulesPdfUrl: item.houseRulesPdfUrl,
+        houseRulesStructured: item.houseRulesStructured,
+        googleMapsUrl: item.googleMapsUrl,
         cancellationTier: item.cancellationTier,
         cancellationWindowHours: item.cancellationWindowHours,
         graceHours: item.graceHours,
+        includedGuests: item.includedGuests ?? null,
+        extraGuestRate: item.extraGuestRate ?? null,
+        priceChangesWithGuests: item.priceChangesWithGuests ?? null,
         minStay: item.minStay,
         latitude: item.latitude,
         longitude: item.longitude,
+        city: item.city ?? ((item as unknown as Record<string, unknown>).City as string | undefined),
+        state: item.state ?? ((item as unknown as Record<string, unknown>).State as string | undefined),
+        country: item.country ?? ((item as unknown as Record<string, unknown>).Country as string | undefined),
+        accommodationType: item.accommodationType ?? null,
+        dormGenderPolicy: item.dormGenderPolicy ?? null,
+        dormBedCount: item.dormBedCount ?? null,
+        clusterRole: item.clusterRole ?? null,
+        clusterId: item.clusterId ?? null,
+        isParentCluster: item.isParentCluster ?? (item.clusterRole ? item.clusterRole.toUpperCase() === 'PARENT' : null),
     };
 }
 
@@ -404,46 +492,19 @@ type ListingReviewRow = {
     ratingValue?: number | null;
     ratingCheckin?: number | null;
     ratingCommunication?: number | null;
+    ratingAccuracy?: number | null;
+    ratingLocation?: number | null;
 };
 
-/** TASK-1979: row shape from `GET /api/public/listings/{id}` externalReviews array. */
-type ExternalReviewRow = {
-    guestName?: string;
-    rating?: number | null;
-    body?: string | null;
-    reviewDate?: string;
-    source?: string;
-    sourceUrl?: string | null;
-};
-
-type DisplayReviewRow = ListingReviewRow & {
-    displayKey: string;
-    isGoogle?: boolean;
-    sourceUrl?: string | null;
-};
-
-function mergeListingAndExternalReviews(
-    native: ListingReviewRow[],
-    external: ExternalReviewRow[],
-): DisplayReviewRow[] {
-    const externalRows: DisplayReviewRow[] = external.map((r, idx) => ({
-        id: -(idx + 1),
-        displayKey: `gbp-${idx}-${r.reviewDate ?? ''}`,
-        guestName: r.guestName ?? 'Google user',
-        rating: r.rating ?? 0,
-        body: r.body ?? null,
-        createdAt: r.reviewDate ? `${r.reviewDate}T00:00:00.000Z` : new Date(0).toISOString(),
-        isGoogle: true,
-        sourceUrl: r.sourceUrl ?? null,
-    }));
-    const nativeRows: DisplayReviewRow[] = native.map((r) => ({
-        ...r,
-        displayKey: `native-${r.id}`,
-    }));
-    return [...nativeRows, ...externalRows].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-}
+import {
+    mergeListingAndExternalReviews,
+    normalizeReviewSource,
+    type ExternalReviewRow,
+} from '@/components/property/reviewMerge';
+// REV-046: QR "Guest feedback" notes. Own list, own block, never merged into the reviews above.
+import { normalizeGuestFeedback, type GuestFeedbackItem } from '@/components/property/guestFeedback';
+import GuestFeedbackSection from '@/components/property/GuestFeedbackCards';
+import ReviewLocaleChip from '@/components/property/ReviewLocaleChip'; // REV-041
 
 /** TASK-1359: Convert YouTube/Vimeo watch URL to embed URL, or return null if unrecognised. */
 function toEmbedUrl(url: string): string | null {
@@ -551,15 +612,48 @@ const PropertyDetails = () => {
     const [reviewSort, setReviewSort] = useState<ReviewSortKey>('recent');
     const [stickyBookingSummary, setStickyBookingSummary] = useState<BookingStickySummary | null>(null);
     const unitType = inferUnitType({ id: data?.id, property_name: data?.property_name });
-    const { setProperty, updateBooking } = useBooking();
+    const { booking, setProperty, updateBooking } = useBooking();
     const [searchParams] = useSearchParams();
-    // Build a back-to-results link when the user arrived from /search (params preserved in URL by SearchPage)
-    const backToResultsHref = useMemo(() => {
-        const searchKeys = ["checkIn", "checkOut", "guests", "minPrice", "maxPrice"];
-        const hasSearchParams = searchKeys.some((k) => searchParams.has(k));
-        if (!hasSearchParams) return null;
-        return `/search?${searchParams.toString()}`;
-    }, [searchParams]);
+    const tenantSlugFromUrl = searchParams.get('tenant')?.trim() || null;
+    const isBrandAtlastaysParam = searchParams.get('brand')?.trim().toLowerCase() === 'atlastays';
+    const isMarketplaceHost = Boolean(_getTenantCtx()?.isMarketplaceRoot) || isMarketplaceMode() || isMarketplaceHostname() || isBrandAtlastaysParam || Boolean(tenantSlugFromUrl);
+    const isMarketplaceDetail = isMarketplaceHost;
+    const isNonAtlasMarketplaceListing = Boolean(isMarketplaceHost && tenantSlugFromUrl && tenantSlugFromUrl.toLowerCase() !== 'atlas');
+    const listingTenantName = useListingTenantName(isMarketplaceDetail ? tenantSlugFromUrl : null);
+
+    const [listingTenantCtx, setListingTenantCtx] = useState<TenantInfo | null>(() => {
+      if (tenantSlugFromUrl) {
+        const cached = getCachedListingTenantContext(tenantSlugFromUrl);
+        if (cached !== undefined) return cached;
+      }
+      return null;
+    });
+
+    useEffect(() => {
+      if (!isNonAtlasMarketplaceListing || !tenantSlugFromUrl) {
+        setListingTenantCtx(null);
+        return;
+      }
+      let active = true;
+      fetchListingTenantContext(tenantSlugFromUrl).then((ctx) => {
+        if (active && ctx) {
+          setListingTenantCtx(ctx);
+        }
+      });
+      return () => {
+        active = false;
+      };
+    }, [isNonAtlasMarketplaceListing, tenantSlugFromUrl]);
+    // TASK-1039953 / TASK-1040085: Build a back-to-results link preserving ?brand=atlastays and utm_* params
+    const hasSearchFilters = useMemo(
+        () => hasPropertyDetailSearchFilters(searchParams),
+        [searchParams],
+    );
+
+    const backToResultsHref = useMemo(
+        () => buildPropertyDetailBackHref(searchParams, isMarketplaceDetail),
+        [searchParams, isMarketplaceDetail],
+    );
     // TASK-102485: WIRED, not removed. This "Check Availability / Try Again" panel used to sit
     // behind `const showAvailabilityPlaceholder = false` — a permanently-false guard that could
     // never render, silently masking the degraded-state UI for a failed listing lookup (the
@@ -582,6 +676,9 @@ const PropertyDetails = () => {
     // Lightbox state
     const [showLightbox, setShowLightbox] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
+    // REV-017: Review photos lightbox state
+    const [reviewLightboxImages, setReviewLightboxImages] = useState<string[] | null>(null);
+    const [reviewLightboxIndex, setReviewLightboxIndex] = useState(0);
 
     /** G3-001: live reviews from `GET /api/listings/{id}/reviews` when listing id resolves */
     const [listingReviewsFromApi, setListingReviewsFromApi] = useState<null | {
@@ -592,6 +689,16 @@ const PropertyDetails = () => {
     }>(null);
     /** TASK-1979: GBP-imported reviews from `GET /api/public/listings/{id}`. */
     const [externalReviewsFromApi, setExternalReviewsFromApi] = useState<ExternalReviewRow[]>([]);
+    /** REV-030: blended star counts from `GET /api/public/listings/{id}`. */
+    const [publicRatingStarCounts, setPublicRatingStarCounts] = useState<number[] | null>(null);
+    /** GUEST-060: what the price covers, from GET /api/public/listings/{id}; the catalog row and GET /listings/{id} may not carry it. */
+    const [publicGuestFacts, setPublicGuestFacts] = useState<IncludedGuestFields | null>(null);
+    /**
+     * REV-046: review-QR "Guest feedback" notes (`guestFeedback` on both review endpoints). Kept apart from
+     * `listingReviewsFromApi` / `externalReviewsFromApi` on purpose: nothing derived from this list may feed
+     * `ppMergedReviews`, the combined count or average, the star bars, the filter counts or the JSON-LD.
+     */
+    const [guestFeedbackFromApi, setGuestFeedbackFromApi] = useState<GuestFeedbackItem[]>([]);
 
     // AMN-001: Fetch amenity master list once on mount
     useEffect(() => {
@@ -668,21 +775,29 @@ const PropertyDetails = () => {
     }, [data, unitType]);
 
     const listingNumericForPricing = Number(resolvedListingId ?? data?.listingId ?? NaN);
+    // TASK-2118: wait for our OWN listingId before fetching the daily pricing summary at all -- passing
+    // `undefined` here used to still fire the catalog-wide (`*`) request on first render (before
+    // resolvedListingId/data resolve), contradicting TASK-7823's "a property page does not price
+    // the whole catalog" and surfacing as a CORS console error on that heavily-contended bucket.
     const dailyPricing = useDailyPricingSummary(
       Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0
         ? listingNumericForPricing
         : undefined,
+      { skip: !(Number.isFinite(listingNumericForPricing) && listingNumericForPricing > 0) },
     );
     const dailyPricingRow = useMemo(() => {
         if (!Number.isFinite(listingNumericForPricing) || listingNumericForPricing <= 0) return undefined;
         return dailyPricing.data?.listings?.find((l) => l.listingId === listingNumericForPricing);
     }, [dailyPricing.data?.listings, listingNumericForPricing]);
 
+    // GUEST-064: ONE from-price, the one the search card and the booking box show
+    // (getTodayBreakdownFromListing().actualPrice). No synthetic estimate: until the real rate has
+    // loaded this is 0 and the mobile bar shows a skeleton instead of a number that changes.
     const directBookingNightly = useMemo(() => {
-        const fromApi = dailyPricingRow?.finalAmount;
-        if (fromApi != null && Number(fromApi) > 0) return Math.round(Number(fromApi));
-        return nightlyPrice?.finalNightlyPrice ?? 0;
-    }, [dailyPricingRow?.finalAmount, nightlyPrice?.finalNightlyPrice]);
+        if (!dailyPricingRow) return 0;
+        const actual = getTodayBreakdownFromListing(dailyPricingRow).actualPrice;
+        return Number.isFinite(actual) && actual > 0 ? actual : 0;
+    }, [dailyPricingRow]);
 
 
     useEffect(() => {
@@ -758,6 +873,7 @@ const PropertyDetails = () => {
     // GET /listings/{id} calls (plus resolveListing on the same URL). Depend on listing-id
     // primitives only; `dedupedJsonFetch` still collapses this caller with resolveListing.
     const detailPhotosHydratedRef = React.useRef<number | null>(null);
+    const [photoDetailSettledFor, setPhotoDetailSettledFor] = useState<number | null>(null);
     const hasPropertyRow = data != null;
     const dataListingId = data?.listingId ?? null;
     useEffect(() => {
@@ -774,6 +890,7 @@ const PropertyDetails = () => {
                 // TASK-2739-v1: GET /listings/{id} also carries publishStatus; keep state in sync.
                 if (typeof d.publishStatus === 'string') setPublishStatus(d.publishStatus);
                 const mg = parseMaxGuestsFromPayload(d);
+                const dorm = readDormListingFields(d);
                 const rawPhone = d.hostPhone ?? d.contactPhone;
                 const phone = typeof rawPhone === 'string' && rawPhone.trim() ? rawPhone.trim() : null;
 
@@ -787,6 +904,7 @@ const PropertyDetails = () => {
                 );
                 const hydratedImages = photoUrls.length > 0 ? photoUrls : (coverUrl ? [coverUrl] : []);
                 detailPhotosHydratedRef.current = lid;
+                setPhotoDetailSettledFor(lid);
 
                 setData((prev) => {
                     if (!prev) return prev;
@@ -799,6 +917,14 @@ const PropertyDetails = () => {
                     if (phone !== null && !prev.hostPhone) {
                         updates.hostPhone = phone;
                     }
+                    // HSL-011: dorm facts (type, gender rule, bed count) come from the listing detail payload only.
+                    if (dorm.accommodationType !== (prev.accommodationType ?? null)) updates.accommodationType = dorm.accommodationType;
+                    if (dorm.dormGenderPolicy !== (prev.dormGenderPolicy ?? null)) updates.dormGenderPolicy = dorm.dormGenderPolicy;
+                    if (dorm.bedCount !== (prev.dormBedCount ?? null)) updates.dormBedCount = dorm.bedCount;
+                    // CLU-011: cluster role/id from the listing detail payload only.
+                    const cluster = readClusterListingFields(d);
+                    if (cluster.clusterRole !== (prev.clusterRole ?? null)) updates.clusterRole = cluster.clusterRole;
+                    if (cluster.clusterId !== (prev.clusterId ?? null)) updates.clusterId = cluster.clusterId;
                     const prevGallery = filterGuestImageUrls(prev.property_img ?? []);
                     if (hydratedImages.length > prevGallery.length) {
                         updates.property_img = hydratedImages;
@@ -806,9 +932,15 @@ const PropertyDetails = () => {
                     return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
                 });
             })
-            .catch(() => {});
+            .catch(() => {
+                // A failed detail call is a settled answer too: show what we have, not a skeleton forever.
+                if (!ac.signal.aborted) setPhotoDetailSettledFor(lid);
+            });
         return () => ac.abort();
     }, [hasPropertyRow, resolvedListingId, dataListingId, listingId]);
+
+    // "About this home": the description the host entered under Rooms & prices → Listing details.
+    const hostDescription = useListingHostDescription(Number(resolvedListingId ?? dataListingId ?? listingId ?? NaN));
 
     /** TASK-1466: deep links e.g. `/homes/.../123?bookingId=1&t=...` load host phone without exposing it on public catalog. */
     const bookingIdForContact = searchParams.get('bookingId');
@@ -842,17 +974,24 @@ const PropertyDetails = () => {
         if (lid == null) {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
+            setGuestFeedbackFromApi([]);
             return;
         }
         const num = typeof lid === 'number' ? lid : Number(lid);
         if (!Number.isFinite(num) || num <= 0) {
             setListingReviewsFromApi(null);
             setExternalReviewsFromApi([]);
+            setPublicRatingStarCounts(null);
+            setPublicGuestFacts(null);
+            setGuestFeedbackFromApi([]);
             return;
         }
         const ac = new AbortController();
         setListingReviewsFromApi({ loading: true, averageRating: 0, totalCount: 0, reviews: [] });
         setExternalReviewsFromApi([]);
+        setPublicRatingStarCounts(null);
+        setPublicGuestFacts(null);
+        setGuestFeedbackFromApi([]);
         void (async () => {
             try {
                 const [nativeRes, publicRes] = await Promise.all([
@@ -874,6 +1013,8 @@ const PropertyDetails = () => {
                     averageRating?: number;
                     totalCount?: number;
                     reviews?: ListingReviewRow[];
+                    /** REV-046: not part of totalCount / averageRating. */
+                    guestFeedback?: unknown;
                 };
                 let nativePayload: NativeReviewsPayload | null = null;
                 if (nativeRes.ok) {
@@ -882,15 +1023,37 @@ const PropertyDetails = () => {
                     setListingReviewsFromApi(null);
                 }
 
+                // REV-046: the same note list arrives on both endpoints; read either, so one endpoint
+                // failing does not hide the notes. Never merged into the review list below.
+                let publicGuestFeedback: unknown;
                 if (publicRes.ok) {
-                    const publicPayload = (await publicRes.json()) as { externalReviews?: ExternalReviewRow[] };
+                    const publicPayload = (await publicRes.json()) as {
+                        externalReviews?: ExternalReviewRow[];
+                        ratingStarCounts?: number[] | null;
+                        RatingStarCounts?: number[] | null;
+                        guestFeedback?: unknown;
+                    };
+                    publicGuestFeedback = publicPayload.guestFeedback;
                     if (!ac.signal.aborted) {
                         setExternalReviewsFromApi(
                             Array.isArray(publicPayload.externalReviews) ? publicPayload.externalReviews : [],
                         );
+                        const starCounts = Array.isArray(publicPayload.ratingStarCounts)
+                            ? publicPayload.ratingStarCounts
+                            : Array.isArray(publicPayload.RatingStarCounts)
+                                ? publicPayload.RatingStarCounts
+                                : null;
+                        setPublicRatingStarCounts(starCounts);
+                        setPublicGuestFacts(readIncludedGuestFields(publicPayload as Record<string, unknown>));
                     }
                 } else if (!ac.signal.aborted) {
                     setExternalReviewsFromApi([]);
+                    setPublicRatingStarCounts(null);
+                    setPublicGuestFacts(null);
+                }
+
+                if (!ac.signal.aborted) {
+                    setGuestFeedbackFromApi(normalizeGuestFeedback(nativePayload?.guestFeedback, publicGuestFeedback));
                 }
 
                 if (nativePayload && !ac.signal.aborted) {
@@ -905,6 +1068,9 @@ const PropertyDetails = () => {
                 if (!ac.signal.aborted) {
                     setListingReviewsFromApi(null);
                     setExternalReviewsFromApi([]);
+                    setPublicRatingStarCounts(null);
+                    setPublicGuestFacts(null);
+                    setGuestFeedbackFromApi([]);
                 }
             }
         })();
@@ -1058,7 +1224,7 @@ const PropertyDetails = () => {
             }
             const controller = new AbortController();
             let cancelled = false;
-            resolveListing(String(listingIdParam), controller.signal)
+            resolveListing(String(listingIdParam), controller.signal, tenantSlugFromUrl)
                 .then(async (apiListing: ListingDetail | null) => {
                     if (cancelled || !apiListing) {
                         if (import.meta.env.DEV && !cancelled) {
@@ -1176,6 +1342,8 @@ const PropertyDetails = () => {
                                 pub.cancellationWindowHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
                         })(), // TASK-4356 / TASK-5205
+                        ...readHostRulesFields(apiListing as Record<string, unknown>), // GUEST-069
+                        ...readIncludedGuestFields(apiListing as Record<string, unknown>), // GUEST-060
                         graceHours: (() => {
                             const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
@@ -1199,6 +1367,29 @@ const PropertyDetails = () => {
                             const n = raw == null || raw === '' ? NaN : Number(raw);
                             return Number.isFinite(n) ? n : null;
                         })(),
+                        city: (() => {
+                            const raw = (apiListing as Record<string, unknown>).city ?? (apiListing as Record<string, unknown>).City;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        state: (() => {
+                            const raw = (apiListing as Record<string, unknown>).state ?? (apiListing as Record<string, unknown>).State;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        country: (() => {
+                            const raw = (apiListing as Record<string, unknown>).country ?? (apiListing as Record<string, unknown>).Country;
+                            return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+                        })(),
+                        // HSL-011: dorm facts, API payload only.
+                        ...(() => {
+                            const dorm = readDormListingFields(apiListing as Record<string, unknown>);
+                            return {
+                                accommodationType: dorm.accommodationType,
+                                dormGenderPolicy: dorm.dormGenderPolicy,
+                                dormBedCount: dorm.bedCount,
+                            };
+                        })(),
+                        // CLU-011: cluster role/id, API payload only.
+                        ...readClusterListingFields(apiListing as Record<string, unknown>),
                     };
                     const images = filterGuestImageUrls(
                         photoUrlsList.length > 0 ? photoUrlsList : (coverUrl ? [coverUrl] : []),
@@ -1217,7 +1408,7 @@ const PropertyDetails = () => {
         }
 
         setNotFound(true);
-    }, [propertySlug, listingIdParam, listingId, apiProperties, location.state]);
+    }, [propertySlug, listingIdParam, listingId, apiProperties, location.state, tenantSlugFromUrl]);
 useEffect(() => {
   if (!data?.id) return;
 
@@ -1226,7 +1417,11 @@ useEffect(() => {
   const lid = Number(resolvedListingId ?? data?.listingId ?? listingId);
   if (Number.isFinite(lid) && lid > 0) {
       setFav(isFavorite(lid));
-      const path = buildHomeUnitPath(propertySlug ?? String(data.id), lid);
+      const basePath = buildHomeUnitPath(propertySlug ?? String(data.id), lid);
+      const pathParams = new URLSearchParams();
+      if (tenantSlugFromUrl) pathParams.set("tenant", tenantSlugFromUrl);
+      if (isBrandAtlastaysParam) pathParams.set("brand", "atlastays");
+      const path = appendQuerySuffix(basePath, pathParams.toString());
       addRecentlyViewed({
           listingId: lid,
           path,
@@ -1244,7 +1439,7 @@ useEffect(() => {
       updateBooking({ listingDetailPath: path });
   }
 
-}, [data?.id, data?.property_name, data?.listingId, data?.property_img, data?.property_location, data?.property_price, listingId, propertySlug, resolvedListingId, setProperty, updateBooking]);
+}, [data?.id, data?.property_name, data?.listingId, data?.property_img, data?.property_location, data?.property_price, isBrandAtlastaysParam, listingId, propertySlug, resolvedListingId, setProperty, tenantSlugFromUrl, updateBooking]);
 
     // Similar listings: GET /listings/{id}/similar
     useEffect(() => {
@@ -1318,17 +1513,35 @@ useEffect(() => {
         return name.charAt(0).toUpperCase() + name.slice(1);
     };
 
-    /** TASK-1357: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
+    const ppApiReviews = listingReviewsFromApi;
+    const ppMergedReviews = useMemo(() => {
+        const raw = ppApiReviews && !ppApiReviews.loading
+            ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
+            : [];
+        // TASK-10299093: Ensure empty-body reviews are suppressed
+        return raw.filter((r) => r.body != null && r.body.trim() !== "");
+    }, [ppApiReviews, externalReviewsFromApi]);
+    const ppCombinedReviewCount = ppMergedReviews.length;
+    const ppCombinedAverageRating = useMemo(() => {
+        return ppCombinedReviewCount > 0
+            ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
+                / ppMergedReviews.filter((r) => r.rating > 0).length
+            : 0;
+    }, [ppMergedReviews, ppCombinedReviewCount]);
+    const ppHasApiReviews = Boolean(
+        ppApiReviews && !ppApiReviews.loading && ppCombinedReviewCount > 0,
+    );
+
+    /** TASK-1357 / REV-013: aggregateRating + Review JSON-LD (before conditional returns — Rules of Hooks). */
     const propertyJsonLd = useMemo(() => {
         if (!data) return undefined;
         const pageUrlForLd = typeof window !== 'undefined' ? window.location.href : '';
         const primaryImageForLd = filterGuestImageUrls(data.property_img ?? [])[0];
-        const apiRev = listingReviewsFromApi;
-        const useApiRatings = Boolean(apiRev && !apiRev.loading && apiRev.totalCount > 0 && apiRev.averageRating > 0);
-        // TASK-2554: only use API-sourced rating; never fall back to static catalog counts for JSON-LD
-        const ratingValue = useApiRatings ? apiRev!.averageRating : 0;
-        const reviewCount = useApiRatings ? apiRev!.totalCount : 0;
-        const reviewNodes = (apiRev?.reviews ?? [])
+        const useApiRatings = Boolean(ppHasApiReviews && ppCombinedReviewCount > 0 && ppCombinedAverageRating > 0);
+        // TASK-2554 / REV-013: only use API-sourced rating; never fall back to static catalog counts for JSON-LD
+        const ratingValue = useApiRatings ? Number(ppCombinedAverageRating.toFixed(1)) : 0;
+        const reviewCount = useApiRatings ? ppCombinedReviewCount : 0;
+        const reviewNodes = ppMergedReviews
             .filter((r) => Number(r.rating) >= 1 && Number(r.rating) <= 5)
             .slice(0, 8)
             .map((r) => ({
@@ -1341,20 +1554,31 @@ useEffect(() => {
             .filter((node) => node.reviewBody.length > 0);
 
         const displayNightly = directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
+        const tenantInfo = isNonAtlasMarketplaceListing ? (listingTenantCtx ?? null) : _getTenantCtx();
+        const resolvedRegion =
+            data.state?.trim() ||
+            (data as any).addressRegion?.trim() ||
+            tenantInfo?.legalContactPack?.state?.trim() ||
+            (tenantInfo?.legalContactPack as any)?.address?.state?.trim() ||
+            (tenantInfo as any)?.address?.state?.trim() ||
+            undefined;
+        const resolvedLocality = data.city?.trim() || (data as any).addressLocality?.trim() || undefined;
+        const resolvedCountry = data.country?.trim() || 'IN';
 
         return [
             {
                 '@context': 'https://schema.org',
                 '@type': 'LodgingBusiness',
-                name: data.property_name,
-                description: data.property_description?.slice(0, 300),
+                name: getListingDisplayName(data.id, data.property_name),
+                description: repairMojibake(hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
                 image: primaryImageForLd,
                 url: pageUrlForLd,
                 address: {
                     '@type': 'PostalAddress',
-                    addressLocality: data.property_location || undefined,
-                    addressRegion: 'Telangana',
-                    addressCountry: 'IN',
+                    streetAddress: data.property_location || undefined,
+                    ...(resolvedLocality ? { addressLocality: resolvedLocality } : {}),
+                    ...(resolvedRegion ? { addressRegion: resolvedRegion } : {}),
+                    addressCountry: resolvedCountry,
                 },
                 aggregateRating:
                     ratingValue > 0 && reviewCount > 0
@@ -1398,8 +1622,8 @@ useEffect(() => {
                       {
                           '@context': 'https://schema.org',
                           '@type': 'Place',
-                          name: data.property_name,
-                          description: data.property_description?.slice(0, 300),
+                          name: getListingDisplayName(data.id, data.property_name),
+                          description: repairMojibake(hostDescription.text || data.property_description?.trim())?.slice(0, 300) || undefined,
                           url: pageUrlForLd,
                       },
                   ]
@@ -1407,10 +1631,42 @@ useEffect(() => {
         ];
     }, [
         data,
-        listingReviewsFromApi,
+        ppHasApiReviews,
+        ppCombinedReviewCount,
+        ppCombinedAverageRating,
+        ppMergedReviews,
         directBookingNightly,
         nightlyPrice?.finalNightlyPrice,
+        isNonAtlasMarketplaceListing,
+        listingTenantCtx,
+        hostDescription.text,
     ]);
+
+    // TASK-10299419 (founder ruling 2026-11-06): on atlastays.com a listing whose host is hidden by billing (a cancelled
+    // subscription past its period end, Closed, Blocked) answers 404 LISTING_UNAVAILABLE. Show "not taking bookings" with a
+    // way back to search, never the bookable page (no Book or Pay control). The server refuses payment for that host anyway.
+    const marketplaceListingUnavailable = useMarketplaceListingUnavailable(
+        resolvedListingId ?? data?.listingId ?? null,
+        isMarketplaceDetail,
+    );
+    if (marketplaceListingUnavailable) {
+        return (
+            <>
+                <SEO
+                    title={`Not taking bookings | ${getTenantBrandName()}`}
+                    description={`This property is not taking bookings right now. Browse other homes on ${getTenantBrandName()}.`}
+                    robots="noindex, nofollow"
+                />
+                <StateMessage
+                    data-testid="listing-unavailable-marketplace"
+                    icon="🏠"
+                    title="This property is not taking bookings right now"
+                    message={`Browse other homes on ${getTenantBrandName()}.`}
+                    primaryAction={{ label: "Browse available homes", to: "/" }}
+                />
+            </>
+        );
+    }
 
     if (!data) {
         // TASK-7195 four-state rule: check the FAILURE state before the absent state. A load that
@@ -1429,15 +1685,35 @@ useEffect(() => {
             );
         }
         if (notFound) {
+            // MKT-010: a "Home not found" page must noindex so search engines do not index a
+            // soft-404 as if it were a real listing page. If a future sitemap/canonical change
+            // re-introduces a /homes/<x>/<y> URL that doesn't resolve, the noindex tag keeps
+            // it out of the index until the mismatch is fixed. seo-only side effect; SEO returns null.
             return (
-                <StateMessage
-                    data-testid="listing-not-found-homepage"
-                    icon="🏠"
-                    title="Home not found"
-                    message={`Please check the link and try again, or return to browse available homes on ${getTenantBrandName()}.`}
-                    primaryAction={{ label: "Browse available homes", to: "/" }}
-                    secondaryActions={[{ label: "Go back", onClick: () => window.history.back() }]}
-                />
+                <>
+                    <SEO
+                        title={`Home not found | ${getTenantBrandName()}`}
+                        description={`The home you were looking for could not be found. Browse available homes on ${getTenantBrandName()}.`}
+                        robots="noindex, nofollow"
+                    />
+                    <StateMessage
+                        data-testid="listing-not-found-homepage"
+                        icon="🏠"
+                        title="Home not found"
+                        message={`Please check the link and try again, or return to browse available homes on ${getTenantBrandName()}.`}
+                        primaryAction={{ label: "Browse available homes", to: "/" }}
+                        secondaryActions={[{
+                          label: "Go back",
+                          onClick: () => {
+                            if (typeof window !== 'undefined' && window.history.length > 1 && document.referrer) {
+                              window.history.back();
+                            } else {
+                              window.location.href = "/";
+                            }
+                          },
+                        }]}
+                    />
+                </>
             );
         }
         return <PropertyDetailsSkeleton />;
@@ -1528,36 +1804,62 @@ useEffect(() => {
 
     // ---- hi-fi design derived values ----------------------------------------
     const ppTenantCtx = _getTenantCtx();
-    const ppTenantOverrides = getTenantOverrides(ppTenantCtx?.slug ?? '');
+    const effectiveTenantCtx = isNonAtlasMarketplaceListing ? (listingTenantCtx ?? null) : ppTenantCtx;
+    const ppTenantOverrides = getTenantOverrides(effectiveTenantCtx?.slug ?? ppTenantCtx?.slug ?? '');
     const ppHideAtlasBranding = shouldHideAtlasBranding(ppTenantCtx, ppTenantOverrides);
     const ppBrandName = getTenantBrandName();
     const ppHasRealHost = !!data.hostName?.trim();
     const ppHostAbout = data.hostAbout?.trim() ?? '';
-    // TASK-4311: On the marketplace, check for ?tenant=TenantName query param to show the actual listing's tenant
-    const tenantNameFromUrl = searchParams.get('tenant')?.trim();
+    // MKT-011: On marketplace, show actual host brand name from tenantName / listing tenant context, never the raw slug
+    const effectiveTenantBrand = listingTenantName || effectiveTenantCtx?.brandName || effectiveTenantCtx?.name || ppTenantCtx?.brandName || ppTenantCtx?.name;
     const ppHostDisplayName = ppHasRealHost
       ? data.hostName!.trim()
-      : tenantNameFromUrl ? `Listed by ${tenantNameFromUrl}` : `Listed by ${ppBrandName}`;
+      : isMarketplaceDetail
+        ? (effectiveTenantBrand ? `Listed by ${effectiveTenantBrand}` : 'Your host')
+        : (effectiveTenantBrand ? `Listed by ${effectiveTenantBrand}` : `Listed by ${ppBrandName}`);
     const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
-    // TASK-7428: one shared predicate for "an online gateway will actually charge this guest" —
-    // drives both the cancellation copy and the Razorpay payment-rail claim below.
-    const ppHasOnlinePayment = hasOnlinePaymentRail(ppTenantCtx);
-    const ppCancellationInfo = getPpCancellationInfo(data.cancellationTier, {
-      fallbackText: _resolvedCancellationText,
-      hasOnlinePayment: ppHasOnlinePayment,
-    });
+    // TASK-7428 / MKT-011: shared predicate for "an online gateway will actually charge this guest" —
+    // uses effectiveTenantCtx so marketplace listings use the listing host's real bookingMode.
+    const ppHasOnlinePayment = hasOnlinePaymentRail(effectiveTenantCtx);
+    // GUEST-059: the selected rate plan's own cancellation wording wins over the listing-tier prose,
+    // so this block, the trust row and the booking box never disagree about the same stay.
+    // GUEST-062: a listing with no times of its own shows the standard times its tenant's FAQ states (null when the FAQ states none).
+    const ppStandardStayTimes = getStandardStayTimes();
+    const ppCancellationInfo = withRatePlanCancellation(
+      getPpCancellationInfo(data.cancellationTier, {
+        fallbackText: _resolvedCancellationText,
+        hasOnlinePayment: ppHasOnlinePayment,
+      }),
+      stickyBookingSummary?.ratePlanCancellation,
+      ppHasOnlinePayment,
+    );
     const ppHasLocation =
         (typeof data.latitude === 'number' && Number.isFinite(data.latitude)) ||
         mapSrcTrimmed.length > 0 ||
         useMultiPin ||
         (mapLocation != null && typeof mapLocation.lat === 'number' && Number.isFinite(mapLocation.lat));
-    // TASK-7192: guest-facing phone precedence — WhatsApp/booking number wins over listing hostPhone.
+    // TASK-7192 / MKT-011: guest-facing phone precedence — on marketplace, the listing host's
+    // whatsappBookingPhone / contactPhone wins over the host platform phone (Atlas).
     const listingHostDigits = (data.hostPhone?.replace(/\D/g, '') || '').trim();
-    const ppHostPhone = getGuestFacingPhone('business') || listingHostDigits;
+    const listingTenantPhone = (
+      effectiveTenantCtx?.whatsappBookingPhone ||
+      effectiveTenantCtx?.legalContactPack?.contactPhone ||
+      effectiveTenantCtx?.legalContactPack?.ownerPhone ||
+      ''
+    ).replace(/\D/g, '').trim();
+    const ppHostPhone = isNonAtlasMarketplaceListing
+      ? (listingTenantPhone || listingHostDigits)
+      : (getGuestFacingPhone('business') || listingHostDigits);
     const ppHasHostPhone = ppHostPhone.length > 0;
     const ppWaDigits = ppHostPhone.length === 10 ? `91${ppHostPhone}` : ppHostPhone;
     const ppWaBookingUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I'm interested in booking ${data.property_name}`)}` : '';
     const ppWaAskUrl = ppHasHostPhone ? `https://wa.me/${ppWaDigits}?text=${encodeURIComponent(`Hi, I have a question about ${data.property_name}`)}` : '';
+    // "About this home": the host's own description wins; the "Ask them" empty state only shows
+    // once GET /listings/{id} has confirmed there is none (no flash before the detail lands).
+    // GUEST-038: pass descriptions through repairMojibake to fix double-encoded UTF-8 sequences.
+    const ppAboutText = repairMojibake(hostDescription.text || withoutInternalCodeDescription(data.property_description) || '');
+    const ppAboutPreview = previewListingDescription(ppAboutText);
+    const ppShowAboutAskHost = !ppAboutText && !!ppWaAskUrl && hostDescription.loaded;
     const ppShowRegRow = (ppTenantOverrides.gstin != null) ||
         (ppTenantOverrides.tourismRegNumbers != null && ppTenantOverrides.tourismRegNumbers.length > 0);
 
@@ -1566,18 +1868,6 @@ useEffect(() => {
         ? data.amenityCodes.map((code) => amenityMaster.get(code.toLowerCase()) ?? formatAmenityName(code))
         : (data.property_amenities || []).map((a) => a.amenities_icon ? formatAmenityName(a.amenities_icon) : 'Amenity');
 
-    const ppApiReviews = listingReviewsFromApi;
-    const ppMergedReviews = ppApiReviews && !ppApiReviews.loading
-        ? mergeListingAndExternalReviews(ppApiReviews.reviews, externalReviewsFromApi)
-        : [];
-    const ppCombinedReviewCount = ppMergedReviews.length;
-    const ppCombinedAverageRating = ppCombinedReviewCount > 0
-        ? ppMergedReviews.reduce((sum, r) => sum + (r.rating > 0 ? r.rating : 0), 0)
-            / ppMergedReviews.filter((r) => r.rating > 0).length
-        : 0;
-    const ppHasApiReviews = Boolean(
-        ppApiReviews && !ppApiReviews.loading && (ppApiReviews.totalCount > 0 || externalReviewsFromApi.length > 0),
-    );
     /** TASK-102112: pill counts + the filtered/sorted review set (instant, client-side). */
     const ppReviewFilterCounts = {
         all: ppMergedReviews.length,
@@ -1608,10 +1898,16 @@ useEffect(() => {
       typeof data.longitude === 'number' &&
       Number.isFinite(data.latitude) &&
       Number.isFinite(data.longitude);
-    const ppStickyNightly =
-      directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
-    const directBookingNightlyIsSynthetic =
-      !(dailyPricingRow?.finalAmount != null && Number(dailyPricingRow.finalAmount) > 0);
+    const ppStickyNightly = directBookingNightly;
+    const ppStickyNightlyPending = dailyPricing.loading && directBookingNightly <= 0;
+    // GUEST-064: hero shows a skeleton (not "Photos coming soon") until GET /listings/{id} has
+    // answered; the "N photos" count waits for the same answer so it never reads 1 and then 8.
+    const ppPhotoLookupId = Number(resolvedListingId ?? data?.listingId ?? listingId ?? NaN);
+    const ppPhotosPending =
+      Number.isFinite(ppPhotoLookupId) && ppPhotoLookupId > 0 && photoDetailSettledFor !== ppPhotoLookupId;
+    // GUEST-064: the public list row carries only the cover, so until the detail answers the hero is a
+    // skeleton (card rule) rather than one photo that is then joined by the rest of the gallery.
+    const ppHeroUrl = ppPhotosPending ? undefined : galleryUrls[0];
 
     return (
         <>
@@ -1631,26 +1927,54 @@ useEffect(() => {
             HI-FI PROPERTY PAGE — pp-* design system
             All logic preserved; only layout/styling changed.
            ===================================================================== */}
-        <div className="pp-root">
+        <div className={`pp-root${galleryUrls.length === 1 ? " pp-single-photo" : ""}${galleryUrls.length === 2 ? " pp-two-photo" : ""}${galleryUrls.length > 0 ? " pp-book-beside" : ""}`}>
           <div className="pp-shell">
 
-            {/* ---- Breadcrumbs ---- */}
-            <nav className="pp-crumbs" aria-label="Breadcrumb">
-              {backToResultsHref ? (
-                <>
-                  <Link to={backToResultsHref} data-testid="back-to-results">Search results</Link>
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                </>
-              ) : (
-                <>
-                  <Link to="/">Home</Link>
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                  <Link to="/#our-homes">Stays</Link>
-                  <span className="pp-sep" aria-hidden="true">›</span>
-                </>
-              )}
-              <span aria-current="page">{getListingDisplayName(data.id, data.property_name)}</span>
-            </nav>
+            {/* ---- Breadcrumbs & Back to Results ---- */}
+            <div className="flex items-center justify-between gap-4 mb-2 flex-wrap" data-testid="detail-nav-header">
+              <nav className="pp-crumbs" aria-label="Breadcrumb">
+                {backToResultsHref && (hasSearchFilters || isMarketplaceDetail) ? (
+                  <>
+                    <Link
+                      to={backToResultsHref}
+                      data-testid="back-to-results"
+                      aria-label={isMarketplaceDetail && !hasSearchFilters ? "Back to all listings" : "Search results"}
+                    >
+                      {isMarketplaceDetail && !hasSearchFilters ? "Back to all listings" : "Search results"}
+                    </Link>
+                    {isMarketplaceDetail && !hasSearchFilters && (
+                      <Link
+                        to={backToResultsHref}
+                        data-testid="back-to-all-listings"
+                        style={{ display: 'none' }}
+                        aria-hidden="true"
+                      >
+                        Back to all listings
+                      </Link>
+                    )}
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                  </>
+                ) : (
+                  <>
+                    <Link to={isMarketplaceDetail ? backToResultsHref : "/"}>Home</Link>
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                    <Link to={isMarketplaceDetail ? backToResultsHref : "/#our-homes"}>{isMarketplaceDetail ? "All Homes" : "Stays"}</Link>
+                    <span className="pp-sep" aria-hidden="true">›</span>
+                  </>
+                )}
+                <span aria-current="page">{getListingDisplayName(data.id, data.property_name)}</span>
+              </nav>
+
+              {/* TASK-1039953: Clear "Back to Results" button returning to /search or previous search state */}
+              <Link
+                to={backToResultsHref || (isMarketplaceDetail ? "/" : "/search")}
+                data-testid="back-to-results-btn"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-primary hover:text-black bg-bg-muted hover:bg-neutral-200/80 px-3 py-1.5 rounded-lg border border-border-subtle transition-colors"
+                aria-label="Back to Results"
+              >
+                ← Back to Results
+              </Link>
+            </div>
 
             {/* ---- Title row ---- */}
             <div className="pp-title-row">
@@ -1686,7 +2010,19 @@ useEffect(() => {
                       native-only fields render ★ 0.0 (0 reviews) when Google imports are the only source. */}
                   {ppHasApiReviews && ppCombinedReviewCount > 0 && (
                     <>
-                      <a href="#reviews" className="pp-rating hover:opacity-80 transition-opacity" data-testid="property-header-rating" aria-label="View guest reviews">
+                      <a
+                        href="#reviews"
+                        className="pp-rating hover:opacity-80 transition-opacity"
+                        data-testid="property-header-rating"
+                        title="View guest reviews"
+                        onClick={() => {
+                          // TASK-102616: native fragment nav scrolls but never moves
+                          // keyboard focus — move it explicitly (WCAG 2.4.3).
+                          window.setTimeout(() => {
+                            document.getElementById('reviews')?.focus();
+                          }, 0);
+                        }}
+                      >
                         ★ {ppCombinedAverageRating.toFixed(1)}{' '}
                         <em>({ppCombinedReviewCount} {ppCombinedReviewCount === 1 ? 'review' : 'reviews'})</em>
                       </a>
@@ -1767,24 +2103,26 @@ useEffect(() => {
                     Fancybox anchor + <img alt> carry semantics, and role="img" here
                     would nest an interactive inside img (axe nested-interactive). */}
                 <div
-                  className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
-                  role={galleryUrls[0] ? undefined : 'img'}
-                  aria-label={galleryUrls[0] ? undefined : `${data.property_name} — photo coming soon`}
+                  className={`pp-cell pp-cell-hero${ppHeroUrl ? ' pp-cell--photo' : ''}`}
+                  role={ppHeroUrl ? undefined : 'img'}
+                  aria-label={ppHeroUrl ? undefined : ppPhotosPending ? 'Loading photos' : `${data.property_name} — photo coming soon`}
                 >
-                {galleryUrls[0] ? (
+                {ppHeroUrl ? (
                   <button onClick={(e) => { e.preventDefault(); setLightboxIndex(0); setShowLightbox(true); }} className="block w-full h-full p-0 border-0 bg-transparent cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-accent transition-shadow">
                     <img
-                      src={getGalleryTransformedUrl(galleryUrls[0], 768)}
-                      srcSet={getGallerySrcSet(galleryUrls[0])}
+                      src={getGalleryTransformedUrl(ppHeroUrl, 768)}
+                      srcSet={getGallerySrcSet(ppHeroUrl)}
                       sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 600px"
                       alt={`${data.property_name} — main photo`}
                       loading="eager"
                       fetchPriority="high"
                       decoding="async"
                       className="pp-gallery-img"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      style={{ width: '100%', height: '100%', objectFit: galleryUrls.length === 1 ? 'contain' : 'cover', display: 'block' }}
                     />
                   </button>
+                ) : ppPhotosPending ? (
+                  <div className="pp-gallery-skeleton" data-testid="gallery-skeleton" aria-busy="true" />
                 ) : (
                   <div className="pp-cell-overlay">
                     <span className="pp-dot" aria-hidden="true" />
@@ -1798,7 +2136,7 @@ useEffect(() => {
                   "Living/Kitchen/Bedroom/Balcony" placeholder tiles for sparse listings. */}
               {([1, 2, 3, 4] as const).map((i) => {
                 const photo = galleryUrls[i];
-                if (!photo) return null;
+                if (!photo || ppPhotosPending) return null;
                 return (
                   <div
                     key={i}
@@ -1823,7 +2161,6 @@ useEffect(() => {
               <button
                 type="button"
                 className="pp-gallery-more"
-                aria-label="View all photos"
                 onClick={() => {
                   if (galleryUrls.length === 0) return;
                   setLightboxIndex(0);
@@ -1843,9 +2180,17 @@ useEffect(() => {
               />
             )}
 
+            {reviewLightboxImages && reviewLightboxImages.length > 0 && (
+              <Lightbox
+                images={reviewLightboxImages}
+                initialIndex={reviewLightboxIndex}
+                onClose={() => setReviewLightboxImages(null)}
+              />
+            )}
+
             {/* ---- TASK-1359: Virtual tour ---- */}
             {data.virtualTourUrl && toEmbedUrl(data.virtualTourUrl) && (
-              <div style={{ marginTop: 24, borderRadius: 18, overflow: 'hidden', aspectRatio: '16/9', width: '100%' }}>
+              <div className="pp-tour-block" style={{ borderRadius: 18, overflow: 'hidden', aspectRatio: '16/9', width: '100%' }}>
                 <iframe
                   src={toEmbedUrl(data.virtualTourUrl)!}
                   title="Virtual property tour"
@@ -1860,6 +2205,14 @@ useEffect(() => {
                 <VirtualTourSection listingId={Number(resolvedListingId)} />
               </Suspense>
             )}
+
+            {/* GUEST-069: the host's house rules, above the booking box and before any date is chosen. */}
+            <ListingHouseRules
+              houseRulesText={data.houseRulesText}
+              houseRulesPdfUrl={data.houseRulesPdfUrl}
+              houseRulesStructured={data.houseRulesStructured}
+              googleMapsUrl={data.googleMapsUrl}
+            />
 
             {/* ---- v2: Location/Map promoted to upper-third (below gallery) ---- */}
             {ppHasLocation && (
@@ -1888,12 +2241,22 @@ useEffect(() => {
                       mapLocation,
                       address: propertyAddressStr,
                     });
-                    switch (mapSelection.kind) {
+                    // TASK-102490: when the property has no coordinates and no custom embed,
+                    // use the listing's city centroid instead of the tenant default so the
+                    // pin lands in the right city rather than a generalized location.
+                    let finalMapSelection = mapSelection;
+                    if (finalMapSelection.kind === 'none' || finalMapSelection.kind === 'tenant') {
+                      const cityCenter = centroidForCity(data.property_location);
+                      if (cityCenter) {
+                        finalMapSelection = { kind: 'coords', lat: cityCenter.lat, lng: cityCenter.lng };
+                      }
+                    }
+                    switch (finalMapSelection.kind) {
                       case 'coords':
                         return (
                           <SinglePinGoogleMap
-                            lat={mapSelection.lat}
-                            lng={mapSelection.lng}
+                            lat={finalMapSelection.lat}
+                            lng={finalMapSelection.lng}
                             zoom={15}
                             markerTitle={data.property_name}
                           />
@@ -1901,7 +2264,7 @@ useEffect(() => {
                       case 'address':
                         return (
                           <EmbeddedListingMap
-                            address={mapSelection.address}
+                            address={finalMapSelection.address}
                             label={data.property_name}
                             zoom={15}
                             height={300}
@@ -1923,8 +2286,8 @@ useEffect(() => {
                       case 'tenant':
                         return (
                           <SinglePinGoogleMap
-                            lat={mapSelection.lat}
-                            lng={mapSelection.lng}
+                            lat={finalMapSelection.lat}
+                            lng={finalMapSelection.lng}
                             zoom={mapLocation && typeof mapLocation.zoom === 'number' && mapLocation.zoom > 0 ? mapLocation.zoom : 15}
                             markerTitle={mapLocation?.markerLabel ?? tenantNameForMap}
                           />
@@ -1945,6 +2308,7 @@ useEffect(() => {
 
                 {/* Host strip + trust panel */}
                 <section className="pp-section" style={{ paddingTop: 28 }} aria-label="About the host">
+                  <MarketplaceHostIdentity marketplace={isMarketplaceDetail} listingId={resolvedListingId} />
                   <div className="pp-host">
                     <div className="pp-host-avatar" aria-hidden="true">{ppHostInitial}</div>
                     <div>
@@ -1952,7 +2316,7 @@ useEffect(() => {
                         {ppHostDisplayName}
                       </div>
                       <div className="pp-host-sub">
-                        Hosted directly · Responds on WhatsApp · Direct booking
+                        {isMarketplaceDetail && !ppHasHostPhone ? 'Hosted directly · Contact details unavailable' : 'Hosted directly · Responds on WhatsApp · Direct booking'}
                         {responseTimeBadge ? ` · ${responseTimeBadge}` : ''}
                         {reviewReplyRateBadge ? ` · ${reviewReplyRateBadge}` : ''}
                       </div>
@@ -1964,8 +2328,9 @@ useEffect(() => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="pp-btn pp-btn-whatsapp pp-btn-sm"
+                          style={{ minHeight: 44 }}
                           data-testid="chat-with-host-btn"
-                          aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                          aria-label={`Message on WhatsApp: ${data.property_name}`}
                           onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
                         >
                           <PpWhatsAppIcon size={14} /> Message on WhatsApp
@@ -1977,7 +2342,8 @@ useEffect(() => {
                           target="_blank"
                           rel="noopener noreferrer"
                           className={`pp-btn pp-btn-sm${ppIsDraft ? ' pp-btn-whatsapp' : ' pp-btn-ghost'}`}
-                          aria-label="Ask host a question on WhatsApp"
+                          style={{ minHeight: 44 }}
+                          aria-label="Ask a question to the host on WhatsApp"
                           data-testid={ppIsDraft ? 'draft-listing-ask-host' : undefined}
                         >
                           {ppIsDraft ? (
@@ -2060,21 +2426,20 @@ useEffect(() => {
                 />
 
                 {/* About this home — DESIGN-031: omit invented prose; Ask host when empty */}
-                {(data.property_description?.trim() ||
+                {(ppAboutText ||
                   resolvedCheckInTime ||
                   resolvedCheckOutTime ||
                   (data.property_neighborhoods || []).length > 0 ||
-                  ppWaAskUrl) && (
+                  ppShowAboutAskHost) && (
                 <section className="pp-section" aria-label="About this home" data-testid="property-about-section">
                   <h2>About this home</h2>
-                  {data.property_description?.trim() ? (
+                  {ppAboutText ? (
                     <>
-                      <p className="pp-prose">
-                        {showAboutMore
-                          ? data.property_description
-                          : `${data.property_description.slice(0, 300)}${data.property_description.length > 300 ? '…' : ''}`}
+                      {/* pre-wrap keeps the host's own line breaks, blank lines and bullet lines. */}
+                      <p className="pp-prose whitespace-pre-wrap break-words" data-testid="property-about-description">
+                        {showAboutMore ? ppAboutText : ppAboutPreview.preview}
                       </p>
-                      {data.property_description.length > 300 && (
+                      {ppAboutPreview.truncated && (
                         <button
                           type="button"
                           className="pp-prose-more"
@@ -2086,7 +2451,7 @@ useEffect(() => {
                         </button>
                       )}
                     </>
-                  ) : ppWaAskUrl ? (
+                  ) : ppShowAboutAskHost ? (
                     <p className="pp-prose" data-testid="property-about-ask-host">
                       The host hasn&apos;t added a description yet.{' '}
                       <a
@@ -2194,13 +2559,26 @@ useEffect(() => {
                       <div style={{ height: 120, borderRadius: 16, background: '#f0ddd0' }} />
                     </section>
                   );
-                  if (!api || (!api.loading && api.totalCount <= 0 && externalReviewsFromApi.length <= 0)) return null;
+                  if (!api || (!api.loading && ppMergedReviews.length <= 0)) return null;
                   const rating = ppCombinedAverageRating;
                   const count = ppCombinedReviewCount;
                   // TASK-8019: "verified stay(s) / through this platform" only for native Atlas reviews.
-                  const nativeVerifiedCount = api.totalCount;
+                  // TASK-1040061: api.totalCount is native + external combined, so an external-only listing (reviews: [])
+                  // read as "4 verified stays". Only the native rows the API actually returned may claim it.
+                  const nativeVerifiedCount = api.reviews.length;
+                  const externalSources = Array.from(
+                    new Set(
+                      ppMergedReviews
+                        .map((r) => r.source?.trim())
+                        .filter((s): s is string => Boolean(s) && s!.toLowerCase() !== 'atlas'),
+                    ),
+                  );
+                  const externalSourcePhrase =
+                    externalSources.length > 0
+                      ? `from ${externalSources.join(', ')}`
+                      : 'from external platforms';
                   return (
-                    <section id="reviews" className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
+                    <section id="reviews" tabIndex={-1} className="pp-section" aria-label="Guest reviews" data-testid="reviews-section">
                       <div className="pp-section-head">
                         <h2>
                           ★ {rating.toFixed(1)} from {count}{' '}
@@ -2221,6 +2599,14 @@ useEffect(() => {
                               : `${count} ${count === 1 ? 'review' : 'reviews'}`}
                           </div>
                         </div>
+                        <div className="pp-v2-reviews-detail">
+                        {/* TASK-101380 / REV-030 / TASK-1040056: per-star distribution from blended ratingStarCounts or merged reviews. */}
+                        <RatingDistribution
+                          ratings={ppMergedReviews.map((r) => Math.round(Number(r.rating)))}
+                          totalCount={ppCombinedReviewCount}
+                          starCounts={publicRatingStarCounts}
+                          otherSourcesCount={publicRatingStarCounts ? 0 : 0}
+                        />
                         {/* Sub-rating bars derived from API reviews if available */}
                         {api.reviews.length > 0 && (() => {
                           const rs = api.reviews.filter((r) => r.rating > 0);
@@ -2239,13 +2625,15 @@ useEffect(() => {
                             { label: 'Value', v: value },
                           ].filter(b => b.v != null);
                           if (bars.length === 0) {
+                            // The distribution already states the count and source; do not repeat it.
+                            if (publicRatingStarCounts || starDistribution(ppMergedReviews.map((r) => Math.round(Number(r.rating))), ppCombinedReviewCount)) return null;
                             return (
                               <div style={{ fontSize: 14, color: 'var(--text-muted, #6b5a55)', lineHeight: 1.6 }}>
                                 <p style={{ margin: '0 0 4px', fontWeight: 600, color: 'var(--text-primary, #4a3535)' }}>Overall rating</p>
                                 <p style={{ margin: 0 }}>
                                   {nativeVerifiedCount > 0
                                     ? `${nativeVerifiedCount} verified ${nativeVerifiedCount === 1 ? 'review' : 'reviews'} · all through this platform.`
-                                    : `${count} ${count === 1 ? 'review' : 'reviews'} including guest feedback from Google.`}
+                                    : `${count} ${count === 1 ? 'review' : 'reviews'} including guest feedback ${externalSourcePhrase}.`}
                                 </p>
                               </div>
                             );
@@ -2267,6 +2655,7 @@ useEffect(() => {
                             </>
                           );
                         })()}
+                        </div>
                       </div>
 
                       {ppMergedReviews.length > 0 ? (
@@ -2290,7 +2679,7 @@ useEffect(() => {
                             {ppDisplayedReviews.map((r, idx) => (
                               <article key={r.displayKey} className="pp-v2-review-card">
                                 <span className="pp-v2-review-quote" aria-hidden="true">&ldquo;</span>
-                                {r.isGoogle && (
+                                {r.isGoogle ? (
                                   <span
                                     title="Review from Google"
                                     style={{
@@ -2309,17 +2698,72 @@ useEffect(() => {
                                   >
                                     G
                                   </span>
-                                )}
+                                ) : r.source ? (() => {
+                                  const cardSource = normalizeReviewSource(r.source) ?? r.source;
+                                  return (
+                                    <span
+                                      title={`Review from ${cardSource}`}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        padding: '2px 6px',
+                                        borderRadius: 4,
+                                        background: cardSource.toLowerCase().includes('airbnb') ? '#FF5A5F' : cardSource.toLowerCase().includes('booking') ? '#003580' : '#475569',
+                                        color: '#fff',
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        marginBottom: 8,
+                                      }}
+                                    >
+                                      {cardSource}
+                                    </span>
+                                  );
+                                })() : null}
                                 {r.rating > 0 && (
                                   <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-primary, #4a3535)' }} aria-label={`${r.rating} out of 5 stars`}>
                                     {'★'.repeat(Math.min(5, r.rating))}{'☆'.repeat(Math.max(0, 5 - r.rating))}
                                   </div>
                                 )}
-                                {r.body && <p className="pp-v2-review-body">{r.body}</p>}
-                                {!r.body && r.title && <p className="pp-v2-review-body">{r.title}</p>}
+                                {r.body && r.body.trim() !== "" && <p className="pp-v2-review-body">{r.body}</p>}
+                                {r.photoUrls && r.photoUrls.length > 0 && (
+                                  <div className="pp-review-photos" style={{ display: 'flex', gap: 8, margin: '8px 0', flexWrap: 'wrap' }} data-testid="review-photos">
+                                    {r.photoUrls.map((url, pIdx) => (
+                                      <button
+                                        key={url + pIdx}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setReviewLightboxImages(r.photoUrls ?? []);
+                                          setReviewLightboxIndex(pIdx);
+                                        }}
+                                        style={{
+                                          padding: 0,
+                                          border: '1px solid var(--border-subtle, #e2e8f0)',
+                                          borderRadius: 6,
+                                          overflow: 'hidden',
+                                          cursor: 'pointer',
+                                          background: 'none',
+                                        }}
+                                        aria-label={`View photo ${pIdx + 1} from ${r.guestName ?? 'guest'}`}
+                                        data-testid={`review-photo-thumb-${pIdx}`}
+                                      >
+                                        <img
+                                          src={url}
+                                          alt={`Review photo ${pIdx + 1}`}
+                                          style={{ width: 64, height: 64, objectFit: 'cover', display: 'block' }}
+                                          loading="lazy"
+                                        />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                                 {(() => {
                                   const chips: { label: string; v: number }[] = [];
                                   if (r.ratingCleanliness != null && r.ratingCleanliness >= 1) chips.push({ label: 'Cleanliness', v: r.ratingCleanliness });
+                                  if (r.ratingAccuracy != null && r.ratingAccuracy >= 1) chips.push({ label: 'Accuracy', v: r.ratingAccuracy });
+                                  if (r.ratingCheckin != null && r.ratingCheckin >= 1) chips.push({ label: 'Check-in', v: r.ratingCheckin });
+                                  if (r.ratingCommunication != null && r.ratingCommunication >= 1) chips.push({ label: 'Communication', v: r.ratingCommunication });
+                                  if (r.ratingLocation != null && r.ratingLocation >= 1) chips.push({ label: 'Location', v: r.ratingLocation });
                                   if (r.ratingValue != null && r.ratingValue >= 1) chips.push({ label: 'Value', v: r.ratingValue });
                                   if (chips.length === 0) return null;
                                   return (
@@ -2349,11 +2793,17 @@ useEffect(() => {
                                     <div className="pp-v2-review-date">
                                       {new Date(r.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
                                     </div>
+                                    <ReviewLocaleChip locale={r.locale} />
                                   </div>
                                 </div>
                                 {r.hostResponse && (
                                   <div className="pp-review-host-resp" style={{ marginTop: 10 }}>
-                                    <div className="pp-review-host-resp-label">Host response</div>
+                                    <div className="pp-review-host-resp-label" data-testid="review-host-response-label">
+                                      Host response
+                                      {r.hostResponseAt && !Number.isNaN(new Date(r.hostResponseAt).getTime())
+                                        ? ` · ${new Date(r.hostResponseAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`
+                                        : ''}
+                                    </div>
                                     <p>{r.hostResponse}</p>
                                   </div>
                                 )}
@@ -2398,6 +2848,10 @@ useEffect(() => {
                   );
                 })()}
 
+                {/* REV-046: review-QR "Guest feedback" notes, after the reviews and as a block of their own.
+                    Never part of the count, average, star bars or JSON-LD above (founder ruling 2026-10-28). */}
+                <GuestFeedbackSection items={guestFeedbackFromApi} />
+
                 {/* Cancellation policy */}
                 <section className="pp-section" aria-label="Cancellation policy">
                   <h2 style={{ marginBottom: 18 }}>If you need to cancel</h2>
@@ -2408,7 +2862,7 @@ useEffect(() => {
                         <p>{ppCancellationInfo.description}</p>
                       </div>
                     </div>
-                    <div className="pp-timeline" role="list">
+                    <div className="pp-timeline" role="list" hidden={ppCancellationInfo.steps.length === 0}>
                       {ppCancellationInfo.steps.map((step) => (
                         <div key={step.title} className="pp-timeline-step" role="listitem">
                           <div className="pp-tl-dot" aria-hidden="true" />
@@ -2427,13 +2881,19 @@ useEffect(() => {
                     {/* Base occupancy card */}
                     <div className="pp-v2-knowcard">
                       <div className="pp-v2-knowicon"><PpV2UsersIcon /></div>
-                      <small>Base occupancy</small>
+                      {/* Founder ruling 2026-10-21: plain words — this is the most guests the home sleeps. */}
+                      <small>Sleeps up to</small>
                       <strong>
                         {data.maxGuests != null && data.maxGuests > 0 ? `${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'}` : 'Ask host'}
                       </strong>
                       <span>
                         {data.maxGuests != null && data.maxGuests > 0
-                          ? `Up to ${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'} welcome.`
+                          ? `Up to ${data.maxGuests} guest${data.maxGuests === 1 ? '' : 's'} welcome.${(() => {
+                              // GUEST-060: what the price covers, from the host's own numbers; nothing when the API sends none.
+                              const facts = pickIncludedGuestFacts(publicGuestFacts, data);
+                              const line = describeIncludedGuests(facts.includedGuests, facts.extraGuestRate, data.maxGuests, (n) => formatCurrency(n, { maximumFractionDigits: 0 }), facts.priceChangesWithGuests);
+                              return line ? ` ${line}.` : '';
+                            })()}`
                           : 'Contact host for occupancy details.'}
                       </span>
                     </div>
@@ -2442,10 +2902,12 @@ useEffect(() => {
                       <div className="pp-v2-knowicon"><PpV2ClockInIcon /></div>
                       <small>Check-in</small>
                       <strong data-testid={resolvedCheckInTime ? 'property-check-in-time' : 'property-check-in-pending'}>
-                        {resolvedCheckInTime ?? 'Ask host'}
+                        {resolvedCheckInTime ?? ppStandardStayTimes?.checkIn ?? 'Ask host'}
                       </strong>
                       {resolvedCheckInTime ? (
                         <span>Early check-in subject to availability.</span>
+                      ) : ppStandardStayTimes ? (
+                        <span>Standard check-in time. Your confirmation says if it differs.</span>
                       ) : (
                         <span>Host will confirm check-in time.</span>
                       )}
@@ -2455,10 +2917,12 @@ useEffect(() => {
                       <div className="pp-v2-knowicon"><PpV2ClockOutIcon /></div>
                       <small>Check-out</small>
                       <strong data-testid={resolvedCheckOutTime ? 'property-check-out-time' : 'property-check-out-pending'}>
-                        {resolvedCheckOutTime ?? 'Ask host'}
+                        {resolvedCheckOutTime ?? ppStandardStayTimes?.checkOut ?? 'Ask host'}
                       </strong>
                       {resolvedCheckOutTime ? (
                         <span>Late check-out subject to availability.</span>
+                      ) : ppStandardStayTimes ? (
+                        <span>Standard check-out time. Your confirmation says if it differs.</span>
                       ) : (
                         <span>Host will confirm check-out time.</span>
                       )}
@@ -2476,26 +2940,71 @@ useEffect(() => {
                     </section>
                   );
                   if (!s || !Array.isArray(s.items) || s.items.length === 0) return null;
+                  const urlGuestCount = Number(searchParams.get('guests')) || ((Number(searchParams.get('adults')) || 0) + (Number(searchParams.get('children')) || 0));
+                  const targetPartyGuests = urlGuestCount > 0 ? urlGuestCount : booking?.guests;
+                  const similarItems = selectSimilarStaysForParty(keepSimilarStaysInSameCity(s.items, data.city), targetPartyGuests, 4);
+                  if (similarItems.length === 0) return null;
                   return (
                     <section className="pp-section" aria-label="Similar stays">
                       <div className="pp-section-head"><h2>Similar stays</h2></div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-                        {s.items.slice(0, 4).map((it: any) => {
+                        {similarItems.map((it: any) => {
                           const id = Number(it.id);
                           const rawName = String(it.name ?? it.propertyName ?? `Listing ${it.id}`);
                           const name = getListingDisplayName(id, rawName);
-                          const img = (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined);
-                          const path = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
+                          // TASK-102647: this card used to render it.coverPhotoUrl / photoUrls[0]
+                          // straight from the API — a raw atlashomestorage.blob.core.windows.net
+                          // URL with no allowlist check and no /img transform, unlike the gallery
+                          // above (TASK-8216). Sanitize + route through the same transform helper.
+                          const rawImg = sanitizeGuestImageUrl(
+                            (it.coverPhotoUrl as string | undefined) ?? (Array.isArray(it.photoUrls) ? it.photoUrls[0] : undefined),
+                          );
+                          const img = rawImg ? toTransformedGuestImageUrl(rawImg, 480) : undefined;
+                          const imgSrcSet = rawImg ? buildGuestImageSrcSet(rawImg, GUEST_IMAGE_SRCSET_WIDTHS) : undefined;
+                          const basePath = buildHomeUnitPath(getPropertySlug({ name: it.propertyName, property_name: it.propertyName }), id);
+                          const path = buildSimilarStayHref(basePath, tenantSlugFromUrl, searchParams);
+                          const meta = extractSimilarStayMeta(it);
                           return (
                             <Link
                               key={String(it.id)}
                               to={path}
+                              data-testid="similar-stay-card"
                               style={{ display: 'block', borderRadius: 16, border: '1px solid var(--border-subtle, #f0ddd0)', overflow: 'hidden', textDecoration: 'none', background: '#fff' }}
                             >
-                              {img && <img src={img} alt={name} style={{ width: '100%', height: 140, objectFit: 'cover' }} loading="lazy" decoding="async" width={300} height={140} />}
+                              {img && (
+                                <img
+                                  src={img}
+                                  srcSet={imgSrcSet}
+                                  sizes="(max-width: 640px) 50vw, 200px"
+                                  alt={name}
+                                  style={{ width: '100%', height: 140, objectFit: 'cover' }}
+                                  loading="lazy"
+                                  decoding="async"
+                                  width={300}
+                                  height={140}
+                                />
+                              )}
                               <div style={{ padding: '12px 14px' }}>
                                 <p style={{ fontWeight: 600, color: 'var(--text-primary, #4a3535)', fontSize: 14, margin: '0 0 4px' }}>{name}</p>
-                                <p style={{ fontSize: 12.5, color: 'var(--text-muted, #6b5a55)', margin: 0 }}>{String(it.propertyAddress ?? '').slice(0, 60)}</p>
+                                {it.propertyAddress && (
+                                  <p style={{ fontSize: 12.5, color: 'var(--text-muted, #6b5a55)', margin: '0 0 6px' }}>{String(it.propertyAddress).slice(0, 60)}</p>
+                                )}
+                                {(meta.maxGuests != null || meta.rating != null) && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginBottom: 6 }}>
+                                    {meta.maxGuests != null && (
+                                      <span data-testid="similar-stay-guests">Up to {meta.maxGuests} {meta.maxGuests === 1 ? 'guest' : 'guests'}</span>
+                                    )}
+                                    {meta.maxGuests != null && meta.rating != null && <span aria-hidden="true">·</span>}
+                                    {meta.rating != null && (
+                                      <span data-testid="similar-stay-rating" style={{ fontWeight: 600, color: 'var(--text-primary, #4a3535)' }}>
+                                        ★ {meta.rating.toFixed(1)}{meta.reviewCount != null ? ` (${meta.reviewCount})` : ''}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                <p data-testid="similar-stay-price-hint" style={{ fontWeight: 700, color: 'var(--text-primary, #4a3535)', fontSize: 13.5, margin: 0 }}>
+                                  {SIMILAR_STAY_PRICE_HINT}
+                                </p>
                               </div>
                             </Link>
                           );
@@ -2515,7 +3024,7 @@ useEffect(() => {
 
               {/* ===== RIGHT COLUMN — sticky booking ===== */}
               <aside className="pp-booking-col" aria-label="Booking">
-                {galleryUrls.length > 0 && (
+                {galleryUrls.length > 0 && !ppPhotosPending && (
                   <p style={{ fontSize: 13, color: 'var(--text-muted, #6b5a55)', marginBottom: 8 }}>
                     {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''}
                   </p>
@@ -2553,14 +3062,14 @@ useEffect(() => {
                         timezoneId={data.timezoneId}
                         coverPhotoUrl={primaryImage}
                         maxGuests={data.maxGuests}
-                        propertySlug={propertySlugParam}
+                        propertySlug={propertySlug}
                         unitSlug={unitSlugParam}
                         // TASK-102485: tell the widget the listing lookup FAILED (vs still
                         // resolving) so that with listingId undefined it fail-closes with the
                         // availability error + retry UI instead of an all-available calendar.
                         lookupFailed={!resolvedListingId && !isListingLookupPending && listingLookupError != null}
-                        reviewRating={ppHasApiReviews ? ppApiReviews!.averageRating : undefined}
-                        reviewCount={ppHasApiReviews ? ppApiReviews!.totalCount : undefined}
+                        reviewRating={ppHasApiReviews && ppCombinedReviewCount > 0 ? ppCombinedAverageRating : undefined}
+                        reviewCount={ppHasApiReviews && ppCombinedReviewCount > 0 ? ppCombinedReviewCount : undefined}
                         minStayNights={
                           data.minStay != null && Number.isFinite(data.minStay) && data.minStay > 0
                             ? data.minStay
@@ -2569,28 +3078,22 @@ useEffect(() => {
                         cancellationTier={data.cancellationTier ?? null}
                         cancellationWindowHours={data.cancellationWindowHours ?? null}
                         graceHours={data.graceHours ?? null}
+                        accommodationType={data.accommodationType ?? null}
+                        dormGenderPolicy={data.dormGenderPolicy ?? null}
+                        dormBedCount={data.dormBedCount ?? null}
+                        isParentCluster={data.isParentCluster ?? (data.clusterRole ? data.clusterRole.toUpperCase() === 'PARENT' : undefined)}
+                        clusterRole={data.clusterRole ?? null}
+                        clusterId={data.clusterId ?? null}
+                        securityDepositAmount={data.securityDepositAmount ?? null}
+                        includedGuests={pickIncludedGuestFacts(publicGuestFacts, data).includedGuests}
+                        extraGuestRate={pickIncludedGuestFacts(publicGuestFacts, data).extraGuestRate}
+                        priceChangesWithGuests={pickIncludedGuestFacts(publicGuestFacts, data).priceChangesWithGuests ?? null}
+                        hasSmallPartyPricing={Boolean(data.hasSmallPartyPricing || (data as unknown as { occupancyPricingEnabled?: boolean }).occupancyPricingEnabled)}
                         onStickySummaryChange={setStickyBookingSummary}
+                        tenantContext={effectiveTenantCtx}
                       />
                     </Suspense>
 
-                    {/* TASK-4015: Save vs OTA delta */}
-                    {data.property_price && data.property_price > 0 && (
-                      <div style={{
-                        marginTop: 16,
-                        padding: '12px 14px',
-                        borderRadius: 8,
-                        background: '#e9f5ef',
-                        border: '1px solid #d2ebde',
-                      }} data-testid="save-vs-ota-delta">
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#157046', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span>💰</span>
-                          <span>Save ~₹{Math.round(data.property_price * 2 * 0.155).toLocaleString('en-IN')} by booking directly</span>
-                        </div>
-                        <div style={{ fontSize: 12, color: '#157046', marginTop: 4 }}>
-                          vs OTA platforms that charge 15–18%
-                        </div>
-                      </div>
-                    )}
                   </>
                 )}
 
@@ -2609,8 +3112,8 @@ useEffect(() => {
                   <div className="pp-trust-row">
                     <CalendarClock className="pp-trust-ic" size={18} aria-hidden="true" />
                     <div>
+                      {/* GUEST-048: headline only here; the full policy sentence is printed once, under "Things to know", and the booking box carries the date-specific line. */}
                       <div className="pp-trust-t">{ppCancellationInfo.headline}</div>
-                      <div className="pp-trust-s">{ppCancellationInfo.description}</div>
                     </div>
                   </div>
                   <div className="pp-trust-row">
@@ -2655,7 +3158,7 @@ useEffect(() => {
                         rel="noopener noreferrer"
                         className="pp-btn pp-btn-whatsapp pp-btn-block"
                         data-testid="chat-with-host-btn"
-                        aria-label={`Message host about ${data.property_name} on WhatsApp`}
+                        aria-label={`Chat with host about ${data.property_name} on WhatsApp`}
                         onClick={() => trackEvent('whatsapp_cta_click', { listingId: resolvedListingId })}
                       >
                         <PpWhatsAppIcon size={16} />
@@ -2719,16 +3222,25 @@ useEffect(() => {
           {/* ===== END pp-shell ===== */}
 
           {/* Mobile sticky CTA — TASK-5192: any non-bookable status (Draft/Archived/Unlisted)
-              shows a notice instead of price + Reserve (sidebar already uses ppIsBookable). */}
+              shows a notice instead of price + Reserve (sidebar already uses ppIsBookable).
+              hostWhatsAppUrl: on phone the bar's Chat chooser keeps the HOST reachable (same number
+              and message as the desktop host WhatsApp bubble below; empty = no host number). */}
           <PropertyMobileStickyBar
             bookable={ppIsBookable}
             nightlyFallback={ppStickyNightly}
-            nightlyIsSynthetic={directBookingNightlyIsSynthetic}
+            nightlyIsSynthetic={false}
+            nightlyPending={ppStickyNightlyPending}
             summary={stickyBookingSummary}
             onReserveClick={() => {
               const widget = document.querySelector('[data-testid="guest-booking-form"]');
               widget?.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }}
+            hostWhatsAppUrl={buildListingWhatsAppUrl(
+              ppHostPhone,
+              getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property',
+              ppBrandName,
+            )}
+            listingId={resolvedListingId ?? data.listingId ?? null}
           />
 
         </div>
@@ -2813,9 +3325,13 @@ useEffect(() => {
           </div>
         )}
 
-        {/* TASK-1728: Guest Assistant FAQ widget */}
+        {/* TASK-1728 / TASK-10298986: Guest Assistant FAQ widget with target tenant scoping */}
         <Suspense fallback={null}>
-          <GuestAssistant listingId={resolvedListingId ?? data.listingId ?? null} />
+          <GuestAssistant
+            listingId={resolvedListingId ?? data.listingId ?? null}
+            tenantSlug={effectiveTenantCtx?.slug ?? tenantSlugFromUrl ?? null}
+            tenantId={effectiveTenantCtx?.id ?? (data as { tenantId?: number | null })?.tenantId ?? null}
+          />
         </Suspense>
 
         {/* TASK-102116: floating "Chat with Host on WhatsApp" bubble with pre-filled

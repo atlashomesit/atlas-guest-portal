@@ -1,4 +1,5 @@
 import { getPropertySlug } from './navigation';
+import { getListingDisplayName } from '../lib/listingDisplayName';
 
 /**
  * TASK-7448 (P0): decide whether the `:propertySlug` segment of `/homes/:propertySlug/:unitSlug`
@@ -42,6 +43,8 @@ export type PropertySlugCandidate = {
   propertyName?: string | null;
   /** Unit/listing name (`dto.name`), stored as `property_name` on TenantPropertyRecord. */
   property_name?: string | null;
+  /** Guest-facing display name (e.g. "Suite 202" for "Atlas202"). */
+  displayName?: string | null;
   id?: string | number | null;
 };
 
@@ -50,13 +53,28 @@ export type PropertySlugCandidate = {
  * Exported for testing.
  */
 export function acceptablePropertySlugs(item: PropertySlugCandidate): string[] {
-  const sources = [item.propertyName, item.property_name];
+  const displayTitle =
+    typeof item.property_name === 'string' && item.property_name.trim()
+      ? getListingDisplayName(item.id, item.property_name, item.displayName)
+      : item.displayName;
+  const sources = [item.propertyName, item.property_name, item.displayName, displayTitle];
   const slugs = new Set<string>();
 
   for (const source of sources) {
     if (typeof source !== 'string' || !source.trim()) continue;
     // Mirror the link builders exactly: getPropertySlug is what produced the URL.
     slugs.add(normalizeSlug(getPropertySlug({ property_name: source, name: source, id: item.id ?? undefined })));
+  }
+
+  // TASK-10299259: Legacy saved searches / bundled fallback (`propertyData.ts`) used "Room 101".."Room 302"
+  // (`/homes/room-301/5`), while the API serves raw SKU `Atlas301` (`displayName: "Studio 301"`).
+  // Accept `room-<NNN>` when the listing's SKU is `Atlas<NNN>`.
+  for (const source of [item.property_name, item.propertyName]) {
+    if (typeof source !== 'string') continue;
+    const atlasMatch = source.trim().match(/^atlas[-_\s]*(\d{3})\b/i);
+    if (atlasMatch) {
+      slugs.add(`room-${atlasMatch[1]}`);
+    }
   }
 
   return Array.from(slugs).filter(Boolean);

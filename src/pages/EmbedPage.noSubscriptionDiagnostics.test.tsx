@@ -11,6 +11,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import EmbedPage from './EmbedPage';
+import { settle } from '../test/settle';
 
 vi.mock('@/runtime-config', () => ({ getApiBaseUrl: () => 'https://api.example.test' }));
 vi.mock('@/api/client', () => ({
@@ -43,7 +44,8 @@ describe('EmbedPage never surfaces subscription diagnostics (TASK-101487)', () =
   it('renders no blocker node for the real contract, which omits both fields', async () => {
     stubConfig(notEligible);
     renderEmbed();
-    expect(await screen.findByTestId('embed-not-eligible')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId('embed-not-eligible')).toBeInTheDocument();
     expect(screen.queryByTestId('embed-blocker')).toBeNull();
     expect(document.body.textContent).not.toMatch(/Unknown/);
   });
@@ -51,7 +53,8 @@ describe('EmbedPage never surfaces subscription diagnostics (TASK-101487)', () =
   it('does not echo websiteState/blocker even if a payload carries them', async () => {
     stubConfig({ ...notEligible, websiteState: 'NotActivated', blocker: 'SUBSCRIPTION_LAPSED_GRACE' });
     renderEmbed();
-    expect(await screen.findByTestId('embed-not-eligible')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId('embed-not-eligible')).toBeInTheDocument();
     expect(screen.queryByTestId('embed-blocker')).toBeNull();
     expect(document.body.textContent).not.toMatch(/SUBSCRIPTION_LAPSED|NotActivated/);
   });

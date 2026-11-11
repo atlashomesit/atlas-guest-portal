@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import MyBookingsPage from "./MyBookingsPage";
 import { GuestAuthProvider } from "../contexts/GuestAuthContext";
+import { settle } from "../test/settle";
 
 // TASK-4360 AC6: assert the in-portal "Rate your stay" CTA renders for a checked-out,
 // not-yet-reviewed booking on the Past tab and is absent for an upcoming booking; and
@@ -88,7 +89,8 @@ describe("MyBookingsPage — TASK-4360 review CTA", () => {
   test("no review CTA on the Upcoming tab (checkout not yet passed)", async () => {
     renderPage();
     // Wait for load to finish — the tab list only renders once bookings arrive.
-    await screen.findByRole("tab", { name: "Past" });
+    await settle();
+    screen.getByRole("tab", { name: "Past" });
     // Default tab is Upcoming; the only upcoming booking must not offer a review CTA.
     expect(screen.getByText("Hilltop Cabin")).toBeInTheDocument();
     expect(screen.queryByTestId("my-bookings-review-cta")).not.toBeInTheDocument();
@@ -97,9 +99,11 @@ describe("MyBookingsPage — TASK-4360 review CTA", () => {
 
   test("Past tab shows the CTA for a checked-out unreviewed stay and links to /review/:id", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("tab", { name: "Past" }));
+    await settle();
+    fireEvent.click(screen.getByRole("tab", { name: "Past" }));
 
-    const ctas = await screen.findAllByTestId("my-bookings-review-cta");
+    await settle();
+    const ctas = screen.getAllByTestId("my-bookings-review-cta");
     // Only the unreviewed past booking (id 1) offers the CTA.
     expect(ctas).toHaveLength(1);
     expect(ctas[0]).toHaveTextContent("Rate your stay");
@@ -110,11 +114,11 @@ describe("MyBookingsPage — TASK-4360 review CTA", () => {
 
   test("Past tab shows a non-CTA Reviewed indicator for an already-reviewed stay", async () => {
     renderPage();
-    fireEvent.click(await screen.findByRole("tab", { name: "Past" }));
+    await settle();
+    fireEvent.click(screen.getByRole("tab", { name: "Past" }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("my-bookings-reviewed-badge")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("my-bookings-reviewed-badge")).toBeInTheDocument();
     const badge = screen.getByTestId("my-bookings-reviewed-badge");
     expect(badge).toHaveTextContent("Reviewed");
     // The reviewed state must not be a link/CTA.

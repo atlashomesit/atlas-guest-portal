@@ -9,6 +9,20 @@ import { getIstCalendarDate, toCalendarISO } from '@/utils/date';
 import { calculateNights, formatNightCount } from '@/utils/dateHelpers';
 import { formatCurrency } from '@/utils/formatting';
 import { razorpayOrderAmountInrToPaise } from '@/utils/razorpayOrderAmount';
+import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
+import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import { failureDetailsFromRazorpayEvent, reportPaymentFailure } from '@/api/paymentFailureClient';
+import { createRazorpayWindowWatch, isRazorpayContainerVisible } from '@/utils/razorpayWindowWatch';
+import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
+import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
+import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
+import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
+import { reportUpiPaid } from '@/api/payment';
+import { isMobileCheckoutUserAgent } from '@/utils/razorpayCheckoutOptions';
+import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
+import { isPricingNotConfiguredError } from '@/utils/pricingNotConfigured';
+import PoweredByAtlasLink from '@/components/PoweredByAtlasLink';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +38,8 @@ type EmbedListingSummary = {
   checkOutTime: string | null;
   timezoneId: string | null;
   securityDepositAmount: number | null;
+  cancellationTier?: string | null;
+  cancellationWindowHours?: number | null;
 };
 
 type EmbedConfig = {
@@ -79,6 +95,7 @@ const CTA_DARK = '#111827';
 const CTA_DARK_LUM = luminanceFromRgb(0x11, 0x18, 0x27); // 0.00918
 const CTA_WHITE_LUM = 1.0;
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located contrast helper
 export function readableCtaText(background: string): string {
   const channels = parseHexChannels(background);
   if (!channels) return 'var(--text-on-cta, #ffffff)';
@@ -94,6 +111,7 @@ export function readableCtaText(background: string): string {
 // toward black (for white text) or toward white (for dark text) in 1% steps and return the
 // first hex that clears 4.5 with its optimal text colour. The step granularity keeps the
 // shift minimal and hue largely intact.
+// eslint-disable-next-line react-refresh/only-export-components -- co-located contrast helper
 export function clampedBrandColor(background: string): string {
   const channels = parseHexChannels(background);
   if (!channels) return background;
@@ -127,6 +145,7 @@ export function clampedBrandColor(background: string): string {
   return background;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- co-located contrast helper
 export function ctaStyle(background: string): { background: string; color: string } {
   const bg = clampedBrandColor(background);
   return { background: bg, color: readableCtaText(bg) };
@@ -138,7 +157,7 @@ export function ctaStyle(background: string): { background: string; color: strin
 // threading a focus ref through four separately-defined sub-components, a single persistent
 // (never unmounted) status region reports each transition in words; only its TEXT changes,
 // which is the reliable way to get assistive tech to actually announce it.
-export function stepAnnouncementText(step: Step, listingCount: number): string {
+function stepAnnouncementText(step: Step, listingCount: number): string {
   switch (step) {
     case 'select': return listingCount > 1 ? 'Choose a stay' : 'Loading stay details';
     case 'dates': return 'Choose your dates and number of guests';
@@ -177,6 +196,10 @@ function normalizeConfig(raw: Record<string, unknown>): EmbedConfig {
       timezoneId: (r.timezoneId ?? r.TimezoneId) as string | null,
       securityDepositAmount: r.securityDepositAmount != null || r.SecurityDepositAmount != null
         ? Number(r.securityDepositAmount ?? r.SecurityDepositAmount)
+        : null,
+      cancellationTier: (r.cancellationTier ?? r.CancellationTier) as string | null,
+      cancellationWindowHours: r.cancellationWindowHours != null || r.CancellationWindowHours != null
+        ? Number(r.cancellationWindowHours ?? r.CancellationWindowHours)
         : null,
     })),
   };
@@ -427,6 +450,7 @@ export function DateGuestPicker({
 function GuestDetailsForm({
   listing,
   tenantName,
+  tenantSlug,
   checkIn,
   checkOut,
   guests,
@@ -436,6 +460,7 @@ function GuestDetailsForm({
 }: {
   listing: EmbedListingSummary;
   tenantName: string;
+  tenantSlug: string;
   checkIn: Date;
   checkOut: Date;
   guests: number;
@@ -443,11 +468,68 @@ function GuestDetailsForm({
   onBack: () => void;
   brand: string;
 }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const savedInitial = useMemo(() => {
+    try {
+      const savedName = localStorage.getItem('atlas_guest_name')?.trim() ?? '';
+      let savedEmail = localStorage.getItem('atlas_guest_email')?.trim() ?? '';
+      const savedPhone = localStorage.getItem('atlas_guest_phone')?.trim() ?? '';
+      if (!savedEmail) {
+        const rawAuth = localStorage.getItem('atlas_guest_auth');
+        if (rawAuth) {
+          const parsed = JSON.parse(rawAuth) as { email?: string | null };
+          if (parsed?.email) savedEmail = parsed.email.trim();
+        }
+      }
+      return {
+        name: savedName,
+        email: savedEmail,
+        phone: savedPhone,
+        hasSaved: Boolean(savedName || savedEmail || savedPhone),
+      };
+    } catch {
+      return { name: '', email: '', phone: '', hasSaved: false };
+    }
+  }, []);
+
+  const [name, setName] = useState(savedInitial.name);
+  const [email, setEmail] = useState(savedInitial.email);
+  const [phone, setPhone] = useState(savedInitial.phone);
+  const [isPrefilledFromSaved, setIsPrefilledFromSaved] = useState(savedInitial.hasSaved);
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [depositAccepted, setDepositAccepted] = useState(false);
+  // FOUNDER RULED 2026-10-19: the host's own house rules (required tick before Pay, only when the host wrote rules) and the host's
+  // own WhatsApp / phone for the failed-payment fallback, read from the LISTING OWNER (never Atlas's own number).
+  const [checkoutInfo, setCheckoutInfo] = useState<ListingCheckoutInfo | null>(null);
+  const [houseRulesAccepted, setHouseRulesAccepted] = useState(false);
+  const [paymentFailure, setPaymentFailure] = useState<{ reasonText: string } | null>(null);
+  const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
+  // PAY-010: UPI_QR / UPI_DEEPLINK host — UPI link / QR instead of Razorpay; "I have paid" waits for the host.
+  const [upiCheckout, setUpiCheckout] = useState<{
+    order: UpiOrder; amountInr: number; bookingId: number; bookingToken: string | null;
+  } | null>(null);
+  const [upiReported, setUpiReported] = useState(false);
+  const [upiReportBusy, setUpiReportBusy] = useState(false);
+  const [upiReportError, setUpiReportError] = useState<string | null>(null);
+  const handleUpiIHavePaid = async () => {
+    if (!upiCheckout || upiReportBusy) return;
+    setUpiReportBusy(true);
+    setUpiReportError(null);
+    try {
+      await reportUpiPaid(upiCheckout.bookingId, upiCheckout.bookingToken, tenantSlug);
+      setUpiReported(true);
+    } catch (err) {
+      setUpiReportError(err instanceof Error ? err.message : 'Could not tell the host. Please try again.');
+    } finally {
+      setUpiReportBusy(false);
+    }
+  };
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetchListingCheckoutInfo(listing.id, undefined, controller.signal).then((info) => {
+      if (!controller.signal.aborted) setCheckoutInfo(info);
+    });
+    return () => controller.abort();
+  }, [listing.id]);
   const [pricing, setPricing] = useState<GuestPriceBreakdown | null>(null);
   const [loadingPricing, setLoadingPricing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -457,6 +539,67 @@ function GuestDetailsForm({
   // Mirrors GuestDetailsPage's persisted holdId/holdToken/holdExpiresAt pattern, but here the
   // hold is created inside this component (not in BookingContext), so we keep it in local state.
   const [heldHold, setHeldHold] = useState<{ holdId: number; holdToken: string; holdExpiresAt: string } | null>(null);
+  const [holdCountdown, setHoldCountdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!heldHold?.holdExpiresAt) {
+      setHoldCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const remainingMs = new Date(heldHold.holdExpiresAt).getTime() - Date.now();
+      if (remainingMs <= 0) {
+        setHoldCountdown('0:00');
+        return;
+      }
+      const totalSec = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      setHoldCountdown(`${mins}:${String(secs).padStart(2, '0')}`);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [heldHold?.holdExpiresAt]);
+
+  // Auto-polling for YouPI PG real-time observer settlement
+  useEffect(() => {
+    if (!upiCheckout || !upiCheckout.bookingId || !upiCheckout.bookingToken) return;
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const token = upiCheckout.bookingToken;
+        const res = await fetch(
+          buildApiUrl(`/bookings/${upiCheckout.bookingId}/payment-status?t=${encodeURIComponent(token || '')}`),
+          { headers: getOrderRequestHeaders(crypto.randomUUID(), tenantSlug) }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { status?: string; bookingStatus?: string };
+        if (active && (data?.status === 'Paid' || data?.bookingStatus === 'Confirmed')) {
+          clearInterval(interval);
+          onBook({ bookingId: upiCheckout.bookingId, bookingToken: upiCheckout.bookingToken });
+        }
+      } catch {
+        // ignore network error
+      }
+    }, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [upiCheckout, tenantSlug, onBook]);
+
+  const handleClearPrefilled = () => {
+    setName('');
+    setEmail('');
+    setPhone('');
+    setIsPrefilledFromSaved(false);
+    try {
+      localStorage.removeItem('atlas_guest_name');
+      localStorage.removeItem('atlas_guest_email');
+      localStorage.removeItem('atlas_guest_phone');
+    } catch { /* ignore */ }
+  };
 
   const depositRequired = (listing.securityDepositAmount ?? 0) > 0;
 
@@ -467,12 +610,13 @@ function GuestDetailsForm({
   useEffect(() => {
     let cancelled = false;
     setLoadingPricing(true);
-    fetchGuestPriceBreakdown(listing.id, checkInStr, checkOutStr)
+    fetchGuestPriceBreakdown(listing.id, checkInStr, checkOutStr, undefined, undefined, guests)
       .then((p) => { if (!cancelled) setPricing(p); })
-      .catch(() => { if (!cancelled) setError('Could not load pricing. Please try again.'); })
+      // 409 PRICING_NOT_CONFIGURED (founder-ruled 2026-11-03): the host has not set this room's pricing yet - say that, in the API's words.
+      .catch((err: unknown) => { if (!cancelled) setError(isPricingNotConfiguredError(err) ? err.message : 'Could not load pricing. Please try again.'); })
       .finally(() => { if (!cancelled) setLoadingPricing(false); });
     return () => { cancelled = true; };
-  }, [listing.id, checkInStr, checkOutStr]);
+  }, [listing.id, checkInStr, checkOutStr, guests]);
 
   const handleSubmit = async () => {
     if (!name.trim() || !email.trim() || !phone.trim()) {
@@ -487,7 +631,12 @@ function GuestDetailsForm({
       setError('Please accept the refundable security deposit terms to continue.');
       return;
     }
+    if (houseRulesRequired && !houseRulesAccepted) {
+      setError('Please accept the house rules to continue.');
+      return;
+    }
     setError(null);
+    setPaymentFailure(null);
     setSubmitting(true);
     try {
       const idempotencyKey = crypto.randomUUID();
@@ -505,7 +654,7 @@ function GuestDetailsForm({
         // Step 1: init-hold (only when no live hold exists or it has expired)
         const holdRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
           method: 'POST',
-          headers: getOrderRequestHeaders(idempotencyKey),
+          headers: getOrderRequestHeaders(idempotencyKey, tenantSlug),
           body: JSON.stringify({
             bookingDraft: {
               listingId: listing.id,
@@ -517,6 +666,20 @@ function GuestDetailsForm({
         });
         if (!holdRes.ok) {
           const body = await holdRes.json().catch(() => ({}));
+          const code = String(body.code ?? body.errorCode ?? (body.error?.code ?? '')).trim();
+          const msg = String(body.message ?? body.error ?? '');
+          if (
+            (holdRes.status === 422 || holdRes.status === 503) &&
+            (code.includes('PAYMENT_PROVIDER_NOT_CONFIGURED') || msg.includes('PAYMENT_PROVIDER_NOT_CONFIGURED'))
+          ) {
+            setCheckoutInfo((prev) => (prev ? { ...prev, onlinePaymentsAvailable: false } : null));
+            setError(null);
+            return;
+          }
+          // FOUNDER RULED 2026-10-19: the hold starts at Pay, so a lost night is told here, BEFORE any money moves.
+          if (holdRes.status === 409 && String(body.code ?? '') === 'AVAILABILITY_CONFLICT') {
+            throw new Error('Sorry, these dates were just booked. No payment was taken. Please pick different dates.');
+          }
           throw new Error(String(body.message ?? body.error ?? 'Failed to create hold'));
         }
         hold = (await holdRes.json()) as { holdId: number; holdExpiresAt: string; prepToken: string };
@@ -526,7 +689,7 @@ function GuestDetailsForm({
       // Step 2: final-charge (Razorpay order)
       const orderRes = await fetch(buildApiUrl('/api/Razorpay/order'), {
         method: 'POST',
-        headers: getOrderRequestHeaders(idempotencyKey),
+        headers: getOrderRequestHeaders(idempotencyKey, tenantSlug),
         body: JSON.stringify({
           holdId: hold.holdId,
           holdToken: hold.prepToken,
@@ -534,10 +697,16 @@ function GuestDetailsForm({
           guestInfo: { name: name.trim(), email: email.trim(), phone: phone.trim() },
           guestConsentAccepted: consentAccepted,
           securityDepositAccepted: depositRequired ? depositAccepted : false,
+          houseRulesAccepted,
         }),
       });
       if (!orderRes.ok) {
         const body = await orderRes.json().catch(() => ({}));
+        if (orderRes.status === 409 && String(body.code ?? '') === 'CHECKOUT_HOLD_EXPIRED') {
+          // The 10 minutes ended and the nights were released: drop the lapsed hold; the next Pay re-checks the dates and starts a fresh one.
+          setHeldHold(null);
+          throw new Error('Your 10 minutes ended, so the dates were released. Tap Pay and we will check them again. No payment was taken.');
+        }
         throw new Error(String(body.message ?? body.error ?? 'Failed to create payment order'));
       }
       // `amount` off this response is RUPEES, while the Razorpay order it created is
@@ -549,10 +718,20 @@ function GuestDetailsForm({
       };
       const amountPaise = razorpayOrderAmountInrToPaise(Number(order.amount));
 
+      // PAY-010: a UPI_QR / UPI_DEEPLINK host gets no Razorpay order; show the UPI panel instead of launching Razorpay.
+      const upiOrder = parseUpiOrder(order);
+      if (upiOrder) {
+        setUpiCheckout({ order: upiOrder, amountInr: Number(order.amount), bookingId: order.bookingId, bookingToken: order.bookingToken });
+        setSubmitting(false);
+        return;
+      }
+
       // Step 3: open Razorpay modal
       const loaded = await loadRazorpayScript();
       if (!loaded) throw new Error('Payment script failed to load. Please try again.');
 
+      // Set by whichever Razorpay event ends this attempt; the "window never opened" watchdog below stops once it is set.
+      let windowSettled = false;
       const rzp = new window.Razorpay({
         key: order.keyId,
         amount: amountPaise,
@@ -561,10 +740,11 @@ function GuestDetailsForm({
         description: `${listing.name} — ${formatNightCount(calculateNights(checkIn, checkOut))}`,
         order_id: order.orderId,
         handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+          windowSettled = true;
           try {
             const verifyRes = await fetch(buildApiUrl('/api/Razorpay/verify'), {
               method: 'POST',
-              headers: getOrderRequestHeaders(crypto.randomUUID()),
+              headers: getOrderRequestHeaders(crypto.randomUUID(), tenantSlug),
               body: JSON.stringify({
                 bookingId: order.bookingId,
                 razorpayOrderId: response.razorpay_order_id,
@@ -574,6 +754,11 @@ function GuestDetailsForm({
               }),
             });
             if (!verifyRes.ok) throw new Error('Payment verification failed');
+            try {
+              localStorage.setItem('atlas_guest_name', name.trim());
+              localStorage.setItem('atlas_guest_email', email.trim());
+              localStorage.setItem('atlas_guest_phone', phone.trim());
+            } catch { /* ignore */ }
             onBook({ bookingId: order.bookingId, bookingToken: order.bookingToken });
           } catch {
             setError('Payment succeeded but confirmation failed. Please contact support.');
@@ -581,17 +766,41 @@ function GuestDetailsForm({
           }
         },
         modal: {
-          ondismiss: () => { setSubmitting(false); },
+          ondismiss: () => { windowSettled = true; setSubmitting(false); },
         },
         prefill: { name, email, contact: phone },
         theme: { color: brand },
       });
       rzp.on('payment.failed', (resp) => {
-        const r = resp as { error?: { description?: string } };
-        setError(r.error?.description ?? 'Payment failed. Please try again.');
+        windowSettled = true;
+        const r = resp as { error?: { code?: string; description?: string } };
+        // GUEST-028: keep what Razorpay said (and which website this ran on), so a refusal that blocks every guest is seen.
+        reportPaymentFailure(order.bookingId, order.bookingToken, null, { ...failureDetailsFromRazorpayEvent(resp), orderId: order.orderId });
+        // FOUNDER RULED 2026-10-19: "Payment didn't go through" with [Try again] and [Message the host on WhatsApp].
+        setError(null);
+        setPaymentFailure({ reasonText: mapRazorpayFailureCode(r.error?.code, r.error?.description) });
         setSubmitting(false);
       });
       rzp.open();
+
+      // Razorpay's window can die without telling the page (an in-app browser that blocks it, an order the gateway rejects): without this the
+      // Pay button would stay on "Securing..." for the rest of the hold. Same way out as a failed payment.
+      const windowWatch = createRazorpayWindowWatch(Date.now());
+      const openWatchdog = window.setInterval(() => {
+        // The widget being gone (the guest left) also ends the watch: a departed guest gets no late failure report.
+        if (windowSettled || !document.querySelector('[data-testid="embed-guest-details"]')) { window.clearInterval(openWatchdog); return; }
+        if (!windowWatch.tick(isRazorpayContainerVisible(), Date.now())) return;
+        window.clearInterval(openWatchdog);
+        windowSettled = true;
+        reportPaymentFailure(order.bookingId, order.bookingToken, null, {
+          code: 'CHECKOUT_DID_NOT_OPEN',
+          description: 'The Razorpay payment window did not open or closed without telling the page',
+          orderId: order.orderId,
+        });
+        setError(null);
+        setPaymentFailure({ reasonText: 'The payment window did not open in this browser. Try again, or open this page in Chrome or Safari.' });
+        setSubmitting(false);
+      }, 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
       setSubmitting(false);
@@ -605,6 +814,17 @@ function GuestDetailsForm({
       <div className="mb-3 rounded-lg bg-bg-muted p-2 text-xs text-text-secondary">
         {listing.name} &middot; {format(checkIn, 'MMM d')} &ndash; {format(checkOut, 'MMM d')} &middot; {formatNightCount(nights)}
       </div>
+
+      {holdCountdown && (
+        <div
+          className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+          data-testid="embed-hold-countdown"
+        >
+          {holdCountdown === '0:00'
+            ? 'Reservation hold expired — unpaid holds release automatically. Tap Pay to start a fresh hold.'
+            : `Dates held for ${holdCountdown} — unpaid holds release automatically when the timer expires.`}
+        </div>
+      )}
 
       {loadingPricing ? (
         <div className="py-4 text-center text-sm text-text-muted">Loading pricing...</div>
@@ -621,12 +841,6 @@ function GuestDetailsForm({
               <span>{formatCurrency(pricing.convenienceFeeAmount)}</span>
             </div>
           )}
-          {pricing.gstAmount != null && pricing.gstAmount > 0 && (
-            <div className="flex justify-between text-text-secondary">
-              <span>GST ({pricing.gstPercent}%)</span>
-              <span>{formatCurrency(pricing.gstAmount)}</span>
-            </div>
-          )}
           {pricing.touristTaxAmount > 0 && (
             <div className="flex justify-between text-text-secondary">
               <span>Tourist tax</span>
@@ -634,13 +848,34 @@ function GuestDetailsForm({
             </div>
           )}
           <div className="mt-1 flex justify-between border-t border-border-subtle pt-1 font-semibold">
-            <span>Total</span>
+            <span>Total <span className="text-xs font-normal text-text-muted">(all fees included)</span></span>
             <span>{formatCurrency(pricing.finalAmount!)}</span>
           </div>
         </div>
       ) : null}
 
+      {/* GUEST-024: Visual cancellation policy milestone timeline */}
+      <CancellationMilestoneTimeline
+        checkInDate={checkIn}
+        cancellationTier={listing.cancellationTier}
+        windowHoursOverride={listing.cancellationWindowHours}
+        className="mb-3"
+      />
+
       <div className="mb-3 grid gap-2">
+        {isPrefilledFromSaved && (
+          <div className="flex items-center justify-between rounded-md bg-bg-muted px-2.5 py-1.5 text-xs text-text-secondary">
+            <span>Saved details pre-filled</span>
+            <button
+              type="button"
+              onClick={handleClearPrefilled}
+              data-testid="clear-prefilled-guest-details"
+              className="font-medium text-text-primary underline hover:no-underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
         <label htmlFor="embed-guest-name" className="text-xs font-medium text-text-secondary">Full name</label>
         <input
           id="embed-guest-name"
@@ -669,6 +904,13 @@ function GuestDetailsForm({
           className="rounded-lg border border-border-input bg-bg-surface px-3 py-2 text-sm text-text-primary"
         />
       </div>
+
+      <HouseRulesAcceptance
+        info={checkoutInfo}
+        accepted={houseRulesAccepted}
+        onChange={setHouseRulesAccepted}
+        variant="embed"
+      />
 
       <label className="mb-3 flex items-start gap-2 text-xs text-text-secondary">
         <input
@@ -701,21 +943,102 @@ function GuestDetailsForm({
         </label>
       )}
 
+      {upiCheckout && !upiReported && (
+        <UpiPaymentPanel
+          order={upiCheckout.order}
+          amountInr={upiCheckout.amountInr}
+          payeeName={tenantName}
+          countdown={holdCountdown}
+          holdActive={heldHold != null && new Date(heldHold.holdExpiresAt).getTime() > Date.now()}
+          isMobile={isMobileCheckoutUserAgent(typeof navigator !== 'undefined' ? navigator.userAgent : '')}
+          onIHavePaid={() => { void handleUpiIHavePaid(); }}
+          busy={upiReportBusy}
+          error={upiReportError}
+        />
+      )}
+      {upiCheckout && upiReported && (
+        <div role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" data-testid="embed-upi-awaiting-host">
+          <b className="block">Waiting for the host to confirm your payment</b>
+          <span className="block">We told the host you paid. Your booking is confirmed once they see the money arrive.</span>
+          <a
+            href={`${window.location.origin}/booking/${upiCheckout.bookingId}${upiCheckout.bookingToken ? `?t=${encodeURIComponent(upiCheckout.bookingToken)}` : ''}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-block font-semibold underline"
+          >
+            View your booking &rarr;
+          </a>
+        </div>
+      )}
+
+      {paymentFailure && !submitting && (
+        <PaymentFailedPanel
+          reasonText={paymentFailure.reasonText}
+          countdown={holdCountdown}
+          holdActive={heldHold != null && new Date(heldHold.holdExpiresAt).getTime() > Date.now()}
+          contact={buildHostFailureContact({
+            hostWhatsAppDigits: checkoutInfo?.hostWhatsAppDigits,
+            hostPhoneDigits: checkoutInfo?.hostPhoneDigits,
+            roomName: listing.name,
+            checkInLabel: format(checkIn, 'EEE, d MMM yyyy'),
+            checkOutLabel: format(checkOut, 'EEE, d MMM yyyy'),
+            nights,
+            guests,
+            amountInr: pricing?.finalAmount ?? null,
+            guestName: name,
+          })}
+          onTryAgain={() => { void handleSubmit(); }}
+          variant="embed"
+        />
+      )}
+
       {error && (
         <div role="alert" className="mb-3 rounded-lg border border-red-300 bg-red-50 p-2 text-xs text-red-700">
           {error}
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted)}
-        onClick={handleSubmit}
-        className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
-        style={ctaStyle(brand)}
-      >
-        {submitting ? 'Processing...' : 'Pay & book'}
-      </button>
+      {checkoutInfo?.onlinePaymentsAvailable === false ? (
+        <div className="space-y-2" data-testid="embed-offline-section">
+          <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+            <b>Online payment is currently not enabled for this property.</b><br />
+            <span>Contact the host directly to complete your reservation.</span>
+          </div>
+          {checkoutInfo?.hostWhatsAppDigits ? (
+            <a
+              href={`https://wa.me/${checkoutInfo.hostWhatsAppDigits.replace(/\D/g, '').length === 10 ? `91${checkoutInfo.hostWhatsAppDigits.replace(/\D/g, '')}` : checkoutInfo.hostWhatsAppDigits.replace(/\D/g, '')}?text=${encodeURIComponent(`Hi, I'm interested in booking ${listing.name || 'this property'}. Can you help me confirm?`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#075e54] px-4 py-2.5 text-sm font-semibold text-white no-underline"
+              data-testid="embed-whatsapp-cta"
+            >
+              Contact Host via WhatsApp · Request to Book
+            </a>
+          ) : checkoutInfo?.hostPhoneDigits ? (
+            <a
+              href={`tel:+${checkoutInfo.hostPhoneDigits.replace(/\D/g, '')}`}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white no-underline"
+              data-testid="embed-phone-cta"
+            >
+              Contact Host · Request to Book
+            </a>
+          ) : (
+            <div className="text-center text-xs text-text-secondary" data-testid="embed-no-host-number">
+              Please contact the host directly to make a reservation.
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={submitting || !name.trim() || !email.trim() || !phone.trim() || !consentAccepted || (depositRequired && !depositAccepted) || (houseRulesRequired && !houseRulesAccepted)}
+          onClick={handleSubmit}
+          className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50"
+          style={ctaStyle(brand)}
+        >
+          {submitting ? 'Processing...' : 'Pay & book'}
+        </button>
+      )}
 
       {/* TASK-102074: security/encryption trust badges below the pay CTA. The embed always
           pays through the Razorpay gateway, so the claims hold unconditionally. */}
@@ -931,6 +1254,7 @@ export default function EmbedPage() {
         <GuestDetailsForm
           listing={selectedListing}
           tenantName={config.tenantName}
+          tenantSlug={config.tenantSlug}
           checkIn={checkIn}
           checkOut={checkOut}
           guests={guests}
@@ -952,7 +1276,9 @@ export default function EmbedPage() {
       )}
 
       {/* Footer */}
-      <div className="mt-4 text-center text-[10px] text-text-muted">Powered by Atlas</div>
+      <div className="mt-4 text-center text-[10px] text-text-muted">
+        <PoweredByAtlasLink slug={config.tenantSlug} medium="embed" className="underline-offset-2 hover:underline" />
+      </div>
     </div>
   );
 }

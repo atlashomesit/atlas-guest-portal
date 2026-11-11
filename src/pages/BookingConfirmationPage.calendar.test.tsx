@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import BookingConfirmationPage from "./BookingConfirmationPage";
+import { settle } from "../test/settle";
 
 vi.mock("../lib/events", () => ({ track: vi.fn() }));
 vi.mock("../components/SEO", () => ({ default: () => null }));
@@ -73,7 +74,8 @@ describe("BookingConfirmationPage TASK-102114 calendar export", () => {
     window.sessionStorage.setItem("booking_101_payment_status", "success");
     mockSummaryFetch();
     renderPage();
-    expect(await screen.findByTestId("booking-confirmation-page")).toBeInTheDocument();
+    await settle();
+    expect(screen.getByTestId("booking-confirmation-page")).toBeInTheDocument();
     expect(screen.getByTestId("confirmation-add-google-calendar")).toBeInTheDocument();
     expect(screen.getByTestId("confirmation-download-ics")).toBeInTheDocument();
   });
@@ -82,7 +84,8 @@ describe("BookingConfirmationPage TASK-102114 calendar export", () => {
     window.sessionStorage.setItem("booking_101_payment_status", "success");
     mockSummaryFetch();
     renderPage();
-    const link = await screen.findByTestId("confirmation-add-google-calendar");
+    await settle();
+    const link = screen.getByTestId("confirmation-add-google-calendar");
     const href = (link as HTMLAnchorElement).href;
     expect(href).toContain("calendar.google.com/calendar/render");
     expect(href).toContain("action=TEMPLATE");
@@ -103,8 +106,10 @@ describe("BookingConfirmationPage TASK-102114 calendar export", () => {
     Object.defineProperty(URL, "revokeObjectURL", { value: revokeObjectURL, configurable: true });
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
     renderPage();
-    expect(await screen.findByTestId("booking-confirmation-page")).toBeInTheDocument();
-    fireEvent.click(await screen.findByTestId("confirmation-download-ics"));
+    await settle();
+    expect(screen.getByTestId("booking-confirmation-page")).toBeInTheDocument();
+    await settle();
+    fireEvent.click(screen.getByTestId("confirmation-download-ics"));
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     const blob = createObjectURL.mock.calls[0][0] as Blob;
     const text = await blob.text();

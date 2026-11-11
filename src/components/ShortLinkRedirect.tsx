@@ -6,9 +6,15 @@ import { getTenantBrandName } from "../tenant/displayBrand";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 
-const ShortLinkRedirect = () => {
+type ShortLinkRedirectProps = {
+    /** MKT-034: resolve this code instead of the `:shortCode` URL param (used by a static route that is not `/:shortCode`). */
+    code?: string;
+};
+
+const ShortLinkRedirect = ({ code }: ShortLinkRedirectProps = {}) => {
     const brandName = getTenantBrandName();
-    const { shortCode } = useParams<{ shortCode: string }>();
+    const { shortCode: routeShortCode } = useParams<{ shortCode: string }>();
+    const shortCode = code ?? routeShortCode;
 
     const normalizedCode = shortCode?.toLowerCase()?.trim();
 

@@ -1,16 +1,18 @@
+import { feePercent, feeAmount } from "../../utils/paymentFeeCopy";
 
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { addDays, differenceInCalendarDays, format, startOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { NETWORK_ERROR_MESSAGE } from './unitBookingPaymentOrderErrors';
+import { ReserveWhatsAppHandoff } from './ReserveWhatsAppHandoff';
+import { buildReserveWhatsAppUrl } from './reserveHandoffLink';
 import { Button } from '@/components/ui/Button';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { AtlasBookingCalendar } from './AtlasBookingCalendar';
 import { useBooking } from '@/contexts/BookingContext';
 import { hasRuntimeConfig } from '@/runtime-config';
 import ErrorBanner from '@/components/ErrorBanner';
-import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
+import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { dedupedAvailabilityCalendarFetch } from '@/api/availabilityCalendarClient';
 // CALENDAR basis throughout this widget — see the header comment in utils/date.ts. Every
 // Date held in widget state (today, dateRange, shownDate, availabilityRange) is a
@@ -25,29 +27,47 @@ import {
 import { calculateNights, formatDateInTimezone, formatIsoDateInTimezone } from '@/utils/dateHelpers';
 import {
   type CancellationTier,
+  describeRatePlanCancellation,
   resolveFreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
+import { describeIncludedGuests } from '@/utils/includedGuests';
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
+import { rememberLinkPromo } from '@/utils/linkPromo';
 import { formatCurrency } from '@/utils/formatting';
+import { isPricingNotConfiguredError } from '@/utils/pricingNotConfigured';
+import { isSmallParty, SMALL_PARTY_HINT_DEFAULT } from '@/utils/smallParty';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
+import DirectSavingRow from '@/components/pricing/DirectSavingRow';
+import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
+import { directPriceDisplay, plainMealLabel } from '@/utils/directBookingPrice';
 import {
   fetchCalendarPricing,
   fetchGuestPriceBreakdown,
+  fetchPublicListingRatePlans,
   netChargeableRoomFare,
   type GuestPriceBreakdown,
+  type PublicListingRatePlanDto,
 } from '@/api/pricingClient';
 import { fetchAvailabilityRatesForMonths } from '@/api/availabilityRatesClient';
 import { fetchPublicListings } from '@/api/listingClient';
 import { useListingPhotosFromApi } from '@/contexts/ListingPhotosContext';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
+import BookDirectPerks from '@/components/trust/BookDirectPerks';
+import ParentChildCrossSellBanner, { isParentListing, type ChildRoomPreview } from '../cluster/ParentChildCrossSellBanner';
+import { fetchClusterChildrenAvailability, type ClusterChildrenAvailability } from '@/api/clusterChildrenClient';
+import { fetchSisterAvailability, type SisterSpillover } from '@/api/sisterAvailabilityClient';
+import SisterPropertySpillover from './SisterPropertySpillover';
+import HostelDormBadge from '../hostel/HostelDormBadge';
+import { bedsLeftForNights, isHostelDormType, type DormGenderPolicy } from '@/utils/dormListing';
 import { track } from '@/lib/events'; // TASK-1480
+import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
-import { isMarketplaceMode } from '@/tenant/tenantResolver';
+import { getTenantContext, type TenantInfo } from '@/tenant/tenantContext';
+import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import {
-  ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT,
 } from '@/utils/directBookingPromo';
 
 declare global {
@@ -59,7 +79,7 @@ declare global {
   }
 }
 
-interface UnitBookingWidgetProps {
+export interface UnitBookingWidgetProps {
   listingId?: string | number;
   propertyId?: string | number;
   listingName?: string;
@@ -95,6 +115,28 @@ interface UnitBookingWidgetProps {
    * widget distinguish "resolving" (pending — keep interactive) from "failed" (fail closed).
    */
   lookupFailed?: boolean;
+  /** MKT-011: optional listing tenant context (used on marketplace to match listing host's bookingMode) */
+  tenantContext?: TenantInfo | null;
+  /** CLU-004: parent cluster indicator for child room cross-sell */
+  isParentCluster?: boolean;
+  clusterRole?: string | null;
+  /** CLU-011: `PublicListingDto.ClusterId` - a Parent only has Children to offer when it belongs to a cluster. */
+  clusterId?: number | null;
+  accommodationType?: string | null;
+  /** HSL-011: `Listing.DormGenderPolicy` from the API (HostelDorm only). Never guessed from the listing name. */
+  dormGenderPolicy?: DormGenderPolicy | null;
+  /** HSL-011: total beds in the dorm (`Listing.Quantity`) - the "Y" of "X of Y beds left". */
+  dormBedCount?: number | null;
+  /** TASK-1039977 / PAY-006: listing security deposit (INR); forwarded to checkout */
+  securityDepositAmount?: number | null;
+  /** TASK-10299183: small-party pricing configured on listing. */
+  hasSmallPartyPricing?: boolean;
+  /** GUEST-060: guests the price covers and the host's extra-guest nightly rate, when the listing sends them. Display only. */
+  includedGuests?: number | null;
+  extraGuestRate?: number | null;
+  priceChangesWithGuests?: boolean | null;
+  /** Custom small-party hint text. Defaults to "Special rate available for 1-2 guests". */
+  smallPartyHint?: string | null;
 }
 
 export type BookingStickySummary = {
@@ -104,9 +146,59 @@ export type BookingStickySummary = {
   freeCancelUntil: string | null;
   /** DESIGN-030: selected range cannot be booked — sticky must not show a bookable total. */
   datesUnavailable?: boolean;
+  /** Navigation readiness from the same state that enables the existing Reserve action. */
+  canReviewBooking?: boolean;
+  /** GUEST-022: selected rate plan name and meal badge for mobile sticky bar visibility. */
+  ratePlanLabel?: string | null;
+  mealPlanCode?: string | null;
+  mealPlanLabel?: string | null;
+  hasMultipleRatePlans?: boolean;
+  /** TOP10-2026-10-27-01-C: "14–16 Nov · 2 guests" for the phone sticky bar (display only). */
+  stayLabel?: string | null;
+  /**
+   * GUEST-059: the selected rate plan's own cancellation wording, so the listing's "If you need to
+   * cancel" block and trust row say the same thing as the rate option the guest picked.
+   */
+  ratePlanCancellation?: { headline: string; nonRefundable: boolean } | null;
 };
 
+/** One quiet automatic re-fetch after a real pricing failure (a dropped connection, a busy API), then the guest's own "Try again". */
+const PRICING_AUTO_RETRIES = 1;
+const PRICING_AUTO_RETRY_DELAY_MS = 1500;
+
 /** Detect network/connection failures (timeout, offline, ECONNREFUSED, etc.). */
+/**
+ * GUEST-048: the cover preview above the date fields. Until the picture has really loaded - and for good
+ * when it fails - nothing is painted: the old block showed OptimizedImage's empty pink placeholder (a
+ * 144px tinted box with a tiny icon) above the dates, which read as a broken element.
+ */
+export const BookingCoverPreview: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setLoaded(false);
+    setFailed(false);
+  }, [src]);
+  if (failed) return null;
+  return (
+    <div
+      className="lv-booking-preview overflow-hidden rounded-xl border border-border-subtle mb-2"
+      style={{ marginTop: 'var(--lv-preview-mt, -4px)', display: loaded ? undefined : 'none' }}
+      data-testid="bw-cover-preview"
+    >
+      <OptimizedImage
+        src={src}
+        alt={alt}
+        className="w-full h-36 sm:h-40 object-cover"
+        loading="eager"
+        showSkeleton={false}
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+};
+
 function isNetworkError(error: unknown): boolean {
   const err = error as { code?: string; message?: string; response?: { status?: number } };
   const msg = (err?.message ?? '').toLowerCase();
@@ -175,6 +267,19 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   graceHours: graceHoursProp,
   onStickySummaryChange,
   lookupFailed = false,
+  tenantContext,
+  isParentCluster,
+  clusterRole,
+  clusterId,
+  accommodationType,
+  dormGenderPolicy = null,
+  dormBedCount = null,
+  securityDepositAmount = null,
+  hasSmallPartyPricing = false,
+  includedGuests = null,
+  extraGuestRate = null,
+  priceChangesWithGuests = null,
+  smallPartyHint,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -213,6 +318,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     endDate: null,
   });
   const [openCalendar, setOpenCalendar] = useState(false);
+  // TASK-10298823: Listing owner tenant slug for marketplace mode / cross-tenant calls
+  const verifiedTenantSlug = useMemo(() => {
+    return (
+      tenantContext?.slug?.trim() ||
+      (typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('tenant')?.trim()
+        : null) ||
+      null
+    );
+  }, [tenantContext?.slug]);
   const [shownDate, setShownDate] = useState<Date>(today);
   const shownMonthIso = useMemo(() => toCalendarISO(startOfMonth(shownDate)), [shownDate]);
   const [calendarDailyPrices, setCalendarDailyPrices] = useState<Map<string, number>>(new Map());
@@ -229,13 +344,70 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // a genuine failure on the other.
   const [shownMonthPricingFailed, setShownMonthPricingFailed] = useState(false);
   const [selectedRangePricingFailed, setSelectedRangePricingFailed] = useState(false);
+  // A pricing fetch that failed for a transient reason (dropped connection, a busy API) used to strand the guest on
+  // "Couldn't load prices" with a disabled Reserve and no way forward except re-picking the dates. The nonce re-runs
+  // BOTH pricing effects: once by itself shortly after the first failure, and on the guest's "Try again" tap.
+  const [pricingRetryNonce, setPricingRetryNonce] = useState(0);
+  // One automatic re-fetch PER pricing effect (shown month / selected range): a success on the other effect must not hand a
+  // failing one a fresh allowance, or a stay that keeps failing would re-fetch every 1.5 s for ever.
+  const pricingAutoRetriesRef = useRef({ month: 0, range: 0 });
+  const pricingAutoRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retryPricing = useCallback(() => {
+    if (pricingAutoRetryTimerRef.current) {
+      clearTimeout(pricingAutoRetryTimerRef.current);
+      pricingAutoRetryTimerRef.current = null;
+    }
+    setPricingRetryNonce((n) => n + 1);
+  }, []);
+  /** Called by a pricing effect when its fetch failed for real (not an abort): one quiet automatic retry, then the guest decides. */
+  const scheduleAutomaticPricingRetry = useCallback((which: 'month' | 'range') => {
+    if (pricingAutoRetriesRef.current[which] >= PRICING_AUTO_RETRIES || pricingAutoRetryTimerRef.current) return;
+    pricingAutoRetriesRef.current[which] += 1;
+    pricingAutoRetryTimerRef.current = setTimeout(() => {
+      pricingAutoRetryTimerRef.current = null;
+      setPricingRetryNonce((n) => n + 1);
+    }, PRICING_AUTO_RETRY_DELAY_MS);
+  }, []);
+  useEffect(() => () => {
+    if (pricingAutoRetryTimerRef.current) clearTimeout(pricingAutoRetryTimerRef.current);
+  }, []);
   // TASK-4331 / TASK-7016: authoritative server quote (charge engine, not calendar display engine).
   const [serverPriceBreakdown, setServerPriceBreakdown] = useState<GuestPriceBreakdown | null>(null);
+  // GUEST-048: which stay (dates | rate plan | guests) the quote above was fetched for, and which stay's fetch has finished (answered OR failed).
+  // Without these the quote of the PREVIOUS dates was shown as the quote of the new ones until the new fetch landed.
+  const [serverPriceBreakdownKey, setServerPriceBreakdownKey] = useState<string | null>(null);
+  const [quoteSettledKey, setQuoteSettledKey] = useState<string | null>(null);
+  // TASK-1040051: the server REFUSED to quote this stay (409 PRICING_NOT_CONFIGURED: the host has not set this room's pricing).
+  // Keyed like the quote, so it only ever speaks for the stay it was fetched for. While set, no total and no Reserve.
+  const [quoteRefused, setQuoteRefused] = useState<{ key: string | null; message: string } | null>(null);
+  // MRP-002: Public rate plans for this listing & selected rate plan ID.
+  const [publicRatePlans, setPublicRatePlans] = useState<PublicListingRatePlanDto[]>([]);
+  const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
+  // CFB-009 / BNB-009 / BNB-010: Optional "Add breakfast" toggle on Room-Only (EP) direct bookings.
+  const [includeBreakfast, setIncludeBreakfast] = useState(false);
   const [guests, setGuests] = useState(2);
+  const [guestsOverLimit, setGuestsOverLimit] = useState<number | null>(null);
   const [guestsOpen, setGuestsOpen] = useState(false);
+
+  // TASK-10299183: small-party pricing hint in booking box
+  const smallPartyPricingConfigured = Boolean(
+    hasSmallPartyPricing ||
+    publicRatePlans.some(
+      (p) =>
+        p.guests > 0 &&
+        p.guests <= 2 &&
+        (!p.isDefault ||
+          p.effectiveNightlyRate <
+            (publicRatePlans.find((d) => d.isDefault)?.effectiveNightlyRate ?? Infinity)),
+    ),
+  );
+  const showSmallPartyHint = smallPartyPricingConfigured && isSmallParty(guests);
   const [_bookedDates, setBookedDates] = useState<Date[]>([]);
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
   const [dateStatusMap, setDateStatusMap] = useState<Map<string, ListingCalendarDayStatus>>(new Map());
+  // TASK-1039690: per-date minStayArrival overrides from GET /api/public/listings/{id}/availability-calendar
+  // when GapNightDirectMinStay is enabled for the tenant.
+  const [perDateMinStayMap, setPerDateMinStayMap] = useState<Map<string, number>>(new Map());
   // TASK-7491 (Rate Sync Authority opt-out): per-date `bookable` flag from GET
   // /api/pricing/availability-rates. `false` = fail-closed — no usable inbound rate for that
   // date (beyond the carry-forward cap, or none at all) — never render a price or allow
@@ -244,6 +416,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Set would be wrong here. Additive/empty for every tenant that never opts out (zero
   // behaviour change — nothing in this Map, every read below is a no-op `=== false` miss).
   const [dateBookabilityMap, setDateBookabilityMap] = useState<Map<string, boolean>>(new Map());
+  // HSL-011: per-date `roomsAvailable` from the same /api/pricing/availability-rates call. For a HostelDorm that is the
+  // number of beds still free that night; it feeds the "X of Y beds left" line and is never read for any other listing.
+  const [dateRoomsAvailableMap, setDateRoomsAvailableMap] = useState<Map<string, number>>(new Map());
   // Availability fetch must NOT gate Reserve (TASK-4277 / 2026-07-12 hosted-dev: a prior
   // `isLoading` flag left Reserve disabled during F1 availability latency after check-in-only).
   //
@@ -262,13 +437,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const listingLookupFailed = lookupFailed && listingId == null;
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const lastAvailabilityKeyRef = useRef<string | null>(null);
-  // TASK-8218: stable idempotency key for the CURRENT reserve attempt (listingId, checkIn,
-  // checkOut, guests). Without this, handleReserve minted a fresh crypto.randomUUID() on every
-  // click, so a retry after a lost/timed-out init-hold response sent a different key, missed the
-  // server's replay ledger, and 409'd against the guest's OWN just-created hold. Mirrors
-  // currentAttemptIdempotencyKeyRef in GuestDetailsPage.tsx (TASK-4536): generate lazily when
-  // null, reuse otherwise, and invalidate below whenever the keying inputs change.
-  const reserveIdempotencyKeyRef = useRef<string | null>(null);
   const hasHydratedFromContextRef = useRef(false);
   // TASK-4726 fix: the URL-hydration effect below runs as soon as ?checkIn=/?checkOut= are
   // parsed — typically before the async availability-calendar GET (fetchBlockedDates) has
@@ -379,9 +547,47 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   ]);
 
   const minStayNights = resolvedMinStay;
+  const getEffectiveMinStayForDate = useCallback(
+    (checkInDate?: Date | null): number => {
+      if (checkInDate && !Number.isNaN(checkInDate.getTime())) {
+        const iso = toCalendarISO(startOfCalendarDay(checkInDate));
+        const override = perDateMinStayMap.get(iso);
+        if (override != null && Number.isFinite(override) && override >= 1) {
+          return override;
+        }
+      }
+      return minStayNights;
+    },
+    [perDateMinStayMap, minStayNights],
+  );
+  const effectiveMinStayNights = getEffectiveMinStayForDate(dateRange.startDate);
   const effectiveMaxGuests = maxGuests;
-  /** RA-006: payment provider not configured for this tenant. */
-  const [providerBlocked, setProviderBlocked] = useState(false);
+  // HSL-011: a HostelDorm sells BEDS. The type comes from the listing API only (never the listing name).
+  const isDorm = isHostelDormType(accommodationType);
+  const dormBedsLeft = useMemo(() => {
+    if (!isDorm || !dateRange.startDate || !dateRange.endDate) return null;
+    const nights: string[] = [];
+    let d = startOfCalendarDay(dateRange.startDate);
+    const end = startOfCalendarDay(dateRange.endDate);
+    while (d.getTime() < end.getTime()) {
+      nights.push(toCalendarISO(d));
+      d = addDays(d, 1);
+    }
+    const left = bedsLeftForNights(nights, dateRoomsAvailableMap);
+    // Never print a count the data contradicts (more free than the dorm has): show nothing instead of a guess.
+    if (left == null || (dormBedCount != null && left > dormBedCount)) return null;
+    return left;
+  }, [isDorm, dateRange.startDate, dateRange.endDate, dateRoomsAvailableMap, dormBedCount]);
+  /** Beds the guest may ask for: the dorm's cap, and no more than are free when that is known. */
+  const dormMaxBeds = dormBedsLeft != null ? Math.max(1, Math.min(effectiveMaxGuests, dormBedsLeft)) : effectiveMaxGuests;
+  const dormOverBeds = isDorm && dormBedsLeft != null && guests > dormBedsLeft;
+  /**
+   * The Reserve init-hold answered 422 PAYMENT_PROVIDER_NOT_CONFIGURED_*: this tenant cannot take an online
+   * payment (TASK-101182's fail-closed guard), so the guest is handed to the host on WhatsApp instead of
+   * the generic "couldn't start checkout" line. It NEVER replaces the form -
+   * the dates and guest count the guest picked stay on screen. Reset on every new Reserve attempt.
+   */
+  const [providerHandoff, setProviderHandoff] = useState(false);
 
   // TASK-4551: Availability range must cover the full selectable booking range (today + 365 days)
   // to prevent booked dates beyond 60 days from appearing available. Re-fetch when shown month changes.
@@ -487,11 +693,52 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     try {
       const url = new URL(window.location.href);
       const promo = normalizePromoCodeSubmit(url.searchParams.get('promo') || '');
-      if (promo) window.localStorage.setItem('atlas_guest_promo_code', promo);
+      if (promo) rememberLinkPromo(promo);
     } catch {
       // no-op
     }
   }, []);
+
+  // AGT-003: a checkout link's ?promo= code that validates for THIS listing gets one plain line by the price.
+  // Display only: no price on this page is computed from it; checkout applies the code itself.
+  const [linkOfferLine, setLinkOfferLine] = useState<string | null>(null);
+  const bookingRef = useRef(booking);
+  bookingRef.current = booking;
+  useEffect(() => {
+    if (listingId == null) return;
+    let promo = '';
+    try { promo = normalizePromoCodeSubmit(new URL(window.location.href).searchParams.get('promo') || ''); } catch { /* ignore */ }
+    if (!promo || !booking.checkIn || !booking.checkOut) { setLinkOfferLine(null); return; }
+    const ac = new AbortController();
+    void (async () => {
+      try {
+        const bk = bookingRef.current;
+        const dayOf = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : toCalendarISO(getIstCalendarDate(new Date(v))));
+        // AGT-005: the same server quote checkout uses; the line shows its percent.
+        const res = await fetch(buildApiUrl('/api/promo-codes/quote'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getApiHeaders(verifiedTenantSlug) },
+          body: JSON.stringify({
+            code: promo,
+            listingId: Number(listingId),
+            checkIn: dayOf(bk.checkIn as string),
+            checkOut: dayOf(bk.checkOut as string),
+            guests: bk.guests ?? 2,
+          }),
+          signal: ac.signal,
+        });
+        if (!res.ok) { setLinkOfferLine(null); return; }
+        const data = (await res.json()) as { valid?: boolean; percent?: number };
+        if (!data.valid) { setLinkOfferLine(null); return; }
+        setLinkOfferLine(
+          Number(data.percent) > 0
+            ? `Your ${Number(data.percent)}% offer is applied at checkout.`
+            : 'Your offer is applied at checkout.',
+        );
+      } catch { if (!ac.signal.aborted) setLinkOfferLine(null); }
+    })();
+    return () => ac.abort();
+  }, [listingId, verifiedTenantSlug, booking.checkIn, booking.checkOut, booking.guests]);
 
   // TASK-2630: Listen for custom event from bottom Availability calendar (BUG-15b).
   // When user clicks a date in the AvailabilityCalendar, it dispatches atlas:set-checkin with the date (ISO string).
@@ -519,7 +766,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
         // Optionally scroll to the date picker to make it visible
         if (calendarButtonRef.current) {
-          calendarButtonRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          calendarButtonRef.current.scrollIntoView({ block: 'nearest' });
         }
       } catch {
         // Silently handle parse errors
@@ -529,6 +776,38 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     window.addEventListener('atlas:set-checkin', handleAvailabilityDateSelect);
     return () => window.removeEventListener('atlas:set-checkin', handleAvailabilityDateSelect);
   }, []);
+
+  // Helper function to check if a date range has interior-night overlaps with blocked/hold dates.
+  // Used by URL hydration, handleRangeChange, and handleReserve to ensure consistent validation.
+  const checkInteriorNightOverlap = useCallback(
+    (startDate: Date, endDate: Date): boolean => {
+      const start = startOfCalendarDay(startDate);
+      const end = startOfCalendarDay(endDate);
+
+      let cursor = start;
+      while (cursor.getTime() < end.getTime()) {
+        const dayISO = toCalendarISO(cursor);
+        const status = dateStatusMap.get(dayISO);
+        // TASK-7491: a no-usable-rate NIGHT blocks the range exactly like a Blocked/Hold night —
+        // fail closed on price. The checkout date itself is exclusive (this loop stops BEFORE
+        // endIST), so a no-usable-rate checkout day alone does not block the range, matching the
+        // same "guest is never charged for the checkout night" semantics as the Blocked/Hold case.
+        if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold' || dateBookabilityMap.get(dayISO) === false) {
+          return true;
+        }
+        // TASK-4628: re-normalize each step so the iterated dayISO can never drift off the civil
+        // day and MISS an occupied night — the divergence behind the E13 overlap-block message
+        // firing locally but not on remote dev. On the calendar basis `addDays` already preserves
+        // local midnight across a DST boundary; `startOfCalendarDay` keeps that guarantee explicit
+        // and keeps these per-night ISOs in lockstep with the calendar's own block rendering.
+        cursor = startOfCalendarDay(addDays(cursor, 1));
+      }
+      return false;
+    },
+    [blockedSet, dateStatusMap, dateBookabilityMap],
+  );
+  const checkInteriorNightOverlapRef = useRef(checkInteriorNightOverlap);
+  checkInteriorNightOverlapRef.current = checkInteriorNightOverlap;
 
   // Hydrate widget from booking context (e.g. ?checkIn=&checkOut=&guests= from property URL)
   // TASK-2630: Ensure AtlasBookingCalendar displays URL-param dates, not today+1/today+2 defaults
@@ -555,11 +834,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       hydratedRangeRef.current = { start, end };
       return;
     }
-    // TASK-4556: enforce min-stay on URL-hydrated dates
+    // TASK-4556 / TASK-1039690: enforce min-stay (including per-date minStayArrival) on URL-hydrated dates
     const nights = calculateNights(start, end);
-    if (minStayNights > 1 && nights < minStayNights) {
+    const effectiveHydratedMinStay = getEffectiveMinStayForDate(start);
+    if (effectiveHydratedMinStay > 1 && nights < effectiveHydratedMinStay) {
       setDateRange({ startDate: start, endDate: end });
-      setDateError(`Minimum stay is ${minStayNights} nights.`);
+      setDateError(`Minimum stay is ${effectiveHydratedMinStay} nights.`);
       hasHydratedFromContextRef.current = true;
       hydratedRangeRef.current = { start, end };
       return;
@@ -568,7 +848,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     // effect very likely fires before the availability-calendar GET resolves, so blockedSet/
     // dateStatusMap can still be empty here — see the hydratedRangeRef re-validation effect
     // below, which catches an overlap that only becomes visible once that fetch settles.
-    if (checkInteriorNightOverlap(start, end)) {
+    if (checkInteriorNightOverlapRef.current(start, end)) {
       setDateRange({ startDate: start, endDate: end });
       setDateConflictError('These dates overlap an existing booking or hold.');
       hasHydratedFromContextRef.current = true;
@@ -578,7 +858,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     setDateRange({ startDate: start, endDate: end });
     hasHydratedFromContextRef.current = true;
     hydratedRangeRef.current = { start, end };
-  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights]);
+  }, [booking.checkIn, booking.checkOut, today, listingId, minStayNights, getEffectiveMinStayForDate, setDateConflictError, setDateError]);
 
   // TASK-4726 fix: re-validate a URL-hydrated range against interior-night overlaps once the
   // availability-calendar fetch (blockedSet/dateStatusMap) has actually loaded. The hydration
@@ -600,13 +880,28 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     }
     if (checkInteriorNightOverlap(hydrated.start, hydrated.end)) {
       setDateConflictError('These dates overlap an existing booking or hold.');
+      return;
     }
-  }, [blockedSet, dateStatusMap, dateRange.startDate, dateRange.endDate]);
+    // TASK-1039690: re-evaluate per-date minStayArrival once availability-calendar settles
+    const nights = calculateNights(hydrated.start, hydrated.end);
+    const effectiveHydratedMinStay = getEffectiveMinStayForDate(hydrated.start);
+    if (effectiveHydratedMinStay > 1 && nights < effectiveHydratedMinStay) {
+      setDateError(`Minimum stay is ${effectiveHydratedMinStay} nights.`);
+    } else if (dateError?.startsWith('Minimum stay is ')) {
+      setDateError(null);
+    }
+  }, [blockedSet, dateStatusMap, perDateMinStayMap, dateRange.startDate, dateRange.endDate, checkInteriorNightOverlap, getEffectiveMinStayForDate, dateError, setDateError, setDateConflictError]);
 
   useEffect(() => {
     const g = booking.guests;
     if (typeof g === 'number' && g >= 1 && g <= effectiveMaxGuests) {
       setGuests(g);
+      setGuestsOverLimit(null);
+    } else if (typeof g === 'number' && g > effectiveMaxGuests && effectiveMaxGuests >= 1) {
+      // GUEST-060: a guest count above this home's maximum used to be dropped silently and the page showed the
+      // default 2 adults. Say so, and keep the most the home allows instead of a smaller number.
+      setGuests(effectiveMaxGuests);
+      setGuestsOverLimit(g);
     }
   }, [booking.guests, effectiveMaxGuests]);
 
@@ -645,18 +940,21 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // and across React StrictMode double-mount. Single attempt (no apiFetch
         // retries on 5xx/network — retries against a cold dev API push the count
         // above MAX_GETS=4).
-        const response = await dedupedAvailabilityCalendarFetch(availabilityKey, { headers: getApiHeaders() });
+        const response = await dedupedAvailabilityCalendarFetch(availabilityKey, { headers: getApiHeaders(verifiedTenantSlug) });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
         const data = await response.json() as unknown;
-        const entries = Array.isArray(data) ? (data as Array<{ date?: string; status?: string }>) : [];
+        const entries = Array.isArray(data)
+          ? (data as Array<{ date?: string; status?: string; minStayArrival?: number | null }>)
+          : [];
         
         if (!isActive) return;
         
         // Filter out past dates and process availability with status
         const newBlockedDates = new Set<string>();
         const newDateStatusMap = new Map<string, ListingCalendarDayStatus>();
+        const newPerDateMinStayMap = new Map<string, number>();
         
         entries.forEach((item) => {
           const dateStr = item?.date;
@@ -686,6 +984,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
           // Store status for rendering
           newDateStatusMap.set(itemISO, status);
 
+          if (
+            typeof item?.minStayArrival === 'number' &&
+            Number.isFinite(item.minStayArrival) &&
+            item.minStayArrival >= 1
+          ) {
+            newPerDateMinStayMap.set(itemISO, Math.max(1, Math.floor(item.minStayArrival)));
+          }
+
           // Update blockedSet for backward compatibility with existing logic
           // Booked, Blocked and Hold dates should be in blockedSet (all are non-selectable). Turnover is bookable.
           const isBlocked =
@@ -699,17 +1005,16 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         
         setBlockedSet(newBlockedDates);
         setDateStatusMap(newDateStatusMap);
+        setPerDateMinStayMap(newPerDateMinStayMap);
         // TASK-4830: a successful load means the maps are authoritative again — clear any
         // prior failure so Reserve is re-enabled (or correctly gated by real blocked dates).
         setAvailabilityFailed(false);
         setBookedDates(Array.from(newBlockedDates).map(date => new Date(date)));
-        const hasTurnover = Array.from(newDateStatusMap.values()).some((s) => s === 'Turnover');
+        // Founder ruling 2026-10-21: plain words — no "Turnover", "blocked" or "on hold" in front of guests.
         setStatusMessage(
-          hasTurnover
-            ? 'Light grey “Turnover” nights are cleaning windows — still bookable. Striped grey is unavailable (blocked or on hold).'
-            : newBlockedDates.size > 0
-              ? 'Striped grey dates are unavailable (blocked or on hold) and cannot be selected.'
-              : 'All dates shown are available to book.'
+          newBlockedDates.size > 0
+            ? 'Grey dates are not available and cannot be selected.'
+            : 'All dates shown are available to book.'
         );
       } catch (error) {
         // A cancelled request (StrictMode double-mount / unmount abort) is NOT a real
@@ -746,7 +1051,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
       isActive = false;
     };
     // availabilityRange is memoized and stable; rely on lastAvailabilityKeyRef deduplication for same requests
-  }, [listingId, isBookingDisabled, availabilityRange, today, availabilityRefreshNonce]);
+  }, [listingId, isBookingDisabled, availabilityRange, today, availabilityRefreshNonce, verifiedTenantSlug]);
 
   // TASK-4830: manual retry after an availability-fetch failure. Clear the dedup key (the fetch
   // effect early-returns while lastAvailabilityKeyRef still holds this URL) and bump the nonce so
@@ -778,11 +1083,12 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
     setShownMonthPricingFailed(false);
-    fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal)
+    fetchCalendarPricing(listingId, shownMonthIso, 3, controller.signal, verifiedTenantSlug)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
         setShownMonthPricingFailed(false);
+        pricingAutoRetriesRef.current.month = 0;
       })
       .catch((error: unknown) => {
         // Fetch failure: leave any already-merged prices in place rather than clearing the
@@ -791,14 +1097,19 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         // TASK-4303: flag a genuine failure (not an unmount/StrictMode abort) so the
         // pricing-pending gate below can degrade to the fallback estimate instead of
         // holding the skeleton forever.
-        if ((error as Error)?.name !== 'AbortError') setShownMonthPricingFailed(true);
+        // A fetch that was superseded (the effect re-ran, or unmounted) says nothing about the CURRENT stay: it must neither
+        // raise the failure flag a newer fetch just cleared nor spend the automatic retry.
+        if ((error as Error)?.name !== 'AbortError' && !controller.signal.aborted) {
+          setShownMonthPricingFailed(true);
+          scheduleAutomaticPricingRetry('month');
+        }
       })
       .finally(() => {
         setCalendarPricingLoading(false);
         if (trackOpen) endCalendarOpenPricingFetch(gen);
       });
     return () => controller.abort();
-  }, [listingId, shownMonthIso]);
+  }, [listingId, shownMonthIso, verifiedTenantSlug, pricingRetryNonce, scheduleAutomaticPricingRetry]);
 
   // TASK-4327: when a range is selected, ensure ITS months are (re-)fetched on calendar
   // open — not just the 3 months from `shownMonthIso` (which resets to today's month on
@@ -815,7 +1126,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     const controller = new AbortController();
     const gen = calendarOpenFetchGenRef.current;
     beginCalendarOpenPricingFetch(gen);
-    fetchCalendarPricing(listingId, selectedMonthIso, 3, controller.signal)
+    fetchCalendarPricing(listingId, selectedMonthIso, 3, controller.signal, verifiedTenantSlug)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
@@ -830,7 +1141,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => {
       controller.abort();
     };
-  }, [openCalendar, listingId, dateRange.startDate, dateRange.endDate, shownMonthIso]);
+  }, [openCalendar, listingId, dateRange.startDate, dateRange.endDate, shownMonthIso, verifiedTenantSlug]);
 
   // TASK-4303: does every night of the selected range have a REAL per-date price from the
   // pricing API? Until then, any total the widget could compute rides on the base-rate
@@ -864,17 +1175,21 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     // TASK-101920: clear error flag when starting a new fetch so transient failures don't
     // permanently disable the button. We'll re-set it only if this specific fetch fails.
     setSelectedRangePricingFailed(false);
-    fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal)
+    fetchCalendarPricing(listingId, selectedStartMonthIso, 3, controller.signal, verifiedTenantSlug)
       .then((result) => {
         setCalendarDailyPrices((prev) => new Map([...prev, ...result.dateToPrice]));
         if (result.convenienceFeePercent != null) setCalendarConvenienceFeePercent(result.convenienceFeePercent);
         setSelectedRangePricingFailed(false);
+        pricingAutoRetriesRef.current.range = 0;
       })
       .catch((error: unknown) => {
-        if ((error as Error)?.name !== 'AbortError') setSelectedRangePricingFailed(true);
+        if ((error as Error)?.name !== 'AbortError' && !controller.signal.aborted) {
+          setSelectedRangePricingFailed(true);
+          scheduleAutomaticPricingRetry('range');
+        }
       });
     return () => controller.abort();
-  }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso]);
+  }, [listingId, selectedStartMonthIso, dateRange.endDate, selectedRangeNightsPriced, shownMonthIso, verifiedTenantSlug, pricingRetryNonce, scheduleAutomaticPricingRetry]);
 
   // TASK-7491: fetch per-day `bookable` (rate-sync-authority opt-out) so the calendar can fail
   // closed on a date with no usable inbound rate — never a guessed price. Three effects mirror
@@ -887,14 +1202,25 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // whatever's already known in place) rather than fail-closing Reserve the way TASK-4830's
   // availability-calendar failure does — that flag is reserved for the booking-CONFLICT source
   // of truth, not this rate-usability signal.
-  const mergeAvailabilityRates = useCallback((days: { date: string; bookable: boolean }[]) => {
+  const mergeAvailabilityRates = useCallback((days: { date: string; bookable: boolean; roomsAvailable?: number }[]) => {
     if (days.length === 0) return;
     setDateBookabilityMap((prev) => {
       const next = new Map(prev);
       for (const day of days) next.set(day.date, day.bookable);
       return next;
     });
-  }, []);
+    // HSL-011: remember the per-night free count - beds, for a dorm only. Same last-write-wins merge as above.
+    if (!isDorm) return;
+    setDateRoomsAvailableMap((prev) => {
+      const next = new Map(prev);
+      for (const day of days) {
+        if (typeof day.roomsAvailable === 'number' && Number.isFinite(day.roomsAvailable)) {
+          next.set(day.date, day.roomsAvailable);
+        }
+      }
+      return next;
+    });
+  }, [isDorm]);
 
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') return;
@@ -949,6 +1275,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
 
   const gstRangeStartIso = dateRange?.startDate ? toCalendarISO(dateRange.startDate) : null;
   const gstRangeEndIso = dateRange?.endDate ? toCalendarISO(dateRange.endDate) : null;
+  const quoteKey = gstRangeStartIso && gstRangeEndIso ? `${gstRangeStartIso}|${gstRangeEndIso}|${selectedRatePlanId ?? ''}|${guests}` : null;
 
   // TASK-4331: fetch the server's own GST slab/amount for the selected range instead of
   // re-deriving 5%/18% client-side from a pre-adjustment per-night rate. The calendar
@@ -960,25 +1287,75 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Near the ₹7,500 boundary the two bases can pick different slabs, so we fetch the
   // server's real value here and prefer it; the client-derived slab below remains only as
   // a fallback while this request is in flight or if it fails.
+  // MRP-002: Fetch active public rate plans for this listing & date range.
+  useEffect(() => {
+    if (!listingId || String(listingId).trim() === '') {
+      setPublicRatePlans([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetchPublicListingRatePlans(
+      listingId,
+      gstRangeStartIso,
+      gstRangeEndIso,
+      guests,
+      controller.signal,
+      verifiedTenantSlug,
+    )
+      .then((plans) => {
+        setPublicRatePlans(plans);
+        setSelectedRatePlanId((prev) => {
+          if (prev != null && plans.some((p) => p.id === prev)) return prev;
+          // PRICE-016: a guest who arrived through a travel agent's link starts on the agent's rate.
+          const agentRate = plans.find((p) => p.isAgentRate);
+          if (agentRate) return agentRate.id;
+          const def = plans.find((p) => p.isDefault) ?? plans[0];
+          return def ? def.id : null;
+        });
+      })
+      .catch(() => {
+        // Best-effort — keep existing plans or fall back to single-rate flow
+      });
+    return () => controller.abort();
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, guests, verifiedTenantSlug]);
+
   useEffect(() => {
     if (!listingId || String(listingId).trim() === '') {
       setServerPriceBreakdown(null);
+      setServerPriceBreakdownKey(null);
       return;
     }
     if (!gstRangeStartIso || !gstRangeEndIso) {
       setServerPriceBreakdown(null);
+      setServerPriceBreakdownKey(null);
       return;
     }
     const controller = new AbortController();
-    fetchGuestPriceBreakdown(listingId, gstRangeStartIso, gstRangeEndIso, controller.signal)
+    fetchGuestPriceBreakdown(
+      listingId,
+      gstRangeStartIso,
+      gstRangeEndIso,
+      controller.signal,
+      selectedRatePlanId,
+      guests,
+      verifiedTenantSlug,
+    )
       .then((b) => {
+        if (controller.signal.aborted) return;
         setServerPriceBreakdown(b);
+        setServerPriceBreakdownKey(quoteKey);
+        setQuoteRefused(null);
+        setQuoteSettledKey(quoteKey);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return; // superseded by a newer stay: its own answer decides
         setServerPriceBreakdown(null);
+        setServerPriceBreakdownKey(null);
+        setQuoteRefused(isPricingNotConfiguredError(err) ? { key: quoteKey, message: err.message } : null);
+        setQuoteSettledKey(quoteKey);
       });
     return () => controller.abort();
-  }, [listingId, gstRangeStartIso, gstRangeEndIso]);
+  }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests, verifiedTenantSlug, quoteKey]);
 
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
@@ -1054,33 +1431,6 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   return true; // disable blocked/hold dates otherwise (including as a check-in candidate)
 }, [blockedSet, dateStatusMap, dateBookabilityMap, today, dateRange.startDate]);
 
-// Helper function to check if a date range has interior-night overlaps with blocked/hold dates.
-// Used by URL hydration, handleRangeChange, and handleReserve to ensure consistent validation.
-const checkInteriorNightOverlap = (startDate: Date, endDate: Date): boolean => {
-  const start = startOfCalendarDay(startDate);
-  const end = startOfCalendarDay(endDate);
-
-  let cursor = start;
-  while (cursor.getTime() < end.getTime()) {
-    const dayISO = toCalendarISO(cursor);
-    const status = dateStatusMap.get(dayISO);
-    // TASK-7491: a no-usable-rate NIGHT blocks the range exactly like a Blocked/Hold night —
-    // fail closed on price. The checkout date itself is exclusive (this loop stops BEFORE
-    // endIST), so a no-usable-rate checkout day alone does not block the range, matching the
-    // same "guest is never charged for the checkout night" semantics as the Blocked/Hold case.
-    if (blockedSet.has(dayISO) || status === 'Blocked' || status === 'Hold' || dateBookabilityMap.get(dayISO) === false) {
-      return true;
-    }
-    // TASK-4628: re-normalize each step so the iterated dayISO can never drift off the civil
-    // day and MISS an occupied night — the divergence behind the E13 overlap-block message
-    // firing locally but not on remote dev. On the calendar basis `addDays` already preserves
-    // local midnight across a DST boundary; `startOfCalendarDay` keeps that guarantee explicit
-    // and keeps these per-night ISOs in lockstep with the calendar's own block rendering.
-    cursor = startOfCalendarDay(addDays(cursor, 1));
-  }
-  return false;
-};
-
 const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   setDateError(null);
   const { startDate, endDate } = next;
@@ -1111,8 +1461,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // differenceInCalendarDays, not an epoch-millis divide: on the calendar basis a guest whose
   // local zone crosses a DST boundary mid-stay has days that are 23h or 25h long.
   const selectedNights = differenceInCalendarDays(endCal, startCal);
-  if (minStayNights > 1 && selectedNights < minStayNights) {
-    setDateError(`Minimum stay is ${minStayNights} nights.`);
+  const effectiveRangeMinStay = getEffectiveMinStayForDate(startCal);
+  if (effectiveRangeMinStay > 1 && selectedNights < effectiveRangeMinStay) {
+    setDateError(`Minimum stay is ${effectiveRangeMinStay} nights.`);
     return;
   }
 
@@ -1197,34 +1548,64 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     return checkinStatus === 'Blocked' || checkinStatus === 'Hold' || blockedSet.has(checkinISO) || dateBookabilityMap.get(checkinISO) === false;
   }, [dateRange.startDate, dateStatusMap, blockedSet, dateBookabilityMap]);
 
+  const selectedRatePlan = useMemo(
+    () => publicRatePlans.find((p) => p.id === selectedRatePlanId) ?? publicRatePlans[0] ?? null,
+    [publicRatePlans, selectedRatePlanId],
+  );
+
+  const effectiveRatePlanCancellationTier = useMemo((): CancellationTier | null => {
+    const policy = selectedRatePlan?.cancellationPolicy;
+    if (policy === 'Flexible') return 'Flexible';
+    if (policy === 'Moderate') return 'Moderate';
+    if (policy === 'Firm' || policy === 'Strict') return 'Strict';
+    return resolvedCancellationTier;
+  }, [selectedRatePlan?.cancellationPolicy, resolvedCancellationTier]);
+
+  const isSelectedRatePlanNonRefundable = selectedRatePlan?.cancellationPolicy === 'NonRefundable';
+
   // TASK-4334/TASK-4405: recompute the free-cancellation deadline whenever the guest's selected
   // check-in date, the listing's resolved cancellation tier, or the resolved grace hours changes.
   // Uses "now" as the booking-time estimate (the actual booking doesn't exist yet at this stage) —
   // same estimate posture the tier-only deadline already used pre-booking.
   const freeCancellationCopy = useMemo(() => {
+    if (isSelectedRatePlanNonRefundable) return null;
     if (!dateRange.startDate) return null;
     return resolveFreeCancellationTrustCopy({
       checkInDate: dateRange.startDate,
-      tier: resolvedCancellationTier,
-      windowHoursOverride: resolvedCancellationWindowHours,
+      tier: effectiveRatePlanCancellationTier,
+      windowHoursOverride: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
       bookingCreatedAt: new Date(),
       graceHours: resolvedGraceHours,
+      planSummary: selectedRatePlan?.cancellationSummary ?? null,
+      serverDeadlineUtc: selectedRatePlan?.refundFreeUntilUtc ?? null, // TASK-1040050
     });
-  }, [dateRange.startDate, resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours]);
+  }, [
+    isSelectedRatePlanNonRefundable,
+    selectedRatePlan?.cancellationSummary,
+    selectedRatePlan?.refundFreeUntilUtc,
+    dateRange.startDate,
+    effectiveRatePlanCancellationTier,
+    selectedRatePlan?.cancellationPolicy,
+    resolvedCancellationWindowHours,
+    resolvedGraceHours,
+  ]);
 
   // TASK-7012: trust-strip sentence, or null when there is nothing truthful to say (a still-active
   // grace window with a lapsed tier deadline — the grace strip below carries that claim instead).
-  const cancellationTrustText =
-    freeCancellationCopy?.trustMessage
-    ?? (!dateRange.startDate ? 'Select check-in dates to see your free cancellation deadline' : null);
+  const cancellationTrustText = isSelectedRatePlanNonRefundable
+    ? 'Non-refundable rate — lowest price'
+    : freeCancellationCopy?.trustMessage
+      ?? (!dateRange.startDate ? 'Select check-in dates to see your free cancellation deadline' : null);
 
   // TASK-7012: grace hours we may DISCLOSE. Once a check-in date is picked we know whether the server
   // would void the grace window for these dates, so gate on the resolved value — `resolvedGraceHours`
   // only says the feature is on for this listing, not that this guest's dates qualify. Before a date
   // is picked there is nothing to void against, so the listing-level value carries generic copy.
-  const disclosableGraceHours = dateRange.startDate
-    ? freeCancellationCopy?.applicableGraceHours ?? null
-    : resolvedGraceHours;
+  const disclosableGraceHours = isSelectedRatePlanNonRefundable
+    ? null
+    : dateRange.startDate
+      ? freeCancellationCopy?.applicableGraceHours ?? null
+      : resolvedGraceHours;
 
   const { loading: dailyPricingLoading, error: _dailyPricingError, getListingPricing } = useDailyPricingSummary(listingId);
   const dailyPricing = useMemo(
@@ -1264,6 +1645,46 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   const datesUnavailable =
     availabilityConflict || checkinUnavailable || availabilityFailed || listingLookupFailed;
 
+  // CLU-011: role comes from the public listing payload only (no name guessing).
+  const isParentOfCluster =
+    isParentListing({ isParentCluster, clusterRole, accommodationType }) ||
+    Boolean(clusterId && isParentListing({ isParentCluster, clusterRole, accommodationType }));
+  const crossSellCheckIn = dateRange.startDate ? toCalendarISO(dateRange.startDate) : null;
+  const crossSellCheckOut = dateRange.endDate ? toCalendarISO(dateRange.endDate) : null;
+  const [clusterAvailability, setClusterAvailability] = useState<ClusterChildrenAvailability | null>(null);
+  useEffect(() => {
+    setClusterAvailability(null);
+    if (!isParentOfCluster || !datesUnavailable || !listingId || !crossSellCheckIn || !crossSellCheckOut) return;
+    const ac = new AbortController();
+    void fetchClusterChildrenAvailability(
+      Number(listingId), crossSellCheckIn, crossSellCheckOut, verifiedTenantSlug, ac.signal,
+    ).then((result) => {
+      if (!ac.signal.aborted) setClusterAvailability(result);
+    });
+    return () => ac.abort();
+  }, [isParentOfCluster, datesUnavailable, listingId, crossSellCheckIn, crossSellCheckOut, verifiedTenantSlug]);
+
+  // CHN-012: the chosen nights are genuinely taken (a booking / hold / block - NOT a failed availability read or a failed listing
+  // lookup) -> ask for a sister property of the same brand that is free for the same dates and guest count. Read-only: the API
+  // answers `sourceSoldOut` itself, and any failure simply shows no cards.
+  const nightsGenuinelyTaken = availabilityConflict || checkinUnavailable;
+  const sisterPropertyId = Number(propertyId);
+  const [sisterSpillover, setSisterSpillover] = useState<SisterSpillover | null>(null);
+  useEffect(() => {
+    setSisterSpillover(null);
+    if (!nightsGenuinelyTaken || !Number.isInteger(sisterPropertyId) || sisterPropertyId <= 0 || !crossSellCheckIn || !crossSellCheckOut) return;
+    const ac = new AbortController();
+    void fetchSisterAvailability(
+      sisterPropertyId, crossSellCheckIn, crossSellCheckOut, guests, verifiedTenantSlug, ac.signal,
+    ).then((result) => {
+      if (!ac.signal.aborted) setSisterSpillover(result);
+    });
+    return () => ac.abort();
+  }, [nightsGenuinelyTaken, sisterPropertyId, crossSellCheckIn, crossSellCheckOut, guests, verifiedTenantSlug]);
+  // Marketplace pages read the host tenant from ?tenant=; keep it on the sister link so that page resolves the same brand.
+  const sisterTenantParam =
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tenant')?.trim() || null : null;
+
   // TASK-102023: gate range pricing pending, fallback estimate, and Reserve on the failure state
   // covering the selected range. If the selected range falls within the shown month, use that
   // fetch's failure state; otherwise use the selected-range fetch's failure state.
@@ -1278,10 +1699,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // of the provisional base-rate/₹0-fee number that would otherwise silently jump ~12% once
   // the pricing API responds. Only a terminal fetch failure degrades to the old fallback
   // estimate (graceful offline UX) — matching the widget's existing degradation pattern.
+  // GUEST-048: the server quote for THIS stay has not answered yet (after a date / guest / plan change): hold the skeleton instead of showing the previous stay's total.
+  const serverQuotePending =
+    hasSelectedRange && !invalidIstStayRange && Boolean(listingId && String(listingId).trim() !== '') && quoteKey != null && quoteSettledKey !== quoteKey;
   const rangePricingPending =
-    hasSelectedRange && !invalidIstStayRange && !selectedRangeNightsPriced && !calendarPricingFailed;
-  const serverGstMatchesSelection =
-    hasSelectedRange && gstRangeStartIso === toCalendarISO(dateRange.startDate!) && gstRangeEndIso === toCalendarISO(dateRange.endDate!);
+    hasSelectedRange && !invalidIstStayRange && ((!selectedRangeNightsPriced && !calendarPricingFailed) || serverQuotePending);
+  // GUEST-048: a quote counts only for the stay it was fetched for (this used to compare the selection with itself, so it was always true).
+  const serverGstMatchesSelection = hasSelectedRange && quoteKey != null && serverPriceBreakdownKey === quoteKey;
 
   const serverGstPercent =
     serverGstMatchesSelection && serverPriceBreakdown ? serverPriceBreakdown.gstPercent : null;
@@ -1308,7 +1732,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // guest. Delegated to `hasOnlinePaymentRail` so this widget, the property-details trust list and
   // the footer MOR disclosure cannot drift apart again; that helper also treats MANUAL
   // (pay-on-arrival) as no-gateway, which the previous inline predicate missed.
-  const showOnlinePaymentProcessing = hasOnlinePaymentRail();
+  const showOnlinePaymentProcessing = hasOnlinePaymentRail(tenantContext !== undefined ? tenantContext : undefined);
+
+  // GUEST-065: with a Payment processing line on screen the box ties "included" to the lines below it; a host with no
+  // online payment has no such line, so the plain words stay.
+  const feesIncludedWords = showOnlinePaymentProcessing ? 'includes all fees listed below' : 'all fees included';
 
   const convenienceFeePercent = !showOnlinePaymentProcessing
     ? 0
@@ -1371,20 +1799,51 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? Math.round(serverPriceBreakdown.touristTaxAmount)
       : 0;
 
-  // TASK-4322 / TASK-102037: Total = discount-net base + Service Fee + tourist tax (zero GST on top).
-  // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax).
+  // CFB-006 / CLU-016: Cleaning fee shown honestly as its own line item on the first screen before payment.
+  const cleaningFeeLineAmount =
+    serverGstMatchesSelection && serverPriceBreakdown?.cleaningFee && serverPriceBreakdown.cleaningFee > 0
+      ? Math.round(serverPriceBreakdown.cleaningFee)
+      : 0;
+
+  // CFB-009 / BNB-009 / BNB-010: Breakfast as a paid extra on Room-Only (EP) direct bookings.
+  const selectedMealCode = (selectedRatePlan?.mealPlanCode ?? '').trim().toUpperCase();
+  const isRoomOnlyRatePlan =
+    !selectedMealCode || selectedMealCode === 'EP' || selectedMealCode === 'RO' || selectedMealCode === 'NONE';
+  const breakfastPricePerPerson =
+    isRoomOnlyRatePlan &&
+    serverGstMatchesSelection &&
+    serverPriceBreakdown?.breakfastPricePerPerson &&
+    serverPriceBreakdown.breakfastPricePerPerson > 0
+      ? Math.round(serverPriceBreakdown.breakfastPricePerPerson)
+      : 0;
+  const breakfastExtraLineAmount =
+    includeBreakfast && breakfastPricePerPerson > 0 && priceDetails.nights > 0
+      ? serverPriceBreakdown?.includeBreakfast &&
+        serverPriceBreakdown?.breakfastExtraAmount &&
+        serverPriceBreakdown.breakfastExtraAmount > 0
+        ? Math.round(serverPriceBreakdown.breakfastExtraAmount)
+        : Math.round(breakfastPricePerPerson * guests * priceDetails.nights)
+      : 0;
+
+  // TASK-4322 / TASK-102037: Total = discount-net base + Service Fee + tourist tax + cleaning fee + breakfast extra (zero GST on top).
+  // Offline fallback only — TASK-5184 prefers server FinalAmount (includes tourist tax & cleaning fee).
   // TASK-7428: when online payment is off, never fold a server FinalAmount that still includes the gateway fee.
   const breakdownFinalTotal = Math.max(
     1,
-    taxableBase + breakdownConvenienceFee + touristTaxLineAmount,
+    taxableBase + breakdownConvenienceFee + touristTaxLineAmount + cleaningFeeLineAmount + breakfastExtraLineAmount,
   );
+
+  const effectiveServerFinalAmount =
+    typeof serverFinalAmount === 'number' && serverFinalAmount > 0
+      ? serverFinalAmount + (serverPriceBreakdown?.includeBreakfast ? 0 : breakfastExtraLineAmount)
+      : null;
 
   const finalTotal =
     showOnlinePaymentProcessing &&
     serverGstMatchesSelection &&
-    typeof serverFinalAmount === 'number' &&
-    serverFinalAmount > 0
-      ? serverFinalAmount
+    typeof effectiveServerFinalAmount === 'number' &&
+    effectiveServerFinalAmount > 0
+      ? effectiveServerFinalAmount
       : hasSelectedRange && selectedRangeTotalFromCalendar != null
         ? breakdownFinalTotal
         : effectiveDailyPricing != null
@@ -1404,64 +1863,178 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       ? lastSettledHeadlineRef.current
       : finalTotal;
 
+  // Founder ruling 2026-10-21: the struck standard nightly rate, the real one and the direct-booking saving,
+  // from the same server quote the Total comes from — so the saving the guest sees is the one they get.
+  const headlineDirectPrice = useMemo(
+    () =>
+      serverGstMatchesSelection && serverPriceBreakdown && priceDetails.nights > 0
+        ? directPriceDisplay({
+            baseAmount: serverPriceBreakdown.baseAmount,
+            discountAmount: serverPriceBreakdown.discountAmount,
+            finalAmount: serverPriceBreakdown.finalAmount,
+            nights: priceDetails.nights,
+            // TASK-10298998: same rule as the Total below — no gateway, no payment fee.
+            paymentFeeCharged: showOnlinePaymentProcessing,
+            paymentFeeAmount: serverPriceBreakdown.convenienceFeeAmount,
+            originalNightlyRate: serverPriceBreakdown.originalNightlyRate,
+            discountedNightlyRate: serverPriceBreakdown.discountedNightlyRate,
+            appliedPromotionLabel: serverPriceBreakdown.appliedPromotionLabel,
+          })
+        : null,
+    [serverGstMatchesSelection, serverPriceBreakdown, priceDetails.nights, showOnlinePaymentProcessing],
+  );
+  // The direct-booking discount the server quote applies for the selected stay (0 when none / not loaded).
+  const directDiscountAmount =
+    serverChargeableBase != null && serverPriceBreakdown && serverPriceBreakdown.discountAmount > 0
+      ? serverPriceBreakdown.discountAmount
+      : 0;
+  const directDiscountPercent =
+    directDiscountAmount > 0 && serverPriceBreakdown && serverPriceBreakdown.baseAmount > 0
+      ? Math.round((serverPriceBreakdown.discountAmount / serverPriceBreakdown.baseAmount) * 100)
+      : 0;
+  // Before dates are picked: tonight's row from daily-summary, which the API builds from the same quote.
+  const tonightDirectPrice = useMemo(
+    () =>
+      effectiveDailyPricing
+        ? directPriceDisplay({
+            baseAmount: effectiveDailyPricing.baseAmount,
+            discountAmount: effectiveDailyPricing.baseAmount - effectiveDailyPricing.actualPrice,
+            finalAmount: effectiveDailyPricing.finalAmount,
+            nights: 1,
+            paymentFeeCharged: showOnlinePaymentProcessing,
+            paymentFeeAmount:
+              (effectiveDailyPricing.actualPrice * (effectiveDailyPricing.convenienceFeePercent ?? 0)) / 100,
+            originalNightlyRate: effectiveDailyPricing.originalNightlyRate,
+            discountedNightlyRate: effectiveDailyPricing.discountedNightlyRate,
+            appliedPromotionLabel: effectiveDailyPricing.appliedPromotionLabel,
+          })
+        : null,
+    [effectiveDailyPricing, showOnlinePaymentProcessing],
+  );
+
+  // TASK-1040051: the API refused to price THIS stay (409 PRICING_NOT_CONFIGURED). The calendar's own numbers must not
+  // stand in for a quote (they read "Accommodation INR 0 / Total INR 1"): show the API's sentence, no amount, no Reserve.
+  const pricingRefusedByApi: string | null =
+    hasSelectedRange && quoteKey != null && quoteRefused != null && quoteRefused.key === quoteKey ? quoteRefused.message : null;
+  // G3 journey 16 / price shown = price charged: when the server quote for THIS stay could not be fetched (network drop), the page falls
+  // back to the calendar's per-night sum, which has no extra-guest charge in it. For a home that charges more above its included guests,
+  // that sum is lower than the checkout total, so show no number and no Reserve (the same sentence the page already uses for an
+  // unreadable price) rather than a total the guest would then be charged more than. Homes with no guest-count pricing keep the fallback.
+  const quoteFailedForSelection =
+    hasSelectedRange && quoteKey != null && quoteSettledKey === quoteKey && serverPriceBreakdownKey !== quoteKey && quoteRefused == null;
+  const guestCountChangesPrice =
+    includedGuests != null && guests > includedGuests && ((extraGuestRate ?? 0) > 0 || priceChangesWithGuests === true);
+  const pricingRefusedMessage: string | null =
+    pricingRefusedByApi ??
+    (quoteFailedForSelection && guestCountChangesPrice
+      ? "We couldn’t work out the price for these dates. Please pick them again or try again in a moment."
+      : null);
+
+  // Keep the navigation shortcut tied to the authoritative form eligibility.
+  const reserveDisabled =
+    isSubmitting ||
+    // TASK-1040051: no quote exists for this stay, so there is nothing to reserve at.
+    pricingRefusedMessage != null ||
+    isBookingDisabled ||
+    (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
+    // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
+    datesUnavailable ||
+    // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
+    // reserving now would seed holdPriceBreakdown's client fallback with the provisional
+    // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
+    // stay clickable (TASK-4277): rangePricingPending is false without both dates.
+    // Do NOT gate on availability-fetch loading — that violated TASK-4277 on F1 (2026-07-12).
+    rangePricingPending ||
+    // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
+    (hasSelectedRange && calendarPricingFailed) ||
+    // TASK-4729: guard against NaN pricing (non-numeric server response)
+    (hasSelectedRange && !rangePricingPending && isNaN(finalTotal));
+  const canReviewBooking = hasSelectedRange && !reserveDisabled && !calendarOpenPricingPending && displayFinalTotal > 0;
+  // TASK-1040051: the total a guest may be shown — never a calendar fallback for a stay the server refused to price.
+  const shownFinalTotal = pricingRefusedMessage != null ? 0 : displayFinalTotal;
+
+  // A disabled Reserve must always say why. Every other blocker already speaks for itself (availability failed -> alert + Retry;
+  // dates unavailable -> headline + alert; pricing pending -> status; pricing failed -> alert + Try again; service down -> banner;
+  // a past-dated or too-short range from a link -> the dateError alert set while hydrating). The one that used to leave a grey
+  // button and nothing else: a quote that came back as not-a-number (TASK-4729 disables Reserve for it).
+  const reserveBlockedNotice: string | null =
+    hasSelectedRange && !isSubmitting && !isBookingDisabled && !invalidIstStayRange && !datesUnavailable
+      && !rangePricingPending && !calendarPricingFailed && isNaN(finalTotal)
+      ? "We couldn't work out the price for these dates. Please pick them again or try again in a moment."
+      : null;
+
+  const stickyStayLabel =
+    hasSelectedRange && dateRange.startDate && dateRange.endDate
+      ? `${format(dateRange.startDate, format(dateRange.startDate, 'MMM') === format(dateRange.endDate, 'MMM') ? 'd' : 'd MMM')}–${format(dateRange.endDate, 'd MMM')} · ${guests} guest${guests === 1 ? '' : 's'}`
+      : null;
+
   useEffect(() => {
     onStickySummaryChange?.({
       hasCompleteDates: hasSelectedRange,
+      canReviewBooking,
       // DESIGN-030: never feed the sticky a bookable total for unavailable dates.
       totalAmount:
-        hasSelectedRange && !datesUnavailable && displayFinalTotal > 0 ? displayFinalTotal : null,
+        hasSelectedRange && !datesUnavailable && shownFinalTotal > 0 ? shownFinalTotal : null,
       pricingPending: !datesUnavailable && (rangePricingPending || calendarOpenPricingPending),
       freeCancelUntil: datesUnavailable
         ? null
         : freeCancellationCopy?.deadlineFormatted ?? null,
       datesUnavailable,
+      // Founder ruling 2026-10-21 / TASK-10299208: never show an internal/OTA plan name ("Atlas501_PH . Double")
+      // or raw meal code ("EP") to a guest. A label appears only when the guest actually chose between real options, in plain words.
+      ratePlanLabel:
+        publicRatePlans.length > 1
+          ? plainMealLabel(selectedRatePlan?.mealPlanLabel || selectedRatePlan?.mealPlanCode)
+          : null,
+      mealPlanCode: null,
+      mealPlanLabel: null,
+      hasMultipleRatePlans: publicRatePlans.length > 1,
+      stayLabel: stickyStayLabel,
+      ratePlanCancellation: describeRatePlanCancellation(
+        selectedRatePlan?.cancellationPolicy,
+        selectedRatePlan?.cancellationSummary,
+      ),
     });
   }, [
+    selectedRatePlan?.cancellationPolicy,
+    selectedRatePlan?.cancellationSummary,
+    stickyStayLabel,
     onStickySummaryChange,
+    canReviewBooking,
     hasSelectedRange,
     datesUnavailable,
-    displayFinalTotal,
+    shownFinalTotal,
     rangePricingPending,
     calendarOpenPricingPending,
     freeCancellationCopy?.deadlineFormatted,
+    publicRatePlans.length,
+    selectedRatePlan?.name,
+    selectedRatePlan?.mealPlanCode,
+    selectedRatePlan?.mealPlanLabel,
   ]);
 
   /** Format price; show ₹0 when 0 (e.g. when API not loaded or API returned 0). */
   const displayPrice = (n: number) =>
     formatCurrency(n, { maximumFractionDigits: 0 });
 
-  const convenienceFeePctLabel = Math.round(convenienceFeePercent * 100);
+  // GUEST-060: "Includes N guests" from the listing's own numbers; empty when the API sends none.
+  const includedGuestsLine = describeIncludedGuests(includedGuests, extraGuestRate, effectiveMaxGuests, displayPrice, priceChangesWithGuests);
+
+  const convenienceFeePctLabel = Number((convenienceFeePercent * 100).toFixed(2));
   const referralDiscountApplied = 0;
   const promoDiscountApplied = 0;
   const addOnsTotal = 0;
 
-  // v2: "Why book direct" block removed from widget JSX. Calculation kept (prefixed _) for future
-  // OTA comparison card on the listing page. TASK-2576 context: data was used to show OTA fee delta.
-  const illustrativeOtaGuestFeeComparison = useMemo(() => {
-    // DESIGN-030: no "Save ~₹…" confidence line for dates that cannot be booked.
-    if (!hasSelectedRange || datesUnavailable || breakdownPrice <= 0) return null;
-    const illustrativeGuestFee = Math.round((breakdownPrice * ILLUSTRATIVE_OTA_GUEST_FEE_PERCENT) / 100);
-    return {
-      illustrativeGuestFee,
-      illustrativeRoomPlusFee: breakdownPrice + illustrativeGuestFee,
-    };
-  }, [hasSelectedRange, datesUnavailable, breakdownPrice]);
-
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
-  // TASK-8218: invalidate the reserve idempotency key whenever what's actually being booked
-  // changes, so a key minted for one (listingId, checkIn, checkOut, guests) combination is never
-  // reused for a different one — that would dedupe a genuinely new booking attempt against an
-  // old hold. Mirrors the cart-change key clear in GuestDetailsPage.tsx (TASK-4536/4607).
-  useEffect(() => {
-    reserveIdempotencyKeyRef.current = null;
-  }, [listingId, dateRange.startDate, dateRange.endDate, guests]);
-
   // TASK-2612: handleReserve replaces the old handleSubmit.
-  // Calls init-hold mode (GuestInfo absent), stores holdId+holdExpiresAt in context, navigates to details page.
+  // FOUNDER RULED 2026-10-19: Reserve no longer calls the API or starts a hold. It stores the stay draft in context and
+  // navigates to the details page; the 10-minute hold starts when the guest taps Pay there.
   const handleReserve = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    // A new attempt supersedes any hand-off from the previous 422 (the host may have reconnected a provider).
+    setProviderHandoff(false);
     if (isBookingDisabled) {
       setFormError('Service temporarily unavailable. Please try again later.');
       return;
@@ -1519,9 +2092,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setDateError('Check-out must be after check-in.');
       return;
     }
-    // TASK-4556: enforce min-stay on handleReserve (like handleRangeChange does)
-    if (minStayNights > 1 && stayNights < minStayNights) {
-      setDateError(`Minimum stay is ${minStayNights} nights.`);
+    // TASK-4556 / TASK-1039690: enforce min-stay (including per-date minStayArrival) on handleReserve
+    const effectiveReserveMinStay = getEffectiveMinStayForDate(checkinIst);
+    if (effectiveReserveMinStay > 1 && stayNights < effectiveReserveMinStay) {
+      setDateError(`Minimum stay is ${effectiveReserveMinStay} nights.`);
       return;
     }
 
@@ -1545,6 +2119,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
+    // HSL-011: never hand a dorm stay to checkout for more beds than the dates have free.
+    if (isDorm && dormBedsLeft != null && guests > dormBedsLeft) {
+      setFormError(`Only ${dormBedsLeft} ${dormBedsLeft === 1 ? 'bed' : 'beds'} left on these dates. Please choose fewer beds.`);
+      return;
+    }
+
     const numericListingId = listingId != null ? Number(listingId) : NaN;
     if (!Number.isFinite(numericListingId)) {
       setFormError('Property could not be loaded. Please refresh the page and try again.');
@@ -1561,105 +2141,107 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       return;
     }
 
-    let orderUrl: string;
-    try {
-      orderUrl = buildApiUrl('/api/Razorpay/order');
-    } catch {
-      setFormError('Unable to start checkout. Please try again later.');
+    // FOUNDER RULED 2026-10-19 (website booking overhaul): Reserve no longer starts the 10-minute hold, which also closes the
+    // night on every OTA. The hold starts when the guest taps PAY on the details page, after the details and the required
+    // house-rules tick. Reserve only hands the stay to that page through BookingContext: listing, dates, guests, rate plan,
+    // the quote the guest is looking at, and the cancellation terms. There is no network call here, so nothing is held and no
+    // OTA night closes while the guest types details or reads the house rules.
+    //
+    // A host that cannot take an online payment is handed off HERE, before anything else (TASK-8048 fail-closed, extended to
+    // Reserve): the same WhatsApp hand-off the order API's 422 used to trigger only after the guest had already reached it.
+    const hostCtx = tenantContext !== undefined ? tenantContext : getTenantContext();
+    if (hostCtx?.bookingMode === 'WHATSAPP') {
+      setProviderHandoff(true);
       return;
     }
 
     setIsSubmitting(true);
+    // Funnel: a guest started checkout. Fired once per Reserve; the Pay taps on the details page do not re-fire it.
     track('start_checkout', numericListingId);
 
     try {
-      const orderPayload = {
-        bookingDraft: {
-          listingId: numericListingId,
-          checkinDate: toCalendarISO(checkinIst),
-          checkoutDate: toCalendarISO(checkoutIst),
-          guests,
-        },
-        currency: 'INR',
-        // GuestInfo absent — init-hold mode
-        guestConsentAccepted: false,
-      };
-
-      // TASK-8218: reuse the stable key for this attempt if one already exists (i.e. this is a
-      // retry after a lost/timed-out response for the SAME listing/dates/guests — the
-      // invalidation effect above already cleared it if anything keying-relevant changed).
-      // Generate lazily only when starting a fresh attempt, mirroring
-      // currentAttemptIdempotencyKeyRef in GuestDetailsPage.tsx.
-      let idempotencyKey = reserveIdempotencyKeyRef.current;
-      if (!idempotencyKey) {
-        idempotencyKey = crypto.randomUUID();
-        reserveIdempotencyKeyRef.current = idempotencyKey;
-      }
-      const initialHoldHeaders = getOrderRequestHeaders(idempotencyKey);
-      const response = await axios.post(orderUrl, orderPayload, {
-        headers: initialHoldHeaders,
-        timeout: 15000,
-      });
-
-      // TASK-4111: read server-authoritative breakdown so GuestDetailsPage renders
-      // the correct quote on first paint. Fall back to client sums when absent.
-      const {
-        holdId,
-        holdExpiresAt,
-        prepToken,
-        baseAmount: serverBaseAmount,
-        convenienceFeeAmount: serverConvFee,
-        finalAmount: serverFinalAmount,
-        touristTaxAmount: serverTouristTax,
-        TouristTaxAmount: serverTouristTaxPascal,
-      } = response.data ?? {};
-      if (!holdId || !holdExpiresAt) {
-        throw new Error('Hold could not be created. Please try again.');
-      }
-
-      const resolvedTouristTax =
-        typeof serverTouristTax === 'number' && serverTouristTax > 0
-          ? serverTouristTax
-          : typeof serverTouristTaxPascal === 'number' && serverTouristTaxPascal > 0
-            ? serverTouristTaxPascal
-            : 0;
-
-      // TASK-102017: derive the tenant slug owning this hold so the details route and final-charge
-      // calls send the identical X-Tenant-Slug header instead of 422ing against the apex tenant.
       const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
       const tenantFromUrl = typeof window !== 'undefined'
         ? new URLSearchParams(currentSearch).get('tenant')
         : null;
-      const holdTenantSlug = tenantFromUrl || initialHoldHeaders['X-Tenant-Slug'] || null;
+      // TASK-102017 / TASK-10298823: the tenant slug owning this stay, so the details route and the Pay-time calls send the identical
+      // X-Tenant-Slug header instead of 422ing against the apex tenant. On the marketplace that is the LISTING OWNER's slug
+      // (`verifiedTenantSlug`: the `tenantContext` prop, else ?tenant=), not the platform's.
+      const holdTenantSlug = verifiedTenantSlug || tenantFromUrl || getApiHeaders(verifiedTenantSlug)['X-Tenant-Slug'] || null;
 
-      // Store hold state in context and navigate to details page
+      const brandParam = typeof window !== 'undefined'
+        ? new URLSearchParams(currentSearch).get('brand')?.trim().toLowerCase() ?? ''
+        : '';
+      const isMarketplaceOrigin =
+        isMarketplaceMode() ||
+        isMarketplaceHostname() ||
+        brandParam === 'atlastays' ||
+        brandParam === 'marketplace';
+
+      // Store the stay draft in context and navigate to the details page. holdId / holdToken / holdExpiresAt stay null.
       updateBooking({
-        holdId: Number(holdId),
-        // TASK-4354: keep the hold ownership token so the final-charge call can prove it owns the hold.
-        holdToken: typeof prepToken === 'string' ? prepToken : null,
-        holdExpiresAt: typeof holdExpiresAt === 'string' ? holdExpiresAt : new Date(holdExpiresAt).toISOString(),
+        holdId: null,
+        holdToken: null,
+        holdExpiresAt: null,
         holdPropertySlug: propertySlug ?? null,
         holdUnitSlug: unitSlug ?? null,
         holdTenantSlug,
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
+        // AGT-005: the AI sales agent's link carries src=ai_receptionist; keep it across the hop to checkout (exact value only).
+        holdBookingChannel: isMarketplaceOrigin
+          ? 'marketplace'
+          : new URLSearchParams(currentSearch).get('src') === 'ai_receptionist' ? 'ai_receptionist' : null,
         holdPriceBreakdown: {
-          baseAmount: typeof serverBaseAmount === 'number' && serverBaseAmount > 0 ? serverBaseAmount : breakdownPrice,
+          paymentFeeDisplay: {
+            percent: feePercent(Number((convenienceFeePercent * 100).toFixed(2))),
+            amount: feeAmount(breakdownConvenienceFee),
+          },
+          baseAmount: breakdownPrice,
           discountAmount: 0,
-          // TASK-4286: only trust server convenienceFeeAmount when it is a positive number.
-          // The init-hold mode API returns convenienceFeeAmount=0 (a valid JS number) when
-          // it doesn't compute the fee, which caused the checkout page to show ₹0 processing
-          // fee and a total ₹378 lower than the listing widget. Fall back to the client-computed
-          // breakdownConvenienceFee so both surfaces agree.
-          convenienceFeeAmount: typeof serverConvFee === 'number' && serverConvFee > 0 ? serverConvFee : breakdownConvenienceFee,
-          finalAmount: typeof serverFinalAmount === 'number' && serverFinalAmount > 0 ? serverFinalAmount : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
+          // TASK-4286: the fee line follows the quote the guest is looking at, and is zero when no online gateway charges them.
+          convenienceFeeAmount: !showOnlinePaymentProcessing ? 0 : breakdownConvenienceFee,
+          finalAmount: !showOnlinePaymentProcessing
+            ? (finalTotal > 0 ? finalTotal : breakdownPrice)
+            : (finalTotal > 0 ? finalTotal : breakdownFinalTotal),
           nights: stayNights,
           currency: 'INR',
-          touristTaxAmount: resolvedTouristTax,
+          touristTaxAmount: touristTaxLineAmount,
+          ...(cleaningFeeLineAmount > 0 ? { cleaningFee: cleaningFeeLineAmount } : {}),
+          ...(breakfastPricePerPerson > 0 ? { breakfastPricePerPerson } : {}),
+          ...(includeBreakfast && breakfastExtraLineAmount > 0
+            ? { includeBreakfast: true, breakfastExtraAmount: breakfastExtraLineAmount }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.petFee && serverPriceBreakdown.petFee > 0
+            ? { petFee: Math.round(serverPriceBreakdown.petFee) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.extraGuestFee && serverPriceBreakdown.extraGuestFee > 0
+            ? { extraGuestFee: Math.round(serverPriceBreakdown.extraGuestFee) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.weekendRateAdjustmentAmount && serverPriceBreakdown.weekendRateAdjustmentAmount > 0
+            ? { weekendRateAdjustmentAmount: Math.round(serverPriceBreakdown.weekendRateAdjustmentAmount) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.originalNightlyRate && serverPriceBreakdown.originalNightlyRate > 0
+            ? { originalNightlyRate: Math.round(serverPriceBreakdown.originalNightlyRate) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.discountedNightlyRate && serverPriceBreakdown.discountedNightlyRate > 0
+            ? { discountedNightlyRate: Math.round(serverPriceBreakdown.discountedNightlyRate) }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.appliedPromotionLabel
+            ? { appliedPromotionLabel: serverPriceBreakdown.appliedPromotionLabel }
+            : {}),
         },
-        holdCancellationTier: resolvedCancellationTier,
-        holdCancellationWindowHours: resolvedCancellationWindowHours,
-        holdGraceHours: resolvedGraceHours,
+        holdCancellationTier: effectiveRatePlanCancellationTier,
+        holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
+        holdRefundFreeUntilUtc: selectedRatePlan?.refundFreeUntilUtc ?? null, // TASK-1040050: the server-quoted deadline, shown identically at checkout
+        holdGraceHours: isSelectedRatePlanNonRefundable ? null : resolvedGraceHours,
+        // TASK-1039977 / PAY-006: refundable security deposit forwarded to checkout
+        holdSecurityDepositAmount:
+          securityDepositAmount != null && Number(securityDepositAmount) > 0
+            ? Number(securityDepositAmount)
+            : null,
+        // HSL-011: the checkout page asks the gender-rule tick from this (API value; null for every non-dorm listing).
+        holdDormGenderPolicy: isDorm ? dormGenderPolicy : null,
         // Forward dates/guests into context for the details page. BookingContext's wire format
         // is an ISO instant, and the hydration effect above reads it back as an IST civil date —
         // so emit the IST-midnight instant (unchanged format, correct day) rather than
@@ -1667,15 +2249,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         checkIn: istInstantFromCalendarDate(checkinIst).toISOString(),
         checkOut: istInstantFromCalendarDate(checkoutIst).toISOString(),
         guests,
+        listingRatePlanId: selectedRatePlanId,
+        // TASK-10299208: never forward internal/OTA rate plan names; only pass plain meal + cancellation terms when the guest chose between options.
+        ratePlanName: null,
+        ratePlanMealPlan:
+          publicRatePlans.length > 1
+            ? plainMealLabel(selectedRatePlan?.mealPlanLabel || selectedRatePlan?.mealPlanCode)
+            : null,
+        ratePlanCancellationPolicy:
+          publicRatePlans.length > 1
+            ? (cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy || null)
+            : null,
       });
 
-      // TASK-8218: the hold succeeded and its ownership token is now in BookingContext — clear
-      // the reserve key so a LATER, unrelated Reserve click (after navigating back) never reuses
-      // a key that already has a completed hold behind it.
-      reserveIdempotencyKeyRef.current = null;
-
       // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
-      // getApiHeaders() resolves the same tenant on final charge and page refreshes.
+      // getApiHeaders() resolves the same tenant at Pay and on page refreshes.
       let navSearch = currentSearch;
       if (!tenantFromUrl && holdTenantSlug && isMarketplaceMode() && holdTenantSlug !== 'atlas') {
         const sp = new URLSearchParams(currentSearch);
@@ -1685,48 +2273,53 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       navigate(`/book/${targetSlug}/${targetUnit}/details${navSearch}`);
     } catch (error: unknown) {
       console.error('[UnitBookingWidget] Reserve error:', error);
-      const data = (error as { response?: { data?: { code?: string; Code?: string } } })?.response?.data;
-      const code = (typeof data?.code === 'string' ? data.code : typeof data?.Code === 'string' ? data.Code : '') || '';
-      const status = (error as { response?: { status?: number } })?.response?.status;
-      if (status === 503 && code === 'PAYMENT_PROVIDER_NOT_CONFIGURED_PLATFORM') {
-        setProviderBlocked(true);
-      } else {
-        setFormError(getBookingErrorMessage(error, 'order'));
-        // AVAILABILITY_CONFLICT (409): the dates were just taken by another in-flight checkout.
-        // Force-refresh the calendar so the now-unavailable dates show as blocked and the guest
-        // isn't re-picking the same taken dates from a stale calendar.
-        if (status === 409 || code === 'AVAILABILITY_CONFLICT') {
-          lastAvailabilityKeyRef.current = null;
-          setAvailabilityRefreshNonce((n) => n + 1);
-        }
-      }
+      setFormError(getBookingErrorMessage(error, 'order'));
     } finally {
       setIsSubmitting(false);
     }
   }, [
     isSubmitting, isBookingDisabled, availabilityFailed, dateRange, dateStatusMap, blockedSet,
-    dateBookabilityMap, today,
+    dateBookabilityMap, today, tenantContext, verifiedTenantSlug,
     listingId, guests, propertySlug, unitSlug, listingName, breakdownPrice, breakdownConvenienceFee,
-    breakdownFinalTotal, finalTotal, updateBooking, navigate,
-    resolvedCancellationTier, resolvedCancellationWindowHours, resolvedGraceHours,
+    breakdownFinalTotal, finalTotal, updateBooking, navigate, showOnlinePaymentProcessing,
+    convenienceFeePercent, touristTaxLineAmount, serverGstMatchesSelection, serverPriceBreakdown,
+    resolvedCancellationWindowHours, resolvedGraceHours,
+    selectedRatePlanId, selectedRatePlan, effectiveRatePlanCancellationTier, isSelectedRatePlanNonRefundable,
+    isDorm, dormBedsLeft, dormGenderPolicy,
+    securityDepositAmount, publicRatePlans, cancellationTrustText,
+    breakfastExtraLineAmount, breakfastPricePerPerson, checkInteriorNightOverlap,
+    cleaningFeeLineAmount, getEffectiveMinStayForDate, includeBreakfast,
+    listingLookupFailed, setDateConflictError, setDateError,
   ]);
 
-  if (providerBlocked) {
-    return (
-      <div className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-8 text-center space-y-3" data-testid="provider-blocked-banner">
-        <div className="text-4xl">🔒</div>
-        <h2 className="text-lg font-semibold text-text-primary">Bookings opening soon</h2>
-        <p className="text-sm text-text-secondary">
-          Online booking is temporarily unavailable for this property. Please contact the host directly to make a reservation.
-        </p>
-      </div>
-    );
-  }
+  // Hand-off link for the Reserve 422 above. Derived at render, not captured in handleReserve, so it
+  // always carries the dates and guest count currently on screen. The host number comes ONLY from the
+  // resolved tenant context - the LISTING host's on a marketplace page (the `tenantContext` prop), the
+  // site's own otherwise (same `!== undefined` convention as hasOnlinePaymentRail above) - never a
+  // platform default; with no number the hand-off renders the message and no link.
+  const handoffHref = useMemo(() => {
+    if (!providerHandoff) return '';
+    const handoffTenant = tenantContext !== undefined ? tenantContext : getTenantContext();
+    return buildReserveWhatsAppUrl({
+      phone: handoffTenant?.whatsappBookingPhone,
+      listingName,
+      checkIn: dateRange.startDate,
+      checkOut: dateRange.endDate,
+      guests,
+    });
+  }, [providerHandoff, tenantContext, listingName, dateRange.startDate, dateRange.endDate, guests]);
+
+  const handleHandoffCtaClick = useCallback(() => {
+    trackEvent('whatsapp_cta_click', {
+      surface: 'reserve_handoff',
+      listingId: listingId != null ? Number(listingId) : undefined,
+    });
+  }, [listingId]);
 
   return (
     // TASK-2612: fragment wrapper intentional — avoids extra DOM nesting
     <>
-      <form id="booking-form" onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
+      <form id="booking-form" tabIndex={-1} data-booking-widget="true" data-can-review-booking={canReviewBooking ? "true" : "false"} onSubmit={handleReserve} className="lv-booking" role="region" aria-label="Booking and availability" data-testid="guest-booking-form">
 
       {/* v2 block (1): Price headline */}
       <div className="lv-booking-headline" data-testid="bw-header">
@@ -1736,6 +2329,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div className="lv-booking-total" data-testid="bw-dates-unavailable-headline">
               <b style={{ fontWeight: 600 }}>Dates unavailable</b>
             </div>
+            {/* GUEST-065: "all fees included" sat next to a separate "Payment processing (3%)" line and read as a
+                contradiction. The total does include that line; say so, tied to the lines the guest can see. */}
             <p className="lv-booking-sub">
               {dateRange.startDate && dateRange.endDate
                 ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · pick different nights`
@@ -1753,29 +2348,50 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
             <p className="lv-booking-sub" role="status">Fetching latest prices…</p>
           </>
+        ) : hasSelectedRange && !invalidIstStayRange && pricingRefusedMessage != null ? (
+          // TASK-1040051: the server refused to price this stay. No amount at all (it used to read "Total INR 1").
+          <div className="lv-booking-total" data-testid="bw-pricing-not-configured-headline">
+            <b style={{ fontWeight: 600 }}>Not bookable online yet</b>
+          </div>
         ) : hasSelectedRange && !invalidIstStayRange && calendarPricingFailed ? (
-          <>
+          <div role="alert" data-testid="bw-pricing-error-alert">
             <div className="lv-booking-total">
               <span className="text-sm text-text-warning" data-testid="bw-pricing-error">
                 Couldn't load prices
               </span>
             </div>
-            <p className="lv-booking-sub">Please try selecting dates again</p>
-          </>
+            <p className="lv-booking-sub">
+              Reserve is paused until the price loads.{' '}
+              <button
+                type="button"
+                onClick={retryPricing}
+                data-testid="bw-pricing-retry"
+                style={{ background: 'transparent', color: '#c2410c', border: '1px solid #c2410c', borderRadius: 8, padding: '2px 10px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
+              >
+                Try again
+              </button>
+            </p>
+          </div>
         ) : hasSelectedRange && !invalidIstStayRange && displayFinalTotal > 0 ? (
           <>
+            {headlineDirectPrice && headlineDirectPrice.standardNightly != null && (
+              <DirectSavingRow display={headlineDirectPrice} formatAmount={displayPrice} />
+            )}
             <div className="lv-booking-total">
               <b data-testid="bw-per-night-price">{displayPrice(displayFinalTotal)}</b>
               <span>total · {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'}</span>
             </div>
             <p className="lv-booking-sub">
               {dateRange.startDate && dateRange.endDate
-                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · all fees included`
-                : 'all fees included'}
+                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · ${feesIncludedWords}`
+                : feesIncludedWords}
             </p>
           </>
         ) : (
           <>
+            {!hasSelectedRange && tonightDirectPrice && tonightDirectPrice.standardNightly != null && (
+              <DirectSavingRow display={tonightDirectPrice} formatAmount={(n) => formatCurrency(n, { maximumFractionDigits: 0 })} />
+            )}
             <div className="lv-booking-total">
               <span className="lv-booking-from-prefix">From </span>
               <b data-testid="bw-per-night-price">
@@ -1785,12 +2401,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
                     : perNightForDisplay > 0
                       ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
-                      : '—'}
+                      : dailyPricingLoading
+                        ? (
+                          <span
+                            className="inline-block h-5 w-16 animate-pulse rounded bg-[#f0e6dc] align-middle"
+                            data-testid="bw-from-price-skeleton"
+                            aria-busy="true"
+                            aria-label="Loading price"
+                          />
+                        )
+                        : '—'}
               </b>
               <span> / night</span>
             </div>
             <p className="lv-booking-sub">Select dates to see total price</p>
           </>
+        )}
+        {linkOfferLine && (
+          <p className="lv-booking-sub" data-testid="bw-link-offer-line" role="status">{linkOfferLine}</p>
         )}
         {reviewCount != null && reviewCount > 0 && reviewRating != null && (
           <div className="bw-rating" data-testid="bw-rating-block" style={{ marginTop: 6 }}>
@@ -1805,25 +2433,16 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       </div>
 
       {displayCoverUrl && (
-        <div className="overflow-hidden rounded-xl border border-border-subtle mb-2" style={{ marginTop: -4 }}>
-          <OptimizedImage
-            src={displayCoverUrl}
-            alt={listingName ? `${listingName} — preview` : 'Listing preview'}
-            className="w-full h-36 sm:h-40 object-cover"
-            loading="lazy"
-          />
-        </div>
+        <BookingCoverPreview
+          src={displayCoverUrl}
+          alt={listingName ? `${listingName} — preview` : 'Listing preview'}
+        />
       )}
 
-      {listingId != null && Number(listingId) > 0 && (
-        <FomoBar listingId={Number(listingId)} />
-      )}
       {isBookingDisabled && (
         <ErrorBanner className="mt-2" message="Service temporarily unavailable. Booking will return soon." />
       )}
 
-      {/* v2: "Why book direct" info collapsed — illustrativeOtaGuestFeeComparison kept for outer page
-          comparison card usage. Reference kept alive by the calculation above (line ~870). */}
       {/* Price loading state — shown inline in breakdown when loading */}
       {dailyPricingLoading && (
         <p className="text-xs text-text-muted" style={{ marginTop: 4 }}>Loading price…</p>
@@ -1831,13 +2450,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (2) + (3): Date range card + Guests card */}
       <div className="lv-booking-form">
-        {minStayNights > 1 && (
+        {/* HSL-011: a dorm says so before the guest picks anything, with the host's gender rule when the API states one. */}
+        {isDorm && (
+          <HostelDormBadge accommodationType={accommodationType} genderPolicy={dormGenderPolicy} className="mb-2" />
+        )}
+        {effectiveMinStayNights > 1 && (
           <p
             className="inline-flex items-center rounded-full bg-[#ffe4d6] px-3 py-1.5 text-sm font-medium text-[#4a3535] border border-[#e5cfc0]"
             style={{ marginBottom: 8 }}
             data-testid="min-stay-badge"
           >
-            Minimum {minStayNights} night{minStayNights !== 1 ? 's' : ''}
+            Minimum {effectiveMinStayNights} night{effectiveMinStayNights !== 1 ? 's' : ''}
           </p>
         )}
         {/* v2 date card */}
@@ -1851,7 +2474,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ref={calendarButtonRef}
             type="button"
             className="lv-date-cell"
-            aria-label="Select check-in date"
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
@@ -1872,7 +2494,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ref={checkoutCellRef}
             type="button"
             className="lv-date-cell"
-            aria-label="Select check-out date"
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
@@ -1906,6 +2527,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             fallbackPrice={effectiveDailyPricing?.actualPrice ?? null}
             pricingLoading={calendarPricingLoading}
             shownDate={shownDate}
+            notice={dateError && dateError.startsWith('Minimum stay is ') ? dateError : null}
             onShownDateChange={(date) => {
               const nextShownDate = startOfMonth(date);
               if (
@@ -1917,35 +2539,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
               setShownDate(nextShownDate);
             }}
           />
-        {/* Incomplete date hint */}
-        {dateRange.startDate && !dateRange.endDate && (
-          <p
-            role="status"
-            data-testid="guest-booking-incomplete-dates"
-            className="text-xs text-text-secondary"
-            style={{ marginTop: 4 }}
-          >
-            Select your check-out date (minimum one night after check-in).
-          </p>
-        )}
-        {/* Legend for calendar cell colours */}
-        <p className="text-xs text-text-secondary" style={{ marginTop: 6, lineHeight: 1.5 }}>
-          <span className="mr-1 inline-block rounded bg-[#ffe4d6]/60 px-1.5 py-0.5 text-[color:var(--accent-text,#a84832)]">Available</span>
-          open for booking.
-          <span className="mx-1 inline-block rounded bg-[#ffe4d6] px-1.5 py-0.5 text-[#4a3535]">Turnover</span>
-          cleaning window (still bookable).
-          <span
-            className="mx-1 inline-block rounded px-1.5 py-0.5 text-[#6b5a55]"
-            style={{
-              background:
-                'repeating-linear-gradient(-45deg, #f5ebe0, #f5ebe0 3px, #ecdfd2 3px, #ecdfd2 6px)',
-            }}
-          >
-            Unavailable
-          </span>
-          booked, blocked, or on hold.
-        </p>
-
         {/* v2 guests card */}
         <div className="lv-guest-cell bw-guests" style={{ marginTop: 0 }}>
           <button
@@ -1959,50 +2552,212 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             // dead. minHeight restores a 44px hit area (WCAG 2.2 SC 2.5.5 / Apple HIG) without
             // re-introducing double padding. Applies on desktop too — it was ~38px there as well.
             style={{ padding: 0, minHeight: 44, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-            aria-label={`Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
+            title="Click to change"
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >
             <div>
-              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>Guests</small>
-              <span className="lv-guest-val">{guests} {guests === 1 ? 'adult' : 'adults'}</span>
+              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>{isDorm ? 'Beds' : 'Guests'}</small>{' '}
+              <span className="lv-guest-val">
+                {isDorm ? `${guests} ${guests === 1 ? 'bed' : 'beds'}` : `${guests} ${guests === 1 ? 'adult' : 'adults'}`}
+              </span>
               {guests >= effectiveMaxGuests && (
                 <small style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}>
-                  Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'} for this home
+                  {isDorm
+                    ? `Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'} per booking`
+                    : `Maximum ${effectiveMaxGuests} guest${effectiveMaxGuests === 1 ? '' : 's'} for this home`}
+                </small>
+              )}
+              {guestsOverLimit != null && guestsOverLimit > effectiveMaxGuests && (
+                <small
+                  role="status"
+                  data-testid="bw-guests-over-limit"
+                  style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}
+                >
+                  {`You asked for ${guestsOverLimit} ${isDorm ? 'beds' : 'guests'}, but this home allows up to ${effectiveMaxGuests}. We've set ${effectiveMaxGuests}.`}
+                </small>
+              )}
+              {/* GUEST-065: a party SMALLER than what the price includes ("1 adult" under "Price includes up to 2 guests") read as two
+                  different guest counts. The line stays at the included count and above, where the extra-guest rule matters. */}
+              {!isDorm && includedGuestsLine && !(includedGuests != null && guests < includedGuests) && (
+                <small
+                  data-testid="bw-included-guests"
+                  style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}
+                >
+                  {includedGuestsLine}
                 </small>
               )}
             </div>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ color: 'var(--text-muted, #6b5a55)', flexShrink: 0 }}><polyline points="6 9 12 15 18 9" /></svg>
           </button>
           {guestsOpen && (
-            <div className="bw-guests-pop" role="group" aria-label="Guest count">
+            <div className="bw-guests-pop" role="group" aria-label={isDorm ? 'Bed count' : 'Guest count'}>
               <div className="bw-guest-row">
                 <div>
-                  <div className="bw-guest-label">Guests</div>
+                  <div className="bw-guest-label">{isDorm ? 'Beds' : 'Guests'}</div>
                   <div className="bw-guest-sub">
-                    Ages 2+ · Maximum {effectiveMaxGuests} guest{effectiveMaxGuests === 1 ? '' : 's'}
+                    {isDorm
+                      ? `One bed per guest · Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'}`
+                      : `Ages 2+ · Maximum ${effectiveMaxGuests} guest${effectiveMaxGuests === 1 ? '' : 's'}`}
                   </div>
                 </div>
                 <div className="bw-counter">
                   <button
                     type="button"
                     className="bw-counter-btn"
-                    aria-label="Decrease guests"
+                    aria-label={isDorm ? 'Decrease beds' : 'Decrease guests'}
                     disabled={guests <= 1}
-                    onClick={() => setGuests((current) => Math.max(1, current - 1))}
+                    onClick={() => { setGuestsOverLimit(null); setGuests((current) => Math.max(1, current - 1)); }}
                   >−</button>
                   <span className="bw-counter-val">{guests}</span>
                   <button
                     type="button"
                     className="bw-counter-btn"
-                    aria-label="Increase guests"
-                    disabled={guests >= effectiveMaxGuests}
-                    onClick={() => setGuests((current) => Math.min(effectiveMaxGuests, current + 1))}
+                    aria-label={isDorm ? 'Increase beds' : 'Increase guests'}
+                    disabled={guests >= (isDorm ? dormMaxBeds : effectiveMaxGuests)}
+                    onClick={() => { setGuestsOverLimit(null); setGuests((current) => Math.min(isDorm ? dormMaxBeds : effectiveMaxGuests, current + 1)); }}
                   >+</button>
                 </div>
               </div>
             </div>
           )}
         </div>
+        {/* TASK-10299183: small-party discount hint when small-party pricing is configured and guest count qualifies (1-2 guests) */}
+        {showSmallPartyHint && (
+          <div
+            className="bw-small-party-hint"
+            data-testid="booking-small-party-hint"
+            role="status"
+            style={{
+              marginTop: 8,
+              padding: '6px 10px',
+              borderRadius: 8,
+              backgroundColor: '#ecfdf5',
+              border: '1px solid #a7f3d0',
+              color: '#065f46',
+              fontSize: '12px',
+              fontWeight: 500,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <span aria-hidden="true" style={{ fontSize: '13px' }}>✨</span>
+            <span>{smallPartyHint || SMALL_PARTY_HINT_DEFAULT}</span>
+          </div>
+        )}
+        {/* HSL-011: live beds-left for the chosen nights (smallest free count across them). Only printed when the
+            availability data gave a count for every night; never a guess. */}
+        {isDorm && dormBedsLeft != null && (
+          <p
+            className="text-xs"
+            data-testid="dorm-beds-left"
+            style={{ margin: '6px 0 0', fontWeight: 600, color: dormBedsLeft <= 2 ? '#b45309' : 'var(--text-muted, #6b5a55)' }}
+          >
+            {dormBedCount != null
+              ? `${dormBedsLeft} of ${dormBedCount} ${dormBedCount === 1 ? 'bed' : 'beds'} left`
+              : `${dormBedsLeft} ${dormBedsLeft === 1 ? 'bed' : 'beds'} left`}
+          </p>
+        )}
+        {dormOverBeds && (
+          <p className="text-xs text-support-error" role="alert" data-testid="dorm-over-beds" style={{ margin: '4px 0 0' }}>
+            Only {dormBedsLeft} {dormBedsLeft === 1 ? 'bed' : 'beds'} left on these dates. Please choose fewer beds.
+          </p>
+        )}
+        {publicRatePlans.length > 1 && (
+          <div
+            className="bw-rate-plan-selector"
+            data-testid="bw-rate-plan-selector"
+            role="radiogroup"
+            aria-label="Rate plan options"
+            style={{
+              marginTop: 12,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            {/* Founder ruling 2026-10-21: the API now offers only genuinely different deals (meals or a
+                cancellation rule), so each choice is named in plain words — never the internal/OTA plan name —
+                and priced with its own checkout quote, all fees included. */}
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary, #475569)' }}>
+              Choose one
+            </div>
+            {publicRatePlans.map((plan) => {
+              const isSelected = (selectedRatePlan?.id ?? publicRatePlans[0]?.id) === plan.id;
+              const planQuoteTotal = plan.guestQuote?.finalAmount != null && plan.guestQuote.finalAmount > 0
+                ? plan.guestQuote.finalAmount
+                : null;
+              return (
+                <button
+                  key={plan.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  data-testid={`bw-rate-plan-option-${plan.id}`}
+                  onClick={() => setSelectedRatePlanId(plan.id)}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    border: isSelected
+                      ? '2px solid var(--accent-primary, #0f172a)'
+                      : '1px solid var(--border-subtle, #e2e8f0)',
+                    background: isSelected ? 'var(--bg-subtle, #f8fafc)' : '#ffffff',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                    <div
+                      data-testid={`rate-plan-meal-badge-${plan.id}`}
+                      style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}
+                    >
+                      {plainMealLabel(plan.mealPlanLabel || plan.mealPlanCode)}
+                    </div>
+                    {plan.isAgentRate && (
+                      <div
+                        data-testid={`rate-plan-agent-badge-${plan.id}`}
+                        style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-primary, #0f172a)' }}
+                      >
+                        {plan.agentName ? `Special rate from ${plan.agentName}` : 'Travel agent rate'}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
+                      {plan.cancellationSummary}
+                    </div>
+                  </div>
+                  {/* TASK-1040051: no INR figure on a card while the server refuses to price this stay. */}
+                  {pricingRefusedMessage == null && (
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
+                      {displayPrice(planQuoteTotal ?? plan.effectiveNightlyRate)}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-secondary, #64748b)' }}>
+                      {planQuoteTotal != null ? 'total, all fees included' : '/ night'}
+                    </div>
+                  </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {/* The hint and legend sit BELOW the joined dates + guests card: the guests cell has no
+            top border, so anything rendered between the two halves splits the card. */}
+        {/* Incomplete date hint */}
+        {dateRange.startDate && !dateRange.endDate && (
+          <p
+            role="status"
+            data-testid="guest-booking-incomplete-dates"
+            className="text-xs text-text-secondary"
+            style={{ marginTop: 8 }}
+          >
+            Select your check-out date (minimum {effectiveMinStayNights > 1 ? `${effectiveMinStayNights} nights` : 'one night'} after check-in).
+          </p>
+        )}
         {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
             AND the range is valid (checkout > checkin) (TASK-4284).
             Showing a breakdown for a reversed or same-day range would display either a
@@ -2033,8 +2788,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             These dates would be ~{displayPrice(displayFinalTotal)} — pick available dates to book.
           </p>
         )}
-        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && pricingRefusedMessage != null && (
+          <p
+            role="alert"
+            data-testid="bw-pricing-not-configured"
+            className="text-sm text-support-error"
+            style={{ marginTop: 8, lineHeight: 1.45 }}
+          >
+            {pricingRefusedMessage}
+          </p>
+        )}
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && pricingRefusedMessage == null && (
         <div className="lv-price-rows">
+          {/* TASK-1039948 / TASK-10299208: Direct booking pricing tier public display — only when the guest chose between options, in plain words (never internal ratePlanName) */}
+          {publicRatePlans.length > 1 && selectedRatePlan && (
+            <div className="lv-price-row" style={{ display: 'block', paddingBottom: 6 }}>
+              <PricingTierDisplay
+                ratePlanName={null}
+                cancellationPolicy={cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy}
+                mealPlanLabel={selectedRatePlan?.mealPlanLabel}
+                mealPlanCode={selectedRatePlan?.mealPlanCode}
+              />
+            </div>
+          )}
           {/* TASK-4282: Show per-night breakdown when rates vary, or averaged format when uniform */}
           {(() => {
             // Collect daily prices for the selected range
@@ -2054,7 +2830,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             const uniquePrices = new Set(dailyPrices.map(dp => dp.price));
             const ratesVary = uniquePrices.size > 1;
 
-            if (ratesVary && dailyPrices.length > 0) {
+            // HSL-010: a dorm's per-night rows are PER BED (calendar rate) while the subtotal is beds x that — rows
+            // that cannot sum to the subtotal read as a hidden fee, so a dorm always uses the single priced line.
+            const isBedPricedStay = serverGstMatchesSelection && !!serverPriceBreakdown?.priceLine;
+
+            // GUEST-048: the nightly rows come from the CALENDAR endpoint, which knows nothing about the minimum-price
+            // floor, long-stay or last-minute rules the checkout quote applies. When the quote is in and those rows
+            // do not add up to the quote's subtotal, the rows would show pre-adjustment prices above a lower
+            // subtotal (the date sheet and this list said 3,150 while the box charged 2,882) - so fall back to the
+            // quote's own single line, which is the price actually charged.
+            const rowsSum = dailyPrices.reduce((sum, dp) => sum + dp.price, 0);
+            const rowsMatchQuote = serverChargeableBase == null || Math.abs(rowsSum - breakdownPrice) <= Math.max(1, dailyPrices.length);
+
+            if (ratesVary && dailyPrices.length > 0 && !isBedPricedStay && rowsMatchQuote) {
               // Show per-night breakdown
               return (
                 <>
@@ -2076,24 +2864,108 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     <span className="font-semibold">Subtotal</span>
                     <span className="lv-num font-semibold">{displayPrice(breakdownPrice)}</span>
                   </div>
+                  {/* Founder ruling 2026-10-21: the nightly rows above already include the direct-booking
+                      discount, so say so — the saving is never netted in silently. */}
+                  {directDiscountAmount > 0 && (
+                    <p
+                      className="text-xs"
+                      data-testid="bw-bd-direct-saving-note"
+                      style={{ color: '#157046', margin: '2px 0 0' }}
+                    >
+                      Includes {directDiscountPercent}% off for booking direct — you save {displayPrice(directDiscountAmount)}
+                    </p>
+                  )}
                 </>
               );
             } else {
-              // Show averaged format (original behavior)
+              // Founder ruling 2026-10-21: show the standard rate × nights, then the direct-booking discount as
+              // its own line — instead of a nightly rate that already had the discount netted in silently.
+              const standardStay = directDiscountAmount > 0 && serverPriceBreakdown ? serverPriceBreakdown.baseAmount : null;
+              const nightlyShown = standardStay != null && priceDetails.nights > 0
+                ? Math.round(standardStay / priceDetails.nights)
+                : perNightForDisplay;
               return (
-                <div className="lv-price-row" data-testid="price-line-base">
-                  <span>
-                    {priceDetails.nights > 0 && perNightForDisplay > 0
-                      ? `${displayPrice(perNightForDisplay)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
-                      : 'Accommodation'}
-                  </span>
-                  <span className="lv-num">{displayPrice(breakdownPrice)}</span>
-                </div>
+                <>
+                  <div className="lv-price-row" data-testid="price-line-base">
+                    <span>
+                      {serverGstMatchesSelection && serverPriceBreakdown?.priceLine
+                        ? /* HSL-010: a dorm stay is priced per bed — the server's own line ("3 beds x Rs 799 x 2 nights")
+                             explains the total instead of a misleading per-night average. */
+                          serverPriceBreakdown.priceLine
+                        : priceDetails.nights > 0 && nightlyShown > 0
+                          ? `${displayPrice(nightlyShown)} × ${priceDetails.nights} ${priceDetails.nights === 1 ? 'night' : 'nights'}`
+                          : 'Accommodation'}
+                    </span>
+                    <span className="lv-num">{displayPrice(standardStay ?? breakdownPrice)}</span>
+                  </div>
+                  {standardStay != null && (
+                    <div className="lv-price-row" data-testid="bw-bd-direct-discount" data-sign="negative">
+                      <span style={{ color: '#157046' }}>Direct booking discount ({directDiscountPercent}%)</span>
+                      <span className="lv-num" style={{ color: '#157046' }}>−{displayPrice(directDiscountAmount)}</span>
+                    </div>
+                  )}
+                </>
               );
             }
           })()}
 
 
+
+          {/* CFB-009 / BNB-009 / BNB-010: Optional "Add breakfast" toggle for Room-Only (EP) direct bookings */}
+          {breakfastPricePerPerson > 0 && priceDetails.nights > 0 && (
+            <label
+              className="lv-price-row"
+              data-testid="bw-add-breakfast-toggle"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                padding: '8px 10px',
+                margin: '4px 0',
+                borderRadius: 8,
+                border: '1px solid var(--border-subtle, #e2e8f0)',
+                background: includeBreakfast ? 'var(--bg-muted, #f8fafc)' : 'transparent',
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={includeBreakfast}
+                  onChange={(e) => setIncludeBreakfast(e.target.checked)}
+                  data-testid="bw-add-breakfast-checkbox"
+                />
+                <span>
+                  Add breakfast ({displayPrice(breakfastPricePerPerson)}/person/night)
+                </span>
+              </span>
+              <span className="lv-num" style={{ fontSize: 13, fontWeight: 600 }}>
+                +{displayPrice(Math.round(breakfastPricePerPerson * guests * priceDetails.nights))}
+              </span>
+            </label>
+          )}
+
+          {/* CFB-006 / CLU-016: Cleaning fee shown honestly as its own line item on the first screen before payment. */}
+          {cleaningFeeLineAmount > 0 && (
+            <div className="lv-price-row" data-testid="bw-bd-cleaning-fee-row">
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                Cleaning fee
+                <FeeInfoTip fee="cleaning" label="Cleaning fee" testId="fee-info-cleaning" />
+              </span>
+              <span className="lv-num">{displayPrice(cleaningFeeLineAmount)}</span>
+            </div>
+          )}
+
+          {/* CFB-009 / BNB-009 / BNB-010: Breakfast extra line item when guest ticks "Add breakfast". */}
+          {breakfastExtraLineAmount > 0 && (
+            <div className="lv-price-row" data-testid="bw-bd-breakfast-extra-row">
+              <span>
+                Breakfast ({displayPrice(breakfastPricePerPerson)} × {guests} {guests === 1 ? 'guest' : 'guests'} × {priceDetails.nights} {priceDetails.nights === 1 ? 'night' : 'nights'})
+              </span>
+              <span className="lv-num">{displayPrice(breakfastExtraLineAmount)}</span>
+            </div>
+          )}
 
           {/* TASK-8293: tourist tax is inside the server FinalAmount the Total prefers, so it
               must appear as its own line or the breakdown does not sum to its own Total. */}
@@ -2159,6 +3031,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <span>Total</span>
             <span className="lv-num">{displayPrice(isNaN(finalTotal) ? 0 : Math.max(1, finalTotal))}</span>
           </div>
+          {/* HSL-011: the all-in Total above divided by the beds, so a group sees what ONE bed costs them. */}
+          {isDorm && guests >= 1 && !isNaN(finalTotal) && finalTotal > 0 && (
+            <p className="text-xs" data-testid="dorm-per-bed-total" style={{ margin: '4px 0 0', color: 'var(--text-muted, #6b5a55)' }}>
+              {guests > 1 ? `About ${displayPrice(Math.round(finalTotal / guests))} per bed, all in` : `${displayPrice(Math.round(finalTotal))} per bed, all in`}
+            </p>
+          )}
         </div>
         )}
         </div>
@@ -2187,9 +3065,21 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* TASK-2612: Guest form fields moved to GuestDetailsPage */}
 
+      {/* Reserve 422 PAYMENT_PROVIDER_NOT_CONFIGURED_*: this tenant cannot take an online payment - hand the
+          guest to the host on WhatsApp. The form (dates, guests) stays mounted and selected above. */}
+      {providerHandoff && (
+        <ReserveWhatsAppHandoff href={handoffHref} onCtaClick={handleHandoffCtaClick} />
+      )}
+
       {formError && (
         <p className="text-sm text-support-error" role="alert" style={{ marginTop: 4 }}>
           {formError}
+        </p>
+      )}
+
+      {reserveBlockedNotice && (
+        <p className="text-sm text-support-error" role="alert" data-testid="bw-reserve-blocked-notice" style={{ marginTop: 4 }}>
+          {reserveBlockedNotice}
         </p>
       )}
 
@@ -2224,27 +3114,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         // handleReserve can surface the inline "Add a check-in/check-out date to continue."
         // validation (and focus the missing field) instead of the button silently swallowing
         // the click. Genuine blockers (service down, invalid range) still disable it.
-        disabled={
-          isSubmitting ||
-          isBookingDisabled ||
-          (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
-          // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
-          datesUnavailable ||
-          // TASK-4303: pricing still resolving for the selected range (1–3 s worst case) —
-          // reserving now would seed holdPriceBreakdown's client fallback with the provisional
-          // base-rate/₹0-fee numbers (see the TASK-4286 fallback in handleReserve). Blank dates
-          // stay clickable (TASK-4277): rangePricingPending is false without both dates.
-          // Do NOT gate on availability-fetch loading — that violated TASK-4277 on F1 (2026-07-12).
-          rangePricingPending ||
-          // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
-          (hasSelectedRange && calendarPricingFailed) ||
-          // TASK-4729: guard against NaN pricing (non-numeric server response)
-          (hasSelectedRange && !rangePricingPending && isNaN(finalTotal))
-        }
+        disabled={reserveDisabled}
         title={datesUnavailable ? 'These dates aren’t available. Please select different dates.' : undefined}
         className={`bw-reserve lv-booking-cta${isSubmitting ? ' opacity-75' : ''}`}
         data-testid="guest-booking-submit"
-        style={{ marginTop: 20, width: '100%', background: 'var(--gradient-cta, linear-gradient(135deg, #f08c71, #e86a4a))', color: '#fff', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'filter .2s, box-shadow .2s', boxShadow: '0 4px 12px rgba(196, 90, 63, 0.25)' }}
+        style={{ marginTop: 20, width: '100%', background: 'var(--cta-primary, #c04528)', color: 'var(--text-on-cta, #fff)', border: 0, borderRadius: 12, padding: '14px 24px', fontSize: 15, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer', transition: 'filter .2s, box-shadow .2s', boxShadow: '0 4px 12px rgba(196, 90, 63, 0.25)' }}
       >
         {isBookingDisabled || datesUnavailable
           ? 'Unavailable'
@@ -2252,22 +3126,70 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ? 'Reserving…'
             : 'Reserve'}
       </Button>
+
+      {/* CLU-004: Parent whole-villa blocked -> available child private rooms cross-sell alert */}
+      {datesUnavailable && (
+        <div className="mt-3">
+          <ParentChildCrossSellBanner
+            isParentCluster={isParentOfCluster}
+            isUnavailable={Boolean(datesUnavailable)}
+            parentName={listingName}
+            availability={clusterAvailability}
+            checkIn={crossSellCheckIn}
+            checkOut={crossSellCheckOut}
+            propertySlug={propertySlug}
+            onSelectChildRoom={(room: ChildRoomPreview) => room.href && navigate(room.href)}
+          />
+        </div>
+      )}
+
+      {/* CHN-012: the property is full for these dates -> sister-property cards (nothing renders unless the API returned some) */}
+      {nightsGenuinelyTaken && sisterSpillover && (
+        <div className="mt-3">
+          <SisterPropertySpillover
+            data={sisterSpillover}
+            checkIn={crossSellCheckIn}
+            checkOut={crossSellCheckOut}
+            guests={guests}
+            tenantSlug={sisterTenantParam}
+          />
+        </div>
+      )}
+
       {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
       {!datesUnavailable && (
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>
-        You won&apos;t be charged yet
+        {/* GUEST-065: a host with no online payment charges nothing here at all; "not charged yet" implies a later online charge. */}
+        {showOnlinePaymentProcessing ? "You won't be charged yet" : 'Nothing is charged online. The host confirms your booking.'}
       </p>
       )}
 
-      {!datesUnavailable && illustrativeOtaGuestFeeComparison && illustrativeOtaGuestFeeComparison.illustrativeGuestFee > 0 && (
-        <p
-          className="bw-direct-savings"
-          data-testid="bw-direct-savings-line"
-          style={{ textAlign: 'center', fontSize: 12, color: '#157046', marginTop: 6, lineHeight: 1.45 }}
-        >
-          Save ~{displayPrice(illustrativeOtaGuestFeeComparison.illustrativeGuestFee)} vs typical booking sites (illustrative) — direct booking, lower fees than OTAs.
-        </p>
+      {/* TOP10-2026-10-27-01-E: social proof and the calendar legend follow the money and the
+          action: total, photo, dates/guests, lines, Reserve, then reassurance. */}
+      {listingId != null && Number(listingId) > 0 && (
+        <FomoBar listingId={Number(listingId)} />
       )}
+      <div className="lv-booking-legend">
+        {/* Legend for calendar cell colours — same swatches as the calendar popover's legend. */}
+        <ul className="bw-legend" aria-label="Calendar legend" data-testid="bw-availability-legend">
+          <li className="bw-legend-item">
+            <span className="bw-legend-label">
+              <span className="bc-sw bc-sw-available" aria-hidden="true" />
+              Available
+            </span>
+            <span className="bw-legend-desc">Open for booking</span>
+          </li>
+          {/* Founder ruling 2026-10-21: no "Turnover" in front of guests — a turnover night is simply a night
+              they can book, so it is drawn and described as available. */}
+          <li className="bw-legend-item">
+            <span className="bw-legend-label">
+              <span className="bc-sw bc-sw-unavail" aria-hidden="true" />
+              Not available
+            </span>
+            <span className="bw-legend-desc">Already booked or closed</span>
+          </li>
+        </ul>
+      </div>
 
       {/* TASK-2623/TASK-4334: Trust strip — free cancellation, actual computed deadline
           when a check-in date is selected; generic fallback copy otherwise. TASK-7012: rendered only
@@ -2296,6 +3218,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           </span>
         </div>
       ) : null}
+
+      {/* GUEST-023: Branded Book Direct Perks */}
+      <BookDirectPerks className="mt-3.5" />
 
       {/* TASK-7428: Razorpay pay rail only when an online payment provider is configured */}
       {showOnlinePaymentProcessing && (

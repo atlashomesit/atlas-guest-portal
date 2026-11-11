@@ -2,14 +2,14 @@ export const SUPPORT_DRAWER_COPY = {
   header: {
     title: "Need a hand?",
     /** Resolved at render via `getSupportDrawerHeaderSubtitle(brandName)`. */
-    subtitle: "Chat with us or jump to WhatsApp/callback without losing your place.",
+    subtitle: "Get automated answers or reach us on WhatsApp/callback.",
     // Warmer variants for future experiments:
     // - "We’re right here if you need us—ping us and we’ll reply in minutes."
     // - "Questions? Our team is online and ready to help."
   },
   trustMicrocopy: "Fast support on WhatsApp",
   trigger: {
-    ariaLabel: "Chat with us",
+    ariaLabel: "Chat with us WhatsApp, call, FAQs",
     label: "Chat with us",
     helper: "WhatsApp, call, FAQs",
   },
@@ -74,8 +74,23 @@ export const SUPPORT_DRAWER_COPY = {
       inputPlaceholder: "Messaging coming soon",
     },
   },
+  assistant: {
+    entryLabel: "Stay assistant",
+    entryDescription: "Automated answers to common stay questions",
+    disclosure: "Automated help from stay FAQs and AI when available.",
+    faqSource: "FAQ answer",
+    aiSource: "Automated answer",
+    fallbackSource: "General guidance",
+    error: "Could not get an answer. Your question is still here; please try again or use WhatsApp.",
+    tooLong: "Keep your question under 2,000 characters.",
+    voiceUnavailable: "Voice input is unavailable in this browser. Please type your question.",
+    inputPlaceholder: "Ask about your stay...",
+    backLabel: "Back to support",
+    humanHelp: "Need a person? Go back for WhatsApp or callback.",
+    whatsappHostCta: "Chat with the host on WhatsApp",
+  },
 } as const;
 
 export function getSupportDrawerHeaderSubtitle(brandName: string): string {
-  return `Chat with ${brandName} or jump to WhatsApp/callback without losing your place.`;
+  return `Get automated answers or contact ${brandName} on WhatsApp/callback.`;
 }

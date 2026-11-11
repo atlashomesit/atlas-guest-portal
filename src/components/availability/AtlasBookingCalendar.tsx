@@ -16,7 +16,7 @@ import React, {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { addDays, format, isSameDay, startOfMonth } from 'date-fns';
+import { addDays, differenceInCalendarDays, format, isSameDay, startOfMonth } from 'date-fns';
 import { type AtlasDateRangePickerValue } from '@/components/date/AtlasDateRangePicker';
 import { toCalendarISO } from '@/utils/date';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
@@ -69,6 +69,11 @@ export interface AtlasBookingCalendarProps {
    */
   shownDate: Date;
   onShownDateChange: (date: Date) => void;
+  /**
+   * GUEST-074: a refusal for the pick just made (for example the home's minimum stay). The sheet covers the booking box on a
+   * phone, so a message that only lives under the dates is never seen; the sheet says it itself.
+   */
+  notice?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +118,7 @@ function formatINR(n: number): string {
 const BOOKING_CALENDAR_Z_INDEX = 100;
 
 /** Mirrors the bottom-sheet `@media` block in AtlasBookingCalendar.css (CSS owns placement there). */
-const BOTTOM_SHEET_MEDIA_QUERY = '(max-width: 620px)';
+const BOTTOM_SHEET_MEDIA_QUERY = '(max-width: 760px)';
 
 /** Smallest height the popover is capped to on a very short viewport (its grid then scrolls). */
 const MIN_CAPPED_POPOVER_HEIGHT = 160;
@@ -136,6 +141,7 @@ const PRESETS: Preset[] = [
 ];
 
 // TASK-4847: exported so the preset date-math can be unit-tested (pure function, no DOM).
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper exported for unit tests
 export function computePreset(id: string, today: Date): { startDate: Date; endDate: Date } | null {
   const dow = today.getDay(); // 0=Sun…6=Sat
   if (id === 'tonight') {
@@ -359,10 +365,12 @@ const MonthGrid: React.FC<MonthProps> = ({
           <div key={d} className="bc-dow">{d}</div>
         ))}
       </div>
-      <div className="bc-grid" role="grid">
-        {cells.map((d, i) => {
+      <div className="bc-grid" role="grid" aria-label={`${MONTH_NAMES[month]} ${year}`} >
+        {Array.from({ length: cells.length / 7 }, (_, week) => <div role="row" key={week} style={{ display: 'contents' }}>
+        {cells.slice(week * 7, week * 7 + 7).map((d, dayIndex) => {
+          const i = week * 7 + dayIndex;
           if (d === null) {
-            return <div key={i} className="bc-cell-wrap bc-empty" />;
+            return <div key={i} className="bc-cell-wrap bc-empty" role="gridcell" />;
           }
           const date = new Date(year, month, d);
           date.setHours(0, 0, 0, 0);
@@ -387,7 +395,8 @@ const MonthGrid: React.FC<MonthProps> = ({
           } else if (isDisabledByWidget) {
             state = 'unavailable';
           } else if (apiStatus === 'Turnover') {
-            state = 'turnover';
+            // Founder ruling 2026-10-21: a turnover night is just a night the guest can book — same look.
+            state = 'available';
           } else {
             state = 'available';
           }
@@ -421,6 +430,7 @@ const MonthGrid: React.FC<MonthProps> = ({
             />
           );
         })}
+        </div>)}
       </div>
     </div>
   );
@@ -446,6 +456,7 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
   pricingLoading,
   shownDate,
   onShownDateChange,
+  notice,
 }) => {
   const [hover, setHover] = useState<Date | null>(null);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -512,19 +523,26 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         // click aimed at an overlapped Reserve button lands inside the popover's own DOM and
         // neither reaches Reserve nor closes the calendar (TASK-102485 regression — the
         // atlas:set-checkin bridge auto-opens this popover, and it can cover the CTA beneath).
-        // Treat the Reserve button's top edge as a floor, same as the navbar ceiling below.
+        // Keep Reserve exposed when the entire picker fits above it. On shorter screens the
+        // date grid takes priority: its explicit Use dates / close controls return to Reserve.
         const reserveEl = document.querySelector('[data-testid="guest-booking-submit"]');
         const reserveTop = reserveEl ? reserveEl.getBoundingClientRect().top : null;
         const visibleBottom =
-          reserveTop != null && reserveTop > navBottom
+          reserveTop != null && reserveTop - MARGIN - (navBottom + MARGIN) >= popHeight
             ? Math.min(viewportHeight - MARGIN, reserveTop - MARGIN)
             : viewportHeight - MARGIN;
+        // A multi-row tablet navbar can otherwise hide the last calendar week. If the full
+        // picker fits in a normal-height viewport, let the open dialog overlap that chrome.
+        // Very short windows still use an internally scrolling picker.
+        const useFullViewport = viewportHeight >= 640 && popHeight <= viewportHeight - 2 * MARGIN &&
+          popHeight > visibleBottom - navBottom - MARGIN;
+        const topLimit = useFullViewport ? MARGIN : navBottom + MARGIN;
 
         // The popover is position:fixed beside a sticky booking column, so scrolling the page can
         // never reveal a part of it that opens below the fold. When the space below the field is
         // too short, slide it up just far enough to keep every day on screen (not above the navbar).
         if (belowTop + popHeight > visibleBottom && belowTop > navBottom + MARGIN) {
-          top = Math.max(visibleBottom - popHeight, navBottom + MARGIN);
+          top = Math.max(visibleBottom - popHeight, topLimit);
         }
         // Viewport too short even then: cap the height so the grid scrolls inside the popover.
         if (top >= navBottom && top + popHeight > visibleBottom) {
@@ -533,7 +551,7 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
         // The field has scrolled under the fixed navbar: clip the overlapped strip so the calendar
         // slides UNDER the navbar instead of painting over it. clip-path also removes that strip
         // from hit-testing, so the navbar stays clickable.
-        if (top < navBottom) {
+        if (top < navBottom && !useFullViewport) {
           next.clipPath = `inset(${Math.ceil(navBottom - top)}px 0 0 0)`;
         }
       }
@@ -780,6 +798,22 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
       aria-label="Select dates"
     >
       <div className="bc-root">
+        <div className="bc-heading">
+          <div>
+            <h2>Choose your dates</h2>
+            <p aria-live="polite">{value.startDate && value.endDate
+              ? `${differenceInCalendarDays(value.endDate, value.startDate)} night${differenceInCalendarDays(value.endDate, value.startDate) === 1 ? '' : 's'} selected`
+              : value.startDate ? 'Now choose your check-out date' : 'Select check-in, then check-out'}</p>
+          </div>
+          <button type="button" className="bc-close" onClick={onClose} aria-label="Close date picker">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+        <div className="bc-selection" data-testid="booking-calendar-selection">
+          <div data-active={!value.startDate}><span>Check-in</span><strong>{value.startDate ? format(value.startDate, 'd MMM yyyy') : 'Add date'}</strong></div>
+          <div data-active={!!value.startDate && !value.endDate}><span>Check-out</span><strong>{value.endDate ? format(value.endDate, 'd MMM yyyy') : 'Add date'}</strong></div>
+        </div>
+
         {/* Quick presets */}
         <div className="bc-presets">
           {PRESETS.map((p) => (
@@ -864,17 +898,30 @@ export const AtlasBookingCalendar: React.FC<AtlasBookingCalendarProps> = ({
             Available
           </div>
           <div className="bc-legend-item">
-            <span className="bc-sw bc-sw-turnover" />
-            Turnover · bookable
-          </div>
-          <div className="bc-legend-item">
             <span className="bc-sw bc-sw-unavail" />
-            Unavailable
+            Not available
           </div>
           <div className="bc-legend-item">
             <span className="bc-sw bc-sw-selected" />
             Your stay
           </div>
+        </div>
+        {/* GUEST-048: the per-day figures come from the calendar rates, which do not include every adjustment the
+            checkout quote applies, so say where the real price is. [FG: pricing] wording is the least-surprising
+            neutral line; the founder may reword it. */}
+        {calendarDailyPrices.size > 0 && (
+          <p className="bc-price-note" data-testid="booking-calendar-price-note" style={{ margin: '0 0 8px', fontSize: 11, lineHeight: 1.4, color: 'var(--text-muted, #6b5a55)' }}>
+            Prices per night are a guide. The price you pay is shown in the booking box once you pick your dates.
+          </p>
+        )}
+        {notice && (
+          <p className="bc-notice" role="alert" data-testid="booking-calendar-notice">
+            {notice}
+          </p>
+        )}
+        <div className="bc-footer">
+          <button type="button" className="bc-clear" disabled={!value.startDate && !value.endDate} onClick={() => { setActivePreset(null); onChange({ startDate: null, endDate: null }); }}>Clear dates</button>
+          <button type="button" className="bc-apply" disabled={!value.startDate || !value.endDate} onClick={onClose}>Use dates</button>
         </div>
       </div>
     </div>

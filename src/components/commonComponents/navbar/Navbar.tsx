@@ -1,16 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate, useLocation, matchPath } from 'react-router-dom';
-import { Search } from 'lucide-react';
 import './navbar.css';
 import './mobile-search.css';
 import MobileSearchPill from './MobileSearchPill';
 
-import { primaryNav, ctaNav, tripsMenuNav } from '../../../config/navigation';
+import { primaryNav, ctaNav, tripsMenuNav, resolveNavTo } from '../../../config/navigation';
 import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { getTenantContext } from '../../../tenant/tenantContext';
-import { getTenantBrandName } from '../../../tenant/displayBrand';
+import { MARKETPLACE_BRAND_BASELINE, resolveTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldShowHostAcquisitionCtas } from '../../../tenant/tenantOverrides';
-import { getTenantSlug } from '../../../tenant/tenantResolver';
+import { getTenantSlug, isMarketplaceMode, isAtlastaysMarketplaceSurface } from '../../../tenant/tenantResolver';
 import { getAdminPortalLoginUrl } from '../../../config/adminPortal';
 import { formatDisplayNumber, getTelLink } from '../../../config/contact';
 import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
@@ -21,6 +20,16 @@ import { useTranslation } from '../../../hooks/useTranslation';
 import { LANGUAGE_SWITCHER_ENABLED } from '../../../i18n/i18n'; // TASK-4517
 
 const Navbar = () => {
+  const headerRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header || typeof ResizeObserver === 'undefined') return;
+    const measure = () => document.documentElement.style.setProperty('--measured-nav-height', `${header.getBoundingClientRect().height}px`);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => { observer.disconnect(); document.documentElement.style.removeProperty('--measured-nav-height'); };
+  }, []);
   const tenant = getTenantContext();
   // When /tenants/from-domain fails locally, tenant context is null — still honour
   // runtime config tenantKey so the marketplace lockup (and other atlas overrides) apply.
@@ -38,7 +47,7 @@ const Navbar = () => {
     slug,
   });
   // RA-006 §3.5: prefer tenant name everywhere; only fall back to "Home" on the Atlas root.
-  const brandName = getTenantBrandName();
+  const brandName = resolveTenantBrandName(tenant);
   const showLogo = !overrides.hideLogo;
   const showHostAcquisition = shouldShowHostAcquisitionCtas(tenant, overrides);
 
@@ -51,6 +60,18 @@ const Navbar = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const isTenantHome = location.pathname === '/' && !(isMarketplaceMode() && isAtlastaysMarketplaceSurface());
+  const isMarketplaceBrand =
+    location.search.includes('brand=atlastays') ||
+    (typeof window !== 'undefined' && (window.location?.search ?? '').includes('brand=atlastays')) ||
+    isMarketplaceMode();
+  const hasTenantIdentity = tenant && !tenant.isMarketplaceRoot && (
+    tenant.guestCommsBrandingMode === 'Neutral' || tenant.legalContactPack?.isCustomDomain ||
+    !['atlas', 'marketplace', 'marketplace-root'].includes(tenant.slug)
+  );
+  const isMarketplaceShell = isMarketplaceBrand && !hasTenantIdentity &&
+    (new URLSearchParams(location.search).get('brand') === 'atlastays' || isAtlastaysMarketplaceSurface());
+  const shellBrandName = isMarketplaceShell ? MARKETPLACE_BRAND_BASELINE : brandName;
   const { booking } = useBooking();
   const { language, changeLanguage, availableLanguages, getLanguageName } = useTranslation();
 
@@ -69,7 +90,7 @@ const Navbar = () => {
   }, [location.pathname]);
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `nav-link ${isActive ? 'text-white' : ''}`;
+    `nav-link ${isActive ? 'font-semibold underline underline-offset-4' : ''}`;
 
   const closeMobile = () => {
     setIsMenuOpen(false);
@@ -108,7 +129,8 @@ const Navbar = () => {
       pets: booking.pets ?? undefined,
     };
 
-    const destination = isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : ctaNav.to;
+    const searchDestination = isMarketplaceBrand && ctaNav.to === '/search' ? '/search?brand=atlastays' : ctaNav.to;
+    const destination = isPropertyDetailsRoute ? `${location.pathname}#${bookingTarget}` : searchDestination;
 
     trackEvent(
       'cta_book_now_clicked',
@@ -142,7 +164,7 @@ const Navbar = () => {
       }
     }
 
-    navigate(ctaNav.to, {
+    navigate(searchDestination, {
       state: { bookingPrefill: bookingState },
     });
 
@@ -160,7 +182,7 @@ const Navbar = () => {
   }, [location.pathname]);
 
   return (
-    <header className="navbar-container" id="navbar_container">
+    <header ref={headerRef} className={`navbar-container${isTenantHome ? ' navbar-home' : ''}`} id="navbar_container">
       {/* Slim utility bar — Home v2 design §1: dark strip above main header */}
       <div className="util-bar" aria-hidden="false">
         <div className="util-bar-inner">
@@ -181,8 +203,10 @@ const Navbar = () => {
             ) : null}
           </div>
           <div className="util-bar-right">
-            <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>
-            <span className="util-bar-sep" aria-hidden="true" />
+            {telLink && formatDisplayNumber() && <>
+              <a className="util-bar-phone" href={telLink}>{formatDisplayNumber()}</a>
+              <span className="util-bar-sep" aria-hidden="true" />
+            </>}
             {/* TASK-4018: Language switcher — TASK-8103: enabled for all 7 locales (English fallback for mr/bn/ta/kn) */}
             {LANGUAGE_SWITCHER_ENABLED && (
               <div className="relative">
@@ -191,7 +215,7 @@ const Navbar = () => {
                   className="util-bar-locale lang-switcher"
                   onClick={() => setLangMenuOpen(!langMenuOpen)}
                   onBlur={() => window.setTimeout(() => setLangMenuOpen(false), 150)}
-                  aria-label="Change language"
+                  aria-label={`${language.toUpperCase()} - Change language`}
                   aria-expanded={langMenuOpen}
                 >
                   {language.toUpperCase()}
@@ -232,7 +256,7 @@ const Navbar = () => {
         {/* LEFT - Logo and Mobile Menu Button */}
         <div className="flex items-center justify-between w-full lg:w-auto">
           <Link
-            to="/"
+            to={isMarketplaceBrand ? "/?brand=atlastays" : "/"}
             className="flex items-center gap-2 navbar-brand-link"
             // TASK-8215: the accessible name must not depend on visible text — the logo's
             // alt is decorative ("") and .navbar-logo-text is display:none below 640px, so
@@ -240,9 +264,11 @@ const Navbar = () => {
             // link-name, WCAG 2.4.4/4.1.2). Derive from the resolved tenant brand name
             // (falls back to the marketplace baseline, never empty) rather than hardcoding
             // "Atlas" so white-label tenants get their own name here too.
-            aria-label={`${brandName || 'Atlas'} — home`}
+            aria-label={`${shellBrandName || 'Atlas'} — home`}
           >
-            {showLogo && (
+            {isMarketplaceShell ? (
+              <span className="navbar-marketplace-wordmark">{MARKETPLACE_BRAND_BASELINE}</span>
+            ) : showLogo && (
               <img
                 src={logoSrc}
                 // Wordmark logos visually spell out the brand name, so they carry the real alt
@@ -258,16 +284,16 @@ const Navbar = () => {
               />
             )}
             {/* Wordmark logos already include the brand name — hide duplicate text */}
-            {brandName && !isWordmarkLogo(logoSrc) ? (
+            {!isMarketplaceShell && brandName && !isWordmarkLogo(logoSrc) ? (
               <span className="navbar-logo-text">{brandName}</span>
             ) : null}
           </Link>
 
           {/* DESIGN-026: persistent mobile search pill — sits between logo and hamburger */}
-          <MobileSearchPill />
+          {!isTenantHome && <MobileSearchPill />}
 
           {/* Mobile Menu Button - Only visible on mobile */}
-          <div className="lg:hidden">
+          <div className="lg:hidden shrink-0">
             <button
               type="button"
               className={`mobile-menu-button ${isMenuOpen ? 'open' : ''}`}
@@ -286,14 +312,13 @@ const Navbar = () => {
 
         {/* CENTER - Desktop Navigation: Stays | Hyderabad | Trips | Help */}
         <div className="hidden lg:flex items-center flex-1 justify-center">
-          <Link to="/search" className="navbar-search-pill" data-testid="navbar-search-pill">
-            <span className="navbar-search-pill__text">
-              <span className="navbar-search-pill__label">Where to?</span>
-              <span className="navbar-search-pill__hint">Search stays</span>
-            </span>
-            <span className="navbar-search-pill__icon" aria-hidden>
-              <Search className="h-4 w-4" strokeWidth={2.5} />
-            </span>
+          <Link
+            to={isMarketplaceBrand ? "/search?brand=atlastays" : "/search"}
+            className="navbar-search-pill"
+            data-testid="navbar-search-pill"
+          >
+            <span className="navbar-search-pill__label">Where to?</span>
+            <span className="navbar-search-pill__hint">Search stays</span>
           </Link>
         </div>
 
@@ -302,7 +327,7 @@ const Navbar = () => {
             {visibleNavItems.map((item) => (
               <NavLink
                 key={item.label}
-                to={item.to}
+                to={resolveNavTo(item, { marketplace: isMarketplaceBrand, search: location.search })}
                 className={navLinkClass}
               >
                 {item.label}
@@ -328,7 +353,7 @@ const Navbar = () => {
                   {tripsMenuNav.map((item) => (
                     <Link
                       key={item.to}
-                      to={item.to}
+                      to={item.to === '/search' && isMarketplaceBrand ? '/search?brand=atlastays' : item.to}
                       role="menuitem"
                       className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
                       onClick={() => setTripsMenuOpen(false)}
@@ -385,7 +410,7 @@ const Navbar = () => {
                 {tripsMenuNav.map((item) => (
                   <Link
                     key={item.to}
-                    to={item.to}
+                    to={item.to === '/search' && isMarketplaceBrand ? '/search?brand=atlastays' : item.to}
                     role="menuitem"
                     className="block px-4 py-2 text-sm text-text-primary hover:bg-brand-primary/10"
                     onClick={() => setAccountMenuOpen(false)}
@@ -443,7 +468,7 @@ const Navbar = () => {
             <NavLink
               key={item.label}
               onClick={closeMobile}
-              to={item.to}
+              to={resolveNavTo(item, { marketplace: isMarketplaceBrand, search: location.search })}
               className="block py-2"
             >
               {item.label}
@@ -457,7 +482,7 @@ const Navbar = () => {
               <NavLink
                 key={item.to}
                 onClick={closeMobile}
-                to={item.to}
+                to={item.to === '/search' && isMarketplaceBrand ? '/search?brand=atlastays' : item.to}
                 className="block py-2 pl-2 font-semibold"
                 data-testid={item.to === '/search' ? 'navbar-search-pill-mobile' : undefined}
               >

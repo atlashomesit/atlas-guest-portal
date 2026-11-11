@@ -8,10 +8,20 @@ import {
 } from "../../config/homepageUxFlags";
 import { useTenantListings } from "../../hooks/useTenantListings";
 import { useVerifiedReviews } from "../../hooks/useVerifiedReviews";
+import ReviewLocaleChip from "../property/ReviewLocaleChip";
+import {
+  ANONYMOUS_GUEST_NAME,
+  GUEST_FEEDBACK_LABEL,
+  formatGuestFeedbackDate,
+  type GuestFeedbackItem,
+} from "../property/guestFeedback";
 
 /* Kind-words band — light peach wash from the Stay by City Focus mockups
    (dark navy band replaced 2026-07: cards are white with alternating
    coral/lavender hairline borders, coral stars, gradient initial avatars). */
+/* REV-046: the band's own supporting lines bind to --text-secondary, not --text-muted. Several presets
+   (auroraChampagne, jetsetPearl, loversRetreatBlush) tune --text-muted for their own white/ivory
+   surfaces but inherit default.css's peach --bg-secondary here, where muted text measured 4.13-4.41:1. */
 const testimonialsBandStyle: CSSProperties = {
   backgroundColor: "var(--bg-secondary, #fdf2e9)",
 };
@@ -60,7 +70,16 @@ const StarRow = ({ stars, label }: { stars: number; label?: string }) => (
   </div>
 );
 
-const KindWordsHeader = ({ ratingLine, headline }: { ratingLine?: string; headline?: string }) => (
+const KindWordsHeader = ({
+  ratingLine,
+  headline,
+  supportingLine,
+}: {
+  ratingLine?: string;
+  headline?: string;
+  /** Replaces the generic marketing line when there is no rating line (REV-046 guest-feedback-only band). */
+  supportingLine?: string;
+}) => (
   <div className="text-center max-w-prose mx-auto mb-12">
     <p className="font-semibold tracking-[0.18em] uppercase text-xs md:text-sm mb-3" style={{ color: "var(--accent-text, #a84832)" }}>
       Kind words
@@ -78,23 +97,83 @@ const KindWordsHeader = ({ ratingLine, headline }: { ratingLine?: string; headli
         {ratingLine}
       </p>
     ) : (
-      <p className="mt-4 text-text-muted text-base md:text-lg">{testimonialsCopy.supporting}</p>
+      <p className="mt-4 text-text-secondary text-base md:text-lg">{supportingLine ?? testimonialsCopy.supporting}</p>
     )}
   </div>
 );
 
+/**
+ * REV-046 (founder ruling 2026-10-28): review-QR "Guest feedback" notes. Every card carries the label and
+ * none carries a verified-stay line or a source logo: a QR code can be scanned by anyone, so these are not
+ * proven stays. They are never counted in the rating line above them.
+ */
+const GuestFeedbackGrid = ({ items }: { items: GuestFeedbackItem[] }) => (
+  <div
+    className="grid gap-6 md:grid-cols-3 overflow-x-auto md:overflow-visible"
+    data-testid="homepage-guest-feedback-grid"
+  >
+    {items.map((item, index) => {
+      const quote = item.comment.length > 220 ? `${item.comment.slice(0, 217)}…` : item.comment;
+      const initial = item.firstName === ANONYMOUS_GUEST_NAME ? "G" : item.firstName.charAt(0).toUpperCase();
+      const monthYear = formatGuestFeedbackDate(item.date);
+      return (
+        <div
+          key={item.key}
+          className={reviewCardBaseClassName}
+          style={reviewCardBorderStyle(index)}
+          data-testid="homepage-guest-feedback-card"
+        >
+          <span
+            className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold text-text-secondary"
+            style={{ border: "1px solid var(--border-strong, #e5cfc0)" }}
+            data-testid="homepage-guest-feedback-label"
+          >
+            {GUEST_FEEDBACK_LABEL}
+          </span>
+          <div className="mt-3">
+            <StarRow stars={item.rating} label={`${item.rating} out of 5 stars`} />
+          </div>
+          <p className="mt-4 font-display text-xl md:text-2xl font-normal text-text-primary leading-relaxed" style={{ fontFamily: 'var(--font-family-display)' }}>
+            “{quote}”
+          </p>
+          <div className="mt-6 flex items-center gap-3">
+            <span
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+              style={avatarStyle(index)}
+              aria-hidden
+            >
+              {initial}
+            </span>
+            <div>
+              <p className="font-semibold text-text-primary leading-tight">{item.firstName}</p>
+              {monthYear ? <p className="text-xs text-text-muted">{monthYear}</p> : null}
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+
 const TestimonialsSection = () => {
-  // TASK-2872: drive testimonials from real verified-stay reviews. Hooks run
-  // unconditionally (rules of hooks) before any early return below.
-  const { properties } = useTenantListings();
+  // TASK-2872 / TASK-1039970: drive testimonials from real verified-stay reviews.
+  // Prioritize listings that have verified reviews according to the public listing DTO,
+  // preventing N+1 queries against units with zero reviews.
+  const { properties, state } = useTenantListings();
   const listingIds = useMemo(
     () =>
-      properties
-        .map((p) => p.listingId)
-        .filter((id): id is number => typeof id === "number" && id > 0),
-    [properties],
+      state === "loading"
+        ? []
+        : properties
+            .slice()
+            .sort((a, b) => (b.property_reviews ?? 0) - (a.property_reviews ?? 0))
+            .map((p) => p.listingId)
+            .filter((id): id is number => typeof id === "number" && id > 0),
+    [properties, state],
   );
-  const { reviews } = useVerifiedReviews(listingIds);
+  // REV-046: `guestFeedback` (review-QR notes) is a separate list from `reviews`. The `= []` also covers a caller
+  // or test double that returns only `{ reviews, loading }`.
+  const { reviews, guestFeedback = [] } = useVerifiedReviews(listingIds);
   if (enableTestimonialsStatic3) {
     return (
       <section
@@ -162,11 +241,32 @@ const TestimonialsSection = () => {
 
   // Default: real verified guest reviews only — never fabricated names.
   // Render nothing when there are no real reviews yet (honest empty state).
-  if (reviews.length === 0) return null;
+  if (reviews.length === 0 && guestFeedback.length === 0) return null;
+
+  // REV-046: a host with review-QR notes but no verified reviews yet. The band says "Guest feedback", with no
+  // rating line and no "verified" wording, because none of these notes is a verified stay.
+  if (reviews.length === 0) {
+    return (
+      <section
+        className="py-section-gap md:py-section-gap-md lg:py-section-gap-lg isolate relative"
+        style={testimonialsBandStyle}
+        aria-labelledby="testimonials-heading"
+        data-testid="homepage-guest-feedback"
+      >
+        <div className="mx-auto max-w-luxury px-[5%]">
+          <KindWordsHeader
+            headline={GUEST_FEEDBACK_LABEL}
+            supportingLine="Notes shared by guests. These are not part of the star rating."
+          />
+          <GuestFeedbackGrid items={guestFeedback} />
+        </div>
+      </section>
+    );
+  }
 
   const averageRating =
     Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length) * 100) / 100;
-  const ratingLine = `${averageRating} · ${reviews.length} verified ${reviews.length === 1 ? "stay" : "stays"}`;
+  const ratingLine = `${averageRating} · ${reviews.length} verified ${reviews.length === 1 ? "review" : "reviews"}`;
 
   return (
     <section
@@ -198,13 +298,30 @@ const TestimonialsSection = () => {
                   </span>
                   <div>
                     <p className="font-semibold text-text-primary leading-tight">{r.firstName}</p>
-                    <p className="text-xs text-text-muted">Verified stay</p>
+                    <p className="text-xs text-text-muted">{r.source ? `${r.source} review` : "Verified stay"}</p>
+                    <ReviewLocaleChip locale={r.locale} />
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
+        {guestFeedback.length > 0 ? (
+          <div
+            className="mt-14"
+            role="region"
+            aria-labelledby="guest-feedback-heading"
+            data-testid="homepage-guest-feedback"
+          >
+            <h3 id="guest-feedback-heading" className="text-center text-lg md:text-xl font-semibold text-text-primary">
+              {GUEST_FEEDBACK_LABEL}
+            </h3>
+            <p className="mt-1 mb-6 text-center text-sm text-text-secondary">
+              Notes shared by guests. These are not part of the star rating.
+            </p>
+            <GuestFeedbackGrid items={guestFeedback} />
+          </div>
+        ) : null}
       </div>
     </section>
   );

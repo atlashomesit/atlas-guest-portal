@@ -1,12 +1,16 @@
+import { useBookingContentVisible } from '@/hooks/useBookingContentVisible';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { matchPath, useLocation } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
+import { getApiHeaders } from "../../api/client";
 import { getFeatureFlags } from "../../config/featureFlags";
 import { SUPPORT_DRAWER_COPY } from "../../config/supportDrawerCopy";
 import { trackEvent } from "../../utils/analytics";
 import { buildWaLink, defaultPrefill } from "../../utils/whatsapp";
 import { getTenantBrandName } from "../../tenant/displayBrand";
+import { getTenantContext } from "../../tenant/tenantContext";
+import { OPEN_SUPPORT_EVENT } from "../property/propertyHelpEvents";
 import { submitCallbackRequest } from "../support/callbackService";
 import CallbackRequestForm from "./CallbackRequestForm";
 import ChatbotPlaceholder from "./ChatbotPlaceholder";
@@ -14,19 +18,28 @@ import SupportActionGrid from "./SupportActionGrid";
 import { SupportDrawerFlagsProvider, useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
 import SupportDrawer, { useSupportDrawerView } from "./SupportDrawer";
 import SupportWidgetTrigger from "./SupportWidgetTrigger";
+import StayIssueActions from "./StayIssueActions";
 import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types";
 
 const SCROLL_BUFFER_PX = 320;
 const DISMISS_KEY = "supportDrawer:dismissed";
 
-const SupportWidgetContent = () => {
+type SupportWidgetProps = { placement?: "floating" | "inline" };
+
+const SupportWidgetContent = ({ placement = "floating" }: SupportWidgetProps) => {
   const brandName = getTenantBrandName();
   const location = useLocation();
   const matchPropertyDetails =
     matchPath("/property_details/:id", location.pathname) ?? matchPath("/properties/:id", location.pathname);
-  const listingId = matchPropertyDetails?.params?.id ?? null;
+  const matchHomeUnit = matchPath("/homes/:propertySlug/:unitSlug", location.pathname);
+  const listingId = matchHomeUnit?.params?.unitSlug && /^\d+$/.test(matchHomeUnit.params.unitSlug)
+    ? matchHomeUnit.params.unitSlug
+    : matchPropertyDetails?.params?.id ?? null;
+  const assistantTenant = getApiHeaders()['X-Tenant-Slug'] ?? getTenantContext()?.slug ?? '';
+  const assistantContextKey = `${assistantTenant}:${listingId ?? ''}`;
 
   const [isOpen, setIsOpen] = useState(false);
+  const bookingContentVisible = useBookingContentVisible();
   const [pageUrl, setPageUrl] = useState("");
   const [footerOffset, setFooterOffset] = useState(0);
   const [callbackPhone, setCallbackPhone] = useState("");
@@ -37,7 +50,6 @@ const SupportWidgetContent = () => {
     enableSupportCtaHierarchy,
     enableSupportLayoutVariants,
     enableChatbotPlaceholder,
-    enableHideUnfinishedChatbot,
     enableRevealCallbackOnClickOnly,
     enableRecommendedWhatsAppPrimary,
     enableCloseReassurance,
@@ -69,7 +81,9 @@ const SupportWidgetContent = () => {
   const bottomSpacing = useMemo(() => {
     const base = 20;
     const homeHeroLift = routePath === "/" && narrowViewport ? 112 : 0;
-    return `calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + ${base + footerOffset + homeHeroLift}px)`;
+    // --pp-sticky-bar-offset: the property page's phone sticky bar publishes its live height here
+    // (0px when hidden / not shown / on any other page), so the drawer opens ABOVE the bar.
+    return `calc(var(--safe-area-bottom, env(safe-area-inset-bottom, 0px)) + var(--pp-sticky-bar-offset, 0px) + ${base + footerOffset + homeHeroLift}px)`;
   }, [footerOffset, routePath, narrowViewport]);
 
   const whatsappLink = useMemo(
@@ -83,7 +97,11 @@ const SupportWidgetContent = () => {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setPageUrl(window.location.href);
+    // The booking token belongs only on internal booking/message links, never in
+    // external WhatsApp prefills or generic callback notes.
+    const publicPageUrl = new URL(window.location.href);
+    publicPageUrl.searchParams.delete('t');
+    setPageUrl(publicPageUrl.toString());
   }, [location.key]);
 
   useEffect(() => {
@@ -135,6 +153,17 @@ const SupportWidgetContent = () => {
     setIsOpen(true);
     trackEvent("chat_opened", { surface: "support_widget", entryPoint: "floating_pill" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
   };
+
+  // TOP10-2026-10-27-01-D: the property page's sticky-bar Chat button opens this same drawer.
+  useEffect(() => {
+    const openFromStickyBar = () => {
+      setIsDismissed(false);
+      setIsOpen(true);
+      trackEvent("chat_opened", { surface: "support_widget", entryPoint: "sticky_bar" }, { route: analyticsMetadata.route, listingId: analyticsMetadata.listingId ?? undefined });
+    };
+    window.addEventListener(OPEN_SUPPORT_EVENT, openFromStickyBar);
+    return () => window.removeEventListener(OPEN_SUPPORT_EVENT, openFromStickyBar);
+  }, [analyticsMetadata.route, analyticsMetadata.listingId]);
 
   const handleClose = () => {
     setIsOpen(false);
@@ -226,6 +255,7 @@ const SupportWidgetContent = () => {
         />
 
         <div className="flex flex-col gap-[var(--drawer-section-gap,0.75rem)] px-[var(--drawer-card-padding-inline,1rem)] pb-[calc(var(--drawer-card-padding-block,0.75rem)+0.25rem)]">
+          <StayIssueActions onSelect={handleClose} />
           {isCallbackExpanded ? (
             <CallbackRequestForm
               callbackError={callbackError}
@@ -239,10 +269,7 @@ const SupportWidgetContent = () => {
           ) : null}
 
           {enableChatbotPlaceholder ? (
-            <ChatbotPlaceholder
-              enableHideUnfinishedChatbot={enableHideUnfinishedChatbot}
-              listingId={listingId}
-            />
+            <ChatbotPlaceholder />
           ) : null}
         </div>
       </>
@@ -259,7 +286,7 @@ const SupportWidgetContent = () => {
 
   return (
     <>
-      {!isOpen ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} /> : null}
+      {!isOpen && !bookingContentVisible ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} placement={placement} /> : null}
 
       {isOpen ? (
         <>
@@ -276,6 +303,8 @@ const SupportWidgetContent = () => {
           {/* Enable layoutVariants + ctaHierarchy (e.g., ?ff=layoutVariants,compactDrawer,ctaHierarchy)
               to trial the compact drawer and CTA priority without changing the default experience. */}
           <SupportDrawer
+            assistantContextKey={assistantContextKey}
+            assistantListingId={listingId}
             bottomSpacing={bottomSpacing}
             layoutVariant={
               enableSupportLayoutVariants
@@ -296,14 +325,14 @@ const SupportWidgetContent = () => {
   );
 };
 
-const SupportWidget = () => {
+const SupportWidget = ({ placement = "floating" }: SupportWidgetProps) => {
   const location = useLocation();
   // eslint-disable-next-line react-hooks/exhaustive-deps -- location changes on navigate, linter flags as outer scope
   const featureFlags = useMemo(() => getFeatureFlags(), [location.search]);
 
   return (
     <SupportDrawerFlagsProvider flags={featureFlags}>
-      <SupportWidgetContent />
+      <SupportWidgetContent placement={placement} />
     </SupportDrawerFlagsProvider>
   );
 };

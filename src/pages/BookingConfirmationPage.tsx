@@ -1,9 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DoorOpen } from 'lucide-react';
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantListingAddress, getTenantOverrides } from "../tenant/tenantOverrides";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useLocation, useParams, useSearchParams, Link } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react"; // TASK-1476
+import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
+import GuestDepositHoldCard, { type GuestDepositHold } from "@/components/stay/GuestDepositHoldCard"; // PAY-006
 import SEO from "../components/SEO";
 import WeatherWidget from "../components/WeatherWidget";
 import ErrorDisplay, { type ErrorResponse as ApiErrorResponse, type RecoveryAction as ApiRecoveryAction } from "../components/ErrorDisplay";
@@ -19,8 +22,12 @@ import {
 } from "../config/refundPolicyTimelines";
 import { useGuestBookingQrToken } from "../hooks/useGuestBookingQrToken";
 import { formatCurrency } from "../utils/formatting";
+import { DormGenderAckLine } from "../components/hostel/DormGenderAckLine";
+import { resolveBookingPlanTerms } from "../utils/bookingPlanTerms";
 import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
+import GuestDietarySelector, { type GuestMealPreferences } from "../components/bnb/GuestDietarySelector"; // BNB-002 / BNB-009
+import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
 import {
   buildReceiptHtml,
   buildStayGuideHtml,
@@ -33,6 +40,18 @@ const GuestAssistant = lazy(() => import("../components/GuestAssistant")); // TA
 /** Minimal shape of the non-standard `beforeinstallprompt` event — only `prompt()` is used here. */
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
+}
+
+/**
+ * G3 journey 12: the API stores a guest's cancellation reason as "CANCELLATION_REQUEST — <reason>" (an internal marker for the host
+ * queue), and "Guest requested cancellation" when none was typed. The guest sees only what they typed.
+ */
+function guestFacingRequestNote(note: string | null | undefined): string | null {
+  const raw = (note ?? "").trim();
+  if (!raw) return null;
+  const stripped = raw.replace(/^CANCELLATION_REQUEST\s*[—–-]\s*/, "").trim();
+  if (!stripped || stripped === "Guest requested cancellation") return null;
+  return stripped;
 }
 
 /** Guest summary API returns ISO dates or formatted strings (e.g. "Sat, 3 May 2026") — normalize for ICS. */
@@ -145,22 +164,43 @@ function buildBookingIcsContent(args: {
   ].join("\r\n");
 }
 
-/** TASK-2490: guest web self-check-in form — posts arrival time + party size + optional ID link. */
-function SelfCheckInCard() {
-  // TASK-4514: Card is now a status + CTA into canonical SelfCheckIn flow
-  // The divergent /api/guest/bookings/{bookingId}/check-in endpoint is superseded by the canonical flow
-  return (
-    <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5" data-testid="self-checkin-done">
-      <h2 className="text-sm font-semibold text-text-primary mb-1">Complete your check-in</h2>
-      <p className="text-sm text-text-secondary mb-3">Share your arrival details and verify your ID through our secure check-in process.</p>
-      <a
-        href="/check-in"
-        className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:bg-brand-primary/90 transition-colors"
-      >
-        Start check-in →
-      </a>
-    </div>
-  );
+/**
+ * TASK-103121: Clean phone formatting with dial code / international format (+91 for India).
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located phone formatter
+export function formatCleanInternationalPhone(raw?: string | null): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return trimmed;
+  // If bare 10-digit Indian national number, format with +91
+  if (digits.length === 10) {
+    return `+91${digits}`;
+  }
+  // If 12 digits starting with 91
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return `+${digits}`;
+  }
+  if (trimmed.startsWith("+")) {
+    return trimmed;
+  }
+  return `+${digits}`;
+}
+
+/**
+ * TASK-103121: Standard clean phone digits for wa.me links:
+ * - Digits only (no spaces, hyphens, plus signs or special characters)
+ * - Standard international format without +
+ * - Prepends 91 for 10-digit Indian numbers
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located phone formatter
+export function cleanWaPhoneDigits(raw?: string | null): string {
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
 }
 
 interface BookingSummary {
@@ -169,6 +209,7 @@ interface BookingSummary {
   listingId?: number;
   guestId?: number;
   guestName: string;
+  guestPhone?: string;
   propertyName: string;
   listingName: string;
   checkinDate: string;
@@ -189,10 +230,27 @@ interface BookingSummary {
   gstInvoiceTotal?: number | null;
   /** TASK-1888: server-computed; show pre-arrival checklist when true. */
   preArrivalBriefingVisible?: boolean;
+  /** GUEST-005: server owns the near-checkout timing policy; absent means hidden. */
+  checkoutBriefingVisible?: boolean;
   hoursUntilCheckin?: number;
   checkInTime?: string;
   checkOutTime?: string;
   nearbyLandmarks?: string[];
+  /** GUEST-029: plan terms on the booking; rendered as plain words, ratePlanName is never shown. */
+  ratePlanName?: string | null;
+  mealPlanCode?: string | null;
+  cancellationPolicy?: string | null;
+  /** GUEST-068: the server's one wording of this booking's cancellation rule (same as the "Your booking" page). */
+  cancellationHeadline?: string | null;
+  cancellationDetail?: string | null;
+  /** BNB-009: saved meal choices + whether to ask + the API's one list of options. Absent on older API builds (selector hidden). */
+  mealPreferences?: GuestMealPreferences | null;
+  /** PAY-009: refunds on this booking (newest first); empty/absent = no tracker. */
+  refunds?: GuestRefund[];
+  /** PAY-006: the refundable security-deposit card hold on this booking (status, amount, expiry); absent = no hold, no card. */
+  depositHold?: GuestDepositHold | null;
+  /** PAY-010: the guest said they paid the host's UPI link / QR; the host has not confirmed yet. NOT paid. */
+  awaitingHostPaymentConfirmation?: boolean;
   /** TASK-1296: guest referral code (e.g. FRIEND42) for the WhatsApp share button. */
   guestReferralCode?: string;
   /** TASK-1490: ISO dates + coordinates for Open-Meteo weather widget. */
@@ -202,6 +260,10 @@ interface BookingSummary {
   propertyLongitude?: number;
   /** TASK-1254: Booking reference for self check-in flow (ExternalReservationId or ATL-{id} fallback). */
   bookingRef?: string;
+  /** GUEST-053: Assigned smart-lock door code & key access on Stay Hub upon check-in completion. */
+  doorCodeVisible?: boolean;
+  doorCode?: string | null;
+  doorCodeLabel?: string | null;
   /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
   preferredLanguage?: string | null;
   // TASK-4510: Digital Guest Guidebook
@@ -210,6 +272,9 @@ interface BookingSummary {
   guidebookTrashParkingText?: string | null;
   guidebookCheckoutChecklistText?: string | null;
   guidebookFoodThingsTodoText?: string | null;
+  /** HSL-011: when the guest confirmed the dorm gender rule (ISO) and which rule. */
+  dormGenderAckAtUtc?: string | null;
+  dormGenderAckPolicy?: "FemaleOnly" | "MaleOnly" | null;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -293,6 +358,7 @@ type ApiErrorEnvelope = ApiErrorResponse & {
 };
 
 export default function BookingConfirmationPage() {
+  const location = useLocation();
   const { bookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("t");
@@ -318,7 +384,7 @@ export default function BookingConfirmationPage() {
   const [modNote, setModNote] = useState("");
   const [modSubmitting, setModSubmitting] = useState(false);
   const [modMessage, setModMessage] = useState<string>("");
-  interface ModRequestSummary { id: number; requestedCheckinDateUtc: string; requestedCheckoutDateUtc: string; requestedGuestCount?: number | null; note?: string | null; status: string; decisionNote?: string | null; decisionMadeAtUtc?: string | null; createdAtUtc: string; }
+  interface ModRequestSummary { id: number; requestedCheckinDateUtc: string; requestedCheckoutDateUtc: string; requestedGuestCount?: number | null; note?: string | null; status: string; decisionNote?: string | null; decisionMadeAtUtc?: string | null; createdAtUtc: string; isCancellation?: boolean; }
   const [modRequests, setModRequests] = useState<ModRequestSummary[]>([]);
   // TASK-350: guest self-service cancellation request
   const [cancelReason, setCancelReason] = useState("");
@@ -328,16 +394,50 @@ export default function BookingConfirmationPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [copyRefFeedback, setCopyRefFeedback] = useState(false);
   const [copyRefManual, setCopyRefManual] = useState(false);
+  const [doorCodeCopied, setDoorCodeCopied] = useState(false);
+  const [isOfflineCachedCopy, setIsOfflineCachedCopy] = useState(false);
+  const copyDoorCodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+  }, []);
   const [shareLanguage, setShareLanguage] = useState<"en" | "hi" | "te">("en");
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "success" | "failed">("pending");
   const [paymentFailureReason, setPaymentFailureReason] = useState<string | null>(null);
   const [paymentFailedAt, setPaymentFailedAt] = useState<string | null>(null);
   const [paymentRetryUrl, setPaymentRetryUrl] = useState<string | null>(null);
+  const [holdExpiresAtUtc, setHoldExpiresAtUtc] = useState<string | null>(null);
+  const [holdCountdown, setHoldCountdown] = useState<string | null>(null);
   const [paymentCheckManual, setPaymentCheckManual] = useState(false);
   const [paymentPollAttempt, setPaymentPollAttempt] = useState(0);
   const [paymentPollExhausted, setPaymentPollExhausted] = useState(false);
   const [lastPaymentCheckAt, setLastPaymentCheckAt] = useState<Date | null>(null);
   const [relativeNowMs, setRelativeNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!holdExpiresAtUtc || paymentStatus === "success") {
+      setHoldCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const remainingMs = new Date(holdExpiresAtUtc).getTime() - Date.now();
+      if (Number.isNaN(remainingMs)) {
+        setHoldCountdown(null);
+        return;
+      }
+      if (remainingMs <= 0) {
+        setHoldCountdown("0:00");
+        return;
+      }
+      const totalSec = Math.ceil(remainingMs / 1000);
+      const mins = Math.floor(totalSec / 60);
+      const secs = totalSec % 60;
+      setHoldCountdown(`${mins}:${String(secs).padStart(2, "0")}`);
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [holdExpiresAtUtc, paymentStatus]);
   const [pwaInstallDismissed, setPwaInstallDismissed] = useState(() => {
     try { return localStorage.getItem("atlas_guest_pwa_install_dismissed_v1") === "1"; } catch { return false; }
   });
@@ -388,13 +488,15 @@ export default function BookingConfirmationPage() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  useEffect(() => {
+  const loadBookingSummary = useCallback(() => {
     if (!bookingId || !token) {
       setError("Invalid booking link. Please use the link from your confirmation email.");
       setLoading(false);
       return;
     }
 
+    const scopedCacheKey = `atlas_stay_arrival_cache_${bookingId}_${token.slice(0, 8)}`;
+    const legacyCacheKey = `atlas_stay_arrival_cache_${bookingId}`;
     const url = buildApiUrl(`/api/guest/bookings/${bookingId}/summary?t=${encodeURIComponent(token)}`);
     fetch(url, {
       headers: { Accept: "application/json", ...getApiHeaders() },
@@ -403,14 +505,18 @@ export default function BookingConfirmationPage() {
         if (res.status === 404) {
           const parsed404 = await res.clone().json().catch(() => null) as ApiErrorEnvelope | null;
           if (parsed404?.code && parsed404?.message) setErrorPayload(parsed404);
-          throw new Error("Booking not found. Please check your confirmation email for the correct link.");
+          const err404 = new Error("Booking not found. Please check your confirmation email for the correct link.") as Error & { httpStatus?: number };
+          err404.httpStatus = 404;
+          throw err404;
         }
         if (!res.ok) {
           const parsed = await res.clone().json().catch(() => null) as ApiErrorEnvelope | null;
           if (parsed?.code && parsed?.message) {
             setErrorPayload(parsed);
           }
-          throw new Error(await messageFromApiResponse(res));
+          const errHttp = new Error(await messageFromApiResponse(res)) as Error & { httpStatus?: number };
+          errHttp.httpStatus = res.status;
+          throw errHttp;
         }
         return res.json() as Promise<BookingSummary>;
       })
@@ -422,6 +528,54 @@ export default function BookingConfirmationPage() {
           b.propertyAddress = overrideAddr;
         }
         setBooking(b);
+        setIsOfflineCachedCopy(false);
+        setError(null);
+        try {
+          const snapshot = {
+            bookingId: b.bookingId,
+            bookingRef: b.bookingRef,
+            listingId: b.listingId,
+            guestId: b.guestId,
+            guestName: b.guestName,
+            propertyName: b.propertyName,
+            listingName: b.listingName,
+            checkinDate: b.checkinDate,
+            checkoutDate: b.checkoutDate,
+            checkinDateIso: b.checkinDateIso,
+            checkoutDateIso: b.checkoutDateIso,
+            nights: b.nights,
+            status: b.status,
+            propertyAddress: b.propertyAddress,
+            propertyPhone: b.propertyPhone,
+            checkinInstructions: b.checkinInstructions,
+            checkInTime: b.checkInTime,
+            checkOutTime: b.checkOutTime,
+            currency: b.currency,
+            totalAmount: b.totalAmount,
+            wifiVisible: b.wifiVisible,
+            wifiName: b.wifiName,
+            wifiPassword: b.wifiPassword,
+            doorCodeVisible: b.doorCodeVisible,
+            doorCode: b.doorCode,
+            doorCodeLabel: b.doorCodeLabel,
+            guidebookAppliancesText: b.guidebookAppliancesText,
+            guidebookWifiTroubleshootingText: b.guidebookWifiTroubleshootingText,
+            guidebookTrashParkingText: b.guidebookTrashParkingText,
+            guidebookCheckoutChecklistText: b.guidebookCheckoutChecklistText,
+            guidebookFoodThingsTodoText: b.guidebookFoodThingsTodoText,
+            nearbyLandmarks: b.nearbyLandmarks,
+            mealPlanCode: b.mealPlanCode,
+            cancellationPolicy: b.cancellationPolicy,
+            cancellationHeadline: b.cancellationHeadline,
+            cancellationDetail: b.cancellationDetail,
+            savedAtUtc: new Date().toISOString(),
+          };
+          const serialized = JSON.stringify(snapshot);
+          localStorage.setItem(scopedCacheKey, serialized);
+          localStorage.setItem(legacyCacheKey, serialized);
+        } catch {
+          // ignore storage quota/privacy failures
+        }
         // TASK-1480: confirmed = guest views booking confirmation page
         track('confirmed', b.listingId);
         // Fetch prior modification requests (best-effort, non-blocking)
@@ -441,12 +595,34 @@ export default function BookingConfirmationPage() {
             .catch(() => {});
         }
       })
-      .catch((err: Error) => {
+      .catch((err: Error & { httpStatus?: number }) => {
         console.error(err);
+        const status = err?.httpStatus;
+        const isExplicitAuthOrNotFound = status === 404 || status === 401 || status === 403;
+        if (!isExplicitAuthOrNotFound && status === undefined) {
+          try {
+            const raw = localStorage.getItem(scopedCacheKey) ?? localStorage.getItem(legacyCacheKey);
+            if (raw) {
+              const cached = JSON.parse(raw) as BookingSummary;
+              if (cached && String(cached.bookingId) === String(bookingId)) {
+                setBooking(cached);
+                setIsOfflineCachedCopy(true);
+                setError(null);
+                return;
+              }
+            }
+          } catch {
+            // fall through to standard error state
+          }
+        }
         setError("We couldn't load your booking — please try again.");
       })
       .finally(() => setLoading(false));
   }, [bookingId, token]);
+
+  useEffect(() => {
+    loadBookingSummary();
+  }, [loadBookingSummary]);
 
   useEffect(() => {
     if (!errorPayload?.code) return;
@@ -461,7 +637,11 @@ export default function BookingConfirmationPage() {
         setPaymentFailureReason(null);
         setPaymentFailedAt(null);
         setPaymentRetryUrl(null);
+        setHoldExpiresAtUtc(null);
         return "success" as const;
+      }
+      if (body.holdExpiresAtUtc !== undefined) {
+        setHoldExpiresAtUtc(body.holdExpiresAtUtc ?? null);
       }
       if (normalized === "failed") {
         setPaymentStatus("failed");
@@ -673,30 +853,60 @@ export default function BookingConfirmationPage() {
   }
 
   const isCancelled = booking.status === "Cancelled";
+  const planTerms = resolveBookingPlanTerms(booking.mealPlanCode, booking.cancellationPolicy, {
+    headline: booking.cancellationHeadline,
+    detail: booking.cancellationDetail,
+  });
   // TASK-2071: pick language strings from guest profile preference
   const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
   const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
+  const checkoutInstructions = booking.guidebookCheckoutChecklistText?.trim();
+  const checkoutBriefingVisible = booking.checkoutBriefingVisible === true
+    && (booking.status === 'Confirmed' || booking.status === 'CheckedIn')
+    && !!checkoutInstructions;
   const hasRealHostPhone = !!booking.propertyPhone?.trim();
   // getContactPhone() now returns "" for white-label tenants with no configured number —
   // never build a tel: or wa.me link with an empty number (cross-tenant leak guard).
   const resolvedFallbackPhone = getContactPhone();
-  const hostPhone = hasRealHostPhone
+  const rawHostPhone = hasRealHostPhone
     ? booking.propertyPhone!.trim()
     : resolvedFallbackPhone
       ? `+91${resolvedFallbackPhone}`
       : "";
+  const hostPhone = formatCleanInternationalPhone(rawHostPhone);
   const hostPhoneDigits = hostPhone.replace(/[^\d+]/g, "");
-  const whatsappDigits = hostPhoneDigits.replace(/^\+/, "");
+  const whatsappDigits = cleanWaPhoneDigits(hostPhone);
   // True when there is a real number to contact (either the property's own phone or the
   // tenant's configured fallback). False for white-label tenants with no number set.
   const hasWhatsAppContact = (hasRealHostPhone || hasHostContact()) && whatsappDigits.length > 0;
   const supportEmail = getContactEmail();
-  const confirmationNotifyPhone = "";
+  const rawGuestPhone =
+    booking.guestPhone ||
+    (typeof window !== "undefined" ? window.localStorage.getItem("atlas_guest_phone") || "" : "");
+  const confirmationNotifyPhone = formatCleanInternationalPhone(rawGuestPhone);
   const whatsappText = encodeURIComponent(`Hi, I have a question about booking #${booking.bookingId}.`);
-  const whatsappUrl = hasWhatsAppContact ? `https://wa.me/${whatsappDigits}?text=${whatsappText}` : "";
+  const whatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${whatsappText}` : "";
+  // GUEST-026: Direct pre-filled WhatsApp link with booking reference and guest name
+  const isPendingBooking = booking.status === "Pending";
+  const messageHostWhatsappText = encodeURIComponent(
+    isPendingBooking
+      ? `Hi, I have a question about booking #${booking.bookingId}${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Its current status is Pending. Please help me check the booking status.`
+      : `Hi, I have a confirmed booking (#${booking.bookingId})${booking.guestName ? ` under ${booking.guestName}` : ''} at ${booking.propertyName}. Looking forward to my stay!`
+  );
+  const messageHostWhatsappUrl = hasWhatsAppContact && whatsappDigits ? `https://wa.me/${whatsappDigits}?text=${messageHostWhatsappText}` : "";
+  // GUEST-031/GUEST-030: canonical check-in deep-link, carries the booking token.
+  const effectiveBookingRef = booking.bookingRef || (booking.bookingId ? `ATL-${booking.bookingId}` : "");
+  const hubCheckinPath = effectiveBookingRef && (token || booking.status === "Confirmed" || booking.status === "CheckedIn")
+    ? `/check-in/${encodeURIComponent(effectiveBookingRef)}${token ? `?t=${encodeURIComponent(token)}` : ""}`
+    : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
-  const hasPendingModRequest = modRequests.some((r) => r.status === "Pending");
+  const isCancellationRequestRow = (r: ModRequestSummary) => r.isCancellation === true || /^CANCELLATION_REQUEST/.test(r.note ?? "");
+  // GUEST-075: only a date or guest change counts as a "change request"; a cancellation request is its own thing.
+  const hasPendingModRequest = modRequests.some((r) => r.status === "Pending" && !isCancellationRequestRow(r));
+  // G3 journey 12: a cancellation request already sent (this visit or an earlier one) is shown as received; the form is not offered a second time.
+  // The guest list endpoint has sent isCancellation=false for these rows, so the stored marker in the note counts too.
+  const hasPendingCancellationRequest = modRequests.some((r) => isCancellationRequestRow(r) && r.status === "Pending");
 
   const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
@@ -754,6 +964,38 @@ export default function BookingConfirmationPage() {
       gstInvoiceNumber: booking.gstInvoiceNumber ?? null,
     };
     openPrintableHtml(buildReceiptHtml(args));
+  }
+
+  // GUEST-053: copy door code with 1-tap and clipboard fallback
+  async function handleCopyDoorCode() {
+    if (!booking?.doorCode) return;
+    try {
+      await navigator.clipboard.writeText(booking.doorCode);
+      setDoorCodeCopied(true);
+      if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+      copyDoorCodeTimerRef.current = setTimeout(() => setDoorCodeCopied(false), 2000);
+      return;
+    } catch {
+      /* fallback */
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = booking.doorCode;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) {
+        setDoorCodeCopied(true);
+        if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
+        copyDoorCodeTimerRef.current = setTimeout(() => setDoorCodeCopied(false), 2000);
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   // TASK-102057: open a printable Stay Guide (check-in, WiFi, directions, host contacts).
@@ -909,6 +1151,23 @@ export default function BookingConfirmationPage() {
       />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 space-y-6" data-testid="booking-confirmation-page">
 
+        {isOfflineCachedCopy && (
+          <div
+            data-testid="confirmation-offline-cache-banner"
+            role="status"
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center justify-between gap-3 flex-wrap"
+          >
+            <span>Offline copy — showing your last saved stay details</span>
+            <button
+              type="button"
+              onClick={() => void loadBookingSummary()}
+              className="rounded-lg border border-amber-400 bg-white px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -974,13 +1233,38 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {paymentStatus === "pending" && (
+        {/* PAY-009: live refund status with the bank reference Razorpay sent (never an invented one). */}
+        <RefundStatusTracker refunds={booking.refunds} currency={booking.currency} />
+
+        {/* PAY-010: direct-UPI payment the guest says they made — only the host can confirm it arrived. */}
+        {booking.awaitingHostPaymentConfirmation && !isCancelled && (
+          <div
+            className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1"
+            role="status"
+            data-testid="upi-awaiting-host-confirmation"
+          >
+            <p className="text-sm text-amber-900 font-semibold">Waiting for the host to confirm your payment</p>
+            <p className="text-sm text-amber-800">
+              You told the host you paid by UPI. Your booking is confirmed once the host sees the money arrive; you will
+              get a confirmation then. No need to pay again.
+            </p>
+          </div>
+        )}
+
+        {paymentStatus === "pending" && !booking.awaitingHostPaymentConfirmation && (
           <div
             className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-1"
             data-testid="payment-polling-status"
             data-poll-attempt={paymentPollAttempt}
           >
             <p className="text-sm text-amber-800 font-medium">Confirming your payment…</p>
+            {holdCountdown && (
+              <p className="text-xs text-amber-800/90" data-testid="booking-hold-countdown">
+                {holdCountdown === "0:00"
+                  ? "Reservation hold has expired and dates are released automatically if payment was not completed."
+                  : `Dates held for ${holdCountdown} — unpaid holds release automatically when the timer expires.`}
+              </p>
+            )}
             {paymentPollExhausted && (
               <>
                 <p className="text-sm text-amber-800">
@@ -1004,6 +1288,13 @@ export default function BookingConfirmationPage() {
             <p className="text-sm text-red-700">
               Payment failed: {paymentFailureReason ?? "Your payment could not be completed."}
             </p>
+            {holdCountdown && (
+              <p className="text-xs text-red-800/90" data-testid="booking-hold-countdown">
+                {holdCountdown === "0:00"
+                  ? "Your reservation hold has expired and the dates have been released automatically."
+                  : `Your dates remain held for ${holdCountdown} so you can retry payment. Unpaid holds release automatically when the timer expires.`}
+              </p>
+            )}
             {paymentFailedAt && (
               <p className="text-sm text-red-700/80">
                 Failed at: {new Date(paymentFailedAt).toLocaleString("en-IN", {
@@ -1080,6 +1371,25 @@ export default function BookingConfirmationPage() {
               <p className="text-base font-semibold text-text-primary mt-0.5" data-testid="confirmation-checkout">{booking.checkoutDate}</p>
             </div>
           </div>
+          <DormGenderAckLine ackAtUtc={booking.dormGenderAckAtUtc} policy={booking.dormGenderAckPolicy} />
+          {planTerms && (planTerms.mealLabel || planTerms.cancellationHeadline) && (
+            <div className="py-4 space-y-2" data-testid="confirmation-plan-terms">
+              {planTerms.mealLabel && (
+                <p className="text-sm font-medium text-text-primary" data-testid="confirmation-meal-plan">
+                  <span aria-hidden="true">🍳 </span>{planTerms.mealLabel}
+                </p>
+              )}
+              {planTerms.cancellationHeadline && (
+                <div data-testid="confirmation-cancellation-terms">
+                  <p className="text-xs text-text-muted uppercase tracking-wider font-medium">Cancellation</p>
+                  <p className="text-sm text-text-primary mt-0.5">{planTerms.cancellationHeadline}</p>
+                  {planTerms.cancellationDetail && (
+                    <p className="text-sm text-text-secondary">{planTerms.cancellationDetail}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <div className="pt-4 flex justify-between items-center">
             <span className="text-sm text-text-secondary">
               {booking.nights} {booking.nights === 1 ? "night" : "nights"}
@@ -1101,6 +1411,151 @@ export default function BookingConfirmationPage() {
             </div>
           )}
         </div>
+
+        {/* GUEST-031: one "Your Stay & Arrival Hub" replaces the duplicate Self Check-In (x2),
+            Trip Preparation and Calendar cards. Check-in CTA keeps the GUEST-030 token deep-link. */}
+        {!isCancelled && (
+          <section
+            className="rounded-2xl border border-brand-primary/40 bg-brand-primary/5 p-5 space-y-4"
+            data-testid="stay-arrival-hub"
+            aria-labelledby="stay-arrival-hub-title"
+          >
+            <div>
+              <h2 id="stay-arrival-hub-title" className="text-base font-semibold text-text-primary">Your Stay &amp; Arrival Hub</h2>
+              <p className="text-sm text-text-secondary mt-0.5">
+                Check in online, save your stay to your calendar, message your host and print your stay guide.
+              </p>
+            </div>
+            {/* GUEST-053: Display assigned smart-lock door code & key access on Stay Hub upon check-in completion */}
+            {booking.doorCode && (
+              <div
+                data-testid="access-door-code-card"
+                className="rounded-xl border border-border-subtle bg-bg-surface p-4 shadow-sm space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg" aria-hidden="true">🔑</span>
+                    <h3 className="text-sm font-semibold text-text-primary">Access &amp; Door Code</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyDoorCode}
+                    data-testid="copy-door-code-btn"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle bg-bg-page px-3 py-1.5 text-xs font-medium text-text-primary hover:bg-bg-surface transition-colors"
+                  >
+                    {doorCodeCopied ? "✓ Copied!" : "Copy Code"}
+                  </button>
+                </div>
+                <div className="flex items-baseline gap-3 bg-bg-page rounded-lg p-3 border border-border-subtle">
+                  <span className="text-xs text-text-muted uppercase tracking-wider font-medium">Door Code:</span>
+                  <span className="text-xl font-mono font-bold tracking-widest text-text-primary" data-testid="door-code-value">
+                    {booking.doorCode}
+                  </span>
+                  {doorCodeCopied && (
+                    <span className="text-xs text-emerald-600 font-medium ml-auto" data-testid="door-code-copied-confirmation">
+                      Copied to clipboard
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-text-secondary leading-relaxed space-y-1" data-testid="door-lock-instructions">
+                  <p>Enter this code on the smart lock keypad to unlock.</p>
+                  {booking.checkinInstructions && (
+                    <p>{booking.checkinInstructions}</p>
+                  )}
+                </div>
+              </div>
+            )}
+            {hubCheckinPath && (
+              <Link
+                to={hubCheckinPath}
+                data-testid="stay-hub-checkin"
+                className="flex items-center justify-between gap-4 rounded-xl bg-brand-primary text-white px-4 py-3.5 hover:bg-brand-primary/90 transition-colors"
+              >
+                <span className="text-sm font-semibold">
+                  {booking.doorCode ? "✓ Checked In — View Door & Key Access" : "Complete Web Check-In"}
+                </span>
+                <span className="shrink-0 text-lg" aria-hidden>→</span>
+              </Link>
+            )}
+            {hasWhatsAppContact && isPendingBooking && (
+              <p className="text-xs leading-relaxed my-2 text-text-secondary" data-testid="stay-hub-whatsapp-status">
+                Your message includes booking #{booking.bookingId} and its Pending status. Check the status with your host before treating this booking as confirmed.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2.5">
+              {hasWhatsAppContact && (
+                <a
+                  href={messageHostWhatsappUrl || whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="stay-hub-whatsapp"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-600 bg-emerald-50 text-emerald-800 text-sm font-medium px-4 py-3 hover:bg-emerald-100 transition-colors"
+                  aria-label="Message Host on WhatsApp"
+                >
+                  💬 Message Host on WhatsApp
+                </a>
+              )}
+              <a
+                href={googleCalendarUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="confirmation-add-google-calendar"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+                aria-label="Add your stay to Google Calendar"
+              >
+                🗓️ Add to Google Calendar
+              </a>
+              <button
+                type="button"
+                onClick={downloadCalendar}
+                data-testid="confirmation-download-ics"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+                aria-label="Download calendar file for Apple Calendar"
+              >
+                📅 Download .ics (Apple Calendar)
+              </button>
+              <button
+                type="button"
+                onClick={openStayGuide}
+                data-testid="download-stay-guide-btn"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
+                aria-label={`Print or save stay guide for booking #${booking.bookingId}`}
+              >
+                🖨️ Print / Save Stay Guide
+              </button>
+            </div>
+          </section>
+        )}
+
+        {checkoutBriefingVisible && (
+          <section
+            aria-labelledby="checkout-briefing-title"
+            data-testid="checkout-briefing"
+            className="rounded-2xl border border-[color-mix(in_srgb,var(--cta-primary)_30%,var(--border-subtle))] bg-bg-surface p-5 shadow-level1 space-y-4"
+          >
+            <div className="flex items-start gap-3">
+              {/* A door (departure), not a checkmark: nothing here is marked complete for the guest. */}
+              <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--cta-primary)_10%,var(--bg-surface))] text-brand-primary">
+                <DoorOpen className="h-5 w-5" strokeWidth={1.75} />
+              </span>
+              <div className="min-w-0 space-y-1">
+                <h2 id="checkout-briefing-title" className="text-base font-semibold text-text-primary">Before you check out</h2>
+                <p className="text-sm text-text-secondary">Please follow your host’s checkout instructions before leaving.</p>
+              </div>
+            </div>
+            {(booking.checkoutDate?.trim() || booking.checkOutTime?.trim()) && (
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-y border-border-subtle py-3 text-sm">
+                {booking.checkoutDate?.trim() && <span className="font-medium text-text-primary">{booking.checkoutDate}</span>}
+                {booking.checkOutTime?.trim() && <span className="text-text-secondary">Check-out by {booking.checkOutTime}</span>}
+              </div>
+            )}
+            {/* Host's own words: a calm quote treatment tinted from the tenant brand, so the most-read text sits on the quietest surface. */}
+            <div className="rounded-r-xl border-l-4 border-[var(--cta-primary)] bg-[color-mix(in_srgb,var(--cta-primary)_5%,var(--bg-surface))] py-4 pl-4 pr-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">From your host</p>
+              <p data-testid="checkout-briefing-instructions" className="whitespace-pre-wrap break-words text-sm leading-relaxed text-text-primary">{checkoutInstructions}</p>
+            </div>
+          </section>
+        )}
 
         {/* TASK-1476: QR check-in code — guests can scan on arrival to confirm identity
             TASK-4437: only show QR once the rotating qrToken is available; show loading state until then */}
@@ -1153,18 +1608,10 @@ export default function BookingConfirmationPage() {
           />
         )}
 
-        {/* TASK-2091: placeholder while invoice is being generated */}
-        {!isCancelled && booking.status === 'Confirmed' && !booking.hasGstInvoice && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <h2 className="text-sm font-semibold text-text-primary">GST invoice</h2>
-            <p className="text-sm text-text-secondary">
-              Your GST invoice is being generated — we'll send it to your email within 1 hour.
-            </p>
-            <p className="text-xs text-text-muted">
-              Accommodation is billed under SAC&nbsp;9963 (hotel and similar accommodation services) as applicable for Indian GST.
-            </p>
-          </div>
-        )}
+        {/* TASK-103053: the TASK-2091 "being generated — within 1 hour" placeholder was removed.
+            Since TASK-102031 retired auto-generation, no invoice is ever generated or sent, so the
+            promise was a dead end. The Documents card below still shows the invoice when
+            hasGstInvoice is true. */}
 
         {/* Documents: GST invoice + booking voucher + stay receipt + stay guide (TASK-102057) */}
         {!isCancelled && ((booking.hasGstInvoice && pdfUrl) || voucherUrl) && (
@@ -1225,7 +1672,7 @@ export default function BookingConfirmationPage() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="stay-documents-section">
             <h2 className="text-sm font-semibold text-text-primary">Stay documents</h2>
             <p className="text-sm text-text-secondary">
-              Save a copy of your stay receipt or print a check-in guide with WiFi, directions and host contacts.
+              Save a copy of your stay receipt.
             </p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -1236,15 +1683,6 @@ export default function BookingConfirmationPage() {
                 aria-label={`Download stay receipt for booking #${booking.bookingId}`}
               >
                 🧾 Download Stay Receipt
-              </button>
-              <button
-                type="button"
-                onClick={openStayGuide}
-                data-testid="download-stay-guide-btn"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3.5 hover:bg-brand-primary/5 transition-colors"
-                aria-label={`Download printable stay guide for booking #${booking.bookingId}`}
-              >
-                🗺️ Download Stay Guide
               </button>
             </div>
           </div>
@@ -1287,7 +1725,7 @@ export default function BookingConfirmationPage() {
                 <InfoRow label="Check-in instructions" value={booking.checkinInstructions} />
               )}
               {booking.propertyPhone && (
-                <InfoRow label="Property contact" value={booking.propertyPhone} />
+                <InfoRow label="Property contact" value={formatCleanInternationalPhone(booking.propertyPhone)} />
               )}
               {!booking.checkinInstructions && !booking.propertyPhone && !booking.propertyAddress && (
                 <p className="text-sm text-text-secondary">Check-in instructions will be sent to you 24 hours before arrival.</p>
@@ -1296,31 +1734,38 @@ export default function BookingConfirmationPage() {
           </div>
         )}
 
-        {/* TASK-2490: guest web self-check-in */}
-        {!isCancelled && bookingId && token && (
-          <SelfCheckInCard />
-        )}
-
         {/* TASK-4333: guest-facing messages thread — read + reply to host */}
         {bookingId && token && (
-          <GuestMessageThread bookingId={Number(bookingId)} token={token} />
+          <GuestMessageThread bookingId={Number(bookingId)} token={token} issueCategory={searchParams.get('issue')} issueRequestKey={location.key} hostPhone={hostPhone} />
         )}
 
-        {/* TASK-4415: guest self-serve FAQ — same as listing detail page */}
+        {/* TASK-4415 / TASK-10298986: guest self-serve FAQ — same as listing detail page */}
         {booking.listingId && (
           <Suspense fallback={null}>
-            <GuestAssistant listingId={booking.listingId} />
+            <GuestAssistant
+              listingId={booking.listingId}
+              tenantSlug={searchParams.get('tenant')?.trim() || getTenantContext()?.slug || null}
+            />
           </Suspense>
         )}
+
+        {/* PAY-006: security-deposit card-hold status (Authorized / Captured / Released) with the bank-authorization countdown */}
+        {!isCancelled && <GuestDepositHoldCard hold={booking.depositHold} bookingId={booking.bookingId ?? bookingId ?? ''} token={token} />}
 
         {/* WiFi */}
         {!isCancelled && booking.wifiVisible && (booking.wifiName || booking.wifiPassword) && (
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-3">📶 WiFi</h2>
             <div className="space-y-0">
-              {booking.wifiName && <InfoRow label="Network" value={booking.wifiName} />}
-              {booking.wifiPassword && <InfoRow label="Password" value={booking.wifiPassword} mono />}
+              {booking.wifiName && (
+                <CopyableInfoRow label="Network" value={booking.wifiName} copyAriaLabel="Copy Wi-Fi network name" copyTestId="copy-wifi-name-btn" />
+              )}
+              {booking.wifiPassword && (
+                <CopyableInfoRow label="Password" value={booking.wifiPassword} mono copyAriaLabel="Copy Wi-Fi password" copyTestId="copy-wifi-password-btn" />
+              )}
             </div>
+            {/* GUEST-039: standard WIFI: QR so a phone camera joins with one scan */}
+            {booking.wifiName && <WifiScanToConnect ssid={booking.wifiName} passphrase={booking.wifiPassword} />}
           </div>
         )}
 
@@ -1329,6 +1774,15 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary mb-1">📶 WiFi</h2>
             <p className="text-sm text-text-secondary">WiFi details will appear here closer to your check-in date.</p>
           </div>
+        )}
+
+        {/* BNB-009: meal choices saved to the host with the booking-link token; shown only when the server says to ask */}
+        {!isCancelled && (
+          <GuestDietarySelector
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            mealPreferences={booking.mealPreferences ?? null}
+          />
         )}
 
         {/* TASK-4510: Digital Guest Guidebook — host-authored content sections */}
@@ -1450,22 +1904,6 @@ export default function BookingConfirmationPage() {
           </section>
         )}
 
-        {/* TASK-1254: Self check-in card — available any time after confirmation */}
-        {!isCancelled && booking.bookingRef &&
-          (booking.status === 'Confirmed' || booking.status === 'CheckedIn') && (
-          <Link
-            to={`/check-in/${encodeURIComponent(booking.bookingRef)}`}
-            data-testid="self-checkin-link"
-            className="flex items-center justify-between gap-4 rounded-2xl border border-brand-primary/40 bg-brand-primary/5 p-5 hover:bg-brand-primary/10 transition-colors"
-          >
-            <div className="space-y-0.5">
-              <p className="text-sm font-semibold text-text-primary">Self check-in</p>
-              <p className="text-xs text-text-secondary">Skip the queue — submit your ID and sign house rules online before you arrive.</p>
-            </div>
-            <span className="shrink-0 text-brand-primary text-lg" aria-hidden>→</span>
-          </Link>
-        )}
-
         {/* TASK-2082: PWA install nudge — only within 72h of check-in, only when prompt is available */}
         {!isCancelled && booking.preArrivalBriefingVisible && !pwaInstallDismissed && !isIosNonPwa && (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-border-subtle bg-bg-muted/60 px-4 py-3 text-sm">
@@ -1508,7 +1946,7 @@ export default function BookingConfirmationPage() {
                   <p>
                     📧 Email confirmation should arrive shortly
                     {confirmationNotifyPhone ? (
-                      <> at <span className="font-medium text-text-primary">{confirmationNotifyPhone}</span></>
+                      <> at <span className="font-medium text-text-primary" data-testid="guest-confirmation-phone">{confirmationNotifyPhone}</span></>
                     ) : (
                       <> on the email you entered at checkout</>
                     )}
@@ -1601,7 +2039,8 @@ export default function BookingConfirmationPage() {
                 const addOnText = encodeURIComponent(
                   `Hi, I just booked #${booking!.bookingId} and I'd like to add: ${addOn.name} (${booking!.currency} ${addOn.price}${priceLabel}). Please confirm.`
                 );
-                const addOnWhatsapp = `https://wa.me/${whatsappDigits}?text=${addOnText}`;
+                const cleanPhone = cleanWaPhoneDigits(whatsappDigits);
+                const addOnWhatsapp = cleanPhone ? `https://wa.me/${cleanPhone}?text=${addOnText}` : "";
                 return (
                   <div key={addOn.addOnServiceId} className="flex items-center justify-between gap-3 bg-bg-surface rounded-xl border border-border-subtle px-4 py-3">
                     <div className="min-w-0">
@@ -1631,7 +2070,7 @@ export default function BookingConfirmationPage() {
               {hasWhatsAppContact && (
                 <>
                   Call or WhatsApp us at{" "}
-                  <a href={`tel:${hostPhoneDigits}`} className="text-brand-primary font-medium">{hostPhone}</a>
+                  <a href={`tel:${hostPhoneDigits.startsWith('+') ? hostPhoneDigits : `+${hostPhoneDigits}`}`} className="text-brand-primary font-medium" data-testid="host-phone-link">{hostPhone}</a>
                   {supportEmail && <>{" "}or email{" "}<a href={`mailto:${supportEmail}`} className="text-brand-primary font-medium">{supportEmail}</a></>}.
                 </>
               )}
@@ -1652,35 +2091,6 @@ export default function BookingConfirmationPage() {
                 {hasRealHostPhone ? 'Chat with host on WhatsApp' : `Chat with ${brandName} support`}
               </a>
             )}
-          </div>
-        )}
-
-        {/* Add to Calendar (TASK-333 .ics + TASK-102114 Google Calendar 1-click) */}
-        {!isCancelled && (
-          <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3" data-testid="confirmation-calendar-section">
-            <h2 className="text-sm font-semibold text-text-primary">Add to your calendar</h2>
-            <p className="text-sm text-text-secondary">Save your check-in date and property details to your phone calendar.</p>
-            <div className="flex flex-wrap gap-2">
-              <a
-                href={googleCalendarUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                data-testid="confirmation-add-google-calendar"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
-                aria-label="Add your stay to Google Calendar"
-              >
-                🗓️ Add to Google Calendar
-              </a>
-              <button
-                type="button"
-                onClick={downloadCalendar}
-                data-testid="confirmation-download-ics"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-primary text-brand-primary text-sm font-medium px-4 py-3 hover:bg-brand-primary/5 transition-colors"
-                aria-label="Download calendar file for Apple Calendar"
-              >
-                📅 Download .ics (Apple Calendar)
-              </button>
-            </div>
           </div>
         )}
 
@@ -1739,7 +2149,7 @@ export default function BookingConfirmationPage() {
                       {fmtDate(r.requestedCheckinDateUtc)} – {fmtDate(r.requestedCheckoutDateUtc)}
                       {r.requestedGuestCount ? ` · ${r.requestedGuestCount} guests` : ""}
                     </p>
-                    {r.note && <p className="text-xs text-text-muted">Your note: {r.note}</p>}
+                    {guestFacingRequestNote(r.note) && <p className="text-xs text-text-muted">Your note: {guestFacingRequestNote(r.note)}</p>}
                     {!isPending && r.decisionNote && (
                       <p className="text-xs text-text-secondary">Host note: {r.decisionNote}</p>
                     )}
@@ -1758,6 +2168,8 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary">Request booking changes</h2>
             {hasPendingModRequest
               ? <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 border border-yellow-200">You have a pending change request. Our team will review it shortly.</p>
+              : (cancelRequested || hasPendingCancellationRequest)
+              ? <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 border border-yellow-200" data-testid="change-request-paused-by-cancellation">Your cancellation request is with our team. Date changes can wait for their answer.</p>
               : <p className="text-sm text-text-secondary">Need a different date or guest count? Send a request and we will review it.</p>
             }
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1806,7 +2218,7 @@ export default function BookingConfirmationPage() {
             <button
               type="button"
               onClick={submitModificationRequest}
-              disabled={modSubmitting || modDatesInvalid || hasPendingModRequest}
+              disabled={modSubmitting || modDatesInvalid || hasPendingModRequest || hasPendingCancellationRequest}
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
               data-testid="mod-request-submit"
             >
@@ -1817,7 +2229,7 @@ export default function BookingConfirmationPage() {
         )}
 
         {/* TASK-350: guest self-service cancellation request */}
-        {canRequestModification && !cancelRequested && (
+        {canRequestModification && !cancelRequested && !hasPendingCancellationRequest && (
           <div className="rounded-2xl border border-red-100 bg-red-50/40 p-5 space-y-3">
             <h2 className="text-sm font-semibold text-red-800">Request cancellation</h2>
             <p className="text-sm text-red-700">
@@ -1885,7 +2297,7 @@ export default function BookingConfirmationPage() {
             )}
           </div>
         )}
-        {cancelRequested && (
+        {(cancelRequested || hasPendingCancellationRequest) && (
           <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-base text-green-800 space-y-2" role="status" aria-live="polite">
             <p>✅ {REFUND_CANCELLATION_RECEIVED_MESSAGE}</p>
             <Link

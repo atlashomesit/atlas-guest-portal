@@ -2,10 +2,20 @@ import { resolveTenantSlugFromDomain } from "./_lib/tenantSlug";
 import { isAtlasDirectBookingHost, isMarketplaceHost } from "./_lib/tenantSiteMeta";
 import { isNoindexHost } from "./_lib/noindexHosts";
 import { textMatchesCityKeywords } from "./_lib/cityKeywordMatch";
+import { buildHomeUnitPath, getPropertySlug } from "../src/utils/navigation";
 import goaCityContent from "../src/content/cities/goa.json";
 import coorgCityContent from "../src/content/cities/coorg.json";
 import hyderabadCityContent from "../src/content/cities/hyderabad.json";
 import manaliCityContent from "../src/content/cities/manali.json";
+// MKT-014: city landing pages for the four cities with live marketplace supply (1 listing per
+// city on 2026-10-02). Keywords are pulled from the same JSON the CityLandingPage component
+// reads, so a sitemap drop and a city-page render can never disagree on which slug a listing
+// matches.
+import bengaluruCityContent from "../src/content/cities/bengaluru.json";
+import gurugramCityContent from "../src/content/cities/gurugram.json";
+import nashikCityContent from "../src/content/cities/nashik.json";
+import guwahatiCityContent from "../src/content/cities/guwahati.json";
+import jalandharCityContent from "../src/content/cities/jalandhar.json";
 
 interface Env {
   ATLAS_API_BASE_URL?: string;
@@ -14,8 +24,22 @@ interface Env {
   ATLAS_WORKER_PROXY_SECRET?: string;
 }
 
-// TASK-4414: city landing pages for SEO acquisition (Atlas marketplace surfaces only — TASK-7194)
-const CITY_LANDING_SLUGS = ["goa", "coorg", "hyderabad", "manali"] as const;
+// TASK-4414: city landing pages for SEO acquisition (Atlas marketplace surfaces only — TASK-7194).
+// MKT-014 / MKT-017: added bengaluru, gurugram, nashik, guwahati, jalandhar — see the matching
+// CityLandingPage.tsx registration in src/App.tsx and the per-city JSON content under
+// src/content/cities/. A sitemap drop and a city-page render both pull from these same JSONs, so
+// they cannot disagree.
+const CITY_LANDING_SLUGS = [
+  "goa",
+  "coorg",
+  "hyderabad",
+  "manali",
+  "bengaluru",
+  "gurugram",
+  "nashik",
+  "guwahati",
+  "jalandhar",
+] as const;
 
 /**
  * MKT-006: keyword lists a marketplace listing must match to count as supply for a given city
@@ -32,9 +56,22 @@ const CITY_LANDING_KEYWORDS: Record<(typeof CITY_LANDING_SLUGS)[number], string[
   coorg: coorgCityContent.listingKeywords,
   hyderabad: hyderabadCityContent.listingKeywords,
   manali: manaliCityContent.listingKeywords,
+  bengaluru: bengaluruCityContent.listingKeywords,
+  gurugram: gurugramCityContent.listingKeywords,
+  nashik: nashikCityContent.listingKeywords,
+  guwahati: guwahatiCityContent.listingKeywords,
+  jalandhar: jalandharCityContent.listingKeywords,
 };
 
 const ATLAS_CITY_PATHS = CITY_LANDING_SLUGS.map((slug) => `/homestays-in-${slug}`);
+
+/**
+ * MKT-040: the `/destinations` city directory hub (MKT-034, `src/pages/DestinationsPage.tsx`). Like the city guides it links to it is
+ * Atlas marketplace content: the page sends a white-label tenant domain home, so it is advertised on Atlas hosts only and never in
+ * `SHARED_SITEMAP_PATHS`. It is a static page that does not depend on listing supply, so (unlike the city guides) it is listed even
+ * when the supply lookup fails. `/explore` is an alias of it and is deliberately not listed (one canonical URL per page).
+ */
+const ATLAS_HUB_PATHS = ["/destinations"];
 
 /**
  * MKT-006: cross-tenant `GET /marketplace/listings` row shape this function needs
@@ -90,16 +127,21 @@ export async function fetchAllMarketplaceListings(
  * `MarketplaceHomepage.tsx`'s `marketplaceListingPath` links to and the listing detail page
  * declares as its own canonical (`?tenant=` tells the detail page which tenant's listing to
  * resolve on the shared marketplace host).
+ *
+ * MKT-010: the property slug MUST match the marketplace card's link exactly. The card uses
+ * `getPropertySlug({ property_name: item.title })` and `buildHomeUnitPath(...)` from
+ * `src/utils/navigation.ts`. We import and call the same helpers here rather than re-implement
+ * them — `listingPathSlug` (used by per-tenant sitemaps below) was over-preferring the API's
+ * `slug` field, which `/marketplace/listings` sets to `String(id)` on 28/28 rows today, so
+ * every sitemap `/homes/` URL resolved to a soft-404.
  */
 export function marketplaceListingPath(
   listing: SitemapMarketplaceListingRow,
-  opts: { allowAtlasHomesFallback: boolean },
+  _opts: { allowAtlasHomesFallback: boolean },
 ): string {
-  const propertySlug = listingPathSlug(
-    { id: listing.id, slug: listing.slug, propertyName: listing.title },
-    opts,
-  );
-  return `/homes/${propertySlug}/${listing.id}?tenant=${encodeURIComponent(listing.tenantSlug)}`;
+  const propertySlug = getPropertySlug({ property_name: listing.title });
+  const base = buildHomeUnitPath(propertySlug, listing.id);
+  return `${base}?tenant=${encodeURIComponent(listing.tenantSlug)}`;
 }
 
 const SHARED_CORE_PATHS = [
@@ -118,7 +160,7 @@ const SHARED_CORE_PATHS = [
   "/terms",
 ];
 
-const CORE_PATHS = [...SHARED_CORE_PATHS, ...ATLAS_CITY_PATHS];
+const CORE_PATHS = [...SHARED_CORE_PATHS, ...ATLAS_HUB_PATHS, ...ATLAS_CITY_PATHS];
 
 /** Paths every tenant sitemap includes (no Atlas SEO city guides). */
 export const SHARED_SITEMAP_PATHS = SHARED_CORE_PATHS;
@@ -297,7 +339,7 @@ export const onRequestGet = async ({ request, env }: { request: Request; env?: E
 
   // TASK-7194: omit /homestays-in-* from white-label tenant sitemaps.
   const corePaths = isMarketplaceHost(host)
-    ? [...SHARED_CORE_PATHS, ...cityPaths]
+    ? [...SHARED_CORE_PATHS, ...ATLAS_HUB_PATHS, ...cityPaths]
     : isAtlasHost
       ? CORE_PATHS
       : SHARED_CORE_PATHS;

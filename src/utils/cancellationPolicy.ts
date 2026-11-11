@@ -81,42 +81,186 @@ export function resolveEffectiveCancellationTier(
 }
 
 /**
- * TASK-7539: single source of truth for guest-facing cancellation policy copy.
- * Returns a headline and after-window sentence that accurately reflect the server's refund math.
+ * The window as a guest reads it, the same sentence shape the server writes (`CancellationPolicyWindow.DescribeWindow`): whole days from three days up ("5 days", "7 days"),
+ * hours below that ("48 hours").
+ */
+export function describeWindowHours(hours: number): string {
+  if (hours >= 72 && hours % 24 === 0) return `${hours / 24} days`;
+  return hours === 1 ? '1 hour' : `${hours} hours`;
+}
+
+/**
+ * TASK-1040050 (money wording, decided as CPO, the safest form): single source of truth for the guest-facing cancellation rule of a LISTING, so the listing page, the rate card, the
+ * booking box and the checkout all say one thing. It leads with what is certain, the free-cancellation window (the same hours the server stamps as the deadline:
+ * `RefundDeadlineResolver`, Flexible 48 h, Moderate 5 days, Strict 7 days, and 7 days when the listing names no tier), and what comes after it never promises a refund amount:
+ * Strict is non-refundable (its late fee is 100%); Moderate says a late-cancellation fee applies (the fee is a server setting, `Booking:LateCancellationFeePercent`, so the words do not repeat a
+ * percentage), and Flexible or untiered (fee 0%) say nothing after the date. "Full refund any time before check-in" is gone: it was true only while that setting is 0 and
+ * contradicted the rate card's "free cancellation up to 7 days". Promising less than the server pays is safe; promising more is not.
  *
- * - Flexible (0% fee): full refund ANY TIME (no time window condition, since there's no fee gate).
- * - Moderate (50% fee): full refund 5+ days before check-in; 50% refund after.
- * - Strict (100% fee): full refund 7+ days before check-in; no refund after.
- *
- * Both call sites (property-details card and trust-strip) render from this function,
- * so they cannot diverge (fixes TASK-7539 Defect 3).
+ * Both call sites (property-details card and trust-strip) render from this function, so they cannot diverge (fixes TASK-7539 Defect 3).
  */
 export function describeCancellationPolicy(
   tier: CancellationTier | string | null | undefined,
 ): { headline: string; afterWindowCopy: string } {
-  // TASK-7819: resolve null/unknown to Flexible FIRST, exactly as the server does. The old
-  // fallback returned a vague "Flexible cancellation policy applies" for untiered listings,
-  // which let callers substitute their own (wrong) literal for the untiered case.
+  // The window follows the NAMED tier; a listing with no tier gets the server's default window (7 days), exactly what RefundDeadlineResolver stamps.
+  const hours = isCancellationTier(tier) ? FREE_CANCELLATION_WINDOW_HOURS[tier] : DEFAULT_FREE_CANCELLATION_WINDOW_HOURS;
+  const headline = `Free cancellation up to ${describeWindowHours(hours)} before check-in`;
+  return {
+    headline,
+    afterWindowCopy:
+      tier === 'Strict'
+        ? 'After that, the booking is non-refundable.'
+        : tier === 'Moderate'
+          ? 'After that, a late-cancellation fee applies.'
+          // Flexible and an untiered listing have a 0% fee: the server pays in full at any time, so nothing is said after the date (it must neither deny nor promise a refund).
+          : '',
+  };
+}
+
+/**
+ * GUEST-059: what the SELECTED rate plan itself says about cancelling, so the listing-level
+ * cancellation block, the trust row and the booking box all read from the same words the guest
+ * sees on the rate option. The plan's own summary (written from the plan's real window by the
+ * API) wins over the generic tier prose, which only describes the listing default and would
+ * otherwise tell a guest on a non-refundable rate that they get a full refund any time.
+ * Returns null when the plan carries nothing — callers then fall back to the listing tier.
+ */
+export interface RatePlanCancellationCopy {
+  headline: string;
+  nonRefundable: boolean;
+}
+
+export function describeRatePlanCancellation(
+  policy: string | null | undefined,
+  summary: string | null | undefined,
+): RatePlanCancellationCopy | null {
+  const p = (policy ?? '').trim();
+  const sum = (summary ?? '').trim();
+  if (/^non[-_ ]?refundable$/i.test(p)) {
+    return { headline: sum || 'Non-refundable rate', nonRefundable: true };
+  }
+  if (sum) return { headline: sum, nonRefundable: /^non[-_ ]?refundable/i.test(sum) };
+  return null;
+}
+
+/**
+ * GUEST-059: lay the selected rate plan's wording over the listing-level cancellation block.
+ * Nothing is invented: the headline is the plan's own summary; a non-refundable plan says so and
+ * drops the refund timeline (there is no refund to walk through); any other plan keeps the refund
+ * steps and only the "how money comes back" sentence, never a tier window that could disagree
+ * with the plan's own days. With no plan wording the block is returned untouched.
+ */
+export function withRatePlanCancellation<T extends { headline: string; description: string; steps: unknown[] }>(
+  base: T,
+  plan: RatePlanCancellationCopy | null | undefined,
+  hasOnlinePayment: boolean,
+): T {
+  if (!plan) return base;
+  if (plan.nonRefundable) {
+    return {
+      ...base,
+      headline: plan.headline,
+      description: 'This rate is not refundable. Choose another rate, if one is offered, to cancel with a refund.',
+      steps: [],
+    };
+  }
+  return {
+    ...base,
+    headline: plan.headline,
+    description: hasOnlinePayment
+      ? 'Money returns to the exact UPI or card you paid with. No phone calls needed.'
+      : 'Your host arranges the refund directly with you.',
+  };
+}
+
+export interface CancellationRefundTier {
+  cutoffLabel: string;
+  refundPercent: number;
+  refundLabel: string;
+  description: string;
+  isFreeCancellation?: boolean;
+  isNonRefundable?: boolean;
+}
+
+/**
+ * TASK-10298996: Structured, unambiguous refund tiers matching backend policy definitions:
+ * - Flexible: Free cancellation up to 48 hours before check-in; Non-refundable within 48h
+ * - Moderate: Free cancellation up to 5 days (120h); 50% refund after 5-day window; Non-refundable after check-in
+ * - Strict: Free cancellation up to 7 days (168h); Non-refundable within 7 days of check-in
+ */
+export function getCancellationRefundTiers(
+  tier: CancellationTier | string | null | undefined,
+  windowHoursOverride?: number | null,
+): CancellationRefundTier[] {
   const effectiveTier = resolveEffectiveCancellationTier(tier);
+  const hours =
+    typeof windowHoursOverride === 'number' && windowHoursOverride > 0
+      ? windowHoursOverride
+      : FREE_CANCELLATION_WINDOW_HOURS[effectiveTier];
+
+  if (effectiveTier === 'Flexible') {
+    return [
+      {
+        cutoffLabel: `Up to ${hours} hours before check-in`,
+        refundPercent: 100,
+        refundLabel: '100% refund',
+        description: `Free cancellation up to ${hours} hours before check-in.`,
+        isFreeCancellation: true,
+      },
+      {
+        cutoffLabel: `Within ${hours} hours of check-in`,
+        refundPercent: 0,
+        refundLabel: 'Non-refundable',
+        description: `Non-refundable within ${hours}h of check-in.`,
+        isNonRefundable: true,
+      },
+    ];
+  }
 
   if (effectiveTier === 'Moderate') {
-    return {
-      headline: 'Full refund if cancelled 5+ days before check-in',
-      afterWindowCopy: 'Partial refund (50%) for cancellations after the 5-day window.',
-    };
+    const days = Math.round(hours / 24);
+    return [
+      {
+        cutoffLabel: `Up to ${days} days before check-in`,
+        refundPercent: 100,
+        refundLabel: '100% refund',
+        description: `Free cancellation up to ${days} days before check-in.`,
+        isFreeCancellation: true,
+      },
+      {
+        cutoffLabel: `Between ${days} days and check-in`,
+        refundPercent: 50,
+        refundLabel: '50% partial refund',
+        description: `Partial refund (50%) for cancellations after the ${days}-day window.`,
+      },
+      {
+        cutoffLabel: 'After check-in',
+        refundPercent: 0,
+        refundLabel: 'Non-refundable',
+        description: 'Non-refundable after check-in.',
+        isNonRefundable: true,
+      },
+    ];
   }
-  if (effectiveTier === 'Strict') {
-    return {
-      headline: 'Full refund if cancelled 7+ days before check-in',
-      afterWindowCopy: 'No refund within 7 days of check-in.',
-    };
-  }
-  // Flexible — fee is 0%, so the engine refunds in full at any time and NOTHING gates it.
-  // Do not add a window condition here: it would read as "cancel later and you get nothing".
-  return {
-    headline: 'Full refund any time before check-in',
-    afterWindowCopy: '',
-  };
+
+  // Strict
+  const days = Math.round(hours / 24);
+  return [
+    {
+      cutoffLabel: `Up to ${days} days before check-in`,
+      refundPercent: 100,
+      refundLabel: '100% refund',
+      description: `Free cancellation up to ${days} days before check-in.`,
+      isFreeCancellation: true,
+    },
+    {
+      cutoffLabel: `Within ${days} days of check-in`,
+      refundPercent: 0,
+      refundLabel: 'Non-refundable',
+      description: `Non-refundable within ${days} days of check-in.`,
+      isNonRefundable: true,
+    },
+  ];
 }
 
 /**
@@ -274,12 +418,26 @@ export function resolveListingCardCancellationChip(
   return describeCancellationPolicy(tier).headline;
 }
 
+/** TASK-1040050: the server's quoted deadline as a Date, or null when absent or unreadable. */
+export function parseServerDeadline(value: Date | string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function resolveFreeCancellationTrustCopy(input: {
   checkInDate: Date;
   tier: CancellationTier | string | null | undefined;
   windowHoursOverride?: number | null;
   bookingCreatedAt?: Date;
   graceHours?: number | null;
+  /** GUEST-059: the selected rate plan's own cancellation summary; wins over tier prose in the fallback line. */
+  planSummary?: string | null;
+  /**
+   * TASK-1040050: the free-cancellation deadline the SERVER quoted for this plan and these dates (rate-plans/public refundFreeUntilUtc, the resolver the hold uses at Pay). When present it IS the
+   * deadline, on every screen; the browser's own tier arithmetic is only the fallback for an API that does not send it.
+   */
+  serverDeadlineUtc?: Date | string | null;
   now?: Date;
 }): FreeCancellationTrustCopy {
   const now = input.now ?? new Date();
@@ -289,13 +447,16 @@ export function resolveFreeCancellationTrustCopy(input: {
     bookingCreatedAt,
     input.graceHours,
   );
-  const deadline = computeEffectiveCancellationDeadline(
-    input.checkInDate,
-    input.tier,
-    input.windowHoursOverride,
-    bookingCreatedAt,
-    applicableGraceHours,
-  );
+  const serverDeadline = parseServerDeadline(input.serverDeadlineUtc);
+  const deadline =
+    serverDeadline ??
+    computeEffectiveCancellationDeadline(
+      input.checkInDate,
+      input.tier,
+      input.windowHoursOverride,
+      bookingCreatedAt,
+      applicableGraceHours,
+    );
 
   if (isFreeCancellationDeadlineActive(deadline, now)) {
     const formatted = formatCancellationDeadline(deadline);
@@ -310,8 +471,26 @@ export function resolveFreeCancellationTrustCopy(input: {
     return { trustMessage: null, deadlineFormatted: null, applicableGraceHours };
   }
 
+  const planSummary = (input.planSummary ?? '').trim();
+  if (planSummary) {
+    return { trustMessage: planSummary, deadlineFormatted: null, applicableGraceHours: null };
+  }
+
+  // GUEST-037: name the listing's actual policy instead of a vague "standard policy" line, so this
+  // strip can never disagree with the policy card on the same page.
+  // TASK-1040050: the free window has already passed for these dates, so the line must not read as a free-cancellation promise; it names the policy and what the server does inside it.
+  const effectiveTier = resolveEffectiveCancellationTier(input.tier);
+  const hours =
+    typeof input.windowHoursOverride === 'number' && input.windowHoursOverride > 0
+      ? input.windowHoursOverride
+      : isCancellationTier(input.tier)
+        ? FREE_CANCELLATION_WINDOW_HOURS[input.tier]
+        : DEFAULT_FREE_CANCELLATION_WINDOW_HOURS;
+  const inside = `this stay is inside the ${describeWindowHours(hours)} before check-in`;
+  const consequence =
+    effectiveTier === 'Strict' ? ', so the booking is non-refundable.' : effectiveTier === 'Moderate' ? ', so a late-cancellation fee applies.' : '.';
   return {
-    trustMessage: 'Standard cancellation policy applies for this stay.',
+    trustMessage: `${effectiveTier} policy: ${inside}${consequence}`,
     deadlineFormatted: null,
     applicableGraceHours: null,
   };

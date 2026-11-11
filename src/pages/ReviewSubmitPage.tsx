@@ -6,6 +6,7 @@ import { sanitizeGuestImageUrl } from "../utils/guestImageUrl";
 import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { resolveReviewLinkParams } from "./reviewLinkParams";
 
 interface ReviewEligibility {
   bookingId: number;
@@ -18,14 +19,20 @@ interface ReviewEligibility {
   checkoutDate: string;
 }
 
-function StarButton({ value, selected, hovered, onHover, onClick }: {
-  value: number; selected: boolean; hovered: boolean;
+interface ReviewFunnelConfig {
+  hasGoogleReviewLink: boolean;
+  googleReviewUrl?: string | null;
+}
+
+function StarButton({ value, selected, hovered, category, pressed, onHover, onClick }: {
+  value: number; selected: boolean; hovered: boolean; category: string; pressed: boolean;
   onHover: (v: number) => void; onClick: (v: number) => void;
 }) {
   return (
     <button
       type="button"
-      aria-label={`${value} star${value !== 1 ? "s" : ""}`}
+      aria-label={`${category}: ${value} of 5 stars`}
+      aria-pressed={pressed}
       onClick={() => onClick(value)}
       onMouseEnter={() => onHover(value)}
       onMouseLeave={() => onHover(0)}
@@ -54,12 +61,14 @@ const SUB_CATEGORY_ROWS: { key: SubKey; label: string }[] = [
 ];
 
 function SubcategoryStars({
+  rowKey,
   label,
   value,
   hover,
   onHover,
   onPick,
 }: {
+  rowKey?: string;
   label: string;
   value: number;
   hover: number;
@@ -69,12 +78,14 @@ function SubcategoryStars({
   const active = hover || value;
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-text-primary">{label}</p>
-      <div className="flex gap-1">
+      <p className="text-sm font-medium text-text-primary">{label} *</p>
+      <div className="flex gap-1" role="group" aria-label={`${label} (required)`} data-testid={rowKey ? `subrating-${rowKey}` : undefined}>
         {[1, 2, 3, 4, 5].map((v) => (
           <StarButton
             key={v}
             value={v}
+            category={label}
+            pressed={v === value}
             selected={v <= value}
             hovered={v <= hover}
             onHover={onHover}
@@ -82,6 +93,7 @@ function SubcategoryStars({
           />
         ))}
       </div>
+      <p className="text-xs mt-1.5" aria-live="polite">{value ? `Selected: ${value} of 5` : "No rating selected"}</p>
       {active > 0 && <p className="text-xs font-semibold text-amber-600">{ratingLabels[active]}</p>}
     </div>
   );
@@ -96,11 +108,14 @@ const emptySubRatings = (): Record<SubKey, number> => ({
 
 export default function ReviewSubmitPage() {
   const brandName = getTenantBrandName();
-  const { bookingId } = useParams<{ bookingId: string }>();
+  const { bookingId: rawBookingId } = useParams<{ bookingId: string }>();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("t");
+  // NOTIF-074: the access code may arrive in the query string or, if WhatsApp encoded the button suffix, inside the path tail.
+  const { bookingId, token } = resolveReviewLinkParams(rawBookingId, searchParams.get("t"));
+  const [missingCode, setMissingCode] = useState(false);
 
   const [eligibility, setEligibility] = useState<ReviewEligibility | null>(null);
+  const [funnelConfig, setFunnelConfig] = useState<ReviewFunnelConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,7 +136,9 @@ export default function ReviewSubmitPage() {
 
   useEffect(() => {
     if (!bookingId || !token) {
-      setError("Invalid review link. Please use the link from your check-out message.");
+      // NOTIF-074: no dead end. Say what is missing and offer the ways that still work.
+      setMissingCode(true);
+      setError("This review link is missing its access code, so we cannot open your review form from it.");
       setLoading(false);
       return;
     }
@@ -141,6 +158,27 @@ export default function ReviewSubmitPage() {
       })
       .finally(() => setLoading(false));
   }, [bookingId, token]);
+
+  useEffect(() => {
+    if (!eligibility?.listingId) return;
+    const funnelUrl = buildApiUrl("/api/public/review-funnel/" + eligibility.listingId);
+    fetch(funnelUrl, { headers: { Accept: "application/json", ...getApiHeaders() } })
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return (await res.json()) as ReviewFunnelConfig;
+      })
+      .then((cfg) => {
+        if (cfg) {
+          setFunnelConfig({
+            hasGoogleReviewLink: Boolean(cfg.hasGoogleReviewLink ?? (cfg as any).HasGoogleReviewLink),
+            googleReviewUrl: cfg.googleReviewUrl ?? (cfg as any).GoogleReviewUrl ?? null,
+          });
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("Review funnel config fetch failed:", err);
+      });
+  }, [eligibility?.listingId]);
 
   const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -184,6 +222,13 @@ export default function ReviewSubmitPage() {
 
   const bodyLen = body.trim().length;
   const bodyTooShort = useMemo(() => bodyLen > 0 && bodyLen < 20, [bodyLen]);
+
+  // REV-046 (founder ruling 2026-10-28): catch first, Google open to every guest. The host's Google review link
+  // is offered to a 1-3 star guest too, before and after they submit. Only the order differs from 4-5 stars,
+  // whose Google call to action stays the big card on the thank-you screen. Never gate a low rating away from Google.
+  const googleReviewUrl =
+    funnelConfig?.hasGoogleReviewLink && funnelConfig.googleReviewUrl ? funnelConfig.googleReviewUrl : null;
+  const isLowRating = rating >= 1 && rating <= 3;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,8 +293,21 @@ export default function ReviewSubmitPage() {
       <div className="min-h-[60vh] flex items-center justify-center px-4">
         <div className="max-w-md text-center space-y-4">
           <div className="text-4xl">🔍</div>
-          <h1 className="text-xl font-bold text-text-primary">Link not found</h1>
+          <h1 className="text-xl font-bold text-text-primary">{missingCode ? "This review link is incomplete" : "Link not found"}</h1>
           <p className="text-sm text-text-secondary">{error ?? "We could not find this review link."}</p>
+          {missingCode && (
+            <div className="space-y-2 text-sm text-text-secondary" data-testid="review-link-missing-code">
+              <p>You can still leave your review:</p>
+              <ul className="space-y-1">
+                <li>open the review link in your check-out email, or</li>
+                <li>
+                  sign in and open{" "}
+                  <Link to="/my-bookings" className="text-brand-primary underline underline-offset-2">My bookings</Link>
+                  , where your stay has a Review button.
+                </li>
+              </ul>
+            </div>
+          )}
           <Link to="/" className="inline-block mt-2 text-sm text-brand-primary underline underline-offset-2">Return to homepage</Link>
         </div>
       </div>
@@ -281,9 +339,48 @@ export default function ReviewSubmitPage() {
           </h1>
           <p className="text-sm text-text-secondary">
             {submitted
-              ? `Your feedback about ${eligibility.propertyName} means a lot. We hope to welcome you back soon!`
+              ? isLowRating
+                ? "Sorry your stay wasn't perfect. The owner has your feedback and will contact you."
+                : `Your feedback about ${eligibility.propertyName} means a lot. We hope to welcome you back soon!`
               : "You have already submitted a review for this stay. Thank you!"}
           </p>
+          {submitted && isLowRating && googleReviewUrl && (
+            // REV-046: the same readable Google link the guest saw while rating. Not a promo card, not greyed out.
+            <a
+              href={googleReviewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="review-success-google-link"
+              className="inline-flex min-h-11 items-center justify-center text-base font-medium text-text-primary underline underline-offset-4"
+            >
+              Prefer to post publicly? Review us on Google
+            </a>
+          )}
+          {submitted && rating >= 4 && funnelConfig?.hasGoogleReviewLink && funnelConfig.googleReviewUrl && (
+            <div className="w-full text-left rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-sm space-y-3 mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xl" aria-hidden="true">⭐</span>
+                <h2 className="text-base font-bold text-text-primary">
+                  Share your experience on Google Maps!
+                </h2>
+              </div>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                Your review helps fellow travelers discover {eligibility.propertyName}. Would you take 10 seconds to share your review on Google?
+              </p>
+              <div className="pt-1">
+                <a
+                  href={funnelConfig.googleReviewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid="review-success-google-cta"
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors shadow-sm w-full"
+                >
+                  <span className="text-amber-300">★</span>
+                  <span>Post on Google Reviews</span>
+                </a>
+              </div>
+            </div>
+          )}
           <div className="flex flex-col items-center justify-center gap-3 mt-4">
             <Link
               to={buildHomeUnitPath(getPropertySlug({ property_name: eligibility.propertyName }), eligibility.listingId)}
@@ -345,11 +442,13 @@ export default function ReviewSubmitPage() {
 
           {/* Star rating */}
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3">
-            <p className="text-sm font-medium text-text-primary">Overall rating</p>
-            <div className="flex gap-1">
+            <p className="text-sm font-medium text-text-primary">Overall rating *</p>
+            <div className="flex gap-1" role="group" aria-label="Overall rating (required)" data-testid="overall-rating-stars">
               {[1, 2, 3, 4, 5].map((v) => (
                 <StarButton
                   key={v} value={v}
+                  category="Overall rating"
+                  pressed={v === rating}
                   selected={v <= rating}
                   hovered={v <= hoveredRating}
                   onHover={setHoveredRating}
@@ -357,8 +456,22 @@ export default function ReviewSubmitPage() {
                 />
               ))}
             </div>
+            <p className="text-xs mt-1.5" aria-live="polite">{rating ? `Selected: ${rating} of 5` : "No rating selected"}</p>
             {activeRating > 0 && (
               <p className="text-sm font-semibold text-amber-600">{ratingLabels[activeRating]}</p>
+            )}
+            {isLowRating && googleReviewUrl && (
+              // REV-046: visible the moment a 1-3 star rating is chosen, before anything is submitted.
+              // Readable text, in the open: not greyed out, not behind a toggle, not behind sending.
+              <a
+                href={googleReviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="review-low-google-link"
+                className="inline-flex min-h-11 items-center text-base font-medium text-text-primary underline underline-offset-4"
+              >
+                Prefer to post publicly? Review us on Google
+              </a>
             )}
           </div>
 
@@ -368,6 +481,7 @@ export default function ReviewSubmitPage() {
               {SUB_CATEGORY_ROWS.map(({ key, label }) => (
                 <div key={key} className="pt-5 first:pt-0">
                   <SubcategoryStars
+                    rowKey={key}
                     label={label}
                     value={subRatings[key]}
                     hover={subHover[key]}

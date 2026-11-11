@@ -6,7 +6,7 @@ import {
   persistGuestAuthState,
   clearGuestAuthState,
 } from '@/storage/guestAuthStorage';
-import { loadFavoritesIfAuthenticated } from '@/utils/guestHistory'; // TASK-4515: sync favorites on login
+import { loadFavoritesIfAuthenticated, loadRecentlyViewedIfAuthenticated, resetRecentlyViewedOnLogout } from '@/utils/guestHistory'; // TASK-4515 / GUEST-009 / TASK-103034
 
 /**
  * TASK-4017: Guest authentication context
@@ -43,12 +43,32 @@ export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isLoading, setIsLoading] = useState(Capacitor.isNativePlatform());
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    if (!Capacitor.isNativePlatform()) {
+      if (getCachedGuestAuthState()?.isAuthenticated) {
+        void loadFavoritesIfAuthenticated().catch((error) => {
+          console.warn('Failed to sync favorites on hydration:', error);
+        });
+        void loadRecentlyViewedIfAuthenticated().catch((error) => {
+          console.warn('Failed to sync recently viewed on hydration:', error);
+        });
+      }
+      return;
+    }
     let cancelled = false;
     void (async () => {
       try {
         const stored = await hydrateGuestAuthState();
-        if (!cancelled && stored) setAuth(stored);
+        if (!cancelled && stored) {
+          setAuth(stored);
+          if (stored.isAuthenticated) {
+            void loadFavoritesIfAuthenticated().catch((error) => {
+              console.warn('Failed to sync favorites on hydration:', error);
+            });
+            void loadRecentlyViewedIfAuthenticated().catch((error) => {
+              console.warn('Failed to sync recently viewed on hydration:', error);
+            });
+          }
+        }
       } catch (error) {
         console.error('Failed to load guest auth from storage:', error);
       } finally {
@@ -75,10 +95,15 @@ export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     void loadFavoritesIfAuthenticated().catch((error) => {
       console.warn('Failed to sync favorites on login:', error);
     });
+    // GUEST-009: sync server recently viewed with local on authenticated login
+    void loadRecentlyViewedIfAuthenticated().catch((error) => {
+      console.warn('Failed to sync recently viewed on login:', error);
+    });
   }, []);
 
   const logout = useCallback(() => {
     setAuth(defaultState);
+    resetRecentlyViewedOnLogout();
     void clearGuestAuthState().catch((error) => {
       console.error('Failed to clear guest auth from storage:', error);
     });
@@ -94,6 +119,7 @@ export const GuestAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   return <GuestAuthContext.Provider value={value}>{children}</GuestAuthContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with provider
 export const useGuestAuth = (): GuestAuthContextValue => {
   const context = useContext(GuestAuthContext);
   if (!context) {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import axios, { AxiosError } from 'axios';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { addDays, nextFriday } from 'date-fns';
 import {
@@ -11,12 +11,14 @@ import {
 } from './unitBookingPaymentOrderErrors';
 import { toISODate } from '@/utils/dateRange';
 import { getIstStartOfDay } from '@/utils/date';
+import { settle } from '../../test/settle';
 
 // ---- TASK-4303 render-test mocks (hoisted; only the render suite below imports the widget) ----
 const task4303 = vi.hoisted(() => ({
   fetchCalendarPricing: vi.fn(),
   fetchGuestGstBreakdown: vi.fn(),
-  booking: { checkIn: null as string | null, checkOut: null as string | null, guests: 2 },
+  fetchPublicListingRatePlans: vi.fn<() => Promise<unknown[]>>(async () => []),
+  booking: { checkIn: null as string | null, checkOut: null as null | string, guests: 2 },
 }));
 
 // TASK-4830: a configurable availability-fetch mock so the failure suite below can make the
@@ -57,6 +59,7 @@ vi.mock('@/api/pricingClient', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   fetchCalendarPricing: task4303.fetchCalendarPricing,
   fetchGuestGstBreakdown: task4303.fetchGuestGstBreakdown,
+  fetchPublicListingRatePlans: (...args: unknown[]) => task4303.fetchPublicListingRatePlans(...(args as [])),
 }));
 vi.mock('@/api/listingClient', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -338,7 +341,7 @@ describe('UnitBookingWidget - TASK-4331: GST slab sourced from server, not a pre
   it('finalTotal prefers server FinalAmount when it matches the current selection (TASK-5184)', () => {
     const content = readFileSync(filePath, 'utf-8');
     expect(content).toMatch(
-      /const finalTotal =\s*\n\s*showOnlinePaymentProcessing &&\s*\n\s*serverGstMatchesSelection &&\s*\n\s*typeof serverFinalAmount === 'number' &&\s*\n\s*serverFinalAmount > 0/,
+      /const finalTotal =\s*\n\s*showOnlinePaymentProcessing &&\s*\n\s*serverGstMatchesSelection &&\s*\n\s*typeof (?:effectiveServerFinalAmount|serverFinalAmount) === 'number' &&\s*\n\s*(?:effectiveServerFinalAmount|serverFinalAmount) > 0/,
     );
   });
 });
@@ -526,7 +529,8 @@ describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pr
     // DESIGN-030 (326df4d6) added a `!datesUnavailable &&` guard alongside `!rangePricingPending`
     // on the settled breakdown (an unavailable range shows the "Dates unavailable" headline
     // instead, never the real purchase breakdown) — the rangePricingPending gate is unchanged.
-    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (');
+    // TASK-1040051 added `pricingRefusedMessage == null` (a stay the server refused to price shows its sentence, never a breakdown).
+    expect(content).toContain('hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && pricingRefusedMessage == null && (');
   });
 
   it('only a terminal (non-abort) pricing fetch failure degrades to the fallback estimate', () => {
@@ -541,7 +545,9 @@ describe('UnitBookingWidget - TASK-4303: no provisional total before per-date pr
       content.indexOf('data-testid="guest-booking-submit"') - 1400,
       content.indexOf('data-testid="guest-booking-submit"'),
     );
-    expect(buttonSection).toContain('rangePricingPending');
+    expect(buttonSection).toContain('disabled={reserveDisabled}');
+    const disabledExpression = content.slice(content.indexOf('  const reserveDisabled ='), content.indexOf('  const canReviewBooking ='));
+    expect(disabledExpression).toContain('rangePricingPending ||');
   });
 });
 
@@ -584,7 +590,8 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
     );
 
     // While per-date pricing is unresolved: skeletons, and NO Total row / provisional numbers.
-    await screen.findByTestId('bw-price-pending');
+    await settle();
+    screen.getByTestId('bw-price-pending');
     expect(screen.getByTestId('bw-breakdown-pending')).toBeInTheDocument();
     expect(screen.queryByText('Total')).toBeNull();
     // The stale provisional numbers from the base rate (₹6,000 × 2 → ₹12,000 / ₹12,600) must never render.
@@ -600,7 +607,8 @@ describe('UnitBookingWidget - TASK-4303: first rendered Total equals the settled
 
     // Settled: base ₹6,500 × 2 = ₹13,000; GST = ₹0 (ADR-0107); fee 3% × ₹13,000 = ₹390 (base only,
     // TASK-4913 founder-ruled 2026-07-17 option c); Total ₹13,390.
-    const totalLabel = await screen.findByText('Total');
+    await settle();
+    const totalLabel = screen.getByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
     expect(totalValue.replace(/[^0-9]/g, '')).toBe('13390');
     // Headline total matches the breakdown total — the FIRST total ever rendered IS the settled one
@@ -703,7 +711,8 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
     await renderWidget();
 
     // Fail-closed: error surfaced, retry offered, Reserve disabled and labelled "Unavailable".
-    await screen.findByTestId('guest-booking-availability-error');
+    await settle();
+    screen.getByTestId('guest-booking-availability-error');
     expect(screen.getByTestId('guest-booking-availability-retry')).toBeInTheDocument();
     const reserve = screen.getByTestId('guest-booking-submit');
     expect(reserve).toBeDisabled();
@@ -719,7 +728,8 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
 
     await renderWidget();
 
-    const retry = await screen.findByTestId('guest-booking-availability-retry');
+    await settle();
+    const retry = screen.getByTestId('guest-booking-availability-retry');
     expect(screen.getByTestId('guest-booking-submit')).toBeDisabled();
 
     await act(async () => {
@@ -728,9 +738,8 @@ describe('UnitBookingWidget - TASK-4830: availability fetch failure fail-closes 
 
     // After a successful retry the error clears and — with no blocking date selection — Reserve
     // is enabled again (blank dates stay clickable per TASK-4277; availabilityFailed was the only gate).
-    await waitFor(() => {
-      expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
-    });
+    await settle();
+    expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });
@@ -835,7 +844,8 @@ describe('UnitBookingWidget - TASK-4725: "Extra guest fee" row deleted (server n
       </MemoryRouter>,
     );
 
-    await screen.findByText('Total');
+    await settle();
+    screen.getByText('Total');
     expect(screen.queryByText('Extra guest fee')).toBeNull();
   });
 });
@@ -895,9 +905,8 @@ describe('UnitBookingWidget - TASK-4726: URL-hydrated interior-night overlap dis
     // would be ENABLED here if not for the (still in-flight) availability check — proving that
     // once it later reveals the interior conflict, the disablement is genuinely attributable to
     // the interior-night-overlap logic and not some other unrelated gate.
-    await waitFor(() => {
-      expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
-    });
+    await settle();
+    expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
 
     await act(async () => {
       resolveAvailability(
@@ -911,11 +920,10 @@ describe('UnitBookingWidget - TASK-4726: URL-hydrated interior-night overlap dis
 
     // The regression: without the fix, the URL-hydration effect never re-runs after blockedSet/
     // dateStatusMap populate, so neither the date-error nor the disabled Reserve ever appear.
-    await waitFor(() => {
-      const dateError = screen.queryByTestId('guest-booking-date-error');
-      const reserve = screen.getByTestId('guest-booking-submit');
-      expect(Boolean(dateError) || reserve.hasAttribute('disabled')).toBe(true);
-    });
+    await settle();
+    const dateError = screen.queryByTestId('guest-booking-date-error');
+    const reserve = screen.getByTestId('guest-booking-submit');
+    expect(Boolean(dateError) || reserve.hasAttribute('disabled')).toBe(true);
   });
 });
 
@@ -956,7 +964,8 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
       fireEvent.click(reserve);
     });
 
-    const error = await screen.findByTestId('guest-booking-date-error');
+    await settle();
+    const error = screen.getByTestId('guest-booking-date-error');
     expect(error.textContent).toContain('Add a check-in date to continue.');
     expect(error).toHaveAttribute('role', 'alert');
 
@@ -994,7 +1003,8 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
       fireEvent.click(reserve);
     });
 
-    const error = await screen.findByTestId('guest-booking-date-error');
+    await settle();
+    const error = screen.getByTestId('guest-booking-date-error');
     expect(error.textContent).toContain('Add a check-out date to continue.');
     expect(error).toHaveAttribute('role', 'alert');
 
@@ -1029,7 +1039,8 @@ describe('UnitBookingWidget - TASK-4911: Reserve CTA surfaces inline validation 
       fireEvent.click(reserve);
     });
 
-    const error = await screen.findByTestId('guest-booking-date-error');
+    await settle();
+    const error = screen.getByTestId('guest-booking-date-error');
     const errorId = error.getAttribute('id');
     expect(errorId).toBeTruthy();
     expect(document.getElementById('unit-booking-dates')).toHaveAttribute('aria-describedby', errorId);
@@ -1077,7 +1088,8 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
     });
 
     // The card must still say "Select dates to see total price" ...
-    expect(await screen.findByText('Select dates to see total price')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText('Select dates to see total price')).toBeInTheDocument();
     // ... and must NEVER show a concrete "Total" row, or any of the partial breakdown rows
     // (Accommodation + Payment processing summing to a total that silently omitted GST) that
     // the TASK-4910 repro captured alongside that same message.
@@ -1105,7 +1117,8 @@ describe('UnitBookingWidget - TASK-4910: no misleading GST-less total in incompl
 
     await renderWidget();
 
-    const totalLabel = await screen.findByText('Total');
+    await settle();
+    const totalLabel = screen.getByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
     expect(totalValue.replace(/[^0-9]/g, '')).toBe('6180');
 
@@ -1165,7 +1178,8 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
       </MemoryRouter>,
     );
 
-    const totalLabel = await screen.findByText('Total');
+    await settle();
+    const totalLabel = screen.getByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
     // Base ₹6,000 + GST ₹0 = ₹6,000 — no 3% processing fee.
     expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
@@ -1207,11 +1221,61 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
       </MemoryRouter>,
     );
 
-    const totalLabel = await screen.findByText('Total');
+    await settle();
+    const totalLabel = screen.getByText('Total');
     const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
     expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
     expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
     expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
+  });
+
+  it('MKT-011: tenantContext prop with bookingMode WHATSAPP overrides global ONLINE context', async () => {
+    // Global context is ONLINE (e.g. apex marketplace host atlas)
+    tenantCtxMock.getTenantContext.mockReturnValue({
+      slug: 'atlas',
+      name: 'Atlas Homes',
+      paymentProvider: 'RAZORPAY',
+      bookingMode: 'ONLINE' as const,
+    });
+
+    const checkin = addDays(getIstStartOfDay(new Date()), 5);
+    const checkout = addDays(checkin, 1);
+    const nightIso = toISODate(checkin);
+    task4303.booking.checkIn = toISODate(checkin);
+    task4303.booking.checkOut = toISODate(checkout);
+    task4303.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[nightIso, 6000]]),
+      convenienceFeePercent: 3,
+    });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 5, gstAmount: 300, finalAmount: 6480 });
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Comfort Cove"
+          propertySlug="comfort-cove"
+          unitSlug="cove"
+          tenantContext={{
+            slug: 'mitali-saikia',
+            name: 'Mitali Saikia',
+            bookingMode: 'WHATSAPP',
+            whatsappBookingPhone: '919435508028',
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const totalLabel = screen.getByText('Total');
+    const totalValue = totalLabel.parentElement?.querySelector('.lv-num')?.textContent ?? '';
+    // Base ₹6,000 + GST ₹0 = ₹6,000 — no 3% processing fee
+    expect(totalValue.replace(/[^0-9]/g, '')).toBe('6000');
+    expect(screen.queryByTestId('bw-bd-service-fee-row')).toBeNull();
+    expect(screen.queryByTestId('bw-payment-trust-logos')).toBeNull();
+    expect(screen.queryByText(/Payment processing/i)).toBeNull();
   });
 
   // Delegation ratchet (not a copy of the predicate): the widget must keep asking the shared
@@ -1221,7 +1285,7 @@ describe('UnitBookingWidget - TASK-7428: hide payment processing when no online 
   it('source: delegates the gate to hasOnlinePaymentRail and keeps both surfaces behind it', () => {
     const content = readFileSync(resolve(__dirname, './UnitBookingWidget.tsx'), 'utf-8');
     expect(content).toContain("from '@/tenant/paymentRail'");
-    expect(content).toContain('const showOnlinePaymentProcessing = hasOnlinePaymentRail()');
+    expect(content).toContain('const showOnlinePaymentProcessing = hasOnlinePaymentRail(');
     expect(content).toContain('{showOnlinePaymentProcessing && (');
     // The fee must never be re-derived from a locally reinvented tenant-payment condition.
     expect(content).not.toContain("bookingMode !== 'WHATSAPP'");
@@ -1273,7 +1337,8 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
 
   it('before any date is picked: prompts for dates and may show the generic grace disclosure', async () => {
     await renderWidget();
-    const strip = await screen.findByTestId('bw-trust-strip-text');
+    await settle();
+    const strip = screen.getByTestId('bw-trust-strip-text');
     expect(strip.textContent).toContain('Select check-in dates');
     // Nothing to void against yet, so the listing-level disclosure is legitimate here.
     expect(screen.getByTestId('bw-grace-window-strip-text').textContent)
@@ -1284,7 +1349,8 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
     await renderWidget();
     await setCheckin(40);
 
-    const strip = await screen.findByTestId('bw-trust-strip-text');
+    await settle();
+    const strip = screen.getByTestId('bw-trust-strip-text');
     // Strict = 168h before check-in, so ~33 days out — a real date, never "48 hours".
     expect(strip.textContent).toMatch(/^Free cancellation until \d{1,2}:\d{2} (?:AM|PM), \d{1,2} \w{3}$/);
     expect(strip.textContent).not.toContain('48');
@@ -1295,12 +1361,24 @@ describe('UnitBookingWidget - TASK-7012: rendered cancellation copy matches the 
     await renderWidget();
     await setCheckin(0);
 
-    const strip = await screen.findByTestId('bw-trust-strip-text');
+    await settle();
+    const strip = screen.getByTestId('bw-trust-strip-text');
     // The refund the server would actually issue here is nil — the copy must not promise otherwise.
-    expect(strip.textContent).toBe('Standard cancellation policy applies for this stay.');
+    expect(strip.textContent).toBe(
+      'Strict policy: this stay is inside the 7 days before check-in, so the booking is non-refundable.',
+    );
+    expect(strip.textContent).not.toMatch(/standard cancellation/i);
     expect(strip.textContent).not.toMatch(/free cancellation/i);
     // The grace window is voided for these dates, so advertising it would over-promise the refund.
     expect(screen.queryByTestId('bw-grace-window-strip')).toBeNull();
+  });
+
+  it('GUEST-037: no "illustrative" OTA savings line is rendered next to the quote', async () => {
+    await renderWidget();
+    await setCheckin(40);
+    await settle();
+    expect(screen.queryByTestId('bw-direct-savings-line')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/illustrative|vs typical booking sites/i);
   });
 
   it('never renders an empty trust strip (a bare check icon with blank text)', async () => {
@@ -1354,9 +1432,8 @@ describe('UnitBookingWidget - TASK-102023: split pricing failure flags', () => {
     );
 
     // Wait for the selected-range fetch to fail and render error affordance
-    await waitFor(() => {
-      expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId('bw-pricing-error')).toBeInTheDocument();
 
     // Now resolve the shown-month fetch
     await act(async () => {
@@ -1429,7 +1506,8 @@ describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-clo
   it('fail-closes Reserve with error + retry when lookupFailed and no listingId', async () => {
     await renderWidgetLookup(true);
 
-    await screen.findByTestId('guest-booking-availability-error');
+    await settle();
+    screen.getByTestId('guest-booking-availability-error');
     expect(screen.getByTestId('guest-booking-availability-retry')).toBeInTheDocument();
     const reserve = screen.getByTestId('guest-booking-submit');
     expect(reserve).toBeDisabled();
@@ -1442,11 +1520,289 @@ describe('UnitBookingWidget - TASK-102485: failed parent listing lookup fail-clo
     await renderWidgetLookup(undefined);
 
     // Resolving ≠ failed: the widget must not show the failure UI …
-    await waitFor(() => {
-      expect(screen.getByTestId('guest-booking-form')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId('guest-booking-form')).toBeInTheDocument();
     expect(screen.queryByTestId('guest-booking-availability-error')).toBeNull();
     // … and Reserve stays clickable for blank dates (TASK-4277).
     expect(screen.getByTestId('guest-booking-submit')).toBeEnabled();
   });
 });
+
+describe('UnitBookingWidget - availability legend layout (render)', () => {
+  beforeEach(() => {
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 0, gstAmount: 0, finalAmount: 0 });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  // Founder ruling 2026-10-21: no "Turnover" in front of guests — a turnover night is just an available night.
+  it('lists Available → Not available in plain words, each label separate from its description, below an unbroken dates + guests card', async () => {
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+    const { container } = render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const legend = screen.getByTestId('bw-availability-legend');
+    const items = Array.from(legend.querySelectorAll('li'));
+    expect(items.map((li) => li.querySelector('.bw-legend-label')?.textContent?.trim())).toEqual([
+      'Available',
+      'Not available',
+    ]);
+    expect(items.map((li) => li.querySelector('.bw-legend-desc')?.textContent?.trim())).toEqual([
+      'Open for booking',
+      'Already booked or closed',
+    ]);
+    // Same swatches as the calendar popover's own legend, so the colours match the day cells.
+    expect(items.map((li) => li.querySelector('.bc-sw')?.className)).toEqual([
+      'bc-sw bc-sw-available',
+      'bc-sw bc-sw-unavail',
+    ]);
+
+    // The guests cell has no top border, so the dates + guests card only reads as one card when
+    // nothing renders between the two halves; the legend sits below it.
+    const datePair = container.querySelector('.lv-date-pair');
+    const guests = container.querySelector('.lv-guest-cell');
+    expect(datePair?.nextElementSibling).toBe(guests);
+    expect(guests!.compareDocumentPosition(legend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe('UnitBookingWidget - TASK-1039690: per-date minStayArrival parity with server', () => {
+  beforeEach(() => {
+    task4303.fetchCalendarPricing.mockResolvedValue({ dateToPrice: new Map(), convenienceFeePercent: 3 });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({ gstPercent: 0, gstAmount: 0, finalAmount: 0 });
+  });
+
+  afterEach(() => {
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('allows a 1-night stay on a gap date with minStayArrival=1 while still enforcing minStayNights=2 on normal dates', async () => {
+    const todayIst = getIstStartOfDay();
+    const gapDate = addDays(todayIst, 5);
+    const gapDateOut = addDays(todayIst, 6);
+    const normalDate = addDays(todayIst, 8);
+    const normalDateOut = addDays(todayIst, 9);
+    const gapIso = toISODate(gapDate);
+    const normalIso = toISODate(normalDate);
+
+    availabilityMock.fetch.mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify([
+            { date: gapIso, status: 'available', minStayArrival: 1 },
+            { date: normalIso, status: 'available', minStayArrival: null },
+          ]),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    );
+
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+
+    // 1. Hydrate a 1-night stay on the gap date (minStayArrival = 1)
+    task4303.booking.checkIn = gapIso;
+    task4303.booking.checkOut = toISODate(gapDateOut);
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+          minStayNights={2}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    expect(screen.queryByText(/Minimum stay is 2 nights/i)).toBeNull();
+    expect(screen.queryByTestId('min-stay-badge')).toBeNull();
+    unmount();
+
+    // 2. Hydrate a 1-night stay on a normal date (no override -> minStayNights = 2 applies)
+    task4303.booking.checkIn = normalIso;
+    task4303.booking.checkOut = toISODate(normalDateOut);
+
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={7}
+          propertyId={3}
+          listingName="Atlas 501 PH"
+          propertySlug="atlas501-ph"
+          unitSlug="ph"
+          minStayNights={2}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+    expect(screen.getByText(/Minimum stay is 2 nights/i)).toBeInTheDocument();
+    expect(screen.getByTestId('min-stay-badge')).toHaveTextContent('Minimum 2 nights');
+  });
+});
+
+describe('UnitBookingWidget - TASK-10299208: rate plan badge honesty (single-plan vs multi-plan)', () => {
+  beforeEach(() => {
+    const todayIst = getIstStartOfDay();
+    const checkIn = toISODate(addDays(todayIst, 5));
+    const checkOut = toISODate(addDays(todayIst, 6));
+    task4303.booking.checkIn = checkIn;
+    task4303.booking.checkOut = checkOut;
+    task4303.fetchCalendarPricing.mockResolvedValue({
+      dateToPrice: new Map([[checkIn, 4500]]),
+      convenienceFeePercent: 3,
+    });
+    task4303.fetchGuestGstBreakdown.mockResolvedValue({
+      baseAmount: 4500,
+      discountAmount: 0,
+      convenienceFeeAmount: 135,
+      finalAmount: 4635,
+      nights: 1,
+    });
+  });
+
+  afterEach(() => {
+    task4303.booking.checkIn = null;
+    task4303.booking.checkOut = null;
+    task4303.fetchPublicListingRatePlans.mockResolvedValue([]);
+    availabilityMock.fetch.mockImplementation(availabilityOk);
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it('shows no plan badge on a single-plan listing even when the plan is named "Atlas101 . Double" or "Standard Rate"', async () => {
+    task4303.fetchPublicListingRatePlans.mockResolvedValue([
+      {
+        id: 101,
+        listingId: 1,
+        name: 'Atlas101 . Double',
+        isDefault: true,
+        sortOrder: 0,
+        baseNightlyRate: 4500,
+        effectiveNightlyRate: 4500,
+        totalStayAmount: 4500,
+        guests: 2,
+        cancellationPolicy: 'Flexible',
+        cancellationSummary: 'Free cancellation up to 24 hours before check-in',
+        mealPlanCode: 'EP',
+        mealPlanLabel: 'Room Only',
+        isDerived: false,
+      },
+    ]);
+
+    const onStickySummaryChange = vi.fn();
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={1}
+          propertyId={1}
+          listingName="Atlas101"
+          propertySlug="atlas101"
+          unitSlug="1"
+          onStickySummaryChange={onStickySummaryChange}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+
+    expect(screen.queryByTestId('selected-rate-plan-badge')).toBeNull();
+    expect(screen.queryByTestId('pricing-tier-display')).toBeNull();
+    expect(screen.queryByText(/Atlas101\s*\.\s*Double/i)).toBeNull();
+
+    const lastSticky = onStickySummaryChange.mock.calls.at(-1)?.[0];
+    expect(lastSticky?.ratePlanLabel).toBeNull();
+    expect(lastSticky?.mealPlanCode).toBeNull();
+  });
+
+  it('shows plain meal words and cancellation policy on a multi-plan listing, never the internal plan name', async () => {
+    task4303.fetchPublicListingRatePlans.mockResolvedValue([
+      {
+        id: 201,
+        listingId: 3,
+        name: 'Atlas201 . Double',
+        isDefault: true,
+        sortOrder: 0,
+        baseNightlyRate: 4500,
+        effectiveNightlyRate: 4500,
+        totalStayAmount: 4500,
+        guests: 2,
+        cancellationPolicy: 'Flexible',
+        cancellationSummary: 'Free cancellation up to 24 hours before check-in',
+        mealPlanCode: 'EP',
+        mealPlanLabel: 'Room Only',
+        isDerived: false,
+      },
+      {
+        id: 202,
+        listingId: 3,
+        name: 'Standard Rate',
+        isDefault: false,
+        sortOrder: 1,
+        baseNightlyRate: 5100,
+        effectiveNightlyRate: 5100,
+        totalStayAmount: 5100,
+        guests: 2,
+        cancellationPolicy: 'NonRefundable',
+        cancellationSummary: 'Non-refundable',
+        mealPlanCode: 'CP',
+        mealPlanLabel: 'Breakfast Included',
+        isDerived: true,
+      },
+    ]);
+
+    const onStickySummaryChange = vi.fn();
+    const { default: UnitBookingWidget } = await import('./UnitBookingWidget');
+
+    render(
+      <MemoryRouter>
+        <UnitBookingWidget
+          listingId={3}
+          propertyId={1}
+          listingName="Atlas201"
+          propertySlug="atlas201"
+          unitSlug="3"
+          onStickySummaryChange={onStickySummaryChange}
+        />
+      </MemoryRouter>,
+    );
+
+    await settle();
+
+    // Multi-plan selector renders plain meal words, never "Atlas201 . Double" or "Standard Rate"
+    expect(screen.getByTestId('bw-rate-plan-selector')).toBeInTheDocument();
+    expect(screen.queryByTestId('selected-rate-plan-badge')).toBeNull();
+    expect(screen.queryByText(/Atlas201\s*\.\s*Double/i)).toBeNull();
+    expect(screen.queryByText(/Standard Rate/i)).toBeNull();
+    expect(screen.getByTestId('rate-plan-meal-badge')).toHaveTextContent('Room only, no meals');
+
+    const lastSticky = onStickySummaryChange.mock.calls.at(-1)?.[0];
+    expect(lastSticky?.ratePlanLabel).toBe('Room only, no meals');
+    expect(lastSticky?.mealPlanCode).toBeNull();
+  });
+});
+
+

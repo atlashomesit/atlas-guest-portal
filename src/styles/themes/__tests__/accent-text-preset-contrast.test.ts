@@ -127,14 +127,11 @@ describe("every preset's effective text-role accents clear WCAG AA on its own su
 /**
  * Known-orphaned theme CSS, deliberately allowlisted rather than deleted here.
  *
- * `luxury-pastel.css` is not imported by `index.css` and is referenced nowhere in src/ or tests/,
- * yet its header calls itself the "single source of truth" for the OLD design and it defines a full
- * `:root[data-theme="default"]` block. Editing it to change the default theme therefore looks
- * effective and does nothing — the live `default` block is in `default.css`. Removing it is a
- * separate call from a contrast fix, so it is recorded here instead of silently deleted; drop this
- * entry when the file goes.
+ * (luxury-pastel.css used to be listed here -- deleted as unreachable dead code, dead-code
+ * cleanup / import-graph sweep 2026-09-28, per this comment's own instruction to "drop this
+ * entry when the file goes".)
  */
-const KNOWN_ORPHANED_THEME_CSS = ["luxury-pastel.css"];
+const KNOWN_ORPHANED_THEME_CSS: string[] = [];
 
 describe("theme stylesheet hygiene", () => {
   it("gains no NEW theme CSS that index.css never imports", () => {

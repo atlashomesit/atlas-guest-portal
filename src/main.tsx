@@ -5,12 +5,14 @@ import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary'
 import ApiConfigGuard from './components/ApiConfigGuard'
 import { initMonitoring } from './lib/monitoring'
+import { rememberAgentCodeFromLink } from './lib/agentCode'
 import { initAnalytics, initTenantAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
 import { getApiHeaders } from './api/client'
 import { getTenantSlug, isAtlastaysMarketplaceSurface, isMarketplaceMode, setMarketplaceMode } from './tenant/tenantResolver'
 import { validateTenant, resolveFromDomain, getTenantContext, SubdomainNotActivatedError, type TenantInfo } from './tenant/tenantContext'
+import { currentUrlTenantInput, isUrlTenantOverridingHost, resolveHonoredUrlTenant } from './tenant/urlTenantGuard'
 import SubdomainNotActivatedScreen from './components/SubdomainNotActivatedScreen'
 import { applyTenantBranding } from './tenant/tenantBranding'
 import { ConfigErrorScreen } from './runtime-config/ConfigErrorScreen'
@@ -81,6 +83,9 @@ const getDevLayoutThemeOverride = (): string | undefined => {
 
 const bootstrapApp = async () => {
   applyTheme(DEFAULT_THEME)
+  // PRICE-016: remember the travel agent's code from the agent's link (?agent=CODE), then take it out of the
+  // address bar before monitoring / analytics read the URL, so the code is never sent to a third party.
+  rememberAgentCodeFromLink()
   initMonitoring()
   initAnalytics()
   window.addEventListener('atlas:cookie-consent-changed', () => {
@@ -119,7 +124,7 @@ const bootstrapApp = async () => {
       // brand-neutral "not activated" page and STOP — do not fall back to validateTenant(),
       // which would leak Atlas branding onto a stranger's branded subdomain.
       if (e instanceof SubdomainNotActivatedError) {
-        root.render(<SubdomainNotActivatedScreen />);
+        root.render(<SubdomainNotActivatedScreen notTakingBookings={e.notTakingBookings} />);
         return;
       }
       throw e;
@@ -144,6 +149,19 @@ const bootstrapApp = async () => {
       }
     }
 
+    // TASK-1040055 (tenant isolation): when a honoured ?tenant= names a tenant other than the host's (non-production shared hosts only, see urlTenantGuard), the API reads THAT tenant's
+    // data, so the page chrome (brand name, logo, colours) must come from that tenant too, never from the host tenant. A failed lookup keeps the host chrome; contact details are
+    // already withheld for this case (isWhiteLabelTenant), so nothing of the host tenant is shown as the data tenant's.
+    try {
+      const urlTenantInput = currentUrlTenantInput();
+      if (isUrlTenantOverridingHost(urlTenantInput)) {
+        const honored = resolveHonoredUrlTenant(urlTenantInput);
+        if (honored) await validateTenant(honored);
+      }
+    } catch (e) {
+      console.warn('[Atlas] ?tenant= chrome lookup failed — keeping the host chrome:', e);
+    }
+
     activateMarketplaceSurface(config.tenantKey, domainResolved);
 
     // 3. Apply brand config to DOM (title, primaryColor CSS vars, favicon)
@@ -161,10 +179,9 @@ const bootstrapApp = async () => {
     }
 
     // TASK-4903 (ADR-0081 D2/D3/D5/D6a): resolve the layout-theme + color-preset axes once
-    // tenant resolution completes. `resolved.effectiveThemeId`/`effectiveColorPresetId` are
-    // undefined until TASK-4904 lands the server-side DTO fields — resolving here already
-    // stubs "classic"/"default" in that case, so this wiring needs no further change once
-    // TASK-4904 ships. Marketplace apex skips this — it isn't a single resolved tenant and
+    // tenant resolution completes. `resolved.effectiveThemeId`/`effectiveColorPresetId` are the
+    // server-resolved DTO fields (TASK-4904, shipped); an older or partial response that omits them
+    // still resolves to "classic"/"default" here. Marketplace apex skips this — it isn't a single resolved tenant and
     // already renders with the boot-time DEFAULT_THEME applied above.
     const effectiveThemeId = resolveLayoutThemeId(getDevLayoutThemeOverride() ?? resolved?.effectiveThemeId)
     setCurrentLayoutThemeId(effectiveThemeId)

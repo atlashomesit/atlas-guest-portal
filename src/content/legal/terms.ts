@@ -1,3 +1,4 @@
+import { REFUND_APPROVER_SENTENCE } from "../../config/refundPolicyTimelines";
 import { MARKETPLACE_BRAND_BASELINE } from "../../tenant/displayBrand";
 
 export type TermsSection = {
@@ -31,9 +32,10 @@ export const termsSections: TermsSection[] = [
     summary:
       "Notice windows impact refunds; once the stay begins, unused nights are generally non-refundable unless mandated by law.",
     body: [
-      "Cancellations received more than 15 days before check-in may be eligible for a full refund, less non-recoverable processing fees.",
-      "Cancellations received 7–15 days before check-in may be eligible for a partial refund or credit, as communicated at booking time.",
-      "Cancellations within 7 days of arrival, no-shows, and early departures are typically non-refundable once the stay start date has begun unless required by law.",
+      "The cancellation policy that applies to your stay is the one shown on the home's listing for the rate you choose, and again on your booking confirmation. Each rate can differ, and some rates are non-refundable.",
+      "Where that policy allows a refund, it is returned to the original payment method. Where no policy is shown for your stay, contact the host before you pay.",
+      REFUND_APPROVER_SENTENCE,
+      "No-shows and early departures are typically non-refundable once the stay start date has begun, unless required by law.",
     ],
   },
   {

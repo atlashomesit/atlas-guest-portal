@@ -86,11 +86,16 @@
   --accent-primary-rgb: 255 140 66;
   --accent-soft-rgb:    255 232 224;
 
-  --cta-primary:       #FF5733;
-  --cta-primary-hover: #E14929;
+  /* TASK-4908 gate fix (AC15): --cta-primary carries the navbar "Book Now" button's
+     --text-on-cta white label (base.css default, not overridden here) directly on this
+     solid fill (navbar.css .navbar-right/.mobile-menu .book-now) — was #FF5733, white text
+     measured 3.15:1, needs 4.5:1. Darkened --cta-primary/-hover only; --brand-primary/
+     --accent-primary (decorative links/icons/focus rings) are untouched. */
+  --cta-primary:       #C2451F;
+  --cta-primary-hover: #A83618;
   --cta-secondary:     #FF8C42;
-  --cta-primary-rgb:       255 87 51;
-  --cta-primary-hover-rgb: 225 73 41;
+  --cta-primary-rgb:       194 69 31;
+  --cta-primary-hover-rgb: 168 54 24;
   --cta-secondary-rgb:     255 140 66;
 
   --text-heading:  #1C0A00;
@@ -241,11 +246,16 @@
   --accent-primary-rgb: 16 185 129;
   --accent-soft-rgb:    167 243 208;
 
-  --cta-primary:       #059669;
-  --cta-primary-hover: #047857;
+  /* TASK-4908 gate fix (AC15): --cta-primary carries the navbar "Book Now" button's
+     --text-on-cta white label (base.css default, not overridden here) directly on this
+     solid fill (navbar.css .navbar-right/.mobile-menu .book-now) — was #059669, white text
+     measured 3.77:1, needs 4.5:1. Darkened --cta-primary/-hover only; --brand-primary/
+     --accent-primary (decorative links/icons/focus rings) are untouched. */
+  --cta-primary:       #047A54;
+  --cta-primary-hover: #036143;
   --cta-secondary:     #10B981;
-  --cta-primary-rgb:       5 150 105;
-  --cta-primary-hover-rgb: 4 120 87;
+  --cta-primary-rgb:       4 122 84;
+  --cta-primary-hover-rgb: 3 97 67;
   --cta-secondary-rgb:     16 185 129;
 
   --text-heading:  #022C22;

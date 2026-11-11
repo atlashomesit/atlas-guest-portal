@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import GuestLoginPage from "./GuestLoginPage";
+import { settle } from "../test/settle";
 
 /**
  * TASK-7429 (done-when #5): Test that the OTP entry screen renders a resend + support path
@@ -67,12 +68,11 @@ describe("GuestLoginPage sendOtp failure path (TASK-7429)", () => {
     fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
 
     // Assert: UI advances to OTP entry step
-    await waitFor(() => {
-      expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
 
     // Verify the delivery hint is displayed (soft guidance without revealing enumeration)
-    const deliveryHint = await screen.findByTestId("otp-delivery-hint");
+    const deliveryHint = screen.getByTestId("otp-delivery-hint");
     expect(deliveryHint).toBeInTheDocument();
     expect(deliveryHint.textContent).toContain("check spam");
     expect(deliveryHint.textContent).toContain("Resend");
@@ -80,7 +80,8 @@ describe("GuestLoginPage sendOtp failure path (TASK-7429)", () => {
     expect(deliveryHint.textContent).not.toContain("invalid email");
 
     // Verify the correlation ID is displayed (opaque reference for support)
-    const correlationDisplay = await screen.findByTestId("otp-correlation-id");
+    await settle();
+    const correlationDisplay = screen.getByTestId("otp-correlation-id");
     expect(correlationDisplay).toBeInTheDocument();
     expect(correlationDisplay.textContent).toContain("Reference");
     expect(correlationDisplay.textContent).toContain("a1b2c3d4e5f6");
@@ -139,12 +140,11 @@ describe("GuestLoginPage sendOtp failure path (TASK-7429)", () => {
     fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
 
     // Wait for OTP step
-    await waitFor(() => {
-      expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
 
     // Verify first attempt's correlation ID
-    const firstCorrelation = await screen.findByTestId("otp-correlation-id");
+    const firstCorrelation = screen.getByTestId("otp-correlation-id");
     expect(firstCorrelation.textContent).toContain("first-attempt-id");
 
     // Resend button is initially disabled due to cooldown starting on first send
@@ -177,12 +177,11 @@ describe("GuestLoginPage sendOtp failure path (TASK-7429)", () => {
     fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
 
     // Wait for OTP step
-    await waitFor(() => {
-      expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
 
     // Verify contact fallback is rendered
-    const contactFallback = await screen.findByTestId("otp-contact-fallback");
+    const contactFallback = screen.getByTestId("otp-contact-fallback");
     expect(contactFallback).toBeInTheDocument();
 
     // Verify the link points to WhatsApp (from mocked config)
@@ -211,9 +210,8 @@ describe("GuestLoginPage sendOtp failure path (TASK-7429)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
 
     // Verify we're at the OTP step (which uses the safe message in the description)
     const description = screen.getByText(/Enter the 6-digit OTP sent to your email/i);
@@ -257,12 +255,11 @@ describe("GuestLoginPage sendOtp failure path (TASK-7429)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
 
     // Verify delivery hint is displayed
-    const hintDisplay = await screen.findByTestId("otp-delivery-hint");
+    const hintDisplay = screen.getByTestId("otp-delivery-hint");
     expect(hintDisplay).toBeInTheDocument();
     expect(hintDisplay.textContent).toContain("Check spam folder");
     expect(hintDisplay.textContent).toContain("Resend");
@@ -291,9 +288,8 @@ describe("GuestLoginPage sendOtp failure path (TASK-7429)", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /send otp/i }));
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByLabelText("One-Time Password")).toBeInTheDocument();
 
     // Verify failure signals are present
     expect(screen.getByTestId("otp-correlation-id")).toBeInTheDocument();
@@ -305,10 +301,9 @@ describe("GuestLoginPage sendOtp failure path (TASK-7429)", () => {
     fireEvent.click(editButton);
 
     // Verify we're back to email step
-    await waitFor(() => {
-      expect(screen.getByLabelText("Email Address")).toBeInTheDocument();
-      expect(screen.getByLabelText("Email Address")).toHaveValue("guest@example.com");
-    });
+    await settle();
+    expect(screen.getByLabelText("Email Address")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email Address")).toHaveValue("guest@example.com");
 
     // Verify failure signals are cleared
     expect(screen.queryByTestId("otp-correlation-id")).not.toBeInTheDocument();

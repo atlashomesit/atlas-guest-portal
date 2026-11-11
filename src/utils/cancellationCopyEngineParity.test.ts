@@ -49,35 +49,37 @@ describe('TASK-7819 — cancellation copy agrees with the refund engine', () => 
       expect(LATE_CANCELLATION_FEE_PERCENT[effective]).toBe(feePercent);
     });
 
-    it('never denies a refund when the engine charges no fee', () => {
+    it('never denies a refund when the engine charges no fee, and never promises more than it pays', () => {
       const { headline, afterWindowCopy } = describeCancellationPolicy(tier);
       const copy = `${headline} ${afterWindowCopy}`.trim();
 
+      // TASK-1040050: the copy leads with the free-cancellation window and never promises a refund amount or "any time".
+      expect(headline).toMatch(/^Free cancellation up to /);
+      expect(copy).not.toMatch(/any time|full refund/i);
       if (feePercent === 0) {
-        // Engine pays 100% at any time — copy must not gate or deny it.
+        // Engine pays 100% at any time — copy must not gate or deny it, so nothing is said after the date.
         expect(copy).not.toMatch(DENIES_REFUND);
         expect(afterWindowCopy).toBe('');
-        expect(headline).toMatch(/full refund/i);
+      } else if (feePercent >= 100) {
+        // Fee 100%: the engine pays nothing after the window, so "non-refundable" is exactly right.
+        expect(afterWindowCopy).toBe('After that, the booking is non-refundable.');
       } else {
-        // A real fee exists, so the copy is allowed (and expected) to state the limit.
-        expect(headline).toMatch(/full refund/i);
-        expect(afterWindowCopy).not.toBe('');
+        // A real partial fee: the copy says a fee applies and repeats no percentage (the fee is a server setting).
+        expect(afterWindowCopy).toBe('After that, a late-cancellation fee applies.');
       }
     });
 
-    it('states the actual retained percentage when a partial fee applies', () => {
+    it('repeats no retained or refunded percentage (the fee is a server setting, not copy)', () => {
       const { afterWindowCopy } = describeCancellationPolicy(tier);
-      if (feePercent > 0 && feePercent < 100) {
-        const refundPct = 100 - feePercent;
-        expect(afterWindowCopy).toContain(`${refundPct}%`);
-      }
+      expect(afterWindowCopy).not.toMatch(/\d+\s*%/);
     });
   });
 
-  it('an untiered listing reads exactly as Flexible — the server resolves null to Flexible', () => {
-    expect(describeCancellationPolicy(null)).toEqual(describeCancellationPolicy('Flexible'));
-    expect(describeCancellationPolicy(undefined)).toEqual(describeCancellationPolicy('Flexible'));
-    expect(describeCancellationPolicy('not-a-tier')).toEqual(describeCancellationPolicy('Flexible'));
+  it('an untiered listing gets the server default window (7 days), unlike a Flexible one — and says nothing after the date, like Flexible', () => {
+    expect(describeCancellationPolicy(null).headline).toBe('Free cancellation up to 7 days before check-in');
+    expect(describeCancellationPolicy(undefined)).toEqual(describeCancellationPolicy(null));
+    expect(describeCancellationPolicy('not-a-tier')).toEqual(describeCancellationPolicy(null));
+    expect(describeCancellationPolicy(null).afterWindowCopy).toBe(describeCancellationPolicy('Flexible').afterWindowCopy);
   });
 
   it('the inline listing-page snippet asserts no refund outcome at all', () => {
@@ -120,21 +122,67 @@ describe('TASK-8020 — FAQ refund copy agrees with the refund engine', () => {
     expect(src).not.toMatch(CLAIMS_PRORATION);
   });
 
-  it('faq.tsx source never claims pro-rating or nights-stayed refund arithmetic', async () => {
+  // The two tests that used to live here covered src/content/faq.tsx, which was deleted as
+  // unreachable dead code (its own header comment called it an "unused legacy widget"; the
+  // live FAQ page renders faqHighlights.ts / content/legal/faqs.ts instead) -- dead-code
+  // cleanup, import-graph sweep 2026-09-28.
+});
+
+describe('TASK-1039743 — listing refund steps and booking confirmation cancellation copy parity', () => {
+  it('refundPolicyTimelines constants describe a reviewed cancellation request and opt-in WhatsApp', async () => {
+    const timelines = await import('../config/refundPolicyTimelines');
+    expect(timelines.REFUND_REQUEST_STEP_DESC).toMatch(/request cancellation/i);
+    expect(timelines.REFUND_REQUEST_STEP_DESC).toMatch(/review/i);
+    expect(timelines.REFUND_CANCELLATION_REQUEST_DISCLOSURE).toMatch(/review/i);
+    expect(timelines.REFUND_CONFIRMATION_STEP_DESC).toMatch(/email/i);
+    expect(timelines.REFUND_CONFIRMATION_STEP_DESC).toMatch(/WhatsApp if you opted in/i);
+
+    for (const val of Object.values(timelines)) {
+      if (typeof val === 'string') {
+        expect(val).not.toMatch(/one tap/i);
+        expect(val).not.toMatch(/no reason needed/i);
+        expect(val).not.toMatch(/SMS and WhatsApp/i);
+      }
+    }
+  });
+
+  it('both property-detail themes and BookingConfirmationPage source refund copy from refundPolicyTimelines', async () => {
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
     const { dirname, join } = await import('node:path');
     const here = dirname(fileURLToPath(import.meta.url));
-    const src = readFileSync(join(here, '../content/faq.tsx'), 'utf8');
-    expect(src).not.toMatch(CLAIMS_PRORATION);
-  });
 
-  it('buildRetailFaqSections refund answers defer to listing policy without invented arithmetic', async () => {
-    const { buildRetailFaqSections } = await import('../content/faq');
-    const sections = buildRetailFaqSections('Atlas');
-    const partial = sections.flatMap((s) => s.items).find((i) => i.id === 'partial-refunds');
-    expect(partial).toBeTruthy();
-    expect(partial!.question).toMatch(/partial refund/i);
-    expect((partial!.tags ?? []).join(' ')).not.toMatch(/pro-rated/i);
+    const classicSrc = readFileSync(
+      join(here, '../components/homepage_components/homepage_Propertydetails/Homepage_PropertyDetails.tsx'),
+      'utf8',
+    );
+    const heritageSrc = readFileSync(
+      join(here, '../themes/heritage/PropertyDetails.tsx'),
+      'utf8',
+    );
+    const confirmationSrc = readFileSync(
+      join(here, '../pages/BookingConfirmationPage.tsx'),
+      'utf8',
+    );
+
+    for (const [name, src] of [
+      ['Homepage_PropertyDetails.tsx', classicSrc],
+      ['themes/heritage/PropertyDetails.tsx', heritageSrc],
+    ] as const) {
+      expect(src, `${name} must import REFUND_REQUEST_STEP_DESC`).toContain('REFUND_REQUEST_STEP_DESC');
+      expect(src, `${name} must import REFUND_INITIATED_STEP_DESC`).toContain('REFUND_INITIATED_STEP_DESC');
+      expect(src, `${name} must import REFUND_SETTLEMENT_STEP_DESC`).toContain('REFUND_SETTLEMENT_STEP_DESC');
+      expect(src, `${name} must import REFUND_CONFIRMATION_STEP_DESC`).toContain('REFUND_CONFIRMATION_STEP_DESC');
+      // Used in both online and host-arranged step lists (1 import + 2 uses = 3 occurrences).
+      expect(src.match(/REFUND_REQUEST_STEP_DESC/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+      expect(src).not.toMatch(/one tap/i);
+      expect(src).not.toMatch(/no reason needed/i);
+      expect(src).not.toMatch(/SMS and WhatsApp/i);
+    }
+
+    expect(confirmationSrc).toContain('REFUND_CANCELLATION_REQUEST_DISCLOSURE');
+    expect(confirmationSrc).toContain('REFUND_CANCELLATION_RECEIVED_MESSAGE');
+    expect(confirmationSrc).not.toMatch(/one tap/i);
+    expect(confirmationSrc).not.toMatch(/no reason needed/i);
   });
 });

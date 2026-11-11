@@ -1,17 +1,19 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { FaFacebook, FaTwitter, FaYoutube, FaInstagram, FaMapMarkerAlt, FaWhatsapp } from 'react-icons/fa';
 import { ImGithub } from 'react-icons/im';
 import { IoIosMail, IoIosCall, IoIosArrowForward } from "react-icons/io";
 import { footerData } from '../../../data';
-import { Link } from 'react-router-dom';
-import { helpNav, moreNav, primaryNav } from '../../../config/navigation';
+import { Link, useLocation } from 'react-router-dom';
+import { helpNav, moreNav, primaryNav, resolveNavTo } from '../../../config/navigation';
 import { isWordmarkLogo, resolveGuestLogoUrl } from '../../../config/branding';
 import { TrustBanner } from './TrustBanner';
 import { getTenantContext } from '../../../tenant/tenantContext';
 import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
-import { getTenantSlug } from '../../../tenant/tenantResolver';
+import { getTenantSlug, isMarketplaceMode } from '../../../tenant/tenantResolver';
+import PoweredByAtlasLink from '../../PoweredByAtlasLink';
+import { getPoweredBySlug } from '../../../tenant/poweredByAtlas';
 import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getGuestFacingPhone, getWhatsAppPhone } from '../../../config/contact';
 
@@ -26,21 +28,25 @@ const iconMap = {
     IoIosArrowForward
 };
 
-const Footer = () => {
-    // DESIGN (atlastays-redesign spike): "Get exclusive offers" email box from the reference
-    // mockup. There is no newsletter-subscription API in this codebase (grepped for
-    // newsletter/subscribe — none), so this is intentionally a front-end-only affordance:
-    // it captures the address locally and shows an inline confirmation. It does not call any
-    // backend. Documented as a judgment call in the spike doc.
-    const [newsletterEmail, setNewsletterEmail] = useState('');
-    const [newsletterSubmitted, setNewsletterSubmitted] = useState(false);
-    const handleNewsletterSubmit = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        if (!newsletterEmail.trim()) return;
-        setNewsletterSubmitted(true);
-    };
+/** Wrap an e-mail address only after the "@" (never mid-word). */
+// eslint-disable-next-line react-refresh/only-export-components -- tiny helper co-located with Footer
+export function renderEmailWrappableAfterAt(email: string): ReactNode {
+    const at = email.indexOf('@');
+    if (at < 0) return email;
+    return (
+        <>
+            {email.slice(0, at + 1)}
+            <wbr />
+            {email.slice(at + 1)}
+        </>
+    );
+}
 
+const Footer = () => {
     const tenant = getTenantContext();
+    const location = useLocation();
+    // TASK-10299142: same marketplace predicate the Navbar uses, so the Stays link behaves alike in both places.
+    const isMarketplaceNav = location.search.includes('brand=atlastays') || isMarketplaceMode();
     const brandName = getTenantBrandName();
     const socialLabelByIcon: Record<string, string> = {
         FaFacebook: `Visit ${brandName} on Facebook`,
@@ -73,6 +79,11 @@ const Footer = () => {
         ? (tenant?.tagline?.trim() || "Comfortable stays with responsive support.")
         : (tenant?.tagline?.trim() || "Thoughtfully curated stays in Hyderabad");
     const year = new Date().getFullYear();
+    // TASK-10299421: every published host site carries the link (ships ON, no hide switch until the founder rules);
+    // the Atlas marketplace itself is Atlas, not a host site, so it does not credit itself.
+    // The check-in page carries its own utm_medium=checkin line, so the footer skips that route.
+    const poweredBySlug = location.pathname.startsWith('/check-in') ? null : getPoweredBySlug();
+    const showPoweredBy = Boolean(poweredBySlug) && !isMarketplaceNav;
 
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
 
@@ -96,8 +107,8 @@ const Footer = () => {
             key: "email",
             icon: <IoIosMail className="shrink-0 text-lg" aria-hidden />,
             content: (
-                <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
-                    {email}
+                <a href={`mailto:${email}`} className="break-normal text-left hover:text-[var(--footer-link-hover)]">
+                    {renderEmailWrappableAfterAt(email)}
                 </a>
             ),
         });
@@ -137,7 +148,7 @@ const Footer = () => {
             className='pt-16 md:pt-20 pb-28 md:pb-24 px-[5%] text-[var(--footer-text)] border-t border-[color:var(--border-subtle)]'
             style={{ background: 'var(--footer-bg)' }}
         >
-            <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-10 lg:items-start'>
+            <div className='max-w-luxury mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-10 lg:items-start'>
                 <div className='flex flex-col gap-3 items-center lg:items-start'>
                     {showLogo && (
                         <img
@@ -185,7 +196,7 @@ const Footer = () => {
                     <h2 className='font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight' style={{ fontFamily: 'var(--font-family-display)' }}>Quick Links</h2>
                     <div className='flex flex-col gap-2 text-base'>
                         {primaryNav.filter((item) => !item.hidden).map((item) => (
-                            <Link key={item.label} to={item.to} className='text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors'>
+                            <Link key={item.label} to={resolveNavTo(item, { marketplace: isMarketplaceNav, search: location.search })} className='text-[var(--footer-link)] hover:text-[var(--footer-link-hover)] transition-colors'>
                                 {item.label}
                             </Link>
                         ))}
@@ -218,50 +229,8 @@ const Footer = () => {
                     </div>
                 </div>
 
-                {/* DESIGN (atlastays-redesign spike): "Get exclusive offers" email box — see
-                    the front-end-only note above handleNewsletterSubmit. */}
                 <div className="text-center lg:text-left min-w-0">
-                    <h2 className="font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Get exclusive offers</h2>
-                    <p className="text-sm text-[var(--footer-link)] mb-3">
-                        Be the first to know about new homes, discounts and special offers.
-                    </p>
-                    {newsletterSubmitted ? (
-                        <p
-                            className="rounded-full bg-[color:color-mix(in_srgb,var(--bg-primary)_92%,transparent)] px-4 py-2.5 text-sm font-semibold text-[var(--footer-heading)]"
-                            role="status"
-                            data-testid="footer-newsletter-success"
-                        >
-                            Thanks — you&apos;re on the list!
-                        </p>
-                    ) : (
-                        <form
-                            className="flex items-center gap-2 rounded-full bg-[var(--bg-primary)] p-1.5 shadow-sm"
-                            onSubmit={handleNewsletterSubmit}
-                            data-testid="footer-newsletter-form"
-                        >
-                            <label htmlFor="footer-newsletter-email" className="sr-only">Email address</label>
-                            <input
-                                id="footer-newsletter-email"
-                                type="email"
-                                required
-                                value={newsletterEmail}
-                                onChange={(event) => setNewsletterEmail(event.target.value)}
-                                placeholder="Enter your email"
-                                className="min-w-0 flex-1 rounded-full bg-transparent px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
-                            />
-                            <button
-                                type="submit"
-                                aria-label="Subscribe"
-                                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--cta-primary)] text-[var(--text-on-cta)] transition hover:bg-[var(--cta-primary-hover)]"
-                            >
-                                <IoIosArrowForward aria-hidden />
-                            </button>
-                        </form>
-                    )}
-                </div>
-
-                <div className="text-center lg:text-left min-w-0">
-                    <h2 className="font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Contact Us</h2>
+                    <h2 className="font-display text-lg font-semibold mb-3 text-[var(--footer-heading)] leading-tight" style={{ fontFamily: 'var(--font-family-display)' }}>Locate Us</h2>
                     <ul className="m-0 flex list-none flex-col gap-3 p-0 text-base text-[var(--footer-link)]">
                         {locateRows.map((row) => (
                             <li key={row.key} className="flex flex-row items-center justify-center gap-3 lg:justify-start">
@@ -287,7 +256,32 @@ const Footer = () => {
                     <span>|</span>
                     <Link to="/privacy" className='hover:text-[var(--footer-link-hover)] transition-colors'>Privacy</Link>
                     <span>|</span>
-                    <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>                </div>
+                    <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>
+                    {showPoweredBy && (<>
+                        <span>|</span>
+                        <PoweredByAtlasLink slug={poweredBySlug} medium="tenant-site" />
+                    </>)}
+                </div>
+            </div>
+
+            {/* TASK-10298995: Legal disclaimer with valid route links */}
+            <div
+                data-testid="footer-legal-disclaimer"
+                className="mt-3 text-xs text-center text-[var(--footer-link)] max-w-2xl mx-auto"
+            >
+                By using this website, you agree to the{' '}
+                <Link to="/terms" className="underline hover:text-[var(--footer-link-hover)] transition-colors">
+                    Terms &amp; Conditions
+                </Link>{' '}
+                and{' '}
+                <Link to="/privacy" className="underline hover:text-[var(--footer-link-hover)] transition-colors">
+                    Privacy Policy
+                </Link>
+                . For inquiries, reach out via our{' '}
+                <Link to="/contact" className="underline hover:text-[var(--footer-link-hover)] transition-colors">
+                    Contact page
+                </Link>
+                .
             </div>
 
             {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 disclosure — custom-domain

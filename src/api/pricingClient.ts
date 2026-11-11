@@ -1,5 +1,7 @@
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { messageFromApiResponse } from '@/utils/serverErrorFromResponse';
+import { getAgentCode } from '@/lib/agentCode';
+import { PricingNotConfiguredError, pricingNotConfiguredMessage } from '@/utils/pricingNotConfigured';
 
 export type PricingBreakdown = {
   baseAmount?: number;
@@ -33,6 +35,9 @@ export type DailyListingPricingDto = {
   convenienceFeePercent: number;
   finalAmount: number;
   globalDiscountPercent: number;
+  originalNightlyRate?: number | null;
+  discountedNightlyRate?: number | null;
+  appliedPromotionLabel?: string | null;
 };
 
 /** Response from GET /pricing/daily-summary. */
@@ -46,6 +51,19 @@ export type TodayBreakdown = {
   baseAmount: number;
   actualPrice: number;
   globalDiscountPercent: number;
+  /**
+   * Founder ruling 2026-10-21: the all-in total for tonight (payment fee included) — the API builds the
+   * daily-summary row from the checkout quote, so cards can show what the guest is actually charged.
+   */
+  finalAmount: number;
+  /**
+   * TASK-10298998: the payment-fee percent inside `finalAmount` (0 when none), so a no-gateway host's card can
+   * take it back out — nothing on that site charges it.
+   */
+  convenienceFeePercent?: number;
+  originalNightlyRate?: number | null;
+  discountedNightlyRate?: number | null;
+  appliedPromotionLabel?: string | null;
 };
 
 /** Per-day row from GET /pricing/breakdown (calendar view). */
@@ -92,6 +110,8 @@ export type GuestGstBreakdown = {
 export type GuestPriceBreakdown = {
   baseAmount: number;
   discountAmount: number;
+  /** The tenant's direct-booking discount percent the quote applied (optional for older fixtures). */
+  globalDiscountPercent?: number;
   losDiscountAmount: number;
   lastMinuteDiscountAmount: number;
   repeatGuestDiscountAmount: number;
@@ -102,6 +122,31 @@ export type GuestPriceBreakdown = {
   gstPercent: number | null;
   gstAmount: number | null;
   finalAmount: number | null;
+  /** HSL-010: HostelDorm stay price line from the server, e.g. "3 beds x Rs 799 x 2 nights". Absent for every other listing type. */
+  priceLine?: string;
+  /** GUEST-049 / CLU-016: Optional per-stay cleaning fee from PriceBreakdownDto. */
+  cleaningFee?: number;
+  /** TASK-10299273: Optional per-stay pet fee from PriceBreakdownDto when guest brings a pet. */
+  petFee?: number;
+  /** GUEST-049: Optional extra-guest occupancy fee when itemized by the API. */
+  extraGuestFee?: number;
+  /** GUEST-049: Optional weekend rate differential when itemized by the API. */
+  weekendRateAdjustmentAmount?: number;
+  /** DYN-005 / TASK-1040117: Original pre-promotion nightly rate from PriceBreakdownDto. */
+  originalNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: Discounted post-promotion nightly rate from PriceBreakdownDto. */
+  discountedNightlyRate?: number | null;
+  /** DYN-005 / TASK-1040117: Genuine server promotion label (e.g. "Last-Minute Deal (10% off)"). */
+  appliedPromotionLabel?: string | null;
+  /** DYN-005 / TASK-1040117: Promotional discount amount & percent. */
+  promotionDiscountAmount?: number;
+  promotionDiscountPercent?: number;
+  /** CFB-009 / BNB-009 / BNB-010: Per-person, per-night breakfast add-on rate when room is Room-Only (EP). */
+  breakfastPricePerPerson?: number;
+  /** CFB-009 / BNB-009 / BNB-010: True when the guest ticked "Add breakfast" on a Room-Only rate. */
+  includeBreakfast?: boolean;
+  /** CFB-009 / BNB-009 / BNB-010: Breakfast extra amount included in finalAmount (BreakfastPricePerPerson * guests * nights). */
+  breakfastExtraAmount?: number;
 };
 
 /**
@@ -143,26 +188,168 @@ export function netChargeableRoomFare(b: GuestPriceBreakdown): number {
 }
 
 /**
+ * MRP-002: Public rate plan DTO returned by GET /api/listings/{listingId}/rate-plans/public.
+ */
+export type PublicListingRatePlanDto = {
+  id: number;
+  listingId: number;
+  name: string;
+  isDefault: boolean;
+  sortOrder: number;
+  baseNightlyRate: number;
+  effectiveNightlyRate: number;
+  totalStayAmount: number | null;
+  guests: number;
+  cancellationPolicy: string | null;
+  cancellationSummary: string | null;
+  /**
+   * TASK-1040050: the free-cancellation deadline the SERVER will stamp for this plan and these dates (the same resolver the hold uses at Pay), quoted before any hold exists, so every
+   * pre-pay screen shows the same date. ISO instant; null without dates or from an API that predates the field.
+   */
+  refundFreeUntilUtc: string | null;
+  mealPlanCode: string | null;
+  mealPlanLabel: string | null;
+  isDerived: boolean;
+  /**
+   * Founder ruling 2026-10-21: the checkout quote for this plan, dates and guest count (same engine as
+   * GET /api/pricing/guest-breakdown). Null without dates or from an API that predates the field.
+   */
+  guestQuote: GuestPriceBreakdown | null;
+  /** PRICE-016: true for an agent-only net rate the guest unlocked with the agent's link. */
+  isAgentRate?: boolean;
+  /** PRICE-016: the agent / company the unlocked rate belongs to. */
+  agentName?: string | null;
+};
+
+/**
+ * MRP-002: Fetch active public rate plans for a listing (and optional date range + guest count).
+ */
+export async function fetchPublicListingRatePlans(
+  listingId: string | number,
+  checkIn?: string | null,
+  checkOut?: string | null,
+  guests?: number | null,
+  signal?: AbortSignal,
+  tenantSlug?: string | null,
+): Promise<PublicListingRatePlanDto[]> {
+  const url = new URL(buildApiUrl(`/api/listings/${Number(listingId)}/rate-plans/public`));
+  if (checkIn) url.searchParams.set('checkIn', checkIn);
+  if (checkOut) url.searchParams.set('checkOut', checkOut);
+  if (guests != null && guests > 0) url.searchParams.set('guests', String(guests));
+  // PRICE-016: the agent's link code unlocks the agent-only rate; absent for every ordinary guest.
+  const agentCode = getAgentCode();
+  if (agentCode) url.searchParams.set('agentCode', agentCode);
+
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
+  if (!response.ok) {
+    throw new Error(await messageFromApiResponse(response));
+  }
+
+  const raw = (await response.json()) as Array<Record<string, unknown>>;
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((r) => {
+    const totalStayRaw = r.totalStayRate ?? r.TotalStayRate ?? r.totalStayAmount ?? r.TotalStayAmount;
+    const cancelPolicyRaw = r.cancellationPolicy ?? r.CancellationPolicy;
+    const cancelSummaryRaw = r.cancellationSummary ?? r.CancellationSummary;
+    const refundFreeUntilRaw = r.refundFreeUntilUtc ?? r.RefundFreeUntilUtc;
+    const mealCodeRaw = r.mealPlanCode ?? r.MealPlanCode;
+    const mealLabelRaw = r.mealPlanLabel ?? r.MealPlanLabel;
+    return {
+      id: Number(r.id ?? r.Id ?? 0),
+      listingId: Number(r.listingId ?? r.ListingId ?? listingId),
+      name: String(r.name ?? r.Name ?? 'Standard Rate'),
+      isDefault: Boolean(r.isDefault ?? r.IsDefault),
+      sortOrder: Number(r.sortOrder ?? r.SortOrder ?? 0),
+      baseNightlyRate: Number(r.baseNightlyRate ?? r.BaseNightlyRate ?? 0),
+      effectiveNightlyRate: Number(r.effectiveNightlyRate ?? r.EffectiveNightlyRate ?? 0),
+      totalStayAmount:
+        totalStayRaw !== undefined && totalStayRaw !== null ? Number(totalStayRaw) : null,
+      guests: Number(r.guests ?? r.Guests ?? 2),
+      cancellationPolicy:
+        typeof cancelPolicyRaw === 'string' && cancelPolicyRaw.trim() ? cancelPolicyRaw : null,
+      cancellationSummary:
+        typeof cancelSummaryRaw === 'string' && cancelSummaryRaw.trim() ? cancelSummaryRaw : null,
+      refundFreeUntilUtc:
+        typeof refundFreeUntilRaw === 'string' && refundFreeUntilRaw.trim() && !Number.isNaN(Date.parse(refundFreeUntilRaw)) ? refundFreeUntilRaw : null,
+      mealPlanCode: typeof mealCodeRaw === 'string' && mealCodeRaw.trim() ? mealCodeRaw : null,
+      mealPlanLabel: typeof mealLabelRaw === 'string' && mealLabelRaw.trim() ? mealLabelRaw : null,
+      isDerived: Boolean(r.isDerived ?? r.IsDerived),
+      isAgentRate: Boolean(r.isAgentRate ?? r.IsAgentRate),
+      agentName: (() => {
+        const n = r.agentName ?? r.AgentName;
+        return typeof n === 'string' && n.trim() ? n.trim() : null;
+      })(),
+      guestQuote: (() => {
+        const q = r.guestQuote ?? r.GuestQuote;
+        return q && typeof q === 'object' ? mapGuestPriceBreakdown(q as Record<string, unknown>) : null;
+      })(),
+    };
+  });
+}
+
+/**
  * GET /pricing/guest-breakdown?listingId=&checkIn=&checkOut= — authoritative pre-checkout quote.
  * TASK-7016: widget totals must derive from this, not from GET /pricing/breakdown calendar rows.
+ * MRP-002: optional `listingRatePlanId` selects a specific rate plan's pricing.
+ * TASK-10298823: optional `tenantSlug` passes explicit listing owner tenant in headers.
  */
 export async function fetchGuestPriceBreakdown(
   listingId: string | number,
   checkIn: string,
   checkOut: string,
   signal?: AbortSignal,
+  listingRatePlanId?: number | null,
+  guests?: number | null,
+  tenantSlug?: string | null,
+  includeBreakfast?: boolean | null,
+  pets?: number | null,
 ): Promise<GuestPriceBreakdown> {
   const url = new URL(buildApiUrl(GUEST_BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(listingId));
   url.searchParams.set('checkIn', checkIn);
   url.searchParams.set('checkOut', checkOut);
+  if (listingRatePlanId != null && Number.isFinite(listingRatePlanId) && listingRatePlanId > 0) {
+    url.searchParams.set('listingRatePlanId', String(listingRatePlanId));
+    // PRICE-016: an agent-only plan is priced only with the agent's code; the API ignores it for any other plan.
+    const agentCode = getAgentCode();
+    if (agentCode) url.searchParams.set('agentCode', agentCode);
+  }
+  if (guests != null && Number.isFinite(guests) && guests > 0) {
+    url.searchParams.set('guests', String(Math.floor(guests)));
+  }
+  if (includeBreakfast === true) {
+    url.searchParams.set('includeBreakfast', 'true');
+  }
+  if (pets != null && Number.isFinite(pets) && pets > 0) {
+    url.searchParams.set('pets', String(Math.floor(pets)));
+  }
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
   if (!response.ok) {
+    // 409 PRICING_NOT_CONFIGURED (founder-ruled 2026-11-03): the host has not set this room's pricing yet. Keep that on the error so a screen can
+    // show the API's own words ("This room can't be booked online yet. Please contact the host.") instead of its generic "could not load pricing".
+    const notConfigured = await pricingNotConfiguredMessageFrom(response);
+    if (notConfigured) throw new PricingNotConfiguredError(notConfigured);
     throw new Error(await messageFromApiResponse(response));
   }
 
   const raw = (await response.json()) as Record<string, unknown>;
+  return mapGuestPriceBreakdown(raw);
+}
+
+/** The PRICING_NOT_CONFIGURED sentence when this failed response is that 409, else null. Reads a clone, so the body stays readable. */
+async function pricingNotConfiguredMessageFrom(response: Response): Promise<string | null> {
+  if (response.status !== 409) return null;
+  try {
+    return pricingNotConfiguredMessage(response.status, await response.clone().json());
+  } catch {
+    return null;
+  }
+}
+
+/** Maps a raw PriceBreakdownDto (camel or Pascal case) to {@link GuestPriceBreakdown}. */
+export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPriceBreakdown {
   const num = (camel: string, pascal: string) => {
     const v = raw[camel] ?? raw[pascal];
     return v !== undefined && v !== null ? Number(v) : 0;
@@ -171,9 +358,41 @@ export async function fetchGuestPriceBreakdown(
   const gstAmount = raw.gstAmount ?? raw.GstAmount;
   const finalAmount = raw.finalAmount ?? raw.FinalAmount;
 
+  const priceLineRaw = raw.priceLine ?? raw.PriceLine;
+  const priceLine = typeof priceLineRaw === 'string' && priceLineRaw.trim() !== '' ? priceLineRaw.trim() : undefined;
+
+  const cleaningFee = num('cleaningFee', 'CleaningFee');
+  const petFee = num('petFee', 'PetFee');
+  const extraGuestFee = num('extraGuestFee', 'ExtraGuestFee');
+  const weekendRateAdjustmentAmount = num('weekendRateAdjustmentAmount', 'WeekendRateAdjustmentAmount');
+  const breakfastPricePerPerson = num('breakfastPricePerPerson', 'BreakfastPricePerPerson');
+  const breakfastExtraAmount = num('breakfastExtraAmount', 'BreakfastExtraAmount');
+  const includeBreakfastRaw = raw.includeBreakfast ?? raw.IncludeBreakfast;
+  const includeBreakfast = includeBreakfastRaw === true ? true : undefined;
+
+  const origNightlyRaw = raw.originalNightlyRate ?? raw.OriginalNightlyRate;
+  const originalNightlyRate =
+    origNightlyRaw !== undefined && origNightlyRaw !== null && Number(origNightlyRaw) > 0
+      ? Number(origNightlyRaw)
+      : undefined;
+
+  const discNightlyRaw = raw.discountedNightlyRate ?? raw.DiscountedNightlyRate;
+  const discountedNightlyRate =
+    discNightlyRaw !== undefined && discNightlyRaw !== null && Number(discNightlyRaw) > 0
+      ? Number(discNightlyRaw)
+      : undefined;
+
+  const promoLabelRaw = raw.appliedPromotionLabel ?? raw.AppliedPromotionLabel;
+  const appliedPromotionLabel =
+    typeof promoLabelRaw === 'string' && promoLabelRaw.trim() !== '' ? promoLabelRaw.trim() : undefined;
+
+  const promotionDiscountAmount = num('promotionDiscountAmount', 'PromotionDiscountAmount');
+  const promotionDiscountPercent = num('promotionDiscountPercent', 'PromotionDiscountPercent');
+
   return {
     baseAmount: num('baseAmount', 'BaseAmount'),
     discountAmount: num('discountAmount', 'DiscountAmount'),
+    globalDiscountPercent: num('globalDiscountPercent', 'GlobalDiscountPercent'),
     losDiscountAmount: num('losDiscountAmount', 'LosDiscountAmount'),
     lastMinuteDiscountAmount: num('lastMinuteDiscountAmount', 'LastMinuteDiscountAmount'),
     repeatGuestDiscountAmount: num('repeatGuestDiscountAmount', 'RepeatGuestDiscountAmount'),
@@ -184,6 +403,19 @@ export async function fetchGuestPriceBreakdown(
     gstPercent: gstPercent !== undefined && gstPercent !== null ? Number(gstPercent) : null,
     gstAmount: gstAmount !== undefined && gstAmount !== null ? Number(gstAmount) : null,
     finalAmount: finalAmount !== undefined && finalAmount !== null ? Number(finalAmount) : null,
+    ...(priceLine ? { priceLine } : {}),
+    ...(cleaningFee > 0 ? { cleaningFee } : {}),
+    ...(petFee > 0 ? { petFee } : {}),
+    ...(extraGuestFee > 0 ? { extraGuestFee } : {}),
+    ...(weekendRateAdjustmentAmount > 0 ? { weekendRateAdjustmentAmount } : {}),
+    ...(breakfastPricePerPerson > 0 ? { breakfastPricePerPerson } : {}),
+    ...(includeBreakfast ? { includeBreakfast } : {}),
+    ...(breakfastExtraAmount > 0 ? { breakfastExtraAmount } : {}),
+    ...(originalNightlyRate !== undefined ? { originalNightlyRate } : {}),
+    ...(discountedNightlyRate !== undefined ? { discountedNightlyRate } : {}),
+    ...(appliedPromotionLabel ? { appliedPromotionLabel } : {}),
+    ...(promotionDiscountAmount > 0 ? { promotionDiscountAmount } : {}),
+    ...(promotionDiscountPercent > 0 ? { promotionDiscountPercent } : {}),
   };
 }
 
@@ -198,8 +430,13 @@ export async function fetchGuestGstBreakdown(
   checkIn: string,
   checkOut: string,
   signal?: AbortSignal,
+  listingRatePlanId?: number | null,
+  guestsOrTenantSlug?: number | string | null,
+  tenantSlug?: string | null,
 ): Promise<GuestGstBreakdown> {
-  const b = await fetchGuestPriceBreakdown(listingId, checkIn, checkOut, signal);
+  const guests = typeof guestsOrTenantSlug === 'number' ? guestsOrTenantSlug : null;
+  const effectiveTenant = typeof guestsOrTenantSlug === 'string' ? guestsOrTenantSlug : tenantSlug;
+  const b = await fetchGuestPriceBreakdown(listingId, checkIn, checkOut, signal, listingRatePlanId, guests, effectiveTenant);
   return {
     gstPercent: b.gstPercent,
     gstAmount: b.gstAmount,
@@ -210,13 +447,14 @@ export async function fetchGuestGstBreakdown(
 export async function fetchPricingBreakdown(
   params: PricingBreakdownParams,
   signal?: AbortSignal,
+  tenantSlug?: string | null,
 ): Promise<PricingBreakdown> {
   const url = new URL(buildApiUrl(BREAKDOWN_ENDPOINT));
   url.searchParams.set('listingId', String(params.listingId));
   url.searchParams.set('startDate', params.checkIn);
   url.searchParams.set('months', '1');
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
 
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
@@ -287,13 +525,14 @@ export async function fetchCalendarPricing(
   startDate: string,
   months: number = 2,
   signal?: AbortSignal,
+  tenantSlug?: string | null,
 ): Promise<CalendarPricingResult> {
   const url = new URL(buildApiUrl(BREAKDOWN_ENDPOINT));
   url.searchParams.set('startDate', startDate);
   url.searchParams.set('listingId', String(listingId));
   url.searchParams.set('months', String(Math.max(1, Math.min(12, months))));
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
   }
@@ -332,12 +571,17 @@ export async function fetchCalendarPricing(
 
 /** GET /pricing/daily-summary. Uses server's current date.
  * TASK-7823: pass listingId so a property page does not price the whole catalog. */
-export async function fetchDailySummary(signal?: AbortSignal, listingId?: string | number): Promise<DailyPricingSummaryDto> {
+export async function fetchDailySummary(
+  signal?: AbortSignal,
+  listingId?: string | number,
+  /** TASK-10298999: the listing owner's tenant — marketplace cards price homes of many hosts on one page. */
+  tenantSlug?: string | null,
+): Promise<DailyPricingSummaryDto> {
   const url = new URL(buildApiUrl(DAILY_SUMMARY_ENDPOINT));
   if (listingId != null && String(listingId).trim() !== '') {
     url.searchParams.set('listingId', String(listingId));
   }
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
+  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
 
   if (!response.ok) {
     throw new Error(await messageFromApiResponse(response));
@@ -357,6 +601,9 @@ export async function fetchDailySummary(signal?: AbortSignal, listingId?: string
     const conv = (l.convenienceFeePercent ?? l.ConvenienceFeePercent) as number | undefined;
     const final = (l.finalAmount ?? l.FinalAmount) as number | undefined;
     const global = (l.globalDiscountPercent ?? l.GlobalDiscountPercent) as number | undefined;
+    const origNightly = l.originalNightlyRate ?? l.OriginalNightlyRate;
+    const discNightly = l.discountedNightlyRate ?? l.DiscountedNightlyRate;
+    const promoLabel = l.appliedPromotionLabel ?? l.AppliedPromotionLabel;
     return {
       listingId: Number(l.listingId ?? l.ListingId),
       listingName: String(l.listingName ?? l.ListingName ?? ''),
@@ -365,6 +612,15 @@ export async function fetchDailySummary(signal?: AbortSignal, listingId?: string
       convenienceFeePercent: Number(conv ?? 0),
       finalAmount: Number(final ?? 0),
       globalDiscountPercent: Number(global ?? 0),
+      ...(origNightly !== undefined && origNightly !== null && Number(origNightly) > 0
+        ? { originalNightlyRate: Number(origNightly) }
+        : {}),
+      ...(discNightly !== undefined && discNightly !== null && Number(discNightly) > 0
+        ? { discountedNightlyRate: Number(discNightly) }
+        : {}),
+      ...(typeof promoLabel === 'string' && promoLabel.trim() !== ''
+        ? { appliedPromotionLabel: promoLabel.trim() }
+        : {}),
     };
   });
   return { date, listings };
@@ -374,9 +630,21 @@ export function getTodayBreakdownFromListing(listing: DailyListingPricingDto): T
   const baseAmount = Number(listing.baseAmount);
   const discountAmount = Number(listing.discountAmount ?? 0);
   const actualPrice = baseAmount - discountAmount;
+  const finalAmount = Number(listing.finalAmount ?? 0);
   return {
     baseAmount,
     actualPrice,
     globalDiscountPercent: Number(listing.globalDiscountPercent ?? 0),
+    finalAmount: finalAmount > 0 ? finalAmount : actualPrice,
+    convenienceFeePercent: Math.max(0, Number(listing.convenienceFeePercent ?? 0) || 0),
+    ...(listing.originalNightlyRate != null && listing.originalNightlyRate > 0
+      ? { originalNightlyRate: listing.originalNightlyRate }
+      : {}),
+    ...(listing.discountedNightlyRate != null && listing.discountedNightlyRate > 0
+      ? { discountedNightlyRate: listing.discountedNightlyRate }
+      : {}),
+    ...(listing.appliedPromotionLabel?.trim()
+      ? { appliedPromotionLabel: listing.appliedPromotionLabel.trim() }
+      : {}),
   };
 }

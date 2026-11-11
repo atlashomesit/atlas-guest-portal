@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Suspense } from 'react';
 import Homepage_PropertyDetails from './Homepage_PropertyDetails';
 import { resolveEffectiveListingAddress } from '../../../utils/listingAddress';
+import { settle } from '../../../test/settle';
 
 vi.mock('@/components/availability/UnitBookingWidget', () => ({
   __esModule: true,
@@ -113,7 +114,8 @@ describe('Homepage_PropertyDetails listing address resolution', () => {
       </MemoryRouter>,
     );
 
-    const addressEl = await screen.findByTestId('property-street-address');
+    await settle();
+    const addressEl = screen.getByTestId('property-street-address');
     expect(addressEl).toHaveTextContent('Suite 404, Sea Breeze Towers');
   });
 
@@ -150,7 +152,8 @@ describe('Homepage_PropertyDetails listing address resolution', () => {
       </MemoryRouter>,
     );
 
-    const addressEl = await screen.findByTestId('property-street-address');
+    await settle();
+    const addressEl = screen.getByTestId('property-street-address');
     expect(addressEl).toHaveTextContent('456 Coastline Boulevard, Miami, FL');
   });
 
@@ -188,10 +191,9 @@ describe('Homepage_PropertyDetails listing address resolution', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      const addressEl = screen.getByTestId('property-street-address');
-      expect(addressEl).toHaveTextContent('Penthouse Unit 900');
-    });
+    await settle();
+    const addressEl = screen.getByTestId('property-street-address');
+    expect(addressEl).toHaveTextContent('Penthouse Unit 900');
   });
 
   it('dynamically resolves property Location Address from API fallback when unit address is blank', async () => {
@@ -228,9 +230,8 @@ describe('Homepage_PropertyDetails listing address resolution', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      const addressEl = screen.getByTestId('property-street-address');
-      expect(addressEl).toHaveTextContent('100 Skyline Ave');
-    });
+    await settle();
+    const addressEl = screen.getByTestId('property-street-address');
+    expect(addressEl).toHaveTextContent('100 Skyline Ave');
   });
 });

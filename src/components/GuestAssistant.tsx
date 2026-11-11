@@ -9,6 +9,8 @@ import { X, HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { buildApiUrl, getApiHeaders } from '../api/client';
 import { messageFromApiResponse } from '../utils/serverErrorFromResponse';
 import { useFocusTrap } from '../hooks/useFocusTrap';
+import { useBookingContentVisible } from '../hooks/useBookingContentVisible';
+import { LISTING_FAQ_BODY_ATTR, OPEN_LISTING_FAQ_EVENT } from './property/propertyHelpEvents';
 
 interface FaqEntry {
   q: string;
@@ -18,14 +20,19 @@ interface FaqEntry {
 interface GuestAssistantProps {
   /** Numeric listing ID — widget is suppressed when null/NaN. */
   listingId: string | number | null;
+  /** TASK-10298986: Optional tenant identifier / slug to scope FAQ request in marketplace context */
+  tenantSlug?: string | null;
+  /** TASK-10298986: Optional target tenant ID */
+  tenantId?: string | number | null;
 }
 
 /**
  * GuestAssistant — FAQ panel for listing-specific questions.
  * Positioned bottom-left to avoid conflict with SupportWidget (bottom-right).
  */
-export default function GuestAssistant({ listingId }: GuestAssistantProps) {
+export default function GuestAssistant({ listingId, tenantSlug, tenantId }: GuestAssistantProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const bookingContentVisible = useBookingContentVisible();
   const [faqs, setFaqs] = useState<FaqEntry[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -51,24 +58,52 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
   }, [isOpen]);
 
   // Fetch FAQ entries when listing ID is known
+  // TASK-10298986: In marketplace mode, pass effective tenantSlug and target tenantId
+  // so requests do not fail with 404 due to incompatible tenant scoping.
   useEffect(() => {
     if (!listingId || isNaN(Number(listingId))) return;
     setLoading(true);
     setFetchErrorMessage(null);
-    const url = buildApiUrl(`/api/public/listings/${Number(listingId)}/faq`);
-    fetch(url, { headers: getApiHeaders() })
+
+    const urlTenant = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('tenant')?.trim()
+      : null;
+    const effectiveTenant = tenantSlug || urlTenant || null;
+
+    const queryParams = new URLSearchParams();
+    if (tenantId != null && !isNaN(Number(tenantId))) {
+      queryParams.set('tenantId', String(tenantId));
+    }
+    const querySuffix = queryParams.toString() ? `?${queryParams.toString()}` : '';
+    const url = buildApiUrl(`/api/public/listings/${Number(listingId)}/faq${querySuffix}`);
+
+    const headers: Record<string, string> = {
+      ...getApiHeaders(effectiveTenant),
+      ...(tenantId != null && !isNaN(Number(tenantId)) ? { 'X-Tenant-Id': String(tenantId) } : {}),
+    };
+
+    fetch(url, { headers })
       .then(async (r) => {
+        if (r.status === 404) {
+          // Gracefully treat 404 in marketplace or unconfigured listing as empty FAQ
+          return [];
+        }
         if (!r.ok) throw new Error(await messageFromApiResponse(r));
         return r.json() as Promise<unknown>;
       })
       .then((data: unknown) => setFaqs(Array.isArray(data) ? (data as FaqEntry[]) : []))
       .catch((err: unknown) => {
-        console.error("Listing FAQ load failed:", err);
-        setFetchErrorMessage("We couldn't load answers right now. Please try again in a moment.");
-        setFaqs([]);
+        const is404 = err instanceof Error && err.message.includes('404');
+        if (is404) {
+          setFaqs([]);
+        } else {
+          console.error("Listing FAQ load failed:", err);
+          setFetchErrorMessage("We couldn't load answers right now. Please try again in a moment.");
+          setFaqs([]);
+        }
       })
       .finally(() => setLoading(false));
-  }, [listingId]);
+  }, [listingId, tenantSlug, tenantId]);
 
   // Reset UI state when panel opens/closes
   useEffect(() => {
@@ -89,10 +124,18 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
     setAiLoading(true);
     setAiReply(null);
     try {
+      const urlTenant = typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('tenant')?.trim()
+        : null;
+      const effectiveTenant = tenantSlug || urlTenant || null;
       const url = buildApiUrl('/api/public/chat');
       const res = await fetch(url, {
         method: 'POST',
-        headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
+        headers: {
+          ...getApiHeaders(effectiveTenant),
+          'Content-Type': 'application/json',
+          ...(tenantId != null && !isNaN(Number(tenantId)) ? { 'X-Tenant-Id': String(tenantId) } : {}),
+        },
         body: JSON.stringify({ message: query.trim(), listingId: Number(listingId) }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -103,7 +146,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
     } finally {
       setAiLoading(false);
     }
-  }, [query, listingId]);
+  }, [query, listingId, tenantSlug, tenantId]);
 
   const handleToggle = useCallback((idx: number) => {
     setExpandedIdx((prev) => (prev === idx ? null : idx));
@@ -124,6 +167,22 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
     );
   }, [faqs, query]);
 
+  // The phone sticky bar hides this floating trigger; its Chat chooser offers the panel instead,
+  // but only while the listing has FAQs (same condition that renders the trigger), and opens it
+  // through OPEN_LISTING_FAQ_EVENT.
+  const hasFaqs = faqs.length > 0;
+  useEffect(() => {
+    if (!hasFaqs) return undefined;
+    document.body.setAttribute(LISTING_FAQ_BODY_ATTR, 'true');
+    return () => document.body.removeAttribute(LISTING_FAQ_BODY_ATTR);
+  }, [hasFaqs]);
+  useEffect(() => {
+    if (!hasFaqs) return undefined;
+    const openFromChooser = () => setIsOpen(true);
+    window.addEventListener(OPEN_LISTING_FAQ_EVENT, openFromChooser);
+    return () => window.removeEventListener(OPEN_LISTING_FAQ_EVENT, openFromChooser);
+  }, [hasFaqs]);
+
   // Don't render if no valid listing
   if (!listingId || isNaN(Number(listingId))) return null;
 
@@ -133,7 +192,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
   return (
     <>
       {/* Floating trigger — bottom-left to avoid collision with SupportWidget (bottom-right) */}
-      {!isOpen && (
+      {!isOpen && !bookingContentVisible && (
         <button
           ref={triggerRef}
           type="button"
@@ -164,7 +223,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
           {/* Backdrop */}
           <div
             role="presentation"
-            className="fixed inset-0 bg-black/30 z-[calc(var(--z-floating)+1)]"
+            className="fixed inset-0 bg-black/30 z-[calc(var(--z-modal)+1)]"
             onClick={() => setIsOpen(false)}
           />
 
@@ -175,7 +234,7 @@ export default function GuestAssistant({ listingId }: GuestAssistantProps) {
             aria-modal="true"
             aria-label="Listing FAQ"
             className={[
-              'fixed bottom-0 left-0 right-0 z-[calc(var(--z-floating)+2)]',
+              'fixed bottom-0 left-0 right-0 z-[calc(var(--z-modal)+2)]',
               'flex flex-col bg-bg-surface',
               'rounded-t-2xl shadow-level4',
               'max-h-[75vh]',

@@ -1,7 +1,10 @@
 import {
   CSSProperties,
   ReactNode,
+  RefObject,
+  Suspense,
   createContext,
+  lazy,
   useCallback,
   useContext,
   useEffect,
@@ -14,8 +17,11 @@ import { FiX } from "react-icons/fi";
 import { SUPPORT_DRAWER_COPY, getSupportDrawerHeaderSubtitle } from "../../config/supportDrawerCopy";
 import { getTenantBrandName } from "../../tenant/displayBrand";
 import { useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
+// TASK-10299465: the assistant pulls in react-markdown (about 110 KB). Every page mounts this drawer, but only a guest who opens the assistant needs the chat,
+// so it is fetched then, not with the first page.
+const AtlasChat = lazy(() => import("./AtlasChat"));
 
-type SupportDrawerView = "home" | "callback" | "faq" | "chat";
+type SupportDrawerView = "home" | "callback" | "faq" | "chat" | "assistant";
 
 type SupportDrawerViewContextValue = {
   view: SupportDrawerView;
@@ -23,11 +29,16 @@ type SupportDrawerViewContextValue = {
   goToCallback: () => void;
   goToFaq: () => void;
   goToChat: () => void;
+  goToAssistant: () => void;
+  assistantLaunchRef: RefObject<HTMLButtonElement | null>;
+  restoreAssistantFocusRef: RefObject<boolean>;
 };
 
 const SupportDrawerViewContext = createContext<SupportDrawerViewContextValue | null>(null);
 
 interface SupportDrawerProps {
+  assistantContextKey?: string;
+  assistantListingId?: string | null;
   bottomSpacing: string;
   children: ReactNode;
   enableCloseReassurance?: boolean;
@@ -45,6 +56,8 @@ const SUPPORT_DRAWER_SPACING = {
 } as const;
 
 const SupportDrawer = ({
+  assistantContextKey,
+  assistantListingId,
   bottomSpacing,
   children,
   enableCloseReassurance,
@@ -53,6 +66,8 @@ const SupportDrawer = ({
   trustMicrocopy,
 }: SupportDrawerProps) => {
   const drawerRef = useRef<HTMLDivElement>(null);
+  const assistantLaunchRef = useRef<HTMLButtonElement>(null);
+  const restoreAssistantFocusRef = useRef(false);
   // TASK-101880: stable close ref so the mount-only a11y effect never re-captures
   // the trigger element or steals focus on re-renders (onClose identity changes).
   const onCloseRef = useRef(onClose);
@@ -98,10 +113,14 @@ const SupportDrawer = ({
     [enableDrawerStructureTokens],
   );
 
-  const goToHome = useCallback(() => setView("home"), []);
+  const goToHome = useCallback(() => {
+    restoreAssistantFocusRef.current = true;
+    setView("home");
+  }, []);
   const goToCallback = useCallback(() => setView("callback"), []);
   const goToFaq = useCallback(() => setView("faq"), []);
   const goToChat = useCallback(() => setView("chat"), []);
+  const goToAssistant = useCallback(() => setView("assistant"), []);
 
   const viewContextValue: SupportDrawerViewContextValue = {
     view,
@@ -109,6 +128,9 @@ const SupportDrawer = ({
     goToCallback,
     goToFaq,
     goToChat,
+    goToAssistant,
+    assistantLaunchRef,
+    restoreAssistantFocusRef,
   };
 
   useEffect(() => {
@@ -180,7 +202,7 @@ const SupportDrawer = ({
             <button
               type="button"
               onClick={onClose}
-              className={`rounded-full ${enableCloseReassurance ? "p-2.5" : "p-2"} text-text-muted transition hover:bg-bg-muted hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong`}
+              className={`flex min-h-11 min-w-11 items-center justify-center rounded-full ${enableCloseReassurance ? "p-2.5" : "p-2"} text-text-muted transition hover:bg-bg-muted hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-border-strong`}
               aria-label={SUPPORT_DRAWER_COPY.controls.closeAriaLabel}
             >
               <FiX aria-hidden="true" size={enableCloseReassurance ? 26 : 24} />
@@ -202,7 +224,13 @@ const SupportDrawer = ({
         <div
           className={`min-h-0 flex-1 ${resolvedLayoutVariant === "compactDrawer" ? "overflow-y-auto" : "overflow-visible"}`}
         >
-          {children}
+          {view === "assistant" ? (
+            <Suspense fallback={<div className="p-4 text-sm text-text-muted" role="status" aria-live="polite">Loading…</div>}>
+              <AtlasChat key={assistantContextKey} listingId={assistantListingId} onBack={goToHome} />
+            </Suspense>
+          ) : (
+            children
+          )}
         </div>
       </div>
     </SupportDrawerViewContext.Provider>

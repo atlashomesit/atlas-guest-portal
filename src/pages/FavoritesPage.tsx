@@ -1,24 +1,44 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useTenantProcessingFee } from "../hooks/useTenantProcessingFee";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FaHeart } from "react-icons/fa";
 import SEO from "../components/SEO";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getFavoriteIds, getRecentlyViewed, toggleFavorite } from "../utils/guestHistory";
-import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
+import { appendQuerySuffix, buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { fetchAllMarketplacePages } from "../api/marketplacePaging"; // TASK-1040071
 import { getTenantBrandName } from "../tenant/displayBrand";
+import { getTenantContext } from "../tenant/tenantContext";
+import { isMarketplaceMode } from "../tenant/tenantResolver";
 import { LoadingState } from "../components/LoadingState";
 import { useCurrency } from "../contexts/CurrencyContext";
 import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 import SavedHomeCover from "../components/SavedHomeCover";
+import SavedHomesReminder from "../components/SavedHomesReminder";
+import { useGuestAuth } from "../contexts/GuestAuthContext";
+
+type FavoriteListing = PublicListing & { tenantSlug?: string };
+
+interface MarketplaceFavoriteItem {
+  id: number;
+  tenantSlug?: string;
+  title?: string;
+  displayName?: string | null;
+  city?: string;
+  pricePerNight?: number;
+  maxGuests?: number;
+  coverImageUrl?: string | null;
+}
 
 export default function FavoritesPage() {
   const brandName = getTenantBrandName();
   const { format: formatDisplayCurrency, formatINR, isConverted } = useCurrency();
+  const processingFeePercent = useTenantProcessingFee();
   const { getListingPricing: getDailyListingPricing } = useDailyPricingSummary();
   const estimateNights = estimateStayNights(null, null);
-  const [all, setAll] = useState<PublicListing[]>([]);
+  const [all, setAll] = useState<FavoriteListing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favEpoch, setFavEpoch] = useState(0);
@@ -33,40 +53,11 @@ export default function FavoritesPage() {
     try { return atob(token).split(",").map(Number).filter(Boolean); } catch { return null; }
   }, [searchParams]);
 
-  // TASK-1709: reminder email capture
-  const [reminderEmail, setReminderEmail] = useState("");
-  const [reminderState, setReminderState] = useState<"idle" | "busy" | "done" | "error" | "invalid">("idle");
-  const [hasStoredEmail, setHasStoredEmail] = useState(() => {
-    try { return !!localStorage.getItem("atlas_guest_email"); } catch { return false; }
-  });
-  const reminderInputRef = useRef<HTMLInputElement>(null);
-
-  const loadListings = React.useCallback(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchPublicListings()
-      .then((list) => {
-        if (!cancelled) {
-          setAll(list);
-          // TASK-4010: Check if API is available by attempting a non-critical fetch
-          checkApiAvailability();
-        }
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setAll([]);
-          console.error("Favorites listings load failed:", err);
-          setError("We couldn't load saved homes right now. Please try again.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { auth, isLoading: authLoading } = useGuestAuth();
+  const knownEmail = auth.isAuthenticated ? (auth.email?.trim() ?? "") : "";
+  const reminderTenant = getApiHeaders()["X-Tenant-Slug"];
+  // Reset typed addresses, progress and success immediately at an account/tenant boundary.
+  const reminderScope = JSON.stringify([reminderTenant, auth.isAuthenticated, auth.guestId, knownEmail.toLowerCase()]);
 
   // TASK-4010: Check if SavedListingsController API is available (TASK-4526: only count as synced if GET works)
   const checkApiAvailability = React.useCallback(async () => {
@@ -87,6 +78,94 @@ export default function FavoritesPage() {
     }
   }, []);
 
+  const isBrandAtlastaysParam = searchParams.get("brand")?.trim().toLowerCase() === "atlastays";
+  const isMarketplaceContext =
+    Boolean(getTenantContext()?.isMarketplaceRoot) || isMarketplaceMode() || isBrandAtlastaysParam;
+
+  const loadListings = React.useCallback(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    const targetIds = sharedWishlistIds ?? getFavoriteIds();
+
+    const mergeWithMarketplaceIfNeeded = async (baseList: FavoriteListing[]): Promise<FavoriteListing[]> => {
+      const hasMissingSavedIds = targetIds.some((id) => !baseList.some((l) => l.id === id));
+      if (!isMarketplaceContext && !hasMissingSavedIds) {
+        return baseList;
+      }
+      try {
+        // TASK-1040071: page through every marketplace listing (server max 100 per page) so a saved home
+        // ranked 101+ is still merged in and keeps its tenantSlug.
+        const mktItems = await fetchAllMarketplacePages<MarketplaceFavoriteItem>({
+          buildUrl: (page, pageSize) => buildApiUrl(`/marketplace/listings?page=${page}&pageSize=${pageSize}`),
+          init: { headers: { Accept: "application/json" } },
+          readPage: (json) => {
+            const data = json as { items?: MarketplaceFavoriteItem[]; total?: number } | null;
+            return {
+              rows: Array.isArray(data?.items) ? data.items.filter((i) => typeof i?.id === "number") : [],
+              total: typeof data?.total === "number" ? data.total : undefined,
+            };
+          },
+          rowKey: (item) => item.id,
+        });
+        if (mktItems.length === 0) return baseList;
+        const mktById = new Map<number, MarketplaceFavoriteItem>();
+        for (const item of mktItems) {
+          if (typeof item?.id === "number") mktById.set(item.id, item);
+        }
+        const merged: FavoriteListing[] = baseList.map((row) => {
+          const mkt = mktById.get(row.id);
+          const slug = typeof mkt?.tenantSlug === "string" && mkt.tenantSlug.trim() ? mkt.tenantSlug.trim() : row.tenantSlug;
+          return slug ? { ...row, tenantSlug: slug } : row;
+        });
+        const existingIds = new Set(merged.map((r) => r.id));
+        for (const item of mktItems) {
+          if (typeof item?.id !== "number" || existingIds.has(item.id)) continue;
+          merged.push({
+            id: item.id,
+            name: item.displayName || item.title,
+            propertyName: item.title,
+            propertyAddress: item.city,
+            baseNightlyRate: typeof item.pricePerNight === "number" ? item.pricePerNight : undefined,
+            maxGuests: typeof item.maxGuests === "number" ? item.maxGuests : 0,
+            coverPhotoUrl: item.coverImageUrl ?? undefined,
+            tenantSlug: typeof item.tenantSlug === "string" && item.tenantSlug.trim() ? item.tenantSlug.trim() : undefined,
+          });
+          existingIds.add(item.id);
+        }
+        return merged;
+      } catch {
+        return baseList;
+      }
+    };
+
+    (isMarketplaceContext
+      ? fetchPublicListings().catch(() => [] as PublicListing[])
+      : fetchPublicListings()
+    )
+      .then((list) => mergeWithMarketplaceIfNeeded(list))
+      .then((mergedList) => {
+        if (!cancelled) {
+          setAll(mergedList);
+          // TASK-4010: Check if API is available by attempting a non-critical fetch
+          void checkApiAvailability();
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setAll([]);
+          console.error("Favorites listings load failed:", err);
+          setError("We couldn't load saved homes right now. Please try again.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [checkApiAvailability, isMarketplaceContext, sharedWishlistIds]);
+
   useEffect(() => loadListings(), [loadListings]);
 
   const favIds = useMemo(() => {
@@ -100,73 +179,30 @@ export default function FavoritesPage() {
     return all.filter((l) => favIds.has(l.id));
   }, [all, favIds, sharedWishlistIds]);
 
-  const handleReminderSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const email = reminderEmail.trim().toLowerCase();
-    // TASK-4968: this regex is stricter than the browser's native `type="email"` check
-    // (e.g. it rejects `me@localhost`), so a rejection here must surface feedback via
-    // the existing error-state UI instead of silently no-opping.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setReminderState("invalid");
-      return;
-    }
-    setReminderState("busy");
-    try {
-      const ids = getFavoriteIds();
-      const results = await Promise.allSettled(
-        ids.map((listingId) =>
-          fetch(buildApiUrl("/api/saved-listings"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json", ...getApiHeaders() },
-            body: JSON.stringify({ guestEmail: email, listingId }),
-          })
-        )
-      );
-      // TASK-4526: Count successes and failures separately; only proceed if ALL succeeded
-      const successful = results.filter(
-        (r) => r.status === "fulfilled" && r.value.ok
-      ).length;
-      const failed = ids.length - successful;
-
-      if (successful === 0) {
-        setReminderState("error");
-        return;
-      }
-
-      // If any failed, show a partial-failure message via error state
-      if (failed > 0) {
-        // Store the email anyway (guest will get reminders for the successful ones)
-        localStorage.setItem("atlas_guest_email", email);
-        setHasStoredEmail(true);
-        // Show error state but include success count context
-        alert(`Reminder set for ${successful} of ${ids.length} homes. Please check your email.`);
-        setReminderState("done");
-        return;
-      }
-
-      localStorage.setItem("atlas_guest_email", email);
-      setHasStoredEmail(true);
-      setReminderState("done");
-    } catch {
-      setReminderState("error");
-    }
+  const listingPath = (l: FavoriteListing) => {
+    const basePath = buildHomeUnitPath(getPropertySlug({ name: l.name, property_name: l.propertyName }), l.id);
+    const params = new URLSearchParams();
+    if (l.tenantSlug) params.set("tenant", l.tenantSlug);
+    if (isBrandAtlastaysParam) params.set("brand", "atlastays");
+    return appendQuerySuffix(basePath, params.toString());
   };
-
-  const listingPath = (l: PublicListing) =>
-    buildHomeUnitPath(getPropertySlug({ name: l.name, property_name: l.propertyName }), l.id);
 
   // TASK-1299: encode saved IDs into shareable URL (no backend needed)
   const handleShareWishlist = () => {
-    const ids = getFavoriteIds();
+    const ids = sharedWishlistIds ?? getFavoriteIds();
     if (!ids.length) return;
     const token = btoa(ids.join(","));
-    const shareUrl = `${window.location.origin}/favorites?wishlist=${encodeURIComponent(token)}`;
+    const shareParams = new URLSearchParams({ wishlist: token });
+    const tenantSlug = getTenantContext()?.slug ?? getApiHeaders()["X-Tenant-Slug"];
+    if (tenantSlug) shareParams.set("tenant", tenantSlug);
+    if (isBrandAtlastaysParam) shareParams.set("brand", "atlastays");
+    const shareUrl = `${window.location.origin}/favorites?${shareParams}`;
     const waText = `Check out these ${brandName} I saved! ${shareUrl}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
     if (navigator.share) {
       navigator.share({ title: `My ${brandName} Wishlist`, url: shareUrl }).catch(() => {});
     } else {
-      navigator.clipboard.writeText(shareUrl).then(() => {
+      Promise.resolve().then(() => navigator.clipboard.writeText(shareUrl)).then(() => {
         setShareState("copied");
         setTimeout(() => setShareState("idle"), 2500);
       }).catch(() => {
@@ -200,9 +236,9 @@ export default function FavoritesPage() {
             <button
               type="button"
               onClick={handleShareWishlist}
-              className="text-sm font-medium text-brand-primary border border-brand-primary rounded-lg px-3 py-1.5 hover:bg-brand-primary/5 transition-colors"
+              className="min-h-11 text-sm font-medium text-brand-primary border border-brand-primary rounded-lg px-3 py-1.5 hover:bg-brand-primary/5 transition-colors"
             >
-              {shareState === "copied" ? "✓ Link copied!" : "Share wishlist"}
+              {shareState === "copied" ? "✓ Link copied!" : (sharedWishlistIds ? "Share this wishlist" : "Share wishlist")}
             </button>
           )}
           <Link
@@ -248,47 +284,13 @@ export default function FavoritesPage() {
         </div>
       ) : (
         <>
-        {/* TASK-1709: email capture for saved-listing T+7 reminders */}
-        {!hasStoredEmail && favorites.length > 0 && reminderState !== "done" && (
-          <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-4">
-            <p className="text-sm font-medium text-text-primary mb-1">Get reminded about these homes</p>
-            <p id="reminder-email-description" className="text-xs text-text-secondary mb-3">
-              Enter your email and we'll send you a one-time reminder in 7 days if you haven't booked yet.
-            </p>
-            <form onSubmit={handleReminderSubmit} className="flex gap-2 flex-wrap">
-              <input
-                ref={reminderInputRef}
-                type="email"
-                required
-                placeholder="your@email.com"
-                aria-label="Reminder email address"
-                aria-describedby="reminder-email-description"
-                value={reminderEmail}
-                onChange={(e) => setReminderEmail(e.target.value)}
-                className="flex-1 min-w-0 rounded-lg border border-border-subtle px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              />
-              <button
-                type="submit"
-                disabled={reminderState === "busy"}
-                className="rounded-lg bg-brand-primary px-4 py-3 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50 min-h-11"
-              >
-                {reminderState === "busy" ? "Saving…" : "Remind me"}
-              </button>
-            </form>
-            {reminderState === "error" && (
-              <p className="text-xs text-red-600 mt-2" role="alert">
-                We couldn&apos;t save your reminder for every saved home. Please try again in a moment.
-              </p>
-            )}
-            {reminderState === "invalid" && (
-              <p className="text-xs text-red-600 mt-2" role="alert">
-                Please enter a valid email address.
-              </p>
-            )}
-          </div>
-        )}
-        {reminderState === "done" && (
-          <p className="text-sm text-green-700 font-medium">✓ We'll remind you in 7 days if you haven't booked.</p>
+        {!authLoading && !sharedWishlistIds && (
+          <SavedHomesReminder
+            key={reminderScope}
+            initialEmail={knownEmail}
+            tenantSlug={reminderTenant}
+            listingIds={favorites.map((listing) => listing.id)}
+          />
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {favorites.map((l) => {
@@ -308,7 +310,7 @@ export default function FavoritesPage() {
                 className="rounded-xl border border-border-subtle bg-bg-surface overflow-hidden shadow-level1 hover:shadow-level2 transition-shadow"
               >
                 <div className="relative">
-                  <Link to={path} className="block">
+                  <Link to={path} className="block" aria-label={`View ${l.name || 'saved home'}`}>
                     <SavedHomeCover src={l.coverPhotoUrl} alt={l.name ?? "Home"} />
                   </Link>
                   {/* TASK-4297: in a SHARED wishlist view the listing isn't the viewer's own save —
@@ -346,7 +348,7 @@ export default function FavoritesPage() {
                           displayedPrice,
                           estimateNights,
                           formatDisplayCurrency,
-                          3,
+                          processingFeePercent,
                           l.isGstRegistered,
                         )}
                       </p>

@@ -176,6 +176,8 @@ describe("_middleware onRequest — happy path (tenant host, HTML response, meta
     const body = await result.json();
     expect(body.innerContent).toBe("Gaurav's Lake View Villa");
     expect(body.appliedAttrs['meta[property="og:title"]::content']).toBe("Gaurav's Lake View Villa");
+    expect(body.appliedAttrs['meta[property="og:site_name"]::content']).toBe("Gaurav's Lake View Villa");
+    expect(body.appliedAttrs['meta[name="apple-mobile-web-app-title"]::content']).toBe("Gaurav's Lake View Villa");
     expect(body.appliedAttrs['meta[property="og:description"]::content']).toBe(
       "Stay lakeside at Gaurav's Lake View Villa.",
     );

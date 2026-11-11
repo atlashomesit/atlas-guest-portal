@@ -13,6 +13,7 @@ import { Info } from 'lucide-react';
  * covers. NEVER invent host-specific policy amounts or rules — amounts shown
  * in the breakdown come from the server; the tip only explains the concept.
  */
+// eslint-disable-next-line react-refresh/only-export-components -- co-located fee copy map
 export const FEE_INFO_COPY = {
   cleaning:
     'One-time charge for professional cleaning of the unit before your check-in. Set by the host and varies by unit — it is not a per-night charge.',
@@ -22,6 +23,14 @@ export const FEE_INFO_COPY = {
     'Razorpay payment gateway fee — passed through, not a platform markup.',
   addOns:
     'Optional extras you selected for this stay, charged in addition to the room fare.',
+  securityDeposit:
+    'Refundable deposit collected by the host to cover potential incidental damages. Refunded after checkout inspection according to host policy.',
+  extraGuest:
+    'Additional guest occupancy charge set by the host for parties above the base occupancy included in the room rate.',
+  weekendAdjustment:
+    'Host weekend nightly rate differential applied for Friday or Saturday nights included in your stay.',
+  rateAdjustment:
+    'Includes date-specific or occupancy-based rate adjustments from the host’s live rate calendar.',
 } as const;
 
 export type FeeInfoKey = keyof typeof FEE_INFO_COPY;

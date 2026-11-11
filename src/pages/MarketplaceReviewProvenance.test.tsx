@@ -7,7 +7,7 @@
 // generic sentiment chip — so an external-only listing is indistinguishable from
 // a natively-reviewed one.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -26,6 +26,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 
 import MarketplaceHomepage from './MarketplaceHomepage';
 import { formatExternalReviewsLabel, formatVerifiedStaysLabel } from './MarketplaceHomepage';
+import { settle } from '../test/settle';
 
 function listing(id: number, extra: Record<string, unknown> = {}) {
   return {
@@ -45,6 +46,22 @@ const NATIVE_ONLY = listing(1, { rating: 4.5, reviewCount: 2, verifiedStayCount:
 const EXTERNAL_ONLY = listing(2, { rating: null, reviewCount: null, verifiedStayCount: null, externalReviewCount: 3 });
 const MIXED = listing(3, { rating: 4.0, reviewCount: 3, verifiedStayCount: 1, externalReviewCount: 1 });
 const NO_REVIEWS = listing(4, { rating: null, reviewCount: null, verifiedStayCount: null, externalReviewCount: null });
+const AIRBNB_DOMINANT = listing(5, {
+  rating: 4.8,
+  reviewCount: 54,
+  verifiedStayCount: null,
+  externalReviewCount: 54,
+  externalReviewSource: 'Airbnb',
+  externalReviewSourceUrl: 'https://www.airbnb.com/rooms/105',
+});
+const BOOKING_COM_SYNCED_NO_URL = listing(6, {
+  rating: 4.9,
+  reviewCount: 15,
+  verifiedStayCount: null,
+  externalReviewCount: 15,
+  externalReviewSource: 'AtlasSyncBookingCom',
+  externalReviewSourceUrl: null,
+});
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -56,7 +73,12 @@ beforeEach(() => {
       }
       return {
         ok: true,
-        json: async () => ({ items: [NATIVE_ONLY, EXTERNAL_ONLY, MIXED, NO_REVIEWS], total: 4, page: 1, pageSize: 20 }),
+        json: async () => ({
+          items: [NATIVE_ONLY, EXTERNAL_ONLY, MIXED, NO_REVIEWS, AIRBNB_DOMINANT, BOOKING_COM_SYNCED_NO_URL],
+          total: 6,
+          page: 1,
+          pageSize: 20,
+        }),
       } as unknown as Response;
     }),
   );
@@ -77,7 +99,8 @@ const renderPage = () =>
 describe('TASK-10089 marketplace review provenance labels', () => {
   it('native-only card renders verified stays and no Google label', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(6);
     const cards = screen.getAllByTestId('marketplace-card');
     const native = within(cards[0]);
     expect(native.getByText('2 verified stays')).toBeInTheDocument();
@@ -86,7 +109,8 @@ describe('TASK-10089 marketplace review provenance labels', () => {
 
   it('external-only card renders Google reviews and never claims verified', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(6);
     const cards = screen.getAllByTestId('marketplace-card');
     const external = within(cards[1]);
     expect(external.getByText('3 Google reviews')).toBeInTheDocument();
@@ -95,7 +119,8 @@ describe('TASK-10089 marketplace review provenance labels', () => {
 
   it('mixed card renders both labels', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(6);
     const cards = screen.getAllByTestId('marketplace-card');
     const mixed = within(cards[2]);
     expect(mixed.getByText('1 verified stay')).toBeInTheDocument();
@@ -104,10 +129,23 @@ describe('TASK-10089 marketplace review provenance labels', () => {
 
   it('card with neither source renders no provenance row (no fabricated proof)', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('marketplace-card')).toHaveLength(4));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(6);
     const cards = screen.getAllByTestId('marketplace-card');
     expect(within(cards[3]).queryByTestId('marketplace-review-provenance')).not.toBeInTheDocument();
-    expect(screen.getAllByTestId('marketplace-review-provenance')).toHaveLength(3);
+    expect(screen.getAllByTestId('marketplace-review-provenance')).toHaveLength(5);
+  });
+
+  it('MKT-012 / MKT-015: OTA-dominant cards label reviews by real normalized source even when Channex omits sourceUrl', async () => {
+    renderPage();
+    await settle();
+    const cards = screen.getAllByTestId('marketplace-card');
+    const airbnbCard = within(cards[4]);
+    expect(airbnbCard.getByText('54 reviews on Airbnb')).toBeInTheDocument();
+    expect(airbnbCard.queryByText(/Google/i)).not.toBeInTheDocument();
+
+    const bookingComCard = within(cards[5]);
+    expect(bookingComCard.getByText('15 reviews on Booking.com')).toBeInTheDocument();
   });
 });
 
@@ -126,5 +164,24 @@ describe('TASK-10089 provenance label formatting', () => {
     expect(formatExternalReviewsLabel(0)).toBeNull();
     expect(formatExternalReviewsLabel(1)).toBe('1 Google review');
     expect(formatExternalReviewsLabel(5)).toBe('5 Google reviews');
+  });
+});
+
+describe('MKT-012 / MKT-015 external review provenance source and Channex normalization', () => {
+  it('labels external reviews by dominant source, singular/plural exact', () => {
+    expect(formatExternalReviewsLabel(1, 'Airbnb', 'https://airbnb.com/rooms/1')).toBe('1 review on Airbnb');
+    expect(formatExternalReviewsLabel(54, 'Airbnb', 'https://airbnb.com/rooms/1')).toBe('54 reviews on Airbnb');
+    expect(formatExternalReviewsLabel(1, 'Booking.com', 'https://booking.com/hotel/1')).toBe('1 review on Booking.com');
+    expect(formatExternalReviewsLabel(12, 'Booking.com', 'https://booking.com/hotel/1')).toBe('12 reviews on Booking.com');
+    expect(formatExternalReviewsLabel(1, 'Google', 'https://maps.google.com')).toBe('1 Google review');
+    expect(formatExternalReviewsLabel(3, 'Google', 'https://maps.google.com')).toBe('3 Google reviews');
+  });
+
+  it('MKT-015: renders provenance label when externalReviewCount > 0 even without sourceUrl and normalizes AtlasSyncBookingCom', () => {
+    expect(formatExternalReviewsLabel(54, 'Airbnb', null)).toBe('54 reviews on Airbnb');
+    expect(formatExternalReviewsLabel(54, 'Airbnb', '')).toBe('54 reviews on Airbnb');
+    expect(formatExternalReviewsLabel(1, 'AtlasSyncBookingCom', null)).toBe('1 review on Booking.com');
+    expect(formatExternalReviewsLabel(15, 'AtlasSyncBookingCom', '')).toBe('15 reviews on Booking.com');
+    expect(formatExternalReviewsLabel(5, 'Google', null)).toBe('5 Google reviews');
   });
 });

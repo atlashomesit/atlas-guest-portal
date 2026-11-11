@@ -2,11 +2,12 @@
  * TASK-102391 — Razorpay SDK is preloaded on checkout mount so Pay opens instantly
  * on slow mobile connections (first-tap fetch latency reads as "nothing happens").
  */
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { BookingProvider } from "@/contexts/BookingContext";
 import GuestDetailsPage from "./GuestDetailsPage";
+import { settle } from "../../test/settle";
 
 vi.mock("@/lib/events", () => ({ track: vi.fn() }));
 
@@ -47,7 +48,8 @@ describe("GuestDetailsPage Razorpay preload (TASK-102391)", () => {
         </BookingProvider>
       </MemoryRouter>,
     );
-    await waitFor(() => expect(document.getElementById("gd-details-form")).toBeInTheDocument());
+    await settle();
+    expect(document.getElementById("gd-details-form")).toBeInTheDocument();
     const scripts = document.querySelectorAll('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
     expect(scripts.length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/pay/i).length).toBeGreaterThanOrEqual(1);

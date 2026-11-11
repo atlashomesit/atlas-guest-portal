@@ -11,7 +11,7 @@
 // RED before the fix: canonical stays "" (SEO's no-`url` fallback) and no
 // meta[property='og:site_name'] exists in <head> at all.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/api/client', () => ({ buildApiUrl: (p: string) => `https://api.test${p}` }));
@@ -29,6 +29,7 @@ vi.mock('@/utils/marketplaceListingCover', () => ({
 
 import MarketplaceHomepage from './MarketplaceHomepage';
 import { MARKETPLACE_BRAND_BASELINE } from '@/tenant/displayBrand';
+import { settle } from '../test/settle';
 
 function clearHeadTags() {
   document.head.querySelector("link[rel='canonical']")?.remove();
@@ -72,16 +73,17 @@ const renderPage = () =>
 describe('TASK-101960 marketplace homepage canonical + og:site_name', () => {
   it('serves a self-referencing absolute canonical link', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('marketplace-homepage')).toBeInTheDocument());
+    await settle();
+    expect(screen.getByTestId('marketplace-homepage')).toBeInTheDocument();
     // SEO writes head tags in useEffect — wait for the canonical to land.
     // NOTE: assert on getAttribute("href"), not the `.href` DOM property — an empty
     // attribute still resolves via the document base URL, which would mask the bug.
-    await waitFor(() => {
+    {
       const canonical = document.head.querySelector(
         "link[rel='canonical'], link[rel=\"canonical\"]",
       ) as HTMLLinkElement | null;
       expect(canonical?.getAttribute('href')).toBeTruthy();
-    });
+    }
     const canonical = document.head.querySelector(
       "link[rel='canonical'], link[rel=\"canonical\"]",
     ) as HTMLLinkElement | null;
@@ -91,13 +93,14 @@ describe('TASK-101960 marketplace homepage canonical + og:site_name', () => {
 
   it('serves og:site_name pinned to the shipped brand baseline', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId('marketplace-homepage')).toBeInTheDocument());
-    await waitFor(() => {
+    await settle();
+    expect(screen.getByTestId('marketplace-homepage')).toBeInTheDocument();
+    {
       const siteName = document.head.querySelector(
         "meta[property='og:site_name'], meta[property=\"og:site_name\"]",
       ) as HTMLMetaElement | null;
       expect(siteName?.content).toBeTruthy();
-    });
+    }
     const siteName = document.head.querySelector(
       "meta[property='og:site_name'], meta[property=\"og:site_name\"]",
     ) as HTMLMetaElement | null;

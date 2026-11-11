@@ -9,6 +9,7 @@ import { HYDERABAD_CENTER, hasMapCoords, fallbackCoordsForListing } from "../../
 import { getTenantBrandName } from "../../tenant/displayBrand";
 import { getTenantContext } from "../../tenant/tenantContext";
 import { getTenantOverrides, getUnitNoun } from "../../tenant/tenantOverrides";
+import { appendQuerySuffix } from "../../utils/navigation";
 
 import "leaflet/dist/leaflet.css";
 
@@ -140,7 +141,7 @@ export default function SearchResultsMap({ units, formatPrice, querySuffix }: Se
                       <span className="text-xs"> / night</span>
                     </p>
                     <Link
-                      to={`${u.canonicalPath}${querySuffix}`}
+                      to={appendQuerySuffix(u.canonicalPath, querySuffix)}
                       className="inline-block font-medium text-cta-primary underline"
                     >
                       {`View ${unitNoun.singular}`}

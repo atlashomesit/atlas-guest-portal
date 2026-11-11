@@ -5,6 +5,7 @@ import { getAccessibilityDeclarations } from '@/utils/amenityCodes';
 import { getTenantContext } from '@/tenant/tenantContext';
 import { getTenantOverrides, getTenantListingAddress } from '@/tenant/tenantOverrides';
 import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { readDormListingFields } from '@/utils/dormListing';
 
 /** Parse maxGuests from listing JSON (camelCase or PascalCase). Returns undefined if missing/invalid. */
 export function parseMaxGuestsFromPayload(payload: Record<string, unknown>): number | undefined {
@@ -127,6 +128,11 @@ export type PublicListing = {
   hasCoworkingDesk?: boolean;
   /** TASK-1025: Minimum stay requirement in nights. */
   minStay?: number | null;
+  /** GUEST-069: the host's own house rules, rules PDF and Google Maps link (null when none). */
+  houseRulesText?: string | null;
+  houseRulesPdfUrl?: string | null;
+  houseRulesStructured?: string | null;
+  googleMapsUrl?: string | null;
   /** TASK-1695: LOS auto-discount tier 1 — minimum nights threshold (null = disabled). */
   losDiscountMinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 1 — discount percent (null = disabled). */
@@ -183,6 +189,22 @@ export type PublicListing = {
    * for booking" notice. Undefined on legacy payloads (treated as published/live).
    */
   publishStatus?: string;
+  /** HSL-011: `Listing.AccommodationType` ("HostelDorm" sells a bed, not a room). Absent for non-dorm payloads. */
+  accommodationType?: string | null;
+  /** HSL-011: `Listing.DormGenderPolicy` - FemaleOnly / MaleOnly / Mixed. Null when the API states none. */
+  dormGenderPolicy?: 'FemaleOnly' | 'MaleOnly' | 'Mixed' | null;
+  /** TASK-1039977 / PAY-006: refundable security deposit configured on listing (null/0 = none). */
+  securityDepositAmount?: number | null;
+  /** TASK-10299183: online payment / checkout gateway available for listing. */
+  onlinePaymentsAvailable?: boolean;
+  /** TASK-10299183: whether small-party discount pricing is configured. */
+  hasSmallPartyPricing?: boolean;
+  /** GUEST-061: the city the listing is in, when the public listing payload names one. */
+  city?: string | null;
+  /** CLU-011: cluster role and id from public listing DTO (API only) */
+  clusterRole?: string | null;
+  clusterId?: number | null;
+  isParentCluster?: boolean | null;
 };
 
 function normalizePublicListing(payload: Record<string, unknown>): PublicListing {
@@ -258,6 +280,10 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         : Number(payload.wifiSpeedMbps),
     hasCoworkingDesk: Boolean(payload.hasCoworkingDesk),
     minStay: minStay != null && Number.isFinite(minStay) && minStay > 0 ? minStay : null,
+    houseRulesText: typeof payload.houseRulesText === 'string' && payload.houseRulesText.trim() ? payload.houseRulesText.trim() : null, // GUEST-069
+    houseRulesPdfUrl: typeof payload.houseRulesPdfUrl === 'string' && payload.houseRulesPdfUrl.trim() ? payload.houseRulesPdfUrl.trim() : null,
+    houseRulesStructured: typeof payload.houseRulesStructured === 'string' && payload.houseRulesStructured.trim() ? payload.houseRulesStructured : null,
+    googleMapsUrl: typeof payload.googleMapsUrl === 'string' && payload.googleMapsUrl.trim() ? payload.googleMapsUrl.trim() : null,
     losDiscountMinNights:
       payload.losDiscountMinNights != null ? Number(payload.losDiscountMinNights) : null,
     losDiscountPercent:
@@ -306,6 +332,37 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     })(),
     // TASK-2739-v1: publish state drives noindex + the "not yet available" notice on Draft detail pages.
     publishStatus: typeof payload.publishStatus === 'string' ? payload.publishStatus : undefined,
+    // HSL-011: dorm facts come from the API only (never guessed from the listing name).
+    ...(() => {
+      const dorm = readDormListingFields(payload);
+      return { accommodationType: dorm.accommodationType, dormGenderPolicy: dorm.dormGenderPolicy };
+    })(),
+    securityDepositAmount: (() => {
+      const raw = payload.securityDepositAmount ?? payload.SecurityDepositAmount;
+      if (raw == null || raw === '') return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
+    onlinePaymentsAvailable: payload.onlinePaymentsAvailable !== false && payload.OnlinePaymentsAvailable !== false,
+    city: (() => {
+      const raw = payload.city ?? payload.City;
+      return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+    })(),
+    hasSmallPartyPricing: Boolean(payload.hasSmallPartyPricing || payload.HasSmallPartyPricing || payload.occupancyPricingEnabled || payload.OccupancyPricingEnabled),
+    clusterRole: (() => {
+      const raw = payload.clusterRole ?? payload.ClusterRole;
+      return typeof raw === 'string' && raw.trim() ? raw.trim().toUpperCase() : null;
+    })(),
+    clusterId: (() => {
+      const raw = payload.clusterId ?? payload.ClusterId;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })(),
+    isParentCluster: (() => {
+      if (typeof payload.isParentCluster === 'boolean') return payload.isParentCluster;
+      const role = payload.clusterRole ?? payload.ClusterRole;
+      return typeof role === 'string' && role.trim().toUpperCase() === 'PARENT';
+    })(),
   };
 }
 
@@ -352,9 +409,19 @@ export async function fetchListingContact(
   return (await response.json()) as ListingContact;
 }
 
-let cachedListings: PublicListing[] | null = null;
-let cachedListingsAt = 0;
-let cachePromise: Promise<PublicListing[]> | null = null;
+interface TenantListingsCacheEntry {
+  listings: PublicListing[] | null;
+  cachedAt: number;
+  promise: Promise<PublicListing[]> | null;
+}
+
+const listingsCacheByTenant = new Map<string, TenantListingsCacheEntry>();
+
+function getListingsCacheKey(): string {
+  const headers = getApiHeaders() as Record<string, string | undefined>;
+  const slug = headers['X-Tenant-Slug'] ?? headers['x-tenant-slug'] ?? '__default__';
+  return slug.trim().toLowerCase() || '__default__';
+}
 
 /**
  * Public listings change rarely, so we cache them for the page session — but bound the
@@ -365,9 +432,7 @@ export const PUBLIC_LISTINGS_TTL_MS = 60_000;
 
 /** Drop the cached public listings so the next fetch hits the network. */
 export function invalidatePublicListingsCache(): void {
-  cachedListings = null;
-  cachedListingsAt = 0;
-  cachePromise = null;
+  listingsCacheByTenant.clear();
 }
 
 /**
@@ -386,18 +451,20 @@ export const fetchPublicListings = async (
   options?: { locale?: string; bypassCache?: boolean },
 ): Promise<PublicListing[]> => {
   const bypassCache = options?.bypassCache === true;
+  const cacheKey = getListingsCacheKey();
+  const entry = listingsCacheByTenant.get(cacheKey);
   // Return cached result if still within the freshness window (unless bypass requested)
-  if (!bypassCache && cachedListings != null && Date.now() - cachedListingsAt < PUBLIC_LISTINGS_TTL_MS) {
-    return cachedListings;
+  if (!bypassCache && entry?.listings != null && Date.now() - entry.cachedAt < PUBLIC_LISTINGS_TTL_MS) {
+    return entry.listings;
   }
 
   // Return existing promise if already fetching (but bypass must start its own fetch)
-  if (!bypassCache && cachePromise != null) {
-    return cachePromise;
+  if (!bypassCache && entry?.promise != null) {
+    return entry.promise;
   }
 
   // Create new fetch promise
-  cachePromise = (async () => {
+  const promise = (async () => {
     try {
       const params = new URLSearchParams();
       if (options?.locale) {
@@ -420,15 +487,27 @@ export const fetchPublicListings = async (
         .map((item) => normalizePublicListing(item))
         .filter((row): row is PublicListing => row !== null && row.id > 0);
 
-      cachedListings = result;
-      cachedListingsAt = Date.now();
+      listingsCacheByTenant.set(cacheKey, {
+        listings: result,
+        cachedAt: Date.now(),
+        promise: null,
+      });
       return result;
     } finally {
-      cachePromise = null;
+      const current = listingsCacheByTenant.get(cacheKey);
+      if (current) {
+        current.promise = null;
+      }
     }
   })();
 
-  return cachePromise;
+  listingsCacheByTenant.set(cacheKey, {
+    listings: entry?.listings ?? null,
+    cachedAt: entry?.cachedAt ?? 0,
+    promise,
+  });
+
+  return promise;
 };
 
 /** Normalize JSON from GET /listings/{propertyId}/photos into ordered URL strings. */

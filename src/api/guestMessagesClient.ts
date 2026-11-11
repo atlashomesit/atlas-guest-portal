@@ -12,6 +12,8 @@ export type GuestConversationMessage = {
   status?: string;
   /** TASK-101313: delivery timestamp. Null when not yet delivered. */
   deliveredAtUtc?: string | null;
+  /** GUEST-015: optional attached photo URLs or data URIs (up to 3). */
+  photos?: string[];
 };
 
 export type GuestConversationThread = {
@@ -44,13 +46,20 @@ export async function sendGuestMessage(
   bookingId: number,
   token: string,
   body: string,
+  photos?: string[],
 ): Promise<GuestConversationMessage> {
+  const cleanPhotos = photos?.filter((p) => typeof p === 'string' && p.trim().length > 0).slice(0, 3);
+  const effectiveBody = body.trim() || (cleanPhotos && cleanPhotos.length > 0 ? '📷 Photo attachment' : body);
+  const payload: { body: string; photos?: string[] } = { body: effectiveBody };
+  if (cleanPhotos && cleanPhotos.length > 0) {
+    payload.photos = cleanPhotos;
+  }
   const response = await fetch(
     buildApiUrl(`/api/guest/bookings/${bookingId}/messages?t=${encodeURIComponent(token)}`),
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...getApiHeaders() },
-      body: JSON.stringify({ body }),
+      body: JSON.stringify(payload),
     },
   );
 

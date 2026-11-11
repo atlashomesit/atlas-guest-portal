@@ -1,8 +1,13 @@
+import { feeAmount, paymentFeeCopy } from "../../utils/paymentFeeCopy";
 /**
  * TASK-2612: GuestDetailsPage — step 2 of the two-step booking flow.
  *
- * Receives holdId + holdExpiresAt from BookingContext (set by UnitBookingWidget Reserve).
- * Collects guest PII, submits final-charge POST /api/Razorpay/order, opens Razorpay modal.
+ * FOUNDER RULED 2026-10-19: the 10-minute hold (which also closes the night on every OTA) starts when the guest
+ * taps PAY, not at Reserve. UnitBookingWidget Reserve now only hands over the stay (listing, dates, guests, quote)
+ * through BookingContext — no hold, no clock. This page collects the details and the required house-rules tick; at
+ * Pay it re-checks the nights and starts the hold (POST /api/Razorpay/order, init-hold), then submits the
+ * final-charge POST /api/Razorpay/order and opens the Razorpay modal. If the nights are gone it says so BEFORE any
+ * money moves. "Try again" inside the window keeps the same hold; the countdown shows only while a hold is live.
  *
  * Visual: matches Claude Design bundle (post-reserve-checkout) exactly.
  * CSS: .gd-* tokens verbatim from styles.css in bundle.
@@ -18,13 +23,14 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Lock, ShieldCheck } from 'lucide-react';
 import { useBooking, type BookingPriceBreakdown } from '@/contexts/BookingContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { buildApiUrl, getApiHeaders, getOrderRequestHeaders } from '@/api/client';
 import { normalizePromoCodeInput } from '@/utils/promoCodeInput';
+import { clearStoredPromo, readLinkPromo } from '@/utils/linkPromo';
 import {
   clampNationalDigits,
   getGuestDialOption,
@@ -33,18 +39,30 @@ import {
   toRazorpayContactDigits,
 } from '@/utils/guestPhoneDial';
 import { getTenantContext } from '@/tenant/tenantContext';
-import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
+import {
+  hasOnlinePaymentRail,
+  isTenantNotTakingBookings,
+  isTenantTrialPayAtPropertyOnly,
+  NOT_TAKING_BOOKINGS_COPY,
+  TRIAL_PAY_AT_PROPERTY_COPY,
+} from '@/tenant/paymentRail';
 import { getGuestDataProcessingEntityName, getTenantBrandName } from '@/tenant/displayBrand';
 import { formatCurrency } from '@/utils/formatting';
 import { formatDateInTimezone } from '@/utils/dateHelpers';
 import { TerminalCheckoutOutcomeEvents, track } from '@/lib/events';
 import { mapRazorpayFailureCode } from '@/utils/razorpayGuestErrors';
+import { failureDetailsFromRazorpayEvent, reportPaymentFailure } from '@/api/paymentFailureClient';
+import { createRazorpayWindowWatch, isRazorpayContainerVisible } from '@/utils/razorpayWindowWatch';
 import {
   isServerTotalConfirmRequired,
   razorpayOrderAmountInrToPaise,
 } from '@/utils/razorpayOrderAmount';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
-import { computeCheckoutTotal } from '@/utils/guestPriceEstimate';
+import {
+  computeCheckoutTotal,
+  resolveCheckoutChargeReconciliation,
+  stayIncludesWeekendNight,
+} from '@/utils/guestPriceEstimate';
 import {
   buildRazorpayCheckoutDisplayConfig,
   isMobileCheckoutUserAgent,
@@ -54,7 +72,32 @@ import {
   type FreeCancellationTrustCopy,
 } from '@/utils/cancellationPolicy';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useStickyBarOffset } from '@/hooks/useStickyBarOffset';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
+import BookDirectPerks from '@/components/trust/BookDirectPerks';
+import CancellationMilestoneTimeline from '@/components/booking/CancellationMilestoneTimeline';
+import PricingTierDisplay from '@/components/pricing/PricingTierDisplay';
+import { fetchListingById } from '@/api/listingClient';
+import { fetchGuestPriceBreakdown } from '@/api/pricingClient';
+import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
+import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
+import { getListingDisplayName } from '@/lib/listingDisplayName';
+import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
+import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
+import { dormNeedsGenderAcknowledgement, readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
+import { hostCallDigits } from '@/utils/hostCallDigits';
+import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
+import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
+import { parseUpiOrder, type UpiOrder } from '@/utils/upiCheckout';
+import { reportUpiPaid } from '@/api/payment';
+import { buildHostFailureContact } from '@/utils/hostPaymentFailure';
+import { getIstCalendarDate, toCalendarISO, istInstantFromCalendarDate } from '@/utils/date';
+import { resolveListing } from '@/utils/listingResolver';
+import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
+import { isProviderNotConfiguredError } from '@/components/availability/unitBookingPaymentOrderErrors';
+import { isPricingNotConfiguredError, pricingNotConfiguredMessage } from '@/utils/pricingNotConfigured';
+import { ADS_MEASUREMENT_CONSENT_SEGMENTS, resolveAdsMeasurementWho } from '@/content/consent/adsMeasurementConsent';
 
 /** TASK-5183: fire-and-forget hard-delete of PaymentPending draft when checkout is abandoned. */
 function abandonPaymentPendingCheckout(
@@ -132,6 +175,9 @@ const IconCheck = ({ size = 14 }: { size?: number }) => (
 const IconWhatsApp = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.6.1-.2.3-.7.9-.9 1-.2.2-.3.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.9-.7-1.4-1.7-1.6-2-.2-.3 0-.4.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5l-.9-2.1c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2 0 1.3.9 2.5 1.1 2.7.1.2 1.8 2.8 4.5 3.9.6.3 1.1.4 1.5.5.6.2 1.2.2 1.7.1.5-.1 1.7-.7 1.9-1.3.2-.6.2-1.2.2-1.3-.1-.1-.3-.2-.6-.3zM12 2a10 10 0 0 0-8.6 15.1L2 22l4.9-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-2.9-.4-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3a8.3 8.3 0 1 1 6.9 3.7z"/></svg>
 );
+const IconPhone = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+);
 const IconAlert = ({ size = 18 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
 );
@@ -160,16 +206,23 @@ const IconNote = ({ size = 14 }: { size?: number }) => (
 
 const LAST_UPI_VPA_KEY = 'atlas_last_upi_vpa';
 const CHECKOUT_DRAFT_KEY = 'atlas_guest_checkout_draft';
-/** TASK-2882: survive hard reload on GuestDetailsPage with a still-valid server hold. */
+/** TASK-2882: survive hard reload on GuestDetailsPage with a still-valid server hold. Since the 2026-10-19 founder
+ *  ruling the cache holds the stay DRAFT (listing, dates, quote) from Reserve onward; the hold fields join it only
+ *  once the guest has tapped Pay. */
 const CHECKOUT_HOLD_KEY = 'atlas_guest_checkout_hold';
-/** TASK-4296, TASK-4432: must match the API's CheckoutHoldConstants.HoldMinutes (15). Drives both the
+/** A stay draft untouched for this long is ignored on reload (the quote and the nights may have changed). */
+const CHECKOUT_DRAFT_STALE_MS = 2 * 60 * 60 * 1000;
+/** TASK-4296, TASK-4432, TASK-10298713: must match the API's CheckoutHoldConstants.HoldMinutes (10). Drives both the
  *  countdown progress baseline and the hold-expiry copy so they agree on the real duration. */
-const CHECKOUT_HOLD_MINUTES = 15;
+const CHECKOUT_HOLD_MINUTES = 10;
 
 type CheckoutHoldCache = {
-  holdId: number;
-  holdExpiresAt: string;
+  /** Present only after the guest tapped Pay (the hold starts at Pay). */
+  holdId?: number | null;
+  holdExpiresAt?: string | null;
   holdToken?: string | null;
+  /** ms since epoch of the last write; drives CHECKOUT_DRAFT_STALE_MS. */
+  savedAt?: number;
   holdListingId?: number | null;
   holdPropertySlug?: string | null;
   holdUnitSlug?: string | null;
@@ -178,10 +231,19 @@ type CheckoutHoldCache = {
   holdPriceBreakdown?: BookingPriceBreakdown | null;
   holdCancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
   holdCancellationWindowHours?: number | null;
+  holdRefundFreeUntilUtc?: string | null; // TASK-1040050
   holdGraceHours?: number | null;
+  /** HSL-011: the dorm's gender rule, so a reload keeps asking the tick. */
+  holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
+  holdSecurityDepositAmount?: number | null;
+  /** TASK-1040087: marketplace booking origin channel preserved across refreshes. */
+  holdBookingChannel?: 'marketplace' | 'ai_receptionist' | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
+  listingRatePlanId?: number | null;
+  ratePlanName?: string | null;
 };
 
 function loadCheckoutHold(): CheckoutHoldCache | null {
@@ -189,10 +251,16 @@ function loadCheckoutHold(): CheckoutHoldCache | null {
     const raw = window.sessionStorage.getItem(CHECKOUT_HOLD_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CheckoutHoldCache;
-    if (!parsed?.holdId || !parsed?.holdExpiresAt) return null;
-    if (new Date(parsed.holdExpiresAt).getTime() <= Date.now()) {
+    // Not a usable stay draft (older cache shape, or cleared): ignore it.
+    if (!(parsed?.holdListingId || parsed?.holdId) || !parsed?.checkIn || !parsed?.checkOut) return null;
+    if (typeof parsed.savedAt === 'number' && Date.now() - parsed.savedAt > CHECKOUT_DRAFT_STALE_MS) {
       window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
       return null;
+    }
+    // A lapsed hold is dropped but the draft stays: the guest taps Pay again, which re-checks the nights and
+    // starts a fresh 10-minute hold.
+    if (parsed.holdId && parsed.holdExpiresAt && new Date(parsed.holdExpiresAt).getTime() <= Date.now()) {
+      return { ...parsed, holdId: null, holdExpiresAt: null, holdToken: null };
     }
     return parsed;
   } catch {
@@ -291,35 +359,118 @@ function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => voi
 
 // ── GuestDetailsPage ─────────────────────────────────────────────────────────
 
+const normalizeDateParam = (val: string | null): string | null => {
+  if (!val) return null;
+  const trimmed = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [y, m, d] = trimmed.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return istInstantFromCalendarDate(dateObj).toISOString();
+  }
+  const parsed = new Date(trimmed);
+  return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+};
+
 const GuestDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { propertySlug, unitSlug } = useParams<{ propertySlug: string; unitSlug: string }>();
   const { booking, updateBooking } = useBooking();
   const brandName = getTenantBrandName();
   const { currency, formatINR } = useCurrency();
   const [holdHydrationDone, setHoldHydrationDone] = useState(false);
 
-  // TASK-2882: rehydrate hold from sessionStorage after hard reload before showing "pick dates" modal.
+  // TASK-10298987: Parse direct deep-link URL search params from router location.search (or window.location.search fallback)
+  const urlParams = useMemo(() => {
+    const search = location.search || (typeof window !== 'undefined' ? window.location.search : '');
+    const sp = new URLSearchParams(search);
+    const rawCheckIn = sp.get('checkIn') || sp.get('checkin');
+    const rawCheckOut = sp.get('checkOut') || sp.get('checkout');
+    const rawGuests = sp.get('guests');
+    const rawListingId = sp.get('listingId') || sp.get('listing_id');
+    const rawRatePlanId = sp.get('ratePlanId') || sp.get('listingRatePlanId');
+    const rawBrand = sp.get('brand')?.trim().toLowerCase() ?? '';
+    const isMarketplaceBrand = rawBrand === 'atlastays' || rawBrand === 'marketplace';
+    // AGT-005: only this exact value marks a checkout that came from the AI sales agent's link.
+    const isAiReceptionistSrc = sp.get('src') === 'ai_receptionist';
+    return {
+      checkIn: normalizeDateParam(rawCheckIn),
+      checkOut: normalizeDateParam(rawCheckOut),
+      guests: rawGuests ? Math.max(1, parseInt(rawGuests, 10) || 1) : null,
+      tenant: sp.get('tenant')?.trim() || null,
+      listingId: rawListingId && !isNaN(Number(rawListingId)) ? Number(rawListingId) : null,
+      ratePlanId: rawRatePlanId && !isNaN(Number(rawRatePlanId)) ? Number(rawRatePlanId) : null,
+      isMarketplaceBrand,
+      isAiReceptionistSrc,
+    };
+  }, [location.search]);
+
+  // TASK-2882 & TASK-10298987: hydrate the stay draft from URL query params (deep link) or sessionStorage
+  // after a reload or direct deep-link before showing the "pick dates" modal.
   useEffect(() => {
-    if (!booking.holdId || !booking.holdExpiresAt) {
+    if (urlParams.checkIn && urlParams.checkOut) {
+      const cached = loadCheckoutHold();
+      const listingIdFromUnit = unitSlug && !isNaN(Number(unitSlug)) ? Number(unitSlug) : null;
+      const effectiveListingId = urlParams.listingId ?? listingIdFromUnit ?? (cached?.holdListingId ?? null);
+
+      updateBooking({
+        checkIn: urlParams.checkIn,
+        checkOut: urlParams.checkOut,
+        guests: urlParams.guests ?? cached?.guests ?? booking.guests ?? 2,
+        holdListingId: effectiveListingId ?? booking.holdListingId ?? null,
+        holdPropertySlug: propertySlug ?? cached?.holdPropertySlug ?? booking.holdPropertySlug ?? null,
+        holdUnitSlug: unitSlug ?? cached?.holdUnitSlug ?? booking.holdUnitSlug ?? null,
+        holdTenantSlug: urlParams.tenant ?? cached?.holdTenantSlug ?? booking.holdTenantSlug ?? null,
+        listingRatePlanId: urlParams.ratePlanId ?? cached?.listingRatePlanId ?? booking.listingRatePlanId ?? null,
+        ratePlanName: cached?.ratePlanName ?? booking.ratePlanName ?? null,
+        holdListingName: cached?.holdListingName ?? booking.holdListingName ?? null,
+        holdPriceBreakdown: cached?.holdPriceBreakdown ?? booking.holdPriceBreakdown ?? null,
+        holdCancellationTier: cached?.holdCancellationTier ?? booking.holdCancellationTier ?? null,
+        holdCancellationWindowHours: cached?.holdCancellationWindowHours ?? booking.holdCancellationWindowHours ?? null,
+        holdRefundFreeUntilUtc: cached?.holdRefundFreeUntilUtc ?? booking.holdRefundFreeUntilUtc ?? null,
+        holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
+        holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
+        holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
+        holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : urlParams.isAiReceptionistSrc ? 'ai_receptionist' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
+      });
+
+      if (!effectiveListingId && unitSlug) {
+        resolveListing(unitSlug, undefined, urlParams.tenant ?? booking.holdTenantSlug ?? null)
+          .then((l) => {
+            if (l?.id && !isNaN(Number(l.id))) {
+              updateBooking({
+                holdListingId: Number(l.id),
+                holdListingName: l.name ? getListingDisplayName(l.id, l.name) : null,
+              });
+            }
+          })
+          .catch(() => {});
+      }
+    } else if (!(booking.holdListingId || booking.holdId) || !booking.checkIn || !booking.checkOut) {
       const cached = loadCheckoutHold();
       if (cached) {
         updateBooking({
-          holdId: cached.holdId,
-          holdExpiresAt: cached.holdExpiresAt,
-          holdToken: cached.holdToken ?? null,
-          holdListingId: cached.holdListingId ?? null,
-          holdPropertySlug: cached.holdPropertySlug ?? null,
-          holdUnitSlug: cached.holdUnitSlug ?? null,
-          holdTenantSlug: cached.holdTenantSlug ?? null,
-          holdListingName: cached.holdListingName ?? null,
-          holdPriceBreakdown: cached.holdPriceBreakdown ?? null,
-          holdCancellationTier: cached.holdCancellationTier ?? null,
-          holdCancellationWindowHours: cached.holdCancellationWindowHours ?? null,
-          holdGraceHours: cached.holdGraceHours ?? null,
-          checkIn: cached.checkIn ?? null,
-          checkOut: cached.checkOut ?? null,
+          holdId: cached.holdId ?? booking.holdId ?? null,
+          holdExpiresAt: cached.holdExpiresAt ?? booking.holdExpiresAt ?? null,
+          holdToken: cached.holdToken ?? booking.holdToken ?? null,
+          holdListingId: cached.holdListingId ?? booking.holdListingId ?? null,
+          holdPropertySlug: cached.holdPropertySlug ?? booking.holdPropertySlug ?? null,
+          holdUnitSlug: cached.holdUnitSlug ?? booking.holdUnitSlug ?? null,
+          holdTenantSlug: cached.holdTenantSlug ?? booking.holdTenantSlug ?? null,
+          holdListingName: cached.holdListingName ?? booking.holdListingName ?? null,
+          holdPriceBreakdown: cached.holdPriceBreakdown ?? booking.holdPriceBreakdown ?? null,
+          holdCancellationTier: cached.holdCancellationTier ?? booking.holdCancellationTier ?? null,
+          holdCancellationWindowHours: cached.holdCancellationWindowHours ?? booking.holdCancellationWindowHours ?? null,
+          holdRefundFreeUntilUtc: cached.holdRefundFreeUntilUtc ?? booking.holdRefundFreeUntilUtc ?? null,
+          holdGraceHours: cached.holdGraceHours ?? booking.holdGraceHours ?? null,
+          holdDormGenderPolicy: cached.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
+          holdSecurityDepositAmount: cached.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
+          holdBookingChannel: cached.holdBookingChannel ?? booking.holdBookingChannel ?? null,
+          checkIn: cached.checkIn ?? booking.checkIn ?? null,
+          checkOut: cached.checkOut ?? booking.checkOut ?? null,
           guests: cached.guests ?? booking.guests,
+          listingRatePlanId: cached.listingRatePlanId ?? booking.listingRatePlanId ?? null,
+          ratePlanName: cached.ratePlanName ?? booking.ratePlanName ?? null,
         });
       }
     }
@@ -336,7 +487,7 @@ const GuestDetailsPage: React.FC = () => {
       () => {},
       () => {},
     );
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only preload
+  }, []);
 
   // ── Hold state from context ──────────────────────────────────────────────
   const holdId = booking.holdId;
@@ -347,6 +498,16 @@ const GuestDetailsPage: React.FC = () => {
 
   // TASK-102017: derive effective tenant slug from BookingContext hold state or URL search params
   const effectiveTenantSlug = booking.holdTenantSlug || (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tenant') : null);
+
+  // TASK-1040087: attribute checkout to 'marketplace' ONLY when originated on Atlastays marketplace
+  // (never on direct tenant / white-label sites even if ?tenant=<slug> is present).
+  const isMarketplaceCheckout =
+    booking.holdBookingChannel === 'marketplace' ||
+    urlParams.isMarketplaceBrand ||
+    isMarketplaceMode() ||
+    isMarketplaceHostname();
+  const isAiReceptionistCheckout =
+    !isMarketplaceCheckout && (booking.holdBookingChannel === 'ai_receptionist' || urlParams.isAiReceptionistSrc);
 
   // Synchronize BookingContext and window.location query string if one was populated and the other missing
   useEffect(() => {
@@ -368,24 +529,33 @@ const GuestDetailsPage: React.FC = () => {
   // TASK-8219: mirror the current hold identity into a ref so the pagehide/unmount abandon
   // guard (registered once, empty deps) always reads the latest holdId/holdToken without
   // needing to re-subscribe its event listeners on every hold change.
-  const latestHoldRef = useRef<{ holdId: number | null; holdToken: string | null; holdTenantSlug: string | null }>({
+  const latestHoldRef = useRef<{ holdId: number | null; holdToken: string | null; holdTenantSlug: string | null; holdExpiresAt: string | null }>({
     holdId: null,
     holdToken: null,
     holdTenantSlug: null,
+    holdExpiresAt: null,
   });
   useEffect(() => {
     latestHoldRef.current = {
       holdId: holdId ? Number(holdId) : null,
       holdToken: holdToken ?? null,
       holdTenantSlug: effectiveTenantSlug ?? null,
+      holdExpiresAt: holdExpiresAt ?? null,
     };
-  }, [holdId, holdToken, effectiveTenantSlug]);
+  }, [holdId, holdToken, effectiveTenantSlug, holdExpiresAt]);
 
-  // No hold state (direct navigation or hard reload): instead of a silent redirect,
+  // No stay draft (direct navigation, hard reload after a long break): instead of a silent redirect,
   // we render a "pick your dates again" card (see early return in Render) and keep the
   // guest's typed details, which are persisted to sessionStorage below.
+  // FOUNDER RULED 2026-10-19: there is NO hold on arrival — the draft is the listing, dates and quote handed over by
+  // Reserve. The hold (and its clock) exists only after the guest taps Pay.
+  // TASK-10298987: if checkIn/checkOut are present in URL search params or in booking state,
+  // hasDraft is true so direct deep links with search params never block the guest.
+  const hasDraft = Boolean(
+    ((holdListingId || holdId || (propertySlug && unitSlug)) && (booking.checkIn || urlParams.checkIn) && (booking.checkOut || urlParams.checkOut))
+  );
 
-  // ── Hold countdown ───────────────────────────────────────────────────────
+  // ── Hold countdown (shown ONLY while a hold is live, i.e. during payment) ──────────────────────
   const [countdown, setCountdown] = useState(() =>
     holdExpiresAt ? formatCountdown(holdExpiresAt) : '0:00',
   );
@@ -393,15 +563,29 @@ const GuestDetailsPage: React.FC = () => {
     holdExpiresAt ? remainingPct(holdExpiresAt) : 0,
   );
   const [holdExpired, setHoldExpired] = useState(false);
+  const holdExpiredRef = useRef(false);
+  useEffect(() => {
+    holdExpiredRef.current = holdExpired;
+  }, [holdExpired]);
+  /** True while a 10-minute hold started at Pay is running. Drives every countdown / "dates held" element. */
+  const holdLive = Boolean(holdId && holdExpiresAt) && !holdExpired;
 
   // TASK-4439: focus management for the blocking hold dialogs (WCAG 2.4.3 / 2.1.2)
   const noHoldDialogRef = useFocusTrap<HTMLDivElement>(
-    holdHydrationDone && (!holdId || !holdExpiresAt),
+    holdHydrationDone && !hasDraft,
   );
   const expiredDialogRef = useFocusTrap<HTMLDivElement>(holdExpired);
 
   useEffect(() => {
-    if (!holdExpiresAt) return;
+    if (!holdExpiresAt) {
+      // No live hold (before Pay, or just cleared): nothing counts down and nothing is "expired".
+      setHoldExpired(false);
+      setCountdown('0:00');
+      setHoldPct(0);
+      return;
+    }
+    // A fresh hold (new expiry) clears a previous lapse; tick() sets it again at once if already past.
+    setHoldExpired(false);
     const tick = () => {
       const remaining = new Date(holdExpiresAt).getTime() - Date.now();
       if (remaining <= 0) {
@@ -418,29 +602,171 @@ const GuestDetailsPage: React.FC = () => {
     return () => clearInterval(id);
   }, [holdExpiresAt]);
 
-  // ── Form state ────────────────────────────────────────────────────────────
-  const [phoneDialCode, setPhoneDialCode] = useState(() => {
+  // ── Form state (GUEST-021: pre-fill from sessionStorage draft or saved localStorage/auth profile) ──
+  const initialGuestProfile = useMemo(() => {
     const draft = loadCheckoutDraft();
-    return typeof draft.phoneDialCode === 'string'
+    let savedName = '';
+    let savedEmail = '';
+    let savedPhoneRaw = '';
+    try {
+      savedName = window.localStorage.getItem('atlas_guest_name')?.trim() ?? '';
+      savedEmail = window.localStorage.getItem('atlas_guest_email')?.trim() ?? '';
+      savedPhoneRaw = window.localStorage.getItem('atlas_guest_phone')?.trim() ?? '';
+      if (!savedEmail) {
+        const rawAuth = window.localStorage.getItem('atlas_guest_auth');
+        if (rawAuth) {
+          const parsedAuth = JSON.parse(rawAuth) as { email?: string | null };
+          if (parsedAuth?.email) savedEmail = parsedAuth.email.trim();
+        }
+      }
+    } catch { /* ignore */ }
+
+    let dialCode = typeof draft.phoneDialCode === 'string'
       && GUEST_DIAL_OPTIONS.some((o) => o.code === draft.phoneDialCode)
       ? draft.phoneDialCode
       : GUEST_DIAL_OPTIONS[0].code;
-  });
-  const [formData, setFormData] = useState(() => {
-    const draft = loadCheckoutDraft();
+
+    let phoneDigits = typeof draft.phone === 'string' ? draft.phone : '';
+    let usedSavedPhone = false;
+    if (!phoneDigits && savedPhoneRaw) {
+      usedSavedPhone = true;
+      if (savedPhoneRaw.startsWith('+')) {
+        const sortedOptions = [...GUEST_DIAL_OPTIONS].sort((a, b) => b.code.length - a.code.length);
+        const matched = sortedOptions.find((o) => savedPhoneRaw.startsWith(o.code));
+        if (matched) {
+          dialCode = matched.code;
+          phoneDigits = clampNationalDigits(savedPhoneRaw.slice(matched.code.length), matched.maxDigits);
+        } else {
+          phoneDigits = clampNationalDigits(savedPhoneRaw, GUEST_DIAL_OPTIONS[0].maxDigits);
+        }
+      } else {
+        phoneDigits = clampNationalDigits(savedPhoneRaw, getGuestDialOption(dialCode).maxDigits);
+      }
+    }
+
+    const draftName = typeof draft.name === 'string' ? draft.name : '';
+    const draftEmail = typeof draft.email === 'string' ? draft.email : '';
+    const usedSavedName = !draftName && Boolean(savedName);
+    const usedSavedEmail = !draftEmail && Boolean(savedEmail);
+
     return {
-      name: typeof draft.name === 'string' ? draft.name : '',
-      email: typeof draft.email === 'string' ? draft.email : '',
-      phone: typeof draft.phone === 'string' ? draft.phone : '',
+      phoneDialCode: dialCode,
+      name: draftName || savedName,
+      email: draftEmail || savedEmail,
+      phone: phoneDigits,
       nationality: typeof draft.nationality === 'string' && draft.nationality ? draft.nationality : 'India',
       notes: typeof draft.notes === 'string' ? draft.notes : '',
+      prefilledFromSaved: usedSavedName || usedSavedEmail || usedSavedPhone,
     };
-  });
+  }, []);
+
+  const [phoneDialCode, setPhoneDialCode] = useState(() => initialGuestProfile.phoneDialCode);
+  const [formData, setFormData] = useState(() => ({
+    name: initialGuestProfile.name,
+    email: initialGuestProfile.email,
+    phone: initialGuestProfile.phone,
+    nationality: initialGuestProfile.nationality,
+    notes: initialGuestProfile.notes,
+  }));
+  const [isPrefilledFromSaved, setIsPrefilledFromSaved] = useState(
+    () => initialGuestProfile.prefilledFromSaved,
+  );
+
+  const handleClearPrefilledGuestDetails = useCallback(() => {
+    setFormData((p) => ({ ...p, name: '', email: '', phone: '' }));
+    setFormErrors({ name: '', email: '', phone: '' });
+    setIsPrefilledFromSaved(false);
+    try {
+      window.localStorage.removeItem('atlas_guest_name');
+      window.localStorage.removeItem('atlas_guest_email');
+      window.localStorage.removeItem('atlas_guest_phone');
+      window.sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+    } catch { /* ignore */ }
+  }, []);
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
+  /** One plain sentence naming everything that stopped Pay (set by the failed validation in handleSubmit; shown while any inline error remains). */
+  const [validationSummary, setValidationSummary] = useState('');
   const [consentFlash, setConsentFlash] = useState(false);
   const consentRowRef = useRef<HTMLDivElement>(null);
+  /** G2 journey 25: the phone Pay bar publishes its height so the privacy banner sits on top of it, not over the Pay button. */
+  const [mobileBarEl, setMobileBarEl] = useState<HTMLDivElement | null>(null);
+  useStickyBarOffset(mobileBarEl);
+
+  // FOUNDER RULED 2026-10-19: the house rules the guest must accept, and the host's OWN WhatsApp / phone for the
+  // failed-payment fallback, both come from the LISTING OWNER (checkout-info) — never from the site's tenant, which on
+  // the atlastays.com marketplace is the platform, and never Atlas's own number.
+  const [checkoutInfo, setCheckoutInfo] = useState<ListingCheckoutInfo | null>(null);
+  const [houseRulesAccepted, setHouseRulesAccepted] = useState(false);
+  const [houseRulesError, setHouseRulesError] = useState('');
+  const houseRulesRowRef = useRef<HTMLDivElement>(null);
+  /** A listing with no host-written rules shows no tick and never blocks a booking on missing host data. */
+  const houseRulesRequired = Boolean(checkoutInfo?.hasHouseRules);
+  // HSL-011: a women-only / men-only dorm (policy straight from the listing API, carried by Reserve or resolved on
+  // direct/deep-link checkout) needs a required tick before Pay. It gates the Pay button and is sent as
+  // `dormGenderAcknowledged`; the API stores it with the listing's policy.
+  const [listingDormGenderPolicy, setListingDormGenderPolicy] = useState<DormGenderPolicy | null>(null);
+  const effectiveDormGenderPolicy = booking.holdDormGenderPolicy ?? listingDormGenderPolicy ?? null;
+  const dormAckRequired = dormNeedsGenderAcknowledgement(effectiveDormGenderPolicy);
+  const [dormAckAccepted, setDormAckAccepted] = useState(false);
+  const [dormAckError, setDormAckError] = useState('');
+  const dormAckRowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const id = holdListingId != null ? Number(holdListingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return;
+    const controller = new AbortController();
+    void fetchListingCheckoutInfo(id, effectiveTenantSlug, controller.signal).then((info) => {
+      if (!controller.signal.aborted) setCheckoutInfo(info);
+    });
+    return () => controller.abort();
+  }, [holdListingId, effectiveTenantSlug]);
+
+  // TASK-1039977 / PAY-006: Refundable security deposit resolution & consent + HSL-011 dorm gender policy fallback
+  const [listingSecurityDeposit, setListingSecurityDeposit] = useState<number | null>(null);
+
+  useEffect(() => {
+    const id = holdListingId != null ? Number(holdListingId) : NaN;
+    if (!Number.isFinite(id) || id <= 0) return;
+    if (booking.holdSecurityDepositAmount != null && booking.holdDormGenderPolicy != null) return;
+    const ac = new AbortController();
+    void fetchListingById(id, ac.signal)
+      .then((l) => {
+        if (!ac.signal.aborted && l) {
+          const raw = l?.securityDepositAmount ?? (l as Record<string, unknown>)?.SecurityDepositAmount;
+          const val = Number(raw);
+          if (Number.isFinite(val) && val > 0) {
+            setListingSecurityDeposit(val);
+          }
+          const dorm = readDormListingFields(l as Record<string, unknown>);
+          if (dorm.accommodationType === 'HostelDorm' && dorm.dormGenderPolicy) {
+            setListingDormGenderPolicy(dorm.dormGenderPolicy);
+          }
+        }
+      })
+      .catch(() => { /* non-critical */ });
+    return () => ac.abort();
+  }, [holdListingId, booking.holdSecurityDepositAmount, booking.holdDormGenderPolicy]);
+
+  const effectiveSecurityDepositAmount =
+    booking.holdSecurityDepositAmount ??
+    checkoutInfo?.securityDepositAmount ??
+    listingSecurityDeposit ??
+    null;
+
+  const depositRequired =
+    typeof effectiveSecurityDepositAmount === 'number' &&
+    Number.isFinite(effectiveSecurityDepositAmount) &&
+    effectiveSecurityDepositAmount > 0;
+
+  const [depositAccepted, setDepositAccepted] = useState(false);
+  const [depositError, setDepositError] = useState('');
+
+  // TASK-10299273: Pet policy + direct booking pet fee per stay
+  const [bringingPet, setBringingPet] = useState<boolean>(() => (booking.pets ?? 0) > 0);
+  const petsAllowedOnListing = Boolean(checkoutInfo?.petsAllowed);
+  const configuredPetFeePerStay = Math.max(0, Math.round(Number(checkoutInfo?.petFeePerStay) || 0));
+  const depositRowRef = useRef<HTMLDivElement>(null);
   // TASK-10050 (DPDP guarded consent): transactional WhatsApp must NOT be pre-checked.
   // The previous `true` default meant consent was assumed unless the guest actively
   // opted out — a dark pattern that fails DPDP §6 "free, specific, informed" and
@@ -448,6 +774,8 @@ const GuestDetailsPage: React.FC = () => {
   // guest must explicitly check the box to opt in.
   const [whatsappOptIn, setWhatsappOptIn] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
+  // TASK-1039907 (Meta CAPI): optional, UNticked, never persisted. Sent only when ticked (see guestPurposeConsents below).
+  const [adsMeasurementOptIn, setAdsMeasurementOptIn] = useState(false);
 
   // Persist guest PII to sessionStorage so a hard reload / Back nav doesn't lose it.
   // Consent is intentionally NOT persisted — DPDP consent must be actively given each session.
@@ -461,14 +789,16 @@ const GuestDetailsPage: React.FC = () => {
   }, [formData, phoneDialCode]);
 
   useEffect(() => {
-    if (!holdId || !holdExpiresAt) {
+    // Persist the stay draft from Reserve onward (the hold fields join it once the guest has tapped Pay).
+    if (!(holdListingId || holdId) || !booking.checkIn || !booking.checkOut) {
       try { window.sessionStorage.removeItem(CHECKOUT_HOLD_KEY); } catch { /* ignore */ }
       return;
     }
     const payload: CheckoutHoldCache = {
-      holdId: Number(holdId),
-      holdExpiresAt,
+      holdId: holdId ? Number(holdId) : null,
+      holdExpiresAt: holdExpiresAt ?? null,
       holdToken: holdToken ?? null,
+      savedAt: Date.now(),
       holdListingId: holdListingId ?? null,
       holdPropertySlug: booking.holdPropertySlug ?? propertySlug ?? null,
       holdUnitSlug: booking.holdUnitSlug ?? unitSlug ?? null,
@@ -477,10 +807,16 @@ const GuestDetailsPage: React.FC = () => {
       holdPriceBreakdown: priceBreakdown ?? null,
       holdCancellationTier: booking.holdCancellationTier ?? null,
       holdCancellationWindowHours: booking.holdCancellationWindowHours ?? null,
+      holdRefundFreeUntilUtc: booking.holdRefundFreeUntilUtc ?? null,
       holdGraceHours: booking.holdGraceHours ?? null,
+      holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
+      holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
+      holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : isAiReceptionistCheckout ? 'ai_receptionist' : (booking.holdBookingChannel ?? null),
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
+      listingRatePlanId: booking.listingRatePlanId ?? null,
+      ratePlanName: booking.ratePlanName ?? null,
     };
     try {
       window.sessionStorage.setItem(CHECKOUT_HOLD_KEY, JSON.stringify(payload));
@@ -488,8 +824,10 @@ const GuestDetailsPage: React.FC = () => {
   }, [
     holdId, holdToken, holdExpiresAt, holdListingId, priceBreakdown, booking.checkIn, booking.checkOut,
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
-    booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours,
-    booking.holdGraceHours, propertySlug, unitSlug, effectiveTenantSlug,
+    booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours, booking.holdRefundFreeUntilUtc,
+    booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount,
+    booking.holdBookingChannel, isMarketplaceCheckout, isAiReceptionistCheckout,
+    booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
   // ── Progressive disclosure state ──────────────────────────────────────────
@@ -508,6 +846,12 @@ const GuestDetailsPage: React.FC = () => {
   const [promoDiscountAmount, setPromoDiscountAmount] = useState(0);
   /** TASK-2880: true once `/api/Razorpay/order` returned the authoritative promo discount. */
   const [serverPromoLocked, setServerPromoLocked] = useState(false);
+  /** AGT-003: a code from a checkout link (`?promo=`) is validated on load and counted in the shown total; a typed code is not. */
+  /** AGT-005: the server's own quote for a link code. `reduction` is everything that comes off the total (promo + the fee/tax that shrink with it). */
+  const [linkQuote, setLinkQuote] = useState<{ discount: number; reduction: number } | null>(null);
+  const linkPromoActive = linkQuote != null;
+  const linkPromoCodeRef = useRef<string>(readLinkPromo());
+  const linkPromoTriedRef = useRef(false);
 
   const [referralCode, setReferralCode] = useState(() => {
     try { return (window.localStorage.getItem('atlas_guest_referral_code') || '').slice(0, 32); } catch { return ''; }
@@ -520,6 +864,95 @@ const GuestDetailsPage: React.FC = () => {
   // ── Add-ons ───────────────────────────────────────────────────────────────
   const [availableAddOns, setAvailableAddOns] = useState<AddOnService[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
+
+  // TASK-1040062: Hydrate holdPriceBreakdown via GET /api/pricing/guest-breakdown when
+  // GuestDetailsPage mounts on a deep-link or restored draft without holdPriceBreakdown,
+  // or when stay parameters (guests, ratePlanId, checkIn, checkOut) change.
+  const hydratedQuoteKeyRef = useRef<string | null>(null);
+  // TASK-1040051: the API refused to quote this stay (409 PRICING_NOT_CONFIGURED). Its sentence; null otherwise.
+  const [quoteRefusedMessage, setQuoteRefusedMessage] = useState<string | null>(null);
+  useEffect(() => {
+    const listingIdNum = holdListingId != null ? Number(holdListingId) : NaN;
+    if (!Number.isFinite(listingIdNum) || listingIdNum <= 0 || !booking.checkIn || !booking.checkOut) {
+      return;
+    }
+    const checkInDate = /^\d{4}-\d{2}-\d{2}$/.test(booking.checkIn)
+      ? booking.checkIn
+      : toCalendarISO(getIstCalendarDate(new Date(booking.checkIn)));
+    const checkOutDate = /^\d{4}-\d{2}-\d{2}$/.test(booking.checkOut)
+      ? booking.checkOut
+      : toCalendarISO(getIstCalendarDate(new Date(booking.checkOut)));
+    const guestsCount = booking.guests ?? 2;
+    const ratePlanId = booking.listingRatePlanId ?? null;
+    const quoteKey = `${listingIdNum}|${checkInDate}|${checkOutDate}|${guestsCount}|${ratePlanId ?? ''}|${effectiveTenantSlug ?? ''}`;
+
+    if (priceBreakdown != null && hydratedQuoteKeyRef.current === null) {
+      hydratedQuoteKeyRef.current = quoteKey;
+      return;
+    }
+    if (priceBreakdown != null && hydratedQuoteKeyRef.current === quoteKey) {
+      return;
+    }
+
+    hydratedQuoteKeyRef.current = quoteKey;
+    const ac = new AbortController();
+    fetchGuestPriceBreakdown(
+      listingIdNum,
+      checkInDate,
+      checkOutDate,
+      ac.signal,
+      ratePlanId,
+      guestsCount,
+      effectiveTenantSlug,
+    )
+      .then((quote) => {
+        if (ac.signal.aborted || !quote) return;
+        setQuoteRefusedMessage(null);
+        const nightsCount = Math.max(
+          1,
+          Math.round((Date.parse(`${checkOutDate}T00:00:00Z`) - Date.parse(`${checkInDate}T00:00:00Z`)) / 86400000),
+        );
+        updateBooking({
+          holdPriceBreakdown: {
+            baseAmount: quote.baseAmount,
+            discountAmount: quote.discountAmount,
+            convenienceFeeAmount: quote.convenienceFeeAmount,
+            finalAmount: quote.finalAmount ?? (quote.baseAmount - quote.discountAmount + quote.convenienceFeeAmount),
+            nights: nightsCount,
+            currency: 'INR',
+            touristTaxAmount: quote.touristTaxAmount,
+            ...(quote.cleaningFee ? { cleaningFee: quote.cleaningFee } : {}),
+            ...(quote.petFee ? { petFee: quote.petFee } : {}),
+            ...(quote.extraGuestFee ? { extraGuestFee: quote.extraGuestFee } : {}),
+            ...(quote.weekendRateAdjustmentAmount
+              ? { weekendRateAdjustmentAmount: quote.weekendRateAdjustmentAmount }
+              : {}),
+            ...(quote.originalNightlyRate != null ? { originalNightlyRate: quote.originalNightlyRate } : {}),
+            ...(quote.discountedNightlyRate != null ? { discountedNightlyRate: quote.discountedNightlyRate } : {}),
+            ...(quote.appliedPromotionLabel != null ? { appliedPromotionLabel: quote.appliedPromotionLabel } : {}),
+            ...(quote.breakfastPricePerPerson ? { breakfastPricePerPerson: quote.breakfastPricePerPerson } : {}),
+            ...(quote.includeBreakfast ? { includeBreakfast: quote.includeBreakfast } : {}),
+            ...(quote.breakfastExtraAmount ? { breakfastExtraAmount: quote.breakfastExtraAmount } : {}),
+          },
+        });
+      })
+      .catch((err: unknown) => {
+        if (ac.signal.aborted) return;
+        // TASK-1040051: a refusal is final for this stay (no total, no Pay); any other failure stays non-fatal.
+        setQuoteRefusedMessage(isPricingNotConfiguredError(err) ? err.message : null);
+      });
+
+    return () => ac.abort();
+  }, [
+    holdListingId,
+    booking.checkIn,
+    booking.checkOut,
+    booking.guests,
+    booking.listingRatePlanId,
+    priceBreakdown,
+    effectiveTenantSlug,
+    updateBooking,
+  ]);
 
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
@@ -542,7 +975,15 @@ const GuestDetailsPage: React.FC = () => {
   const baseAmount = priceBreakdown?.baseAmount ?? 0;
   const globalDiscountAmount = priceBreakdown?.discountAmount ?? 0;
   const convenienceFeeAmount = priceBreakdown?.convenienceFeeAmount ?? 0;
-  const nights = priceBreakdown?.nights ?? 0;
+  // The widget's legacy estimate fallback may retain a positive fee for an absorbed hold.
+  // Raw hold metadata drives only visible rows; total/payment calculation stays unchanged.
+  const displayedFeeAmount = feeAmount(priceBreakdown?.paymentFeeDisplay?.amount) ?? convenienceFeeAmount;
+  const nights =
+    priceBreakdown?.nights && priceBreakdown.nights > 0
+      ? priceBreakdown.nights
+      : (booking.checkIn && booking.checkOut
+          ? Math.max(1, Math.round((new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime()) / 86400000))
+          : 0);
 
   const addOnsTotal = useMemo(
     () =>
@@ -552,8 +993,22 @@ const GuestDetailsPage: React.FC = () => {
       }, 0),
     [availableAddOns, selectedAddOns, nights, stayGuestCount],
   );
-  // cleaningFeeAmount not in BookingPriceBreakdown — convenienceFee covers cleaning + service combined
-  const cleaningFeeAmount = 0;
+  // GUEST-049: honor itemized cleaning fee from server/hold breakdown when present
+  const cleaningFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.cleaningFee) || 0));
+  // CFB-009 / BNB-009 / BNB-010: honor breakfast extra when guest opted in on Room-Only booking
+  const includeBreakfast = Boolean(priceBreakdown?.includeBreakfast);
+  const breakfastExtraAmount = Math.max(0, Math.round(Number(priceBreakdown?.breakfastExtraAmount) || 0));
+  const quotedPetFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.petFee) || 0));
+  const petFeeAmount =
+    quotedPetFeeAmount > 0
+      ? quotedPetFeeAmount
+      : petsAllowedOnListing && bringingPet
+        ? configuredPetFeePerStay
+        : 0;
+  const unquotedPetFeeAmount =
+    quotedPetFeeAmount === 0 && petsAllowedOnListing && bringingPet ? configuredPetFeePerStay : 0;
+  const extraGuestFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.extraGuestFee) || 0));
+  const weekendRateAdjustmentAmount = Math.max(0, Math.round(Number(priceBreakdown?.weekendRateAdjustmentAmount) || 0));
 
   const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
 
@@ -566,7 +1021,7 @@ const GuestDetailsPage: React.FC = () => {
   // TASK-4421: global discount still applies before GST; the slab decision uses the post-discount base.
   const serverFinalAmount =
     typeof priceBreakdown?.finalAmount === 'number' && priceBreakdown.finalAmount > 0
-      ? priceBreakdown.finalAmount
+      ? priceBreakdown.finalAmount + unquotedPetFeeAmount
       : null;
   const touristTaxAmount =
     typeof priceBreakdown?.touristTaxAmount === 'number' && priceBreakdown.touristTaxAmount > 0
@@ -574,11 +1029,14 @@ const GuestDetailsPage: React.FC = () => {
       : 0;
   // TASK-5204: client-side promo validate is advisory only — subtract from the total once
   // `/api/Razorpay/order` echoes the authoritative discount (`serverPromoLocked`).
-  const confirmedPromoDiscount = serverPromoLocked ? promoDiscountAmount : 0;
+  const confirmedPromoDiscount = linkQuote ? linkQuote.reduction : serverPromoLocked ? promoDiscountAmount : 0;
+  // The "Promo discount" line is the promo alone; what the fee and taxes shrink by is its own plain line.
+  const promoRowAmount = linkQuote ? linkQuote.discount : confirmedPromoDiscount;
+  const promoFeeShrink = linkQuote ? Math.max(0, linkQuote.reduction - linkQuote.discount) : 0;
 
   const { perNight, displayTotal } =
     computeCheckoutTotal({
-      baseAmount,
+      baseAmount: serverFinalAmount == null ? baseAmount + unquotedPetFeeAmount : baseAmount,
       globalDiscountAmount,
       convenienceFeeAmount,
       nights,
@@ -589,6 +1047,71 @@ const GuestDetailsPage: React.FC = () => {
       referralDiscountAmount,
     });
 
+  // GUEST-049 / TASK-102392: itemize known fee components (Cleaning fee, Extra guest fee,
+  // Weekend rate adjustment) and reconcile any residual server differential into the base
+  // accommodation row with an explanatory tooltip so "Other charges" never appears to guests
+  // while visible lines always sum 100% to `displayTotal`.
+  const hasWeekendNight = useMemo(
+    () => stayIncludesWeekendNight(booking.checkIn, booking.checkOut),
+    [booking.checkIn, booking.checkOut],
+  );
+  const {
+    effectiveBaseAmount,
+    effectivePerNight,
+    petFeeRow,
+    extraGuestFeeRow,
+    weekendAdjustmentRow,
+    discountRow,
+    reconciledIntoBaseAmount,
+  } = resolveCheckoutChargeReconciliation({
+    baseAmount,
+    cleaningFeeAmount,
+    breakfastExtraAmount,
+    petFeeAmount,
+    extraGuestFeeAmount,
+    weekendRateAdjustmentAmount,
+    touristTaxAmount,
+    displayedFeeAmount,
+    addOnsTotal,
+    confirmedPromoDiscount,
+    referralDiscountAmount,
+    displayTotal,
+    nights,
+    stayGuestCount,
+    hasWeekendNight,
+    appliedPromotionLabel: priceBreakdown?.appliedPromotionLabel ?? null,
+  });
+
+  useEffect(() => {
+    if (reconciledIntoBaseAmount > 0) {
+      console.warn('[GuestDetailsPage] Reconciled unitemized server rate differential into base accommodation row', {
+        reconciledIntoBaseAmount,
+        baseAmount,
+        displayTotal,
+      });
+    }
+  }, [reconciledIntoBaseAmount, baseAmount, displayTotal]);
+
+  const displayedPerNight = effectiveBaseAmount !== baseAmount ? effectivePerNight : perNight;
+  const originalNightlyRateForStrike =
+    typeof priceBreakdown?.originalNightlyRate === 'number' &&
+    Math.round(priceBreakdown.originalNightlyRate) > displayedPerNight &&
+    displayedPerNight > 0 &&
+    nights > 0
+      ? Math.round(priceBreakdown.originalNightlyRate)
+      : null;
+  const checkoutDealBadgeLabel =
+    priceBreakdown?.appliedPromotionLabel?.trim() &&
+    (originalNightlyRateForStrike != null || (discountRow != null && discountRow.amount > 0))
+      ? originalNightlyRateForStrike != null
+        ? alignPromotionLabelPercent(priceBreakdown.appliedPromotionLabel.trim(), originalNightlyRateForStrike, displayedPerNight)
+        : alignPromotionLabelPercent(
+            priceBreakdown.appliedPromotionLabel.trim(),
+            effectiveBaseAmount,
+            Math.max(0, effectiveBaseAmount - (discountRow?.amount ?? 0)),
+          )
+      : null;
+
   // ── Check-in/out display ─────────────────────────────────────────────────
   const checkInDisplay = booking.checkIn
     ? formatDateInTimezone(new Date(booking.checkIn), 'Asia/Kolkata')
@@ -596,13 +1119,26 @@ const GuestDetailsPage: React.FC = () => {
   const checkOutDisplay = booking.checkOut
     ? formatDateInTimezone(new Date(booking.checkOut), 'Asia/Kolkata')
     : '—';
-  // propertyName: prefer booking.propertyName (set by BookingContext), fallback to deriving from slug
-  const propertyName = booking.propertyName ?? (propertySlug ? propertySlug.replace(/-/g, ' ') : '');
-  // TASK-2623: prefer holdListingName (the actual listing name passed from UnitBookingWidget);
-  // fall back to unitSlug-derived display only when holdListingName is unavailable.
+  // propertyName: prefer booking.propertyName (set by BookingContext), fallback to deriving from slug,
+  // and map raw Atlas SKUs ("atlas101", "atlas501 ph") to their guest-facing display name ("Studio 101").
+  const effectivePropertySlug = propertySlug ?? booking.holdPropertySlug ?? '';
+  const rawPropertyName =
+    booking.propertyName ?? (effectivePropertySlug ? effectivePropertySlug.replace(/-/g, ' ') : '');
+  const propertyName = rawPropertyName ? getListingDisplayName(undefined, rawPropertyName) : '';
+  // TASK-2623 / TASK-10299260: prefer holdListingName (the actual listing name passed from UnitBookingWidget),
+  // mapped through getListingDisplayName so raw SKU names ("Atlas101") show as "Studio 101".
   // When unitSlug is purely numeric (e.g. "5"), skip the slug→name fallback entirely.
-  const unitName = booking.holdListingName?.trim()
-    || (unitSlug && /\D/.test(unitSlug) ? unitSlug.replace(/-/g, ' ') : unitSlug ?? '');
+  const rawUnitName =
+    booking.holdListingName?.trim() ||
+    (unitSlug && /\D/.test(unitSlug) ? unitSlug.replace(/-/g, ' ') : unitSlug ?? '');
+  const unitName =
+    rawUnitName && /\D/.test(rawUnitName)
+      ? getListingDisplayName(booking.holdListingId ?? undefined, rawUnitName)
+      : rawUnitName;
+  const distinctUnitName =
+    unitName && propertyName && unitName.trim().toLowerCase() === propertyName.trim().toLowerCase()
+      ? ''
+      : unitName;
 
   // TASK-5179: free-cancellation deadline from resolved listing policy (not a hardcoded 48h).
   const freeCancellationCopy = useMemo(() => {
@@ -613,19 +1149,31 @@ const GuestDetailsPage: React.FC = () => {
       windowHoursOverride: booking.holdCancellationWindowHours,
       bookingCreatedAt: new Date(),
       graceHours: booking.holdGraceHours,
+      serverDeadlineUtc: booking.holdRefundFreeUntilUtc ?? null, // TASK-1040050: the date the server quoted at the booking box
     });
   }, [
     booking.checkIn,
     booking.holdCancellationTier,
     booking.holdCancellationWindowHours,
     booking.holdGraceHours,
+    booking.holdRefundFreeUntilUtc,
   ]);
 
   // ── Submit state ──────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderErrorIs409, setOrderErrorIs409] = useState(false);
+  /** Heading for the "pick different dates" banner. Null = the default "just booked" race wording; set for the host's own stay rules. */
+  const [orderErrorHeading, setOrderErrorHeading] = useState<string | null>(null);
   const [paymentCancelled, setPaymentCancelled] = useState(false);
+  /** FOUNDER RULED 2026-10-19: set by the first `payment.failed`; drives the "Payment didn't go through" panel. */
+  const [paymentFailure, setPaymentFailure] = useState<{ reasonText: string; code: string; at: number } | null>(null);
+  /** True once the order API said this listing's host cannot take an online payment (422 provider not configured). */
+  const [hostOffline, setHostOffline] = useState(false);
+  /** Funnel: `enter_contact` fires once per page visit, the first time the guest gets through the form and taps Pay. */
+  const contactTrackedRef = useRef(false);
+  /** Stable key so a lost response on the hold-start call can be retried without creating a second hold (TASK-8218). */
+  const holdIdempotencyKeyRef = useRef<string | null>(null);
   const [razorpayOrderId, setRazorpayOrderId] = useState<string | null>(null);
   // PAISE. The value the API hands us is RUPEES — see razorpayOrderAmountInrToPaise,
   // which is the single boundary where that conversion happens.
@@ -691,6 +1239,11 @@ const GuestDetailsPage: React.FC = () => {
     };
   }, []);
 
+  // TASK-1040051: no real price yet (no server quote and no base amount) reads as "Total INR 1" from the estimate's
+  // floor. Never show that placeholder: the amount is hidden until a real quote exists.
+  const checkoutPriceKnown =
+    quoteRefusedMessage == null && (serverFinalAmount != null || baseAmount > 0);
+
   /** TASK-2875: when the server total differs, the Pay CTA shows the authoritative charge (INR). */
   const chargeInr =
     serverTotalConfirmRequired && razorpayAmountPaise != null && razorpayAmountPaise > 0
@@ -717,8 +1270,32 @@ const GuestDetailsPage: React.FC = () => {
     if (!consentAccepted) { setConsentError('Please accept the consent to continue.'); valid = false; }
     else { setConsentError(''); }
 
+    // FOUNDER RULED 2026-10-19: "I accept the house rules" is required before Pay — when the host wrote rules.
+    if (houseRulesRequired && !houseRulesAccepted) { setHouseRulesError('Please accept the house rules to continue.'); valid = false; }
+    else { setHouseRulesError(''); }
+
+    // HSL-011: women-only / men-only dorm - the guest must confirm the rule before Pay.
+    if (dormAckRequired && !dormAckAccepted) { setDormAckError('Please confirm the dorm rule to continue.'); valid = false; }
+    else { setDormAckError(''); }
+
+    // TASK-1039977 / PAY-006: refundable security deposit consent
+    if (depositRequired && !depositAccepted) { setDepositError('Please accept the refundable security deposit terms to continue.'); valid = false; }
+    else { setDepositError(''); }
+
     setFormErrors(errors);
-    if (!valid) {
+    if (valid) {
+      setValidationSummary('');
+    } else {
+      const problems: string[] = [];
+      if (errors.name) problems.push('your name');
+      if (errors.email) problems.push('a valid email address');
+      if (errors.phone) problems.push('a valid phone number');
+      if (dormAckRequired && !dormAckAccepted) problems.push('the dorm rule');
+      if (depositRequired && !depositAccepted) problems.push('the security deposit terms');
+      if (houseRulesRequired && !houseRulesAccepted) problems.push('the house rules');
+      if (!consentAccepted) problems.push('the booking consent');
+      const list = problems.length > 1 ? `${problems.slice(0, -1).join(', ')} and ${problems[problems.length - 1]}` : problems[0];
+      setValidationSummary(`Payment has not started. Please check ${list} above, then tap Pay again.`);
       requestAnimationFrame(() => {
         // Focus and scroll to first failing field (WCAG 3.3 error identification)
         if (errors.name) {
@@ -739,28 +1316,90 @@ const GuestDetailsPage: React.FC = () => {
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
+        if (dormAckRequired && !dormAckAccepted) {
+          dormAckRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          dormAckRowRef.current?.querySelector('input')?.focus();
+          return;
+        }
+        if (depositRequired && !depositAccepted) {
+          depositRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          depositRowRef.current?.querySelector('input')?.focus();
+          return;
+        }
+        if (houseRulesRequired && !houseRulesAccepted) {
+          houseRulesRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          houseRulesRowRef.current?.querySelector('input')?.focus();
+          return;
+        }
         if (!consentAccepted) {
           consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          consentRowRef.current?.focus();
+          consentRowRef.current?.querySelector('input')?.focus();
         }
       });
     }
     return valid;
-  }, [formData, phoneDialCode, consentAccepted]);
+  }, [formData, phoneDialCode, consentAccepted, houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted, depositRequired, depositAccepted]);
 
   // ── Promo blur handler ────────────────────────────────────────────────────
-  const handlePromoBlur = useCallback(async () => {
-    const code = promoCode.trim();
+  const validatePromo = useCallback(async (rawCode: string, fromLink: boolean) => {
+    const code = rawCode.trim();
     if (!code || !holdListingId) return;
     setPromoValidating(true);
     setPromoMessage(null);
+    const trimmedEmail = formData.email.trim();
+    const calendarDay = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : toCalendarISO(getIstCalendarDate(new Date(v))));
+    // AGT-003: a link code that cannot be used says so in one plain sentence, drops the code (so a dead
+    // discount never follows the guest to another home) and leaves the normal price. Checkout is never blocked.
+    const rejectLinkCode = () => {
+      setPromoMessage("That offer can't be used for this stay, so the normal price applies.");
+      setPromoOpen(true);
+      setPromoCode('');
+      setAppliedPromoCode(null);
+      setPromoDiscountAmount(0);
+      setLinkQuote(null);
+      clearStoredPromo();
+    };
     try {
+      if (fromLink && booking.checkIn && booking.checkOut) {
+        // AGT-005: the server prices the stay with the code (fee, GST and tourist tax included): use its numbers as they are.
+        const qres = await fetch(buildApiUrl('/api/promo-codes/quote'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getApiHeaders(effectiveTenantSlug) },
+          body: JSON.stringify({
+            code,
+            listingId: Number(holdListingId),
+            checkIn: calendarDay(booking.checkIn),
+            checkOut: calendarDay(booking.checkOut),
+            guests: booking.guests ?? 2,
+            ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          }),
+        });
+        if (!qres.ok) { rejectLinkCode(); return; }
+        const q = (await qres.json()) as { valid?: boolean; message?: string; discountAmount?: number; totalReduction?: number };
+        if (!q.valid || !(Number(q.discountAmount) > 0)) { rejectLinkCode(); return; }
+        const discount = Number(q.discountAmount);
+        const reduction = Math.max(discount, Number(q.totalReduction) || 0);
+        setPromoMessage(q.message || null);
+        setAppliedPromoCode(code);
+        setServerPromoLocked(false);
+        setPromoDiscountAmount(discount);
+        setLinkQuote({ discount, reduction });
+        return;
+      }
       const res = await fetch(buildApiUrl('/api/promo-codes/validate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getApiHeaders(effectiveTenantSlug) },
-        body: JSON.stringify({ code, listingId: Number(holdListingId), subtotal: baseAmount }),
+        body: JSON.stringify({
+          code,
+          listingId: Number(holdListingId),
+          subtotal: baseAmount,
+          guestEmail: trimmedEmail || undefined,
+        }),
       });
-      if (!res.ok) { setPromoMessage('Could not validate code — try again.'); return; }
+      if (!res.ok) {
+        if (fromLink) rejectLinkCode(); else setPromoMessage('Could not validate code — try again.');
+        return;
+      }
       const data = (await res.json()) as { valid: boolean; message: string; discountAmount?: number };
       setPromoMessage(data.message);
       if (data.valid) {
@@ -769,13 +1408,27 @@ const GuestDetailsPage: React.FC = () => {
         if (typeof data.discountAmount === 'number' && data.discountAmount > 0) {
           setPromoDiscountAmount(data.discountAmount);
         }
+      } else if (code === (window.localStorage.getItem('atlas_guest_promo_code') || '').toUpperCase()) {
+        // A remembered code that fails for this home must not keep following the guest.
+        clearStoredPromo();
       }
     } catch {
-      setPromoMessage('Could not validate code — check your connection.');
+      if (fromLink) rejectLinkCode(); else setPromoMessage('Could not validate code — check your connection.');
     } finally {
       setPromoValidating(false);
     }
-  }, [promoCode, holdListingId, baseAmount, effectiveTenantSlug]);
+  }, [holdListingId, baseAmount, effectiveTenantSlug, formData.email, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId]);
+
+  const handlePromoBlur = useCallback(() => validatePromo(promoCode, false), [validatePromo, promoCode]);
+
+  // AGT-003: apply a code that came from a checkout link, once, as soon as the quote gives a subtotal.
+  useEffect(() => {
+    if (linkPromoTriedRef.current) return;
+    const linkCode = linkPromoCodeRef.current;
+    if (!linkCode || promoCode !== linkCode || !holdListingId || !(baseAmount > 0)) return;
+    linkPromoTriedRef.current = true;
+    void validatePromo(linkCode, true);
+  }, [promoCode, holdListingId, baseAmount, validatePromo]);
 
   // ── Promo remove (TASK-102118) ──────────────────────────────────────────
   // 1-click remove behind the savings chip's (x) button. No dedicated
@@ -790,7 +1443,8 @@ const GuestDetailsPage: React.FC = () => {
     setAppliedPromoCode(null);
     setPromoDiscountAmount(0);
     setServerPromoLocked(false);
-    try { window.localStorage.removeItem('atlas_guest_promo_code'); } catch { /* ignore */ }
+    setLinkQuote(null);
+    clearStoredPromo();
   }, []);
 
   const handleReferralBlur = useCallback(() => {
@@ -814,28 +1468,190 @@ const GuestDetailsPage: React.FC = () => {
     }, 300);
   }, [referralCode, referralDiscountAmount]);
 
+  // ── Start the hold (at Pay) ──────────────────────────────────────────────────
+  // FOUNDER RULED 2026-10-19: the 10-minute hold — which also closes the night on every OTA — starts when the guest taps Pay,
+  // after the details and the required house-rules tick. The API re-checks the nights under the listing row lock and starts
+  // the hold in one step; if the nights are gone it answers 409 AVAILABILITY_CONFLICT, which handleSubmit turns into
+  // "Sorry, these dates were just booked" BEFORE any money moves. Errors propagate as the axios error so the caller's
+  // catch can map them.
+  const startHoldAtPay = useCallback(async (): Promise<{ holdId: number; holdToken: string | null; holdExpiresAt: string }> => {
+    const listingIdNum = Number(holdListingId);
+    if (!Number.isFinite(listingIdNum) || listingIdNum <= 0 || !booking.checkIn || !booking.checkOut) {
+      throw new Error('We could not find your stay. Please go back and select dates again.');
+    }
+    // The context carries IST-midnight instants (see UnitBookingWidget); read them back as the IST civil date.
+    const checkinDate = toCalendarISO(getIstCalendarDate(new Date(booking.checkIn)));
+    const checkoutDate = toCalendarISO(getIstCalendarDate(new Date(booking.checkOut)));
+    let key = holdIdempotencyKeyRef.current;
+    if (!key) {
+      key = crypto.randomUUID();
+      holdIdempotencyKeyRef.current = key;
+    }
+    const response = await axios.post(
+      buildApiUrl('/api/Razorpay/order'),
+      {
+        bookingDraft: {
+          listingId: listingIdNum,
+          checkinDate,
+          checkoutDate,
+          guests: booking.guests ?? 1,
+          ...(includeBreakfast ? { includeBreakfast: true } : {}),
+          ...(bringingPet ? { pets: 1, hasPets: true } : {}),
+          ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
+          ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
+        },
+        ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
+        currency: 'INR',
+        // GuestInfo absent => init-hold mode on the API (it creates the hold; no Razorpay order yet).
+        guestConsentAccepted: false,
+      },
+      { headers: getOrderRequestHeaders(key, effectiveTenantSlug), timeout: 15000 },
+    );
+    const { holdId: newHoldId, holdExpiresAt: newExpiry, prepToken } = response.data ?? {};
+    if (!newHoldId || !newExpiry) {
+      throw new Error('Hold could not be created. Please try again.');
+    }
+    holdIdempotencyKeyRef.current = null; // a later hold (after this one lapses) must not reuse this key
+    checkoutSettledRef.current = false; // a new hold starts a new abandon/settle cycle
+    const expiresIso = typeof newExpiry === 'string' ? newExpiry : new Date(newExpiry).toISOString();
+    const token = typeof prepToken === 'string' ? prepToken : null;
+    latestHoldRef.current = {
+      holdId: Number(newHoldId),
+      holdToken: token,
+      holdTenantSlug: effectiveTenantSlug ?? null,
+      holdExpiresAt: expiresIso,
+    };
+    updateBooking({ holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso });
+    return { holdId: Number(newHoldId), holdToken: token, holdExpiresAt: expiresIso };
+  }, [holdListingId, booking.checkIn, booking.checkOut, booking.guests, booking.listingRatePlanId, includeBreakfast, bringingPet, isMarketplaceCheckout, isAiReceptionistCheckout, effectiveTenantSlug, updateBooking]);
+
+  // ── PAY-010: UPI_QR / UPI_DEEPLINK checkout ──────────────────────────────────
+  const [upiCheckout, setUpiCheckout] = useState<{
+    order: UpiOrder;
+    amountInr: number;
+    bookingId: number;
+    bookingToken: string | null;
+  } | null>(null);
+  const [upiReportBusy, setUpiReportBusy] = useState(false);
+  const [upiReportError, setUpiReportError] = useState<string | null>(null);
+
+  /** "I have paid": tell the host, then show the booking page's "waiting for the host to confirm" state. Never marks it paid. */
+  const handleUpiIHavePaid = useCallback(async () => {
+    if (!upiCheckout || upiReportBusy) return;
+    setUpiReportBusy(true);
+    setUpiReportError(null);
+    try {
+      await reportUpiPaid(upiCheckout.bookingId, upiCheckout.bookingToken, effectiveTenantSlug);
+      try {
+        sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+        sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+      } catch { /* ignore */ }
+      updateBooking({
+        holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+        holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
+        holdListingName: null, holdCancellationTier: null,
+        holdCancellationWindowHours: null, holdGraceHours: null,
+        holdSecurityDepositAmount: null, holdBookingChannel: null,
+        paymentHoldBookingId: null, paymentHoldToken: null,
+      });
+      const token = upiCheckout.bookingToken;
+      navigate(
+        token
+          ? `/booking/${upiCheckout.bookingId}?t=${encodeURIComponent(token)}`
+          : `/booking/${upiCheckout.bookingId}`,
+        { replace: true },
+      );
+    } catch (err) {
+      setUpiReportError(err instanceof Error ? err.message : 'Could not tell the host. Please try again.');
+    } finally {
+      setUpiReportBusy(false);
+    }
+  }, [upiCheckout, upiReportBusy, effectiveTenantSlug, updateBooking, navigate]);
+
+  // Real-time observer verification polling: when YouPI PG observer verifies the UPI deposit,
+  // the booking transitions to Paid automatically without requiring manual action.
+  useEffect(() => {
+    if (!upiCheckout || !upiCheckout.bookingId || !upiCheckout.bookingToken) return;
+
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const token = upiCheckout.bookingToken;
+        const res = await fetch(
+          buildApiUrl(`/bookings/${upiCheckout.bookingId}/payment-status?t=${encodeURIComponent(token || '')}`),
+          { headers: getApiHeaders(effectiveTenantSlug) }
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { status?: string; bookingStatus?: string };
+        if (active && (data?.status === 'Paid' || data?.bookingStatus === 'Confirmed')) {
+          clearInterval(interval);
+          try {
+            sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+            sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+          } catch { /* ignore */ }
+          updateBooking({
+            holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+            holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
+            holdListingName: null, holdCancellationTier: null,
+            holdCancellationWindowHours: null, holdGraceHours: null,
+            holdSecurityDepositAmount: null,
+            paymentHoldBookingId: null, paymentHoldToken: null,
+          });
+          navigate(
+            token
+              ? `/booking/${upiCheckout.bookingId}?t=${encodeURIComponent(token)}`
+              : `/booking/${upiCheckout.bookingId}`,
+            { replace: true }
+          );
+        }
+      } catch {
+        // ignore network error during polling
+      }
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [upiCheckout, effectiveTenantSlug, updateBooking, navigate]);
+
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (isSubmitting || holdExpired) return;
+      // A lapsed hold (holdExpired) no longer blocks Pay: the next tap simply starts a fresh hold after re-checking the nights.
+      if (isSubmitting) return;
+      if (isTenantNotTakingBookings(getTenantContext())) {
+        setOrderError(NOT_TAKING_BOOKINGS_COPY);
+        return;
+      }
       if (!validateForm()) return;
-      // TASK-8048: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
-      if (!hasOnlinePaymentRail(getTenantContext())) {
-        setOrderError('Online payment is not available for this property. Please contact the host on WhatsApp to complete your booking.');
+      // TASK-8048 / TASK-10298848: fail closed before touching the network — a WHATSAPP / no-provider tenant must not reach POST /api/Razorpay/order.
+      // 2026-10-19: also fail closed on the LISTING OWNER's own answer (checkout-info) — on the atlastays.com marketplace the
+      // site's tenant is the platform, so a host with no payment provider looked payable and a guest reached the order API.
+      if (!hasOnlinePaymentRail(getTenantContext()) || checkoutInfo?.onlinePaymentsAvailable === false) {
+        setHostOffline(true);
+        setOrderError(null);
         return;
       }
 
-      const numericHoldId = holdId != null ? Number(holdId) : NaN;
-      if (!Number.isFinite(numericHoldId)) {
-        setOrderError('Hold not found. Please go back and select dates again.');
+      if (!hasDraft) {
+        setOrderError('We could not find your stay. Please go back and select dates again.');
         return;
       }
 
       setIsSubmitting(true);
       setOrderError(null);
       setOrderErrorIs409(false);
+      setOrderErrorHeading(null);
       setPaymentCancelled(false);
+      setPaymentFailure(null);
+      // Funnel: the guest got through name / phone / email / consents / house rules and tapped Pay.
+      if (!contactTrackedRef.current) {
+        contactTrackedRef.current = true;
+        track('enter_contact', holdListingId ? Number(holdListingId) : 0);
+      }
 
       const dial = getGuestDialOption(phoneDialCode);
       const e164Phone = toGuestPhoneE164(phoneDialCode, clampNationalDigits(formData.phone, dial.maxDigits));
@@ -844,18 +1660,27 @@ const GuestDetailsPage: React.FC = () => {
         .filter((ao) => (selectedAddOns[ao.addOnServiceId] ?? 0) > 0)
         .map((ao) => ({ addOnServiceId: ao.addOnServiceId, quantity: selectedAddOns[ao.addOnServiceId] }));
 
-      const payload = {
-        holdId: numericHoldId,
+      // The final-charge body. holdId / holdToken are filled in below, once the hold exists (it may be started by this very tap).
+      const buildPayload = (activeHoldId: number, activeHoldToken: string | null) => ({
+        holdId: activeHoldId,
         // TASK-4354: prove ownership of the hold — server rejects a guessed holdId without this token.
-        holdToken: holdToken ?? undefined,
+        holdToken: activeHoldToken ?? undefined,
         currency: 'INR',
+        ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         guestConsentAccepted: consentAccepted,
+        // FOUNDER RULED 2026-10-19: the server re-checks this when the listing has house rules.
+        houseRulesAccepted,
+        // HSL-011: the dorm gender-rule tick. The API requires it (400 DORM_GENDER_ACK_REQUIRED) on women-only / men-only dorms,
+        // stores it with the policy it read from the listing, and ignores it everywhere else.
+        dormGenderAcknowledged: dormAckAccepted,
         guestPurposeConsents: {
           booking_contact: consentAccepted,
           transactional_whatsapp: whatsappOptIn,
           marketing: marketingOptIn,
+          // TASK-1039907: only a TICKED box is sent. The API reads `false` as a withdrawal, so an unticked box must send nothing.
+          ...(adsMeasurementOptIn ? { ads_measurement: true } : {}),
         },
-        securityDepositAccepted: false,
+        securityDepositAccepted: depositRequired ? depositAccepted : false,
         guestInfo: {
           name: formData.name.trim(),
           email: formData.email.trim(),
@@ -868,11 +1693,40 @@ const GuestDetailsPage: React.FC = () => {
           notes: formData.notes.trim().slice(0, 500) || undefined,
           guestNationality: formData.nationality || 'India',
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
+          ...(includeBreakfast ? { includeBreakfast: true } : {}),
+          ...(bringingPet ? { pets: 1, hasPets: true } : {}),
+          ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
+          ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
         },
-      };
+      });
 
       try {
-        const numericListingId = holdListingId ? Number(holdListingId) : 0;
+        // ── FOUNDER RULED 2026-10-19: the 10-minute hold starts HERE, at Pay ─────────────────────────
+        // Details and house rules carried no clock and closed no OTA night. A live hold is reused as is
+        // ("Try again" keeps the same hold — no fresh clock per try). Otherwise the nights are re-checked and the
+        // hold started right now; if the nights are gone the 409 below says so BEFORE any money moves.
+        let activeHoldId: number | null = (holdId != null ? Number(holdId) : null) ?? latestHoldRef.current.holdId;
+        let activeHoldToken: string | null = holdToken ?? latestHoldRef.current.holdToken;
+        let activeHoldExpiresAt: string | null = holdExpiresAt ?? latestHoldRef.current.holdExpiresAt;
+        const holdIsLive =
+          activeHoldId != null &&
+          activeHoldExpiresAt != null &&
+          new Date(activeHoldExpiresAt).getTime() > Date.now() + 5_000;
+        if (!holdIsLive) {
+          // A lapsed hold takes its order with it: never reuse an order or a launch stashed for a released hold.
+          pendingRazorpayLaunchRef.current = null;
+          currentAttemptIdempotencyKeyRef.current = null;
+          setServerTotalConfirmRequired(false);
+          setRazorpayOrderId(null);
+          const started = await startHoldAtPay();
+          activeHoldId = started.holdId;
+          activeHoldToken = started.holdToken;
+          activeHoldExpiresAt = started.holdExpiresAt;
+        }
+        const numericHoldId = activeHoldId as number;
+        const payload = buildPayload(numericHoldId, activeHoldToken);
+
         let keyId: string;
         let orderId: string;
         let bookingId: number;
@@ -899,7 +1753,7 @@ const GuestDetailsPage: React.FC = () => {
             idempotencyKey = crypto.randomUUID();
             currentAttemptIdempotencyKeyRef.current = idempotencyKey;
           }
-          track('start_checkout', numericListingId);
+          // (start_checkout is tracked ONCE per stay, at Reserve — re-firing it on every Pay tap inflated "checkouts started".)
 
           const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
             headers: getOrderRequestHeaders(idempotencyKey, effectiveTenantSlug),
@@ -943,6 +1797,7 @@ const GuestDetailsPage: React.FC = () => {
             setPromoDiscountAmount(Number(serverPromoDiscount) > 0 ? Number(serverPromoDiscount) : 0);
             setServerPromoLocked(true);
             if (!(Number(serverPromoDiscount) > 0)) {
+              setLinkQuote(null);
               setPromoMessage(`Promo ${serverPromoCode.trim()} could not be applied`);
               setPromoOpen(true);
             }
@@ -951,6 +1806,7 @@ const GuestDetailsPage: React.FC = () => {
           } else if (appliedPromoCode && promoDiscountAmount > 0) {
             setPromoDiscountAmount(0);
             setAppliedPromoCode(null);
+            setLinkQuote(null);
             setServerPromoLocked(true);
             setPromoMessage(`Promo ${appliedPromoCode} could not be applied`);
             setPromoOpen(true);
@@ -992,6 +1848,22 @@ const GuestDetailsPage: React.FC = () => {
           pendingBookingTokenRef.current = bookingToken;
           pendingBookingIdRef.current = bookingId; // TASK-8219: available to the pagehide/unmount abandon guard
 
+          // PAY-010: a UPI_QR / UPI_DEEPLINK host gets no Razorpay order — show the UPI link / QR instead of launching
+          // Razorpay with the host's UPI address as the key (which failed, so these guests could not pay at all). The
+          // panel shows the amount the order charged, so the price shown is the price paid.
+          const upiOrder = parseUpiOrder(responseData);
+          if (upiOrder) {
+            // The guest may pay from their UPI app at any moment from here on: never abandon (release) this hold from
+            // the page. The server's 10-minute sweep still releases it if nobody says they paid.
+            checkoutSettledRef.current = true;
+            currentAttemptIdempotencyKeyRef.current = null;
+            setUpiReportError(null);
+            setUpiCheckout({ order: upiOrder, amountInr: Number(respAmountInr), bookingId, bookingToken });
+            track('payment_init', holdListingId ? Number(holdListingId) : 0);
+            setIsSubmitting(false);
+            return;
+          }
+
           if (isServerTotalConfirmRequired(amountPaise, displayTotal)) {
             pendingRazorpayLaunchRef.current = {
               keyId,
@@ -1024,12 +1896,16 @@ const GuestDetailsPage: React.FC = () => {
               const handleClose = () => {
                 if (paymentCompleted) return;
                 paymentCompleted = true;
-                // TASK-5183: release inventory when the guest dismisses Razorpay without paying.
-                // TASK-8219: mark the checkout settled so a pagehide/unmount that follows this
-                // explicit dismiss doesn't fire a second abandon-checkout call for the same hold.
-                checkoutSettledRef.current = true;
-                abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
-                // TASK-10087: terminal outcome — anonymous session/listing identifiers only, no PII.
+                // GUEST-019: keep active hold on modal dismiss for retry; only abandon if expired.
+                const holdStillActive =
+                  !holdExpiredRef.current &&
+                  (!latestHoldRef.current.holdExpiresAt ||
+                    new Date(latestHoldRef.current.holdExpiresAt).getTime() > Date.now());
+                if (!holdStillActive) {
+                  checkoutSettledRef.current = true;
+                  abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
+                }
+                currentAttemptIdempotencyKeyRef.current = null;
                 track(TerminalCheckoutOutcomeEvents.PaymentModalDismissed, holdListingId ? Number(holdListingId) : 0);
                 setIsSubmitting(false);
                 setPaymentCancelled(true);
@@ -1101,6 +1977,7 @@ const GuestDetailsPage: React.FC = () => {
                         sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
                         sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
                       } catch { /* ignore */ }
+                      clearStoredPromo(); // AGT-003: the discount was used; it must not follow the guest to another home.
                       // TASK-4536: Clear the attempt's idempotency key on successful payment.
                       currentAttemptIdempotencyKeyRef.current = null;
                       // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
@@ -1110,6 +1987,7 @@ const GuestDetailsPage: React.FC = () => {
                         holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
                         holdListingName: null, holdCancellationTier: null,
                         holdCancellationWindowHours: null, holdGraceHours: null,
+                        holdSecurityDepositAmount: null, holdBookingChannel: null,
                         paymentHoldBookingId: null, paymentHoldToken: null,
                       });
                       const token = pendingBookingTokenRef.current;
@@ -1135,9 +2013,11 @@ const GuestDetailsPage: React.FC = () => {
                     // TASK-10087: terminal outcome — anonymous identifiers only, no PII
                     // (payment/order IDs stay in the visible recovery message, never in the event).
                     track(TerminalCheckoutOutcomeEvents.ChargedUnconfirmed, holdListingId ? Number(holdListingId) : 0);
+                    const waBase = getWhatsAppLink();
+                    const waSection = waBase ? ` or contact us on WhatsApp (${waBase}?text=${waText})` : '';
                     setOrderError(
                       `Payment received but we could not confirm your booking yet. Payment ID: ${paymentId} · Booking #${bookingId}. ` +
-                        `We will retry automatically for about 5 minutes — if your stay is not confirmed by then, tap "Check again" below or contact us on WhatsApp (${getWhatsAppLink()}?text=${waText}) ` +
+                        `We will retry automatically for about 5 minutes — if your stay is not confirmed by then, tap "Check again" below${waSection} ` +
                         `or email ${getContactEmail()}. No need to pay again.`,
                     );
                     const pollToken = pendingBookingTokenRef.current;
@@ -1154,6 +2034,7 @@ const GuestDetailsPage: React.FC = () => {
                           if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
                             pollTimerRef.current = null;
                             setChargedUnconfirmedPollExhausted(false);
+                            clearStoredPromo();
                             navigate(
                               pollToken ? `/booking/${bookingId}?t=${encodeURIComponent(pollToken)}` : `/booking/${bookingId}`,
                               { replace: true },
@@ -1176,15 +2057,14 @@ const GuestDetailsPage: React.FC = () => {
                 },
               };
 
-              // TASK-4541: gate opening Razorpay if hold has expired or insufficient time remains
-              if (holdExpired) {
-                throw new Error('Hold expired — please re-select your dates.');
-              }
-              if (holdExpiresAt) {
-                const remainingMs = new Date(holdExpiresAt).getTime() - Date.now();
+              // TASK-4541: gate opening Razorpay if the hold has expired or insufficient time remains.
+              // Uses the hold THIS tap is working with (it may have been started a moment ago), not the render's stale copy.
+              const expiresAtIso = activeHoldExpiresAt as string;
+              {
+                const remainingMs = new Date(expiresAtIso).getTime() - Date.now();
                 // Require ≥ 30 seconds remaining to open checkout (guest has time to pay)
                 if (remainingMs < 30000) {
-                  throw new Error(`Hold expires in ${Math.ceil(remainingMs / 1000)} seconds — please re-select your dates to avoid an interruption during payment.`);
+                  throw new Error(`Your hold ends in ${Math.max(0, Math.ceil(remainingMs / 1000))} seconds. Wait a few seconds, then tap Pay to start a fresh one.`);
                 }
               }
 
@@ -1202,32 +2082,27 @@ const GuestDetailsPage: React.FC = () => {
               // TASK-4541: monitor hold expiry while payment modal is open and close on expiry
               // TASK-8222: hard-close the modal on expiry — the hold-expiry gate exists but without
               // closing Razorpay the guest can still pay into a released slot.
+              const holdEndedDuringPayment = () => {
+                paymentCompleted = true;
+                checkoutSettledRef.current = true;
+                try { rzp.close(); } catch { /* ignore */ }
+                abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
+                // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
+                track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
+                // The 10 minutes are over and the nights are released: drop the lapsed hold so the next Pay tap re-checks the
+                // dates and starts a fresh one (the details the guest typed stay on the page).
+                currentAttemptIdempotencyKeyRef.current = null;
+                pendingRazorpayLaunchRef.current = null;
+                setRazorpayOrderId(null);
+                updateBooking({ holdId: null, holdToken: null, holdExpiresAt: null });
+                setOrderError('Your 10 minutes ended while payment was in progress, so the dates were released. If your payment went through you will get a confirmation. Otherwise tap Pay and we will check the dates again.');
+                setIsSubmitting(false);
+              };
               const expireCheckInterval = setInterval(() => {
-                if (holdExpired || !holdExpiresAt) {
+                const remainingMs = new Date(expiresAtIso).getTime() - Date.now();
+                if ((holdExpiredRef.current || remainingMs <= 0) && !paymentCompleted) {
                   clearInterval(expireCheckInterval);
-                  if (holdExpired && !paymentCompleted) {
-                    paymentCompleted = true;
-                    checkoutSettledRef.current = true;
-                    try { rzp.close(); } catch { /* ignore */ }
-                    abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
-                    // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
-                    track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
-                    setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
-                    setIsSubmitting(false);
-                  }
-                  return;
-                }
-                const remainingMs = new Date(holdExpiresAt).getTime() - Date.now();
-                if (remainingMs <= 0 && !paymentCompleted) {
-                  clearInterval(expireCheckInterval);
-                  paymentCompleted = true;
-                  checkoutSettledRef.current = true;
-                  try { rzp.close(); } catch { /* ignore */ }
-                  abandonPaymentPendingCheckout(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
-                  // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
-                  track(TerminalCheckoutOutcomeEvents.HoldExpiredDuringPayment, holdListingId ? Number(holdListingId) : 0);
-                  setOrderError('Hold expired while payment was in progress. Please re-select your dates and try again.');
-                  setIsSubmitting(false);
+                  holdEndedDuringPayment();
                 }
               }, 1000);
 
@@ -1243,8 +2118,16 @@ const GuestDetailsPage: React.FC = () => {
                 // or back-to-property. TTL worker remains the backstop if they leave mid-failure.
                 // TASK-10087: terminal outcome — anonymous identifiers only, no PII.
                 track(TerminalCheckoutOutcomeEvents.PaymentFailed, holdListingId ? Number(holdListingId) : 0);
-                setOrderError(`No money was taken. ${mapRazorpayFailureCode(code, desc)}`);
-                // TASK-2906: Store the order ID and amount so the "Resume payment" button can retry
+                // GUEST-028: keep what Razorpay said (and which website this ran on), so a refusal that blocks every guest is seen.
+                reportPaymentFailure(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug, {
+                  ...failureDetailsFromRazorpayEvent(failRes),
+                  orderId: orderId,
+                });
+                // FOUNDER RULED 2026-10-19: after the FIRST failed payment show "Payment didn't go through" with
+                // [Try again] and [Message the host on WhatsApp]. The dates stay held until the 10-minute mark.
+                setOrderError(null);
+                setPaymentFailure({ reasonText: mapRazorpayFailureCode(code, desc), code, at: Date.now() });
+                // TASK-2906: Store the order ID and amount so "Try again" can reuse the same order inside the window
                 setRazorpayOrderId(orderId);
                 setRazorpayAmountPaise(amountPaise);
                 setPaymentCancelled(false);
@@ -1257,6 +2140,35 @@ const GuestDetailsPage: React.FC = () => {
 
               track('payment_init', holdListingId ? Number(holdListingId) : 0);
               rzp.open();
+
+              // Razorpay's window can die without telling us (an in-app browser that blocks it, an order the gateway rejects): it alerts,
+              // hides itself, and fires neither `close` nor `payment.failed`, which would leave Pay on "Securing your booking..." for the
+              // rest of the hold. Give the guest the same way out as a failed payment: Try again, or the host on WhatsApp.
+              const windowWatch = createRazorpayWindowWatch(Date.now());
+              const openWatchdog = window.setInterval(() => {
+                // `checkoutSettledRef` also flips when the guest leaves the page, so a departed guest never gets a late failure report.
+                if (paymentCompleted || checkoutSettledRef.current) { window.clearInterval(openWatchdog); return; }
+                if (!windowWatch.tick(isRazorpayContainerVisible(), Date.now())) return;
+                window.clearInterval(openWatchdog);
+                clearInterval(expireCheckInterval);
+                paymentCompleted = true;
+                track(TerminalCheckoutOutcomeEvents.PaymentFailed, holdListingId ? Number(holdListingId) : 0);
+                reportPaymentFailure(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug, {
+                  code: 'CHECKOUT_DID_NOT_OPEN',
+                  description: 'The Razorpay payment window did not open or closed without telling the page',
+                  orderId,
+                });
+                setOrderError(null);
+                setPaymentFailure({
+                  reasonText: 'The payment window did not open in this browser. Try again, or open this page in Chrome or Safari.',
+                  code: 'CHECKOUT_DID_NOT_OPEN',
+                  at: Date.now(),
+                });
+                // The order Razorpay's window refused is not reused: "Try again" starts a fresh order on the SAME hold.
+                setRazorpayOrderId(null);
+                setPaymentCancelled(false);
+                setIsSubmitting(false);
+              }, 1000);
             } catch (err) {
               console.error('[GuestDetailsPage] Razorpay init error:', err);
               setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
@@ -1278,9 +2190,75 @@ const GuestDetailsPage: React.FC = () => {
 
         // Detect timeout errors
         const isTimeout = axiosErr?.code === 'ECONNABORTED' || axiosErr?.message?.includes('timeout');
+        const apiCode = typeof data?.code === 'string'
+          ? data.code
+          : typeof (data as { errorCode?: string })?.errorCode === 'string'
+            ? (data as { errorCode: string }).errorCode
+            : typeof (data as { error?: { code?: string } })?.error?.code === 'string'
+              ? (data as { error: { code: string } }).error.code
+              : '';
+
+        // 409 PRICING_NOT_CONFIGURED (founder-ruled 2026-11-03): the host has not set this room's pricing yet. The API's own sentence is the
+        // answer; it used to reach this page as a 500 and read "Something went wrong".
+        const pricingNotConfigured = pricingNotConfiguredMessage(status, data);
+
+        const isProviderNotConfigured =
+          isProviderNotConfiguredError(err) ||
+          ((status === 422 || status === 503) && (
+            apiCode === 'PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT' ||
+            apiCode === 'PAYMENT_PROVIDER_NOT_CONFIGURED' ||
+            serverMessage.includes('PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT') ||
+            serverMessage.includes('PAYMENT_PROVIDER_NOT_CONFIGURED')
+          ));
 
         if (isTimeout) {
           setOrderError('Payment initialization timed out. Please check your connection and try again.');
+        } else if (isProviderNotConfigured) {
+          // TASK-10298848: The host cannot take an online payment (PAYMENT_PROVIDER_NOT_CONFIGURED_TENANT):
+          // Immediately hide online pay and gracefully display the WhatsApp / Request to Book fallback CTA.
+          setHostOffline(true);
+          setOrderError(null);
+          setPaymentCancelled(false);
+          setPaymentFailure(null);
+          setCheckoutInfo((prev) => (prev ? { ...prev, onlinePaymentsAvailable: false } : {
+            listingId: Number(holdListingId) || 0,
+            hostName: null,
+            hasHouseRules: false,
+            houseRulesText: null,
+            houseRulesPdfUrl: null,
+            houseRulesStructuredJson: null,
+            hostWhatsAppDigits: null,
+            hostPhoneDigits: null,
+            bookingMode: 'WHATSAPP',
+            onlinePaymentsAvailable: false,
+          }));
+        } else if (status === 409 && apiCode === 'CHECKOUT_HOLD_EXPIRED') {
+          // The 10 minutes ended before this call: the nights were released. Drop the lapsed hold; the next Pay tap re-checks the
+          // dates and starts a fresh one. No money moved.
+          updateBooking({ holdId: null, holdToken: null, holdExpiresAt: null });
+          pendingRazorpayLaunchRef.current = null;
+          currentAttemptIdempotencyKeyRef.current = null;
+          setRazorpayOrderId(null);
+          setOrderError('Your 10 minutes ended, so the dates were released. Tap Pay and we will check them again. No payment was taken.');
+        } else if (status === 422 && apiCode === 'HOUSE_RULES_NOT_ACCEPTED') {
+          setHouseRulesError('Please accept the house rules to continue.');
+          setOrderError('Please accept the house rules to continue. No payment was taken.');
+        } else if (pricingNotConfigured !== null) {
+          // Not a lost-the-dates race and not a payment failure: say what the API says, as the heading, and that nothing was taken. Nothing was held
+          // and no money moved. The inline 409 panel keeps the way back to the property.
+          setOrderError('No payment was taken.');
+          setOrderErrorHeading(pricingNotConfigured);
+          setOrderErrorIs409(true);
+        } else if ((status === 400 || status === 422) && apiCode === 'DORM_GENDER_ACK_REQUIRED') {
+          setDormAckError('Please confirm the dorm rule to continue.');
+          setOrderError('Please confirm the dorm gender rule to continue. No payment was taken.');
+        } else if (status === 409 && apiCode === 'STAY_RULE_REFUSED') {
+          // The host's own stay rule (minimum stay, closed to arrival, stop-sell, ...): the API's sentence is accurate and readable, and
+          // nobody "got there first", so never say that. Nothing was held and no money moved.
+          const ruleSentence = (serverMessage || 'These dates cannot be booked as chosen').trim().replace(/[.!?]+$/, '');
+          setOrderError(`${ruleSentence}. Pick different dates to continue. No payment was taken.`);
+          setOrderErrorHeading("These dates can't be booked as chosen.");
+          setOrderErrorIs409(true);
         } else if (status === 409) {
           // TASK-4537: Distinguish the guest's OWN confirmed booking from an availability race.
           // If the message mentions "confirmed booking" or "already exists", this is likely
@@ -1302,8 +2280,9 @@ const GuestDetailsPage: React.FC = () => {
               booking.checkIn && booking.checkOut
                 ? `${checkInDisplay} – ${checkOutDisplay}`
                 : 'those dates';
+            // FOUNDER RULED 2026-10-19: said at Pay, BEFORE any money moves.
             setOrderError(
-              `Someone else just booked these dates. We couldn't confirm ${datesLabel}. Pick different dates to continue. No payment was taken.`,
+              `Sorry, these dates were just booked. We couldn't hold ${datesLabel} — someone else got there first. Pick different dates to continue. No payment was taken.`,
             );
             setOrderErrorIs409(true);
           }
@@ -1320,10 +2299,14 @@ const GuestDetailsPage: React.FC = () => {
       }
     },
     [
-      isSubmitting, holdExpired, validateForm, holdId, holdToken, phoneDialCode, formData,
-      availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, consentAccepted,
-      holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, displayTotal,
+      isSubmitting, validateForm, holdId, holdToken, holdExpiresAt, phoneDialCode, formData,
+      availableAddOns, selectedAddOns, referralCode, promoCode, whatsappOptIn, marketingOptIn, adsMeasurementOptIn, consentAccepted,
+      houseRulesAccepted, dormAckAccepted, depositRequired, depositAccepted, checkoutInfo, hasDraft, startHoldAtPay,
+      holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, booking.listingRatePlanId,
+      isMarketplaceCheckout, isAiReceptionistCheckout, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
+      appliedPromoCode, appliedReferralCode, bringingPet, includeBreakfast,
+      promoDiscountAmount, referralDiscountAmount,
     ],
   );
 
@@ -1349,6 +2332,7 @@ const GuestDetailsPage: React.FC = () => {
         const s = d?.status;
         if (s === 'Confirmed' || s === 'CheckedIn' || s === 'PaymentReceived') {
           setChargedUnconfirmedPollExhausted(false);
+          clearStoredPromo();
           navigate(
             ctx.pollToken
               ? `/booking/${ctx.bookingId}?t=${encodeURIComponent(ctx.pollToken)}`
@@ -1369,11 +2353,29 @@ const GuestDetailsPage: React.FC = () => {
   // Mobile: the sticky Pay bar can't show the desktop "tick consent" microcopy, so tapping
   // it while consent is unchecked scrolls the consent box into view and flashes it.
   const scrollToConsent = useCallback(() => {
+    // HSL-011: the dorm rule tick sits above the house rules, so point at it first.
+    if (dormAckRequired && !dormAckAccepted) {
+      setDormAckError('Please confirm the dorm rule to continue.');
+      dormAckRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // TASK-1039977 / PAY-006: refundable security deposit consent
+    if (depositRequired && !depositAccepted) {
+      setDepositError('Please accept the refundable security deposit terms to continue.');
+      depositRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // The house-rules tick (when the host wrote rules) comes first on the page, so point at it first.
+    if (houseRulesRequired && !houseRulesAccepted) {
+      setHouseRulesError('Please accept the house rules to continue.');
+      houseRulesRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     setConsentError('Please accept the consent to continue.');
     consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setConsentFlash(true);
     window.setTimeout(() => setConsentFlash(false), 1200);
-  }, []);
+  }, [houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted, depositRequired, depositAccepted]);
 
   // TASK-4537: Determine if the error message indicates a charged-but-unconfirmed state
   // that warrants showing clickable support affordance.
@@ -1390,9 +2392,25 @@ const GuestDetailsPage: React.FC = () => {
       holdId: null, holdExpiresAt: null, holdPropertySlug: null,
       holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null, holdListingName: null,
       holdCancellationTier: null, holdCancellationWindowHours: null, holdGraceHours: null,
+      holdSecurityDepositAmount: null,
     });
     navigate(propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/', { replace: true });
   }, [updateBooking, navigate, propertySlug, unitSlug, holdId, holdToken, effectiveTenantSlug]);
+
+  // FOUNDER RULED 2026-10-19: the 10 minutes after Pay are over and the nights are released. Drop the lapsed hold and keep
+  // every detail on the page; the next Pay tap re-checks the dates and starts a fresh hold.
+  const handleRestartHold = useCallback(() => {
+    abandonPaymentPendingCheckout(holdId, holdToken ?? pendingBookingTokenRef.current, effectiveTenantSlug);
+    pendingRazorpayLaunchRef.current = null;
+    currentAttemptIdempotencyKeyRef.current = null;
+    setServerTotalConfirmRequired(false);
+    setRazorpayOrderId(null);
+    setPaymentFailure(null);
+    setPaymentCancelled(false);
+    setOrderError(null);
+    setOrderErrorIs409(false);
+    updateBooking({ holdId: null, holdToken: null, holdExpiresAt: null });
+  }, [holdId, holdToken, effectiveTenantSlug, updateBooking]);
 
   // TASK-8219: a guest who leaves /details via browser Back, mobile swipe-back, or tab-close
   // never routed through handleClose or handleBackToProperty, so abandonPaymentPendingCheckout
@@ -1436,6 +2454,15 @@ const GuestDetailsPage: React.FC = () => {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
+        // GUEST-019: Do not abandon an active hold when the browser tab is backgrounded
+        // (e.g., mobile guest switching to UPI app or SMS/bank OTP for 15-60s).
+        // Real tab closes and navigations away are handled by pagehide and unmount;
+        // if the guest never returns, the server-side hold TTL releases the slot automatically.
+        const holdStillActive =
+          !holdExpiredRef.current &&
+          (!latestHoldRef.current.holdExpiresAt ||
+            new Date(latestHoldRef.current.holdExpiresAt).getTime() > Date.now());
+        if (holdStillActive) return;
         if (hiddenTimer) clearTimeout(hiddenTimer);
         hiddenTimer = setTimeout(fireAbandonOnce, HIDDEN_ABANDON_DELAY_MS);
       } else if (hiddenTimer) {
@@ -1465,8 +2492,8 @@ const GuestDetailsPage: React.FC = () => {
     );
   }
 
-  // No active hold after rehydrate attempt — show pick-dates card (PII still in sessionStorage).
-  if (!holdId || !holdExpiresAt) {
+  // No stay draft after rehydrate attempt — show pick-dates card (PII still in sessionStorage).
+  if (!hasDraft) {
     return (
       <div className="gd-page">
         <div ref={noHoldDialogRef} className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-nohold-title">
@@ -1474,8 +2501,8 @@ const GuestDetailsPage: React.FC = () => {
             <div className="gd-modal-icon"><IconClock size={22} /></div>
             <h3 id="gd-nohold-title">Let's pick your dates again</h3>
             <p>
-              Your {CHECKOUT_HOLD_MINUTES}-minute hold has expired or was cleared. Pick your dates again to start a
-              fresh hold — any details you entered are saved and will be waiting for you.
+              We couldn't find the stay you were booking (the page may have been open for a while). Pick your dates again
+              — any details you entered are saved and will be waiting for you.
             </p>
             <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
               Choose dates
@@ -1489,25 +2516,65 @@ const GuestDetailsPage: React.FC = () => {
 
   const tenantCtx = getTenantContext();
   const brandInitial = brandName.charAt(0).toUpperCase();
-  const whatsappNumber = tenantCtx?.whatsappBookingPhone ?? '';
+  // The HOST's own WhatsApp: the listing owner's checkout-info first; the site's own tenant number only when the site IS
+  // the host's (never on the marketplace, where the site tenant is the platform). Never Atlas's default number.
+  const siteHostWhatsapp = isMarketplaceMode() ? '' : (tenantCtx?.whatsappBookingPhone ?? '');
+  // Once checkout-info has loaded it is the ONLY source (it already falls back to the owner's phone); the site number is used only
+  // when checkout-info could not be loaded at all.
+  const whatsappNumber = checkoutInfo ? (checkoutInfo.hostWhatsAppDigits ?? '') : siteHostWhatsapp;
   const consentEntityName = getGuestDataProcessingEntityName();
   // TASK-8048: single choke-point — do not offer a Razorpay pay rail when no online provider is configured.
   // hasOnlinePaymentRail() mirrors GET /tenants/from-domain's bookingMode derivation (TENANT vs WHATSAPP).
-  const hasOnlineRail = hasOnlinePaymentRail(tenantCtx);
+  // 2026-10-19: the LISTING OWNER's own answer (checkout-info, or the order API's refusal) also closes the rail, because on
+  // the marketplace the site's tenant is the platform and says nothing about this host.
+  const hasOnlineRail =
+    hasOnlinePaymentRail(tenantCtx) && !hostOffline && checkoutInfo?.onlinePaymentsAvailable !== false;
+  const notTakingBookings = isTenantNotTakingBookings(tenantCtx);
+  const trialPayAtProperty = isTenantTrialPayAtPropertyOnly(tenantCtx);
   const whatsappHandoffUrl = (() => {
     const digits = (whatsappNumber || '').replace(/\D/g, '');
+    if (!digits) return null;
+    const fullDigits = digits.length === 10 ? `91${digits}` : digits;
     const text = `Hi, I'm interested in booking ${propertyName || 'your property'}${unitName ? ` · ${unitName}` : ''} for ${checkInDisplay} → ${checkOutDisplay} (${nights} ${nights === 1 ? 'night' : 'nights'}, ${booking.guests ?? 1} guest${(booking.guests ?? 1) !== 1 ? 's' : ''}). Can you help me confirm?`;
-    if (digits) return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-    return `${getWhatsAppLink()}?text=${encodeURIComponent(text)}`;
+    return `https://wa.me/${fullDigits}?text=${encodeURIComponent(text)}`;
   })();
-  const paymentFailureWhatsAppUrl = `${getWhatsAppLink()}?text=${encodeURIComponent(
-    'Hi, my payment just failed while booking. Can you help?',
-  )}`;
+  // The site tenant's own number is the host's profile phone (`legalContactPack.contactPhone`); TenantInfo has no top-level `phone`.
+  // Never on the marketplace (the site tenant is the platform there), never Atlas's default number.
+  const siteHostPhoneDigits = isMarketplaceMode() ? null : hostCallDigits(tenantCtx?.legalContactPack?.contactPhone);
+  const hostDirectPhoneDigits = checkoutInfo ? checkoutInfo.hostPhoneDigits : siteHostPhoneDigits;
+  const hostDirectPhoneLink = hostDirectPhoneDigits ? `tel:+${hostDirectPhoneDigits.replace(/^\+/, '')}` : null;
+  // FOUNDER RULED 2026-10-19: the failed-payment contact is the HOST's WhatsApp (pre-written with the room, dates, guests,
+  // amount and the guest's name; the guest only taps Send), else a call link to the host's phone, else nothing.
+  const failedPaymentContact = buildHostFailureContact({
+    hostWhatsAppDigits: whatsappNumber,
+    hostPhoneDigits: checkoutInfo ? checkoutInfo.hostPhoneDigits : (isMarketplaceMode() ? null : getTelLink().replace(/\D/g, '')),
+    roomName: [propertyName, unitName].filter(Boolean).join(' · ') || null,
+    checkInLabel: checkInDisplay,
+    checkOutLabel: checkOutDisplay,
+    nights,
+    guests: booking.guests ?? 1,
+    amountInr: razorpayAmountPaise != null && razorpayAmountPaise > 0 ? razorpayAmountPaise / 100 : chargeInr,
+    guestName: formData.name,
+  });
+  // Charged-but-unconfirmed (the money WAS taken) keeps the site-level support links below; only the failed-payment panel is host-first.
+  const waBase = getWhatsAppLink();
+  const paymentFailureWhatsAppUrl = waBase
+    ? `${waBase}?text=${encodeURIComponent(
+        'Hi, my payment went through but my booking is not confirmed yet. Can you help?',
+      )}`
+    : '';
   const paymentFailureTelLink = getTelLink();
   const paymentFailureEmail = getContactEmail();
-  const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment failed — need help')}`;
+  const paymentFailureMailto = `mailto:${paymentFailureEmail}?subject=${encodeURIComponent('Payment received — booking not confirmed')}`;
 
-  const payDisabled = isSubmitting || holdExpired || !consentAccepted;
+  /** Pay needs consent, house rules when present, dorm rule when present, and deposit consent when configured. */
+  const readyToPay =
+    consentAccepted &&
+    (!houseRulesRequired || houseRulesAccepted) &&
+    (!dormAckRequired || dormAckAccepted) &&
+    (!depositRequired || depositAccepted);
+  // TASK-1040051: a stay the API refused to price can never be paid for here.
+  const payDisabled = isSubmitting || !readyToPay || notTakingBookings || quoteRefusedMessage != null;
 
   return (
     <div className="gd-page">
@@ -1516,11 +2583,17 @@ const GuestDetailsPage: React.FC = () => {
         <div className="gd-desktop-strip-inner">
           <div className="gd-desktop-strip-left">
             <IconClock size={15}/>
-            <span>
-              Your dates are reserved for the next{' '}
-              <b className="gd-strip-timer">{countdown}</b>.
-              {'  '}Finish payment to confirm — we won't release them while you're here.
-            </span>
+            {holdLive ? (
+              <span>
+                Your dates are reserved for the next{' '}
+                <b className="gd-strip-timer">{countdown}</b>.
+                {'  '}Finish payment to confirm — if the time runs out the dates are released.
+              </span>
+            ) : (
+              <span data-testid="hold-strip-no-clock">
+                Take your time — nothing is held yet. Your dates are held for {CHECKOUT_HOLD_MINUTES} minutes only once you tap Pay.
+              </span>
+            )}
           </div>
           <div className="gd-desktop-strip-right">
             <span>Step <b>2</b> of 2 · Details &amp; payment</span>
@@ -1541,28 +2614,40 @@ const GuestDetailsPage: React.FC = () => {
           <IconChevronLeft size={18}/>
         </Link>
         <div className="gd-hold-body">
-          <div className="gd-hold-title">
-            Dates held for <b>{countdown}</b>
+          {holdLive ? (
+            <>
+              <div className="gd-hold-title">
+                Dates held for <b>{countdown}</b>
+              </div>
+              <div className="gd-hold-sub">Finish payment to lock them in</div>
+            </>
+          ) : (
+            <>
+              <div className="gd-hold-title" data-testid="hold-header-no-clock">Confirm your details</div>
+              <div className="gd-hold-sub">Nothing is held until you tap Pay</div>
+            </>
+          )}
+        </div>
+        {holdLive && (
+          <div className="gd-hold-track">
+            <span style={{ width: (holdPct * 100) + '%' }} />
           </div>
-          <div className="gd-hold-sub">Finish payment to lock them in</div>
-        </div>
-        <div className="gd-hold-track">
-          <span style={{ width: (holdPct * 100) + '%' }} />
-        </div>
+        )}
       </div>
 
-      {/* ── Hold expired modal ── */}
-      {holdExpired && (
+      {/* ── Hold expired modal (the 10 minutes after Pay ended) ──
+          PAY-010: not over the UPI panel — a guest who already paid by UPI must still be able to tap "I have paid". */}
+      {holdExpired && !upiCheckout && (
         <div ref={expiredDialogRef} className="gd-modal-shade" role="dialog" aria-modal="true" aria-labelledby="gd-expired-title">
           <div className="gd-modal">
             <div className="gd-modal-icon"><IconClock size={22}/></div>
-            <h3 id="gd-expired-title">Your hold just expired.</h3>
+            <h3 id="gd-expired-title">Your {CHECKOUT_HOLD_MINUTES} minutes are over.</h3>
             <p>
-              The {CHECKOUT_HOLD_MINUTES}-minute reservation has ended and those dates are back on the calendar.
-              Re-select to continue — your details aren't lost.
+              The dates are open again for other guests. Your details are saved — tap below and we will check the dates
+              again, then you can pay.
             </p>
-            <button type="button" className="gd-modal-cta" onClick={handleBackToProperty}>
-              Choose dates again
+            <button type="button" className="gd-modal-cta" onClick={handleRestartHold} data-testid="hold-expired-check-again">
+              Check the dates again
             </button>
           </div>
         </div>
@@ -1575,8 +2660,12 @@ const GuestDetailsPage: React.FC = () => {
           {/* Breadcrumb (desktop only) */}
           <div className="gd-breadcrumb">
             <Link to={propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/'} className="gd-breadcrumb-link">{propertyName}</Link>
-            <span className="gd-breadcrumb-sep">›</span>
-            <Link to={propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/'} className="gd-breadcrumb-link">{unitName}</Link>
+            {distinctUnitName && (
+              <>
+                <span className="gd-breadcrumb-sep">›</span>
+                <Link to={propertySlug && unitSlug ? `/homes/${propertySlug}/${unitSlug}` : '/'} className="gd-breadcrumb-link">{distinctUnitName}</Link>
+              </>
+            )}
             <span className="gd-breadcrumb-sep">›</span>
             <span className="gd-breadcrumb-current">Confirm and pay</span>
           </div>
@@ -1594,7 +2683,7 @@ const GuestDetailsPage: React.FC = () => {
             </div>
             <div className="gd-recap-body">
               <h4 className="gd-recap-name">
-                {propertyName}{unitName ? ` · ${unitName}` : ''}
+                {propertyName}{distinctUnitName ? ` · ${distinctUnitName}` : ''}
               </h4>
               <div className="gd-recap-dates">{checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : ''}</div>
               <div className="gd-recap-guests">
@@ -1609,18 +2698,34 @@ const GuestDetailsPage: React.FC = () => {
             </div>
           </div>
 
+          {/* GUEST-023: Branded Book Direct Perks */}
+          <BookDirectPerks className="my-4" />
+
           {/* Guest form */}
           <form onSubmit={handleSubmit} noValidate id="gd-details-form">
             {/* Who's coming */}
             <div className="gd-fset" style={{ marginTop: 0 }}>
-              <div className="gd-fset-head">
-                <h3>Who's coming</h3>
-                <small>Needed for booking &amp; police records</small>
+              <div className="gd-fset-head" style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <h3>Who's coming</h3>
+                  <small>Needed for booking &amp; police records</small>
+                </div>
+                {isPrefilledFromSaved && (
+                  <button
+                    type="button"
+                    onClick={handleClearPrefilledGuestDetails}
+                    data-testid="clear-prefilled-guest-details"
+                    className="gd-pill"
+                    style={{ cursor: 'pointer', border: '1px solid var(--gd-border, #e5d5c5)', background: 'transparent', fontSize: 12, padding: '2px 8px' }}
+                  >
+                    Saved details pre-filled · Clear
+                  </button>
+                )}
               </div>
 
               <div className="gd-field">
                 <label className="gd-field-label" htmlFor="gd-name">
-                  <span>Full name <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                  <span>Full name <span aria-hidden="true" style={{ color: 'var(--gd-accent-text)', marginLeft: 4 }}>*</span></span>
                 </label>
                 <input
                   id="gd-name"
@@ -1632,7 +2737,7 @@ const GuestDetailsPage: React.FC = () => {
                   className={`gd-input${formErrors.name ? ' gd-input--error' : ''}`}
                   placeholder="As on a government ID"
                   value={formData.name}
-                  onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, name: e.target.value })); setFormErrors((p) => ({ ...p, name: '' })); }}
                   onFocus={scrollFieldIntoView}
                   data-testid="guest-booking-name"
                 />
@@ -1641,7 +2746,7 @@ const GuestDetailsPage: React.FC = () => {
 
               <div className="gd-field">
                 <label className="gd-field-label" htmlFor="gd-email">
-                  <span>Email <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                  <span>Email <span aria-hidden="true" style={{ color: 'var(--gd-accent-text)', marginLeft: 4 }}>*</span></span>
                 </label>
                 <input
                   id="gd-email"
@@ -1653,7 +2758,7 @@ const GuestDetailsPage: React.FC = () => {
                   className={`gd-input${formErrors.email ? ' gd-input--error' : ''}`}
                   placeholder="you@example.com"
                   value={formData.email}
-                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                  onChange={(e) => { setFormData((p) => ({ ...p, email: e.target.value })); setFormErrors((p) => ({ ...p, email: '' })); }}
                   onFocus={scrollFieldIntoView}
                   data-testid="guest-booking-email"
                 />
@@ -1663,7 +2768,7 @@ const GuestDetailsPage: React.FC = () => {
 
               <div className="gd-field">
                 <label className="gd-field-label" htmlFor="gd-phone">
-                  <span>Phone <span aria-hidden="true" style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                  <span>Phone <span aria-hidden="true" style={{ color: 'var(--gd-accent-text)', marginLeft: 4 }}>*</span></span>
                 </label>
                 <div className={`gd-row${formErrors.phone ? ' gd-input--error-wrap' : ''}`}>
                   <div className="gd-dial">
@@ -1695,6 +2800,7 @@ const GuestDetailsPage: React.FC = () => {
                     maxLength={getGuestDialOption(phoneDialCode).maxDigits}
                     value={formData.phone}
                     onChange={(e) => {
+                      setFormErrors((p) => ({ ...p, phone: '' }));
                       const dial = getGuestDialOption(phoneDialCode);
                       setFormData((p) => ({
                         ...p,
@@ -1715,11 +2821,13 @@ const GuestDetailsPage: React.FC = () => {
 
               <div className="gd-field">
                 <div className="gd-field-label">
-                  <span>Nationality <span style={{ color: 'var(--gd-coral)', marginLeft: 4 }}>*</span></span>
+                  <span>Nationality <span style={{ color: 'var(--gd-accent-text)', marginLeft: 4 }}>*</span></span>
                 </div>
                 <div className="gd-dial">
                   <select
                     id="gd-nationality"
+                    aria-label="Nationality"
+                    aria-required="true"
                     value={formData.nationality}
                     onChange={(e) => setFormData((p) => ({ ...p, nationality: e.target.value }))}
                     data-testid="guest-booking-nationality"
@@ -1752,15 +2860,15 @@ const GuestDetailsPage: React.FC = () => {
                     onClick={() => setPromoOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ color: 'var(--gd-coral)' }}><IconTag size={14}/></span>
+                      <span style={{ color: 'var(--gd-accent-text)' }}><IconTag size={14}/></span>
                       Promo code
                       {promoValidating && (
                         <span className="gd-pill">Checking code…</span>
                       )}
-                      {!promoValidating && serverPromoLocked && promoDiscountAmount > 0 && (
+                      {!promoValidating && (serverPromoLocked || linkPromoActive) && promoDiscountAmount > 0 && (
                         <span className="gd-pill">−{displayPrice(promoDiscountAmount)}</span>
                       )}
-                      {!promoValidating && !serverPromoLocked && appliedPromoCode && promoDiscountAmount > 0 && (
+                      {!promoValidating && !serverPromoLocked && !linkPromoActive && appliedPromoCode && promoDiscountAmount > 0 && (
                         <span className="gd-pill">Pending confirmation</span>
                       )}
                     </span>
@@ -1784,6 +2892,7 @@ const GuestDetailsPage: React.FC = () => {
                           setPromoMessage(null);
                           setAppliedPromoCode(null);
                           setPromoDiscountAmount(0);
+                          setLinkQuote(null);
                         }}
                         onBlur={() => void handlePromoBlur()}
                         data-testid="guest-booking-promo"
@@ -1817,7 +2926,7 @@ const GuestDetailsPage: React.FC = () => {
                       </div>
                     )}
                     {!promoValidating && !promoMessage && promoCode && (
-                      <div className="gd-input-help">Codes are case-insensitive. Tax recalculates after apply.</div>
+                      <div className="gd-input-help">Codes are case-insensitive. Total updates after apply.</div>
                     )}
                   </div>
                 </div>
@@ -1832,7 +2941,7 @@ const GuestDetailsPage: React.FC = () => {
                     onClick={() => setReferralOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ color: 'var(--gd-coral)' }}><IconGift size={14}/></span>
+                      <span style={{ color: 'var(--gd-accent-text)' }}><IconGift size={14}/></span>
                       Referral code
                       {appliedReferralCode && referralDiscountAmount > 0 && (
                         <span className="gd-pill">−{displayPrice(referralDiscountAmount)} applied</span>
@@ -1892,7 +3001,7 @@ const GuestDetailsPage: React.FC = () => {
                       onClick={() => setAddOnsOpen((v) => !v)}
                     >
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ color: 'var(--gd-coral)' }}><IconSparkles size={14}/></span>
+                        <span style={{ color: 'var(--gd-accent-text)' }}><IconSparkles size={14}/></span>
                         Add-on services
                         {addOnsTotal > 0 && (
                           <span className="gd-pill">+{displayPrice(addOnsTotal)}</span>
@@ -1963,7 +3072,7 @@ const GuestDetailsPage: React.FC = () => {
                     onClick={() => setNotesOpen((v) => !v)}
                   >
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ color: 'var(--gd-coral)' }}><IconNote size={14}/></span>
+                      <span style={{ color: 'var(--gd-accent-text)' }}><IconNote size={14}/></span>
                       Notes or special requests
                     </span>
                     <span className="gd-disc-side">
@@ -1988,89 +3097,241 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Consent block */}
-            <div className="gd-consent">
-              {/* DPDP required consent */}
+            {/* GUEST-024: Visual cancellation policy milestone timeline */}
+            <div className="mb-6">
+              <CancellationMilestoneTimeline
+                checkInDate={booking.checkIn}
+                cancellationTier={booking.holdCancellationTier}
+                windowHoursOverride={booking.holdCancellationWindowHours}
+                graceHours={booking.holdGraceHours}
+                refundFreeUntilUtc={booking.holdRefundFreeUntilUtc}
+              />
+            </div>
+
+            {/* GUEST-025: Clear security deposit terms breakdown */}
+            <div
+              className="rounded-2xl border border-border-subtle bg-bg-surface p-5 space-y-3 mb-6 shadow-xs"
+              data-testid="security-deposit-terms"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true" />
+                <h3 className="text-sm font-semibold text-text-primary">Security Deposit Policy &amp; Terms</h3>
+              </div>
+              <p className="text-xs text-text-secondary">
+                To protect against accidental damage and preserve property care, homestays may collect a standard security deposit.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-border-subtle text-xs">
+                <div className="bg-bg-muted p-3 rounded-xl border border-border-subtle">
+                  <span className="font-semibold text-text-primary block mb-0.5">100% Refundable</span>
+                  <span className="text-text-secondary">Fully refunded if no damages, excess cleaning, or policy violations occur during your stay.</span>
+                </div>
+                <div className="bg-bg-muted p-3 rounded-xl border border-border-subtle">
+                  <span className="font-semibold text-text-primary block mb-0.5">Payment Method</span>
+                  <span className="text-text-secondary">Collected securely via UPI, card link, or at check-in per host instructions (not charged on this hold).</span>
+                </div>
+                <div className="bg-bg-muted p-3 rounded-xl border border-border-subtle">
+                  <span className="font-semibold text-text-primary block mb-0.5">Return Timeframe</span>
+                  <span className="text-text-secondary">Inspected and credited back to your original payment method within 24–48 hours of checkout.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* HSL-011: women-only / men-only dorm - REQUIRED rule tick before Pay. Renders nothing for any other listing. */}
+            <div ref={dormAckRowRef}>
+              <DormGenderAcknowledgement
+                policy={effectiveDormGenderPolicy}
+                accepted={dormAckAccepted}
+                onChange={(next) => { setDormAckAccepted(next); if (next) setDormAckError(''); }}
+                error={dormAckError}
+              />
+            </div>
+
+            {/* FOUNDER RULED 2026-10-19: the host's own house rules, with a REQUIRED "I accept" tick before Pay.
+                Renders nothing when the host wrote no rules (a listing with no rules never blocks a booking). */}
+            <div ref={houseRulesRowRef}>
+              <HouseRulesAcceptance
+                info={checkoutInfo}
+                accepted={houseRulesAccepted}
+                onChange={(next) => { setHouseRulesAccepted(next); if (next) setHouseRulesError(''); }}
+                error={houseRulesError}
+                variant="details"
+              />
+            </div>
+
+            {/* TASK-10299273: Pet policy & per-stay pet fee toggle on direct website bookings */}
+            {petsAllowedOnListing && (
               <div
-                ref={consentRowRef}
-                className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`}
-                onClick={() => { setConsentAccepted((v) => !v); if (!consentAccepted) setConsentError(''); }}
-                role="checkbox"
-                aria-checked={consentAccepted}
-                tabIndex={0}
-                onKeyDown={(e) => e.key === ' ' && setConsentAccepted((v) => { if (!v) setConsentError(''); return !v; })}
-                data-testid="guest-booking-consent-row"
+                className="gd-pet-policy-section"
+                data-testid="checkout-pet-policy-section"
+                style={{
+                  marginBottom: '1rem',
+                  padding: '0.875rem 1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--gd-line-strong, #e2e8f0)',
+                  background: 'var(--gd-surface-muted, #f8fafc)',
+                }}
               >
-                <span className={`gd-check${consentAccepted ? ' checked' : ''}`}>
-                  <IconCheck size={14}/>
-                </span>
-                <div className="gd-consent-body">
-                  I consent to <b>{consentEntityName}</b> collecting and using my name, phone, and email to process this booking and send booking-related communications.{' '}
-                  <Link to="/privacy" className="gd-consent-link" onClick={(e) => e.stopPropagation()}>Privacy Policy</Link>
-                  {' '}&amp;{' '}
-                  <Link to="/terms" className="gd-consent-link" onClick={(e) => e.stopPropagation()}>Guest Terms</Link>.
-                  <span className="gd-consent-tag">Required · booking &amp; contact · DPDP Act, 2023</span>
-                  {/* Hidden native checkbox for testid compatibility */}
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '0.75rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: 500 }}>
+                    <input
+                      type="checkbox"
+                      checked={bringingPet}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setBringingPet(next);
+                        updateBooking({ pets: next ? 1 : 0 });
+                      }}
+                      data-testid="checkout-bringing-pet-checkbox"
+                    />
+                    Bringing a pet?
+                  </span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--gd-ink-soft, #475569)' }} data-testid="checkout-pet-fee-label">
+                    {configuredPetFeePerStay > 0
+                      ? `+${displayPrice(configuredPetFeePerStay)} pet fee per stay`
+                      : 'Pets stay free'}
+                  </span>
+                </label>
+              </div>
+            )}
+
+            {/* PAY-006 / TASK-1039977: Refundable security deposit disclosure banner & consent */}
+            {depositRequired && (
+              <div
+                ref={depositRowRef}
+                className="gd-deposit-section"
+                data-testid="security-deposit-banner"
+                style={{
+                  marginBottom: '1rem',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  border: '1px solid var(--gd-line-strong, #e2e8f0)',
+                  background: 'var(--gd-surface-muted, #f8fafc)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                  <ShieldCheck size={20} style={{ color: 'var(--gd-accent, #0f766e)', marginTop: '2px', flexShrink: 0 }} />
+                  <div>
+                    <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--gd-ink, #0f172a)' }}>
+                      Refundable Security Deposit: {displayPrice(effectiveSecurityDepositAmount ?? 0)}
+                    </h4>
+                    <p style={{ margin: '0.25rem 0 0.75rem 0', fontSize: '0.85rem', color: 'var(--gd-ink-soft, #475569)', lineHeight: 1.4 }}>
+                      A refundable security deposit of <b>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</b> is required for this stay.
+                      This deposit covers incidental damages and is refunded after checkout inspection according to host policy.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className={`gd-consent-row required${depositAccepted ? ' checked' : ''}`}
+                  data-testid="guest-booking-deposit-consent-row"
+                  style={{ marginTop: '0.5rem' }}
+                >
                   <input
+                    id="gd-deposit-consent"
                     type="checkbox"
-                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-                    checked={consentAccepted}
-                    onChange={(e) => { setConsentAccepted(e.target.checked); if (e.target.checked) setConsentError(''); }}
-                    aria-invalid={Boolean(consentError)}
-                    data-testid="guest-booking-consent"
-                    tabIndex={-1}
+                    checked={depositAccepted}
+                    onChange={(e) => {
+                      setDepositAccepted(e.target.checked);
+                      if (e.target.checked) setDepositError('');
+                    }}
+                    aria-invalid={Boolean(depositError)}
+                    aria-describedby={depositError ? 'gd-deposit-error' : undefined}
+                    data-testid="guest-booking-deposit-consent"
                   />
+                  <div className="gd-consent-body">
+                    <label htmlFor="gd-deposit-consent">
+                      I understand and accept the refundable security deposit of{' '}
+                      <b>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</b> for this stay.
+                    </label>
+                    <span className="gd-consent-tag">Required · Refundable Deposit Policy</span>
+                  </div>
+                </div>
+                {depositError && (
+                  <div id="gd-deposit-error" className="gd-input-help error" role="alert" style={{ marginTop: '0.25rem' }}>
+                    {depositError}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Native consent controls keep one focus stop per choice and independent policy links. */}
+            <div className="gd-consent">
+              <div ref={consentRowRef} className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`} data-testid="guest-booking-consent-row">
+                <input id="gd-consent" type="checkbox" checked={consentAccepted}
+                  onChange={(e) => { setConsentAccepted(e.target.checked); if (e.target.checked) setConsentError(''); }}
+                  aria-invalid={Boolean(consentError)} aria-describedby={consentError ? 'gd-consent-error' : undefined}
+                  data-testid="guest-booking-consent" />
+                <div className="gd-consent-body">
+                  <label htmlFor="gd-consent">I consent to <b>{consentEntityName}</b> collecting and using my name, phone, and email to process this booking and send booking-related communications.</label>{' '}
+                  <Link to="/privacy" className="gd-consent-link">Privacy Policy</Link>{' '}&amp;{' '}
+                  <Link to="/terms" className="gd-consent-link">Guest Terms</Link>.
+                  <span className="gd-consent-tag">Required · booking &amp; contact · DPDP Act, 2023</span>
                 </div>
               </div>
-              {consentError && <div className="gd-input-help error" role="alert">{consentError}</div>}
-
-              {/* WhatsApp opt-in — TASK-10050: unchecked by default, explicit opt-in required */}
-              <div
-                className={`gd-consent-row${whatsappOptIn ? ' checked' : ''}`}
-                onClick={() => setWhatsappOptIn((v) => !v)}
-                role="checkbox"
-                aria-checked={whatsappOptIn}
-                aria-label="Send my booking updates on WhatsApp"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === ' ' && setWhatsappOptIn((v) => !v)}
-                data-testid="guest-booking-whatsapp-consent-row"
-              >
-                <span className={`gd-check${whatsappOptIn ? ' checked' : ''}`}>
-                  <IconCheck size={14}/>
-                </span>
-                <div className="gd-consent-body">
-                  Send my booking updates on <b>WhatsApp</b> — confirmations, directions, host messages.{' '}
+              {consentError && <div id="gd-consent-error" className="gd-input-help error" role="alert">{consentError}</div>}
+              <div className={`gd-consent-row${whatsappOptIn ? ' checked' : ''}`} data-testid="guest-booking-whatsapp-consent-row">
+                <input id="gd-whatsapp-consent" type="checkbox" checked={whatsappOptIn} onChange={(e) => setWhatsappOptIn(e.target.checked)} data-testid="guest-booking-whatsapp-consent" />
+                <label htmlFor="gd-whatsapp-consent" className="gd-consent-body">Send my booking updates on <b>WhatsApp</b> — confirmations, directions, host messages.{' '}
                   <span style={{ color: 'var(--gd-faint)' }}>(Optional — requires your explicit consent.)</span>
-                </div>
-                <input
-                  type="checkbox"
-                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-                  checked={whatsappOptIn}
-                  onChange={(e) => setWhatsappOptIn(e.target.checked)}
-                  data-testid="guest-booking-whatsapp-consent"
-                  tabIndex={-1}
-                />
+                </label>
               </div>
-
-              {/* Marketing opt-in — optional, separate purpose (TASK-5137) */}
-              <div
-                className={`gd-consent-row${marketingOptIn ? ' checked' : ''}`}
-                onClick={() => setMarketingOptIn((v) => !v)}
-                role="checkbox"
-                aria-checked={marketingOptIn}
-                tabIndex={0}
-                onKeyDown={(e) => e.key === ' ' && setMarketingOptIn((v) => !v)}
-                data-testid="guest-booking-marketing-consent-row"
-              >
-                <span className={`gd-check${marketingOptIn ? ' checked' : ''}`}>
-                  <IconCheck size={14}/>
-                </span>
+              <div className={`gd-consent-row${marketingOptIn ? ' checked' : ''}`} data-testid="guest-booking-marketing-consent-row">
+                <input id="gd-marketing-consent" type="checkbox" checked={marketingOptIn} onChange={(e) => setMarketingOptIn(e.target.checked)} data-testid="guest-booking-marketing-consent" />
+                <label htmlFor="gd-marketing-consent" className="gd-consent-body">Send me promotional offers and deals from <b>{consentEntityName}</b>.{' '}
+                  <span style={{ color: 'var(--gd-faint)' }}>(Optional — you can withdraw anytime from your preferences link.)</span>
+                </label>
+              </div>
+              {/* TASK-1039907: optional ads measurement (Meta). Unticked by default; the label is the API's versioned consent text, word for word. */}
+              <div className={`gd-consent-row${adsMeasurementOptIn ? ' checked' : ''}`} data-testid="guest-booking-ads-measurement-consent-row">
+                <input id="gd-ads-measurement-consent" type="checkbox" checked={adsMeasurementOptIn} onChange={(e) => setAdsMeasurementOptIn(e.target.checked)} data-testid="guest-booking-ads-measurement-consent" />
                 <div className="gd-consent-body">
-                  Send me promotional offers and deals from <b>{consentEntityName}</b>.{' '}
+                  <label htmlFor="gd-ads-measurement-consent" data-testid="guest-booking-ads-measurement-consent-text">
+                    {ADS_MEASUREMENT_CONSENT_SEGMENTS.beforeFirstWho}<b>{resolveAdsMeasurementWho(consentEntityName)}</b>{ADS_MEASUREMENT_CONSENT_SEGMENTS.beforeSecondWho}<b>{resolveAdsMeasurementWho(consentEntityName)}</b>{ADS_MEASUREMENT_CONSENT_SEGMENTS.afterSecondWho}
+                  </label>{' '}
                   <span style={{ color: 'var(--gd-faint)' }}>(Optional — you can withdraw anytime from your preferences link.)</span>
                 </div>
               </div>
             </div>
+
+            {/* PAY-010: UPI_QR / UPI_DEEPLINK host — pay by UPI link / QR, then "I have paid" (host confirms). */}
+            {upiCheckout && (
+              <UpiPaymentPanel
+                order={upiCheckout.order}
+                amountInr={upiCheckout.amountInr}
+                payeeName={getTenantContext()?.displayMerchantName ?? brandName}
+                countdown={countdown}
+                holdActive={holdLive}
+                isMobile={isMobileCheckoutUserAgent(typeof navigator !== 'undefined' ? navigator.userAgent : '')}
+                onIHavePaid={() => void handleUpiIHavePaid()}
+                busy={upiReportBusy}
+                error={upiReportError}
+              />
+            )}
+
+            {/* FOUNDER RULED 2026-10-19: after the FIRST failed payment — "Payment didn't go through" with [Try again]
+                and [Message the host on WhatsApp] (the HOST's number, pre-written; never Atlas's). */}
+            {paymentFailure && !isSubmitting && (
+              <PaymentFailedPanel
+                reasonText={paymentFailure.reasonText}
+                countdown={countdown}
+                holdActive={holdLive}
+                contact={failedPaymentContact}
+                onTryAgain={() => {
+                  setPaymentFailure(null);
+                  // Same hold, same window: handleSubmit reuses a live hold and starts a new one only after the 10 minutes ended.
+                  void handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+                }}
+                variant="details"
+              />
+            )}
 
             {/* Error banners */}
             {serverTotalConfirmRequired && razorpayAmountPaise != null && (
@@ -2085,6 +3346,15 @@ const GuestDetailsPage: React.FC = () => {
                 {displayPrice(displayTotal)}). Tap <b>Pay</b> again to confirm and open payment.
               </div>
             )}
+            {validationSummary && (formErrors.name || formErrors.email || formErrors.phone || consentError || houseRulesError || dormAckError || depositError) && (
+              <div className="gd-banner" role="alert" data-testid="guest-checkout-validation-summary">
+                <IconAlert size={16}/>
+                <div>
+                  <b>Almost there.</b><br/>
+                  <span>{validationSummary}</span>
+                </div>
+              </div>
+            )}
             {orderError && !orderErrorIs409 && (
               <div className="gd-banner" role="alert" data-testid="guest-checkout-order-error">
                 <IconAlert size={16}/>
@@ -2092,44 +3362,35 @@ const GuestDetailsPage: React.FC = () => {
                   <b>
                     {orderError.startsWith('Couldn')
                       ? 'Payment cancelled — no money taken.'
-                      : orderError.startsWith('No money was taken')
-                        ? 'Payment failed — no money taken.'
-                        : isChargedUnconfirmed
-                          ? 'Payment received — we\'re confirming your booking.'
-                          : 'Something went wrong.'}
+                      : isChargedUnconfirmed
+                        ? 'Payment received — we\'re confirming your booking.'
+                        : 'Something went wrong.'}
                   </b><br/>
                   <span>{orderError}</span>
-                  {/* TASK-4537: Show support affordance for both "No money taken" (need to retry)
-                      and charged-unconfirmed (already charged, monitoring for confirmation). */}
-                  {(orderError.startsWith('No money was taken') || isChargedUnconfirmed) && (
+                  {/* TASK-4537: Show a support affordance while a charged-but-unconfirmed payment is monitored.
+                      (The plain "payment failed" case now has its own host-first panel above.) */}
+                  {isChargedUnconfirmed && (
                     <div style={{ marginTop: 12 }} data-testid="payment-failed-support">
                       <p style={{ margin: '0 0 8px', fontSize: 14 }}>
-                        {isChargedUnconfirmed
-                          ? chargedUnconfirmedPollExhausted
-                            ? 'Automatic checks have paused — tap Check again or reach out if you need help.'
-                            : 'We\'re still checking automatically — no need to pay again.'
-                          : 'Need help finishing your booking?'}
+                        {chargedUnconfirmedPollExhausted
+                          ? 'Automatic checks have paused — tap Check again or reach out if you need help.'
+                          : 'We\'re still checking automatically — no need to pay again.'}
                       </p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 16px', alignItems: 'center' }}>
-                        {isChargedUnconfirmed && (
-                          <button
-                            type="button"
-                            className="gd-resume-btn"
-                            onClick={() => { void handleChargedUnconfirmedRecheck(); }}
-                            disabled={chargedUnconfirmedChecking}
-                            data-testid="charged-unconfirmed-recheck"
-                          >
-                            {chargedUnconfirmedChecking ? 'Checking…' : 'Check again'}
-                          </button>
-                        )}
-                        {!isChargedUnconfirmed && razorpayOrderId && (
-                          <button type="button" className="gd-resume-btn" onClick={handleResume}>
-                            Resume payment
-                          </button>
-                        )}
-                        <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
-                          <IconWhatsApp size={14} /> WhatsApp us
-                        </a>
+                        <button
+                          type="button"
+                          className="gd-resume-btn"
+                          onClick={() => { void handleChargedUnconfirmedRecheck(); }}
+                          disabled={chargedUnconfirmedChecking}
+                          data-testid="charged-unconfirmed-recheck"
+                        >
+                          {chargedUnconfirmedChecking ? 'Checking…' : 'Check again'}
+                        </button>
+                        {paymentFailureWhatsAppUrl ? (
+                          <a href={paymentFailureWhatsAppUrl} target="_blank" rel="noopener noreferrer">
+                            <IconWhatsApp size={14} /> WhatsApp us
+                          </a>
+                        ) : null}
                         <a href={paymentFailureTelLink}>Call {formatDisplayNumber()}</a>
                         <a href={paymentFailureMailto}>Email {paymentFailureEmail}</a>
                       </div>
@@ -2144,7 +3405,7 @@ const GuestDetailsPage: React.FC = () => {
               <div className="gd-banner" role="alert">
                 <IconAlert size={16}/>
                 <div>
-                  <b>Someone else just booked these dates.</b><br/>
+                  <b>{orderErrorHeading || 'Sorry, these dates were just booked.'}</b><br/>
                   <span>{orderError}</span>
                   <div style={{ marginTop: 10 }}>
                     <button type="button" className="gd-modal-cta" style={{ marginTop: 0 }} onClick={handleBackToProperty}>
@@ -2162,7 +3423,7 @@ const GuestDetailsPage: React.FC = () => {
                 <div>
                   <b style={{ color: 'var(--gd-ink)' }}>Payment cancelled — no money taken.</b><br/>
                   Your dates are still held for{' '}
-                  <b style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--gd-coral)', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}>{countdown}</b>.
+                  <b style={{ fontFamily: 'ui-monospace, monospace', color: 'var(--gd-accent-text)', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.04em' }}>{countdown}</b>.
                   {' '}Ready to try again?
                   {razorpayOrderId && (
                     <span>
@@ -2176,15 +3437,11 @@ const GuestDetailsPage: React.FC = () => {
             )}
           </form>
 
-          {/* Pay rail (mobile only — desktop in aside) */}
-          <div className="gd-pay-rail gd-pay-rail--mobile">
-            <span className="gd-pay-rail-label">Pay with</span>
-            <span className="gd-pay-mark">UPI</span>
-            <span className="gd-pay-mark">VISA</span>
-            <span className="gd-pay-mark">RuPay</span>
-            <span className="gd-pay-mark">Net banking</span>
-            <span className="gd-pay-mark razorpay">Razorpay</span>
-          </div>
+          {/* Pay rail (mobile only — desktop in aside). Gated on the online rail:
+              never on the TASK-8048 WhatsApp-handoff branch. */}
+          {hasOnlineRail && (
+            <GuestCheckoutPaymentBadges className="gd-pay-rail--mobile" />
+          )}
 
           {/* Security badges (mobile only — desktop in aside). Gated on the online rail:
               never on the TASK-8048 WhatsApp-handoff branch. */}
@@ -2192,6 +3449,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (mobile only — desktop in aside) */}
           <TrustBand
+            feeCopy={paymentFeeCopy(priceBreakdown?.paymentFeeDisplay ?? { percent: null, amount: priceBreakdown?.convenienceFeeAmount })}
             freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
@@ -2202,13 +3460,22 @@ const GuestDetailsPage: React.FC = () => {
         {/* ── Right: sticky aside ── */}
         <aside className="gd-aside">
           {/* Hold chip in aside */}
-          <div className="gd-hold-chip">
-            <div className="gd-hold-chip-clock">{countdown}</div>
-            <div className="gd-hold-chip-text">
-              <b>Dates held</b><br/>
-              Finish to confirm
+          {holdLive ? (
+            <div className="gd-hold-chip">
+              <div className="gd-hold-chip-clock">{countdown}</div>
+              <div className="gd-hold-chip-text">
+                <b>Dates held</b><br/>
+                Finish to confirm
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="gd-hold-chip" data-testid="aside-no-hold-chip">
+              <div className="gd-hold-chip-text">
+                <b>Nothing is held yet</b><br/>
+                We hold your dates for {CHECKOUT_HOLD_MINUTES} minutes when you tap Pay
+              </div>
+            </div>
+          )}
 
           {/* Aside recap */}
           <div className="gd-aside-recap">
@@ -2216,7 +3483,7 @@ const GuestDetailsPage: React.FC = () => {
               <div className="gd-aside-thumb-id">{brandInitial}</div>
             </div>
             <div>
-              <h4 className="gd-aside-stay-name">{propertyName}{unitName ? ` · ${unitName}` : ''}</h4>
+              <h4 className="gd-aside-stay-name">{propertyName}{distinctUnitName ? ` · ${distinctUnitName}` : ''}</h4>
               <div className="gd-aside-stay-dates">
                 {checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : ''} · {booking.guests ?? 1} guest{(booking.guests ?? 1) !== 1 ? 's' : ''}
               </div>
@@ -2225,15 +3492,63 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Price block */}
           <div className="gd-price-rows">
+            {/* TASK-1039948 / TASK-10299208: Direct booking pricing tier public display (plain words only, never internal plan names) */}
+            {(booking.ratePlanMealPlan || booking.ratePlanCancellationPolicy) && (
+              <div style={{ marginBottom: 6 }}>
+                <PricingTierDisplay
+                  ratePlanName={null}
+                  mealPlanLabel={booking.ratePlanMealPlan}
+                  cancellationPolicy={booking.ratePlanCancellationPolicy || freeCancellationCopy?.deadlineFormatted}
+                  isCompact
+                />
+              </div>
+            )}
             <div className="gd-price-row" data-testid="price-line-base">
               <div className="desc">
-                <span>
-                  {nights > 0 && perNight > 0
-                    ? `${displayPrice(perNight)} × ${nights} ${nights === 1 ? 'night' : 'nights'}`
-                    : 'Accommodation'}
+                <span style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                  {originalNightlyRateForStrike != null && (
+                    <del
+                      data-testid="checkout-original-nightly-rate"
+                      style={{ color: 'var(--gd-faint, #8b7b70)', fontWeight: 400 }}
+                    >
+                      {displayPrice(originalNightlyRateForStrike)}
+                    </del>
+                  )}
+                  <span>
+                    {nights > 0 && displayedPerNight > 0
+                      ? `${displayPrice(displayedPerNight)} × ${nights} ${nights === 1 ? 'night' : 'nights'}`
+                      : 'Accommodation'}
+                  </span>
+                  {reconciledIntoBaseAmount > 0 && (
+                    <FeeInfoTip
+                      fee="rateAdjustment"
+                      label="Accommodation rate details"
+                      testId="fee-info-rate-adjustment"
+                    />
+                  )}
                 </span>
+                {checkoutDealBadgeLabel && (
+                  <small>
+                    <span
+                      data-testid="checkout-deal-badge"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        marginTop: 2,
+                        padding: '1px 7px',
+                        borderRadius: 999,
+                        background: 'var(--gd-success-bg, #ecfdf5)',
+                        color: 'var(--gd-success, #047857)',
+                        fontWeight: 600,
+                        fontSize: 11,
+                      }}
+                    >
+                      {checkoutDealBadgeLabel}
+                    </span>
+                  </small>
+                )}
               </div>
-              <span className="num">{displayPrice(baseAmount)}</span>
+              <span className="num">{displayPrice(effectiveBaseAmount)}</span>
             </div>
             {cleaningFeeAmount > 0 && (
               <div className="gd-price-row" data-testid="cleaning-fee-row">
@@ -2243,6 +3558,42 @@ const GuestDetailsPage: React.FC = () => {
                   <FeeInfoTip fee="cleaning" label="Cleaning fee" testId="fee-info-cleaning" />
                 </span>
                 <span className="num">{displayPrice(cleaningFeeAmount)}</span>
+              </div>
+            )}
+            {breakfastExtraAmount > 0 && (
+              <div className="gd-price-row" data-testid="breakfast-extra-row">
+                <span>
+                  Breakfast ({stayGuestCount} {stayGuestCount === 1 ? 'guest' : 'guests'} × {nights} {nights === 1 ? 'night' : 'nights'})
+                </span>
+                <span className="num">{displayPrice(breakfastExtraAmount)}</span>
+              </div>
+            )}
+            {petFeeRow && (
+              <div className="gd-price-row" data-testid="price-breakdown-pet-fee">
+                <span>{petFeeRow.label}</span>
+                <span className="num">{displayPrice(petFeeRow.amount)}</span>
+              </div>
+            )}
+            {extraGuestFeeRow && (
+              <div className="gd-price-row" data-testid="extra-guest-fee-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {extraGuestFeeRow.label}
+                  <FeeInfoTip fee="extraGuest" label={extraGuestFeeRow.label} testId="fee-info-extra-guest" />
+                </span>
+                <span className="num">{displayPrice(extraGuestFeeRow.amount)}</span>
+              </div>
+            )}
+            {weekendAdjustmentRow && (
+              <div className="gd-price-row" data-testid="weekend-adjustment-row">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {weekendAdjustmentRow.label}
+                  <FeeInfoTip
+                    fee="weekendAdjustment"
+                    label={weekendAdjustmentRow.label}
+                    testId="fee-info-weekend-adjustment"
+                  />
+                </span>
+                <span className="num">{displayPrice(weekendAdjustmentRow.amount)}</span>
               </div>
             )}
             {addOnsTotal > 0 && (
@@ -2257,8 +3608,14 @@ const GuestDetailsPage: React.FC = () => {
             )}
             {confirmedPromoDiscount > 0 && (
               <div className="gd-price-row save" data-testid="promo-confirmed-row">
-                <span>Promo{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}</span>
-                <span className="num">−{displayPrice(confirmedPromoDiscount)}</span>
+                <span>Promo discount{appliedPromoCode ? ` · ${appliedPromoCode}` : ''}</span>
+                <span className="num">−{displayPrice(promoRowAmount)}</span>
+              </div>
+            )}
+            {promoFeeShrink > 0 && (
+              <div className="gd-price-row save" data-testid="promo-fee-shrink-row">
+                <span>Fee and tax on the lower price</span>
+                <span className="num">−{displayPrice(promoFeeShrink)}</span>
               </div>
             )}
             {referralDiscountAmount > 0 && (
@@ -2277,7 +3634,7 @@ const GuestDetailsPage: React.FC = () => {
                 <span className="num">{displayPrice(touristTaxAmount)}</span>
               </div>
             )}
-            {convenienceFeeAmount > 0 && (
+            {displayedFeeAmount > 0 && (
               <div className="gd-price-row" title="Razorpay payment gateway fee — passed through, not a platform markup.">
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                   Payment processing
@@ -2285,7 +3642,15 @@ const GuestDetailsPage: React.FC = () => {
                       The row `title` is kept as a native-hover fallback. */}
                   <FeeInfoTip fee="paymentProcessing" label="Payment processing" testId="fee-info-payment-processing" />
                 </span>
-                <span className="num">{displayPrice(convenienceFeeAmount)}</span>
+                <span className="num">{displayPrice(displayedFeeAmount)}</span>
+              </div>
+            )}
+            {/* GUEST-049 / TASK-102392: positive discount row only — negative variances are itemized
+                above or reconciled into the accommodation rate so "Other charges" never appears. */}
+            {discountRow && (
+              <div className="gd-price-row save" data-testid="price-line-discount-plug">
+                <span>{discountRow.label}</span>
+                <span className="num">−{displayPrice(discountRow.amount)}</span>
               </div>
             )}
           </div>
@@ -2293,12 +3658,41 @@ const GuestDetailsPage: React.FC = () => {
           <div className="gd-price-total">
             <span className="label">Total</span>
             <div style={{ textAlign: 'right' }}>
-              <div className="num">{displayPrice(displayTotal)}</div>
+              <div className="num" data-testid="checkout-total-amount">{checkoutPriceKnown ? displayPrice(displayTotal) : '—'}</div>
               <small className="num-sub" data-testid="checkout-total-gst-note">
                 INR
               </small>
             </div>
           </div>
+
+          {/* PAY-006 / TASK-1039977: Refundable security deposit breakdown line in aside */}
+          {depositRequired && (
+            <div
+              className="gd-deposit-recap"
+              data-testid="security-deposit-breakdown"
+              style={{
+                marginTop: '0.75rem',
+                marginBottom: '0.75rem',
+                padding: '0.625rem 0.75rem',
+                borderRadius: '0.5rem',
+                background: 'var(--gd-surface-muted, #f8fafc)',
+                border: '1px solid var(--gd-line, #e2e8f0)',
+                fontSize: '0.85rem',
+                color: 'var(--gd-ink-soft, #475569)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, color: 'var(--gd-ink, #0f172a)' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  Refundable security deposit
+                  <FeeInfoTip fee="securityDeposit" label="Refundable security deposit" testId="fee-info-security-deposit" />
+                </span>
+                <span>{displayPrice(effectiveSecurityDepositAmount ?? 0)}</span>
+              </div>
+              <div style={{ marginTop: '0.25rem', fontSize: '0.78rem', color: 'var(--gd-ink-faint, #64748b)' }}>
+                Held separately per host policy · Refundable upon checkout inspection
+              </div>
+            </div>
+          )}
 
           {/* TASK-4161: Consumer Protection (E-Commerce) Rules 2020 — Razorpay on-behalf-of
               disclosure for white-label / custom-domain tenants only. */}
@@ -2324,15 +3718,32 @@ const GuestDetailsPage: React.FC = () => {
               >
                 {isSubmitting
                   ? <><IconSpinner size={16}/> Securing your booking…</>
-                  : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
+                  : checkoutPriceKnown
+                    ? <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
+                    : <><IconLock size={14}/> Pay to confirm</>
                 }
               </button>
+              {quoteRefusedMessage != null && (
+                <div className="gd-pay-microcopy" role="alert" data-testid="checkout-pricing-not-configured">
+                  {quoteRefusedMessage}
+                </div>
+              )}
 
               {/* Pay microcopy */}
-              {!consentAccepted && (
-                <div className="gd-pay-microcopy">Tick the consent box to enable payment.</div>
+              {!readyToPay && (
+                <div className="gd-pay-microcopy">
+                  {dormAckRequired && !dormAckAccepted
+                    ? 'Confirm the dorm rule and tick the consent box to enable payment.'
+                    : depositRequired && !depositAccepted
+                      ? 'Tick the refundable security deposit agreement to enable payment.'
+                      : houseRulesRequired && !houseRulesAccepted && !consentAccepted
+                        ? 'Tick the house rules and the consent box to enable payment.'
+                        : houseRulesRequired && !houseRulesAccepted
+                          ? 'Tick the house rules to enable payment.'
+                          : 'Tick the consent box to enable payment.'}
+                </div>
               )}
-              {consentAccepted && (
+              {readyToPay && checkoutPriceKnown && (
                 <div className="gd-pay-microcopy">
                   You'll be charged <b>{displayPrice(chargeInr)}</b> now to confirm.
                   {freeCancellationCopy?.deadlineFormatted
@@ -2356,44 +3767,114 @@ const GuestDetailsPage: React.FC = () => {
               )}
 
               {/* Pay rail (desktop) */}
-              <div className="gd-pay-rail">
-                <span className="gd-pay-rail-label">Pay with</span>
-                <span className="gd-pay-mark">UPI</span>
-                <span className="gd-pay-mark">VISA</span>
-                <span className="gd-pay-mark">RuPay</span>
-                <span className="gd-pay-mark">Net banking</span>
-                <span className="gd-pay-mark razorpay">Razorpay</span>
-              </div>
+              <GuestCheckoutPaymentBadges />
 
               {/* Security badges — gated on the online rail: never rendered on the
                   TASK-8048 WhatsApp-handoff branch where there is no gateway to claim. */}
               <SecurityBadges />
             </>
+          ) : notTakingBookings ? (
+            <>
+              <div className="gd-banner" role="status" data-testid="guest-not-taking-bookings-notice">
+                <IconAlert size={16}/>
+                <div>
+                  <b>{NOT_TAKING_BOOKINGS_COPY}</b><br/>
+                  <span>Checkout is currently disabled for this property.</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="gd-pay"
+                disabled
+                data-testid="guest-booking-disabled-cta"
+              >
+                Not taking bookings right now
+              </button>
+            </>
           ) : (
             <>
-              <div className="gd-banner" role="status" data-testid="guest-booking-offline-notice">
+              <div className="gd-banner" role={hostOffline ? 'alert' : 'status'} data-testid="guest-booking-offline-notice">
                 <IconWhatsApp size={16}/>
                 <div>
                   <b>Online payment is not available for this property.</b><br/>
-                  <span>Contact the host on WhatsApp to confirm your dates — your hold is reserved for {countdown}.</span>
+                  <span>
+                    Online payment is currently not enabled for this property.{' '}
+                    {whatsappHandoffUrl
+                      ? 'Contact the host on WhatsApp to confirm your dates.'
+                      : hostDirectPhoneLink
+                        ? 'Contact the host directly by phone to confirm your dates.'
+                        : 'Please contact the host directly to make a reservation.'}
+                  </span>
+                  {trialPayAtProperty && (
+                    <div data-testid="guest-trial-pay-at-property-notice" style={{ marginTop: 4 }}>
+                      {TRIAL_PAY_AT_PROPERTY_COPY}
+                    </div>
+                  )}
                 </div>
               </div>
-              <a
-                href={whatsappHandoffUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="gd-pay"
-                style={{ textDecoration: 'none' }}
-                data-testid="guest-booking-whatsapp-cta"
-              >
-                <IconWhatsApp size={16}/> WhatsApp host to confirm
-              </a>
-              <div className="gd-pay-microcopy">You'll be connected directly to the host — no payment taken on this site.</div>
+              {whatsappHandoffUrl ? (
+                <>
+                  <a
+                    href={whatsappHandoffUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="gd-pay"
+                    style={{ textDecoration: 'none' }}
+                    data-testid="guest-booking-whatsapp-cta"
+                    aria-label="Contact Host via WhatsApp / Request to Book"
+                  >
+                    <IconWhatsApp size={16}/> Contact Host via WhatsApp · Request to Book
+                    <span className="sr-only"> (WhatsApp host to confirm)</span>
+                  </a>
+                  <div className="gd-pay-microcopy">You'll be connected directly to the host — no payment taken on this site.</div>
+                </>
+              ) : hostDirectPhoneLink ? (
+                <>
+                  <a
+                    href={hostDirectPhoneLink}
+                    className="gd-pay"
+                    style={{ textDecoration: 'none' }}
+                    data-testid="guest-booking-phone-cta"
+                    aria-label="Contact Host / Request to Book"
+                  >
+                    <IconPhone size={16}/> Contact Host (Call) · Request to Book
+                  </a>
+                  <div className="gd-pay-microcopy">
+                    Call the host directly to request your booking — no online payment required.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <a
+                    href={getContactEmail() ? `mailto:${getContactEmail()}?subject=${encodeURIComponent(`Request to Book: ${propertyName || 'Property'}`)}` : '/contact'}
+                    className="gd-pay"
+                    style={{ textDecoration: 'none' }}
+                    data-testid="guest-booking-request-cta"
+                    aria-label="Request to Book"
+                  >
+                    Request to Book
+                  </a>
+                  <div className="gd-pay-microcopy" data-testid="guest-booking-no-host-number">
+                    Please contact the host directly to make a reservation.
+                  </div>
+                </>
+              )}
             </>
           )}
 
+          {/* GUEST-024: Cancellation policy milestone timeline in checkout summary */}
+          <CancellationMilestoneTimeline
+            checkInDate={booking.checkIn}
+            cancellationTier={booking.holdCancellationTier}
+            windowHoursOverride={booking.holdCancellationWindowHours}
+            graceHours={booking.holdGraceHours}
+            refundFreeUntilUtc={booking.holdRefundFreeUntilUtc}
+            className="mb-4"
+          />
+
           {/* Trust band (desktop) */}
           <TrustBand
+            feeCopy={paymentFeeCopy(priceBreakdown?.paymentFeeDisplay ?? { percent: null, amount: priceBreakdown?.convenienceFeeAmount })}
             freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
@@ -2402,28 +3883,41 @@ const GuestDetailsPage: React.FC = () => {
       </main>
 
       {/* ── Mobile sticky bottom bar — TASK-8048: offline tenants show WhatsApp CTA, not a pay rail. */}
-      <div className="gd-mobile-bar">
-        <div className="gd-mobile-bar-clock">
-          <b>{countdown}</b>
-          <small>Held</small>
-        </div>
+      <div className="gd-mobile-bar" ref={setMobileBarEl}>
+        {holdLive && (
+          <div className="gd-mobile-bar-clock">
+            <b>{countdown}</b>
+            <small>Held</small>
+          </div>
+        )}
         {hasOnlineRail ? (
           <button
-            type={consentAccepted ? 'submit' : 'button'}
+            type={readyToPay ? 'submit' : 'button'}
             form="gd-details-form"
             className="gd-mobile-bar-cta"
-            disabled={isSubmitting || holdExpired}
-            onClick={consentAccepted ? undefined : scrollToConsent}
+            disabled={isSubmitting || quoteRefusedMessage != null}
+            onClick={readyToPay ? undefined : scrollToConsent}
             data-testid="guest-booking-submit-mobile"
           >
             {isSubmitting
               ? <><IconSpinner size={14}/> Securing…</>
-              : serverTotalConfirmRequired
-                ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
-                : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
+              : !checkoutPriceKnown
+                ? <><IconLock size={14}/> Pay</>
+                : serverTotalConfirmRequired
+                  ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
+                  : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
             }
           </button>
-        ) : (
+        ) : notTakingBookings ? (
+          <button
+            type="button"
+            className="gd-mobile-bar-cta"
+            disabled
+            data-testid="guest-booking-disabled-cta-mobile"
+          >
+            Not taking bookings right now
+          </button>
+        ) : whatsappHandoffUrl ? (
           <a
             href={whatsappHandoffUrl}
             target="_blank"
@@ -2431,8 +3925,29 @@ const GuestDetailsPage: React.FC = () => {
             className="gd-mobile-bar-cta"
             style={{ textDecoration: 'none' }}
             data-testid="guest-booking-whatsapp-cta-mobile"
+            aria-label="Contact Host via WhatsApp / Request to Book"
           >
-            <IconWhatsApp size={14}/> WhatsApp host
+            <IconWhatsApp size={14}/> Contact Host via WhatsApp · Request to Book
+          </a>
+        ) : hostDirectPhoneLink ? (
+          <a
+            href={hostDirectPhoneLink}
+            className="gd-mobile-bar-cta"
+            style={{ textDecoration: 'none' }}
+            data-testid="guest-booking-phone-cta-mobile"
+            aria-label="Contact Host / Request to Book"
+          >
+            <IconPhone size={14}/> Request to Book (Call)
+          </a>
+        ) : (
+          <a
+            href={getContactEmail() ? `mailto:${getContactEmail()}?subject=${encodeURIComponent(`Request to Book: ${propertyName || 'Property'}`)}` : '/contact'}
+            className="gd-mobile-bar-cta"
+            style={{ textDecoration: 'none' }}
+            data-testid="guest-booking-no-host-number-mobile"
+            aria-label="Request to Book"
+          >
+            Request to Book
           </a>
         )}
       </div>
@@ -2444,12 +3959,13 @@ const GuestDetailsPage: React.FC = () => {
 
 // ── TrustBand atom ────────────────────────────────────────────────────────────
 interface TrustBandProps {
+  feeCopy: string;
   freeCancellationCopy: FreeCancellationTrustCopy | null;
   brandName: string;
   whatsappNumber: string;
   className?: string;
 }
-const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, whatsappNumber, className }) => (
+const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, whatsappNumber, className, feeCopy }) => (
   <div className={`gd-trust${className ? ` ${className}` : ''}`}>
     <div className="gd-trust-row">
       <IconCheck size={14}/>
@@ -2482,31 +3998,34 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
     </div>
     <div className="gd-trust-row">
       <IconLock size={14}/>
-      {/* TASK-7428: Razorpay / 3% copy only when an online payment provider is configured. */}
+      {/* TASK-7428: Payment copy only when an online payment provider is configured. */}
       <span>
         {hasOnlinePaymentRail()
-          ? <>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · 3% payment processing at checkout</>
+          ? <>Direct booking · secure payment via Razorpay · <b>no OTA fee</b> · {feeCopy}</>
           : <>Direct booking with the host · <b>no OTA fee</b></>}
       </span>
     </div>
-    {whatsappNumber && (
-      <div className="gd-trust-row">
-        <span style={{ color: '#25D366' }}><IconWhatsApp size={14}/></span>
-        <span>
-          Stuck?{' '}
-          <a
-            // TASK-4294/TASK-4300: use the canonical contact helpers — getWhatsAppLink() carries
-            // the 91 country code and formatDisplayNumber() shows "+91-…", instead of the raw
-            // tenant whatsappBookingPhone (no +, no country code, wrong number on the marketplace).
-            href={getWhatsAppLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            WhatsApp {brandName} on {formatDisplayNumber()}
-          </a>
-        </span>
-      </div>
-    )}
+    {(() => {
+      const digits = (whatsappNumber || '').replace(/\D/g, '');
+      if (!digits) return null;
+      const fullDigits = digits.length === 10 ? `91${digits}` : digits;
+      const prefill = encodeURIComponent(`Hi ${brandName}, I need help with my booking.`);
+      return (
+        <div className="gd-trust-row">
+          <span style={{ color: '#25D366' }}><IconWhatsApp size={14}/></span>
+          <span>
+            Stuck?{' '}
+            <a
+              href={`https://wa.me/${fullDigits}?text=${prefill}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              WhatsApp {brandName} on {formatDisplayNumber()}
+            </a>
+          </span>
+        </div>
+      );
+    })()}
   </div>
 );
 
@@ -2542,8 +4061,9 @@ const gdStyles = `
   --gd-peach: #f5c8b0;
   --gd-line: rgba(59, 31, 30, 0.12);
   --gd-line-strong: rgba(59, 31, 30, 0.20);
-  --gd-coral: #c04528;
-  --gd-coral-dark: #a83c22;
+  --gd-coral: var(--cta-primary, #c04528);
+  --gd-accent-text: #a83c22;
+  --gd-coral-dark: var(--cta-primary-hover, #a83c22);
   --gd-amber: #d4724e;
   --gd-success: #157046;
   --gd-success-bg: #e9f5ef;
@@ -2641,7 +4161,7 @@ const gdStyles = `
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-weight: 700;
   font-size: 13.5px;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
@@ -2679,7 +4199,7 @@ const gdStyles = `
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 16px;
   font-weight: 700;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
   flex-shrink: 0;
@@ -2716,13 +4236,14 @@ const gdStyles = `
   width: 44px; height: 44px;
   border-radius: 12px;
   background: var(--gd-peach);
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
 }
 .gd-modal h3 {
+  color: var(--gd-ink);
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500;
   font-size: 24px;
@@ -2740,7 +4261,7 @@ const gdStyles = `
   display: block;
   width: 100%;
   background: var(--gd-coral);
-  color: #fff;
+  color: var(--text-on-cta, #fff);
   border: 0;
   border-radius: 12px;
   padding: 14px 18px;
@@ -2859,7 +4380,7 @@ const gdStyles = `
   gap: 8px;
 }
 .gd-recap-edit-link {
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-weight: 600;
   text-decoration: none;
   font-size: 12px;
@@ -2881,6 +4402,7 @@ const gdStyles = `
   margin-bottom: 14px;
 }
 .gd-fset-head h3 {
+  color: var(--gd-ink);
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500;
   font-size: 22px;
@@ -2918,10 +4440,10 @@ const gdStyles = `
 }
 .gd-input::placeholder { color: #aaa097; }
 .gd-input:focus {
-  border-color: var(--gd-coral);
+  border-color: var(--gd-accent-text);
   box-shadow: 0 0 0 4px rgba(196, 90, 63,0.12);
 }
-.gd-input--error { border-color: var(--gd-coral) !important; }
+.gd-input--error { border-color: var(--gd-danger) !important; }
 .gd-input-help {
   font-size: 11.5px;
   color: var(--gd-faint);
@@ -2934,7 +4456,7 @@ const gdStyles = `
 /* Phone row */
 .gd-row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; }
 .gd-input--error-wrap .gd-dial select,
-.gd-input--error-wrap .gd-input { border-color: var(--gd-coral); }
+.gd-input--error-wrap .gd-input { border-color: var(--gd-accent-text); }
 
 .gd-dial { position: relative; }
 .gd-dial select {
@@ -2954,7 +4476,7 @@ const gdStyles = `
   box-sizing: border-box;
 }
 .gd-dial select:focus {
-  border-color: var(--gd-coral);
+  border-color: var(--gd-accent-text);
   box-shadow: 0 0 0 4px rgba(196, 90, 63,0.12);
 }
 .gd-dial::after {
@@ -3014,7 +4536,7 @@ const gdStyles = `
 /* Pill badge */
 .gd-pill {
   background: var(--gd-peach);
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-size: 11px;
   font-weight: 700;
   padding: 3px 8px;
@@ -3161,7 +4683,7 @@ const gdStyles = `
 .gd-check.checked {
   background: var(--gd-coral);
   border-color: var(--gd-coral);
-  color: #fff;
+  color: var(--text-on-cta, #fff);
 }
 .gd-check svg { opacity: 0; }
 .gd-check.checked svg { opacity: 1; }
@@ -3184,7 +4706,10 @@ const gdStyles = `
   transition: border-color .18s ease;
   position: relative;
 }
-.gd-consent-row.required { border-color: var(--gd-coral); background: #fff8f2; }
+.gd-consent-row input { width: 22px; height: 22px; accent-color: var(--gd-coral); cursor: pointer; }
+.gd-consent-row label { cursor: pointer; display: inline-block; min-height: 44px; align-content: center; }
+.gd-consent-row:focus-within { outline: 2px solid var(--gd-ink); outline-offset: 3px; }
+.gd-consent-row.required { border-color: var(--gd-accent-text); background: #fff8f2; }
 .gd-consent-row.checked { border-color: var(--gd-success); background: var(--gd-success-bg); }
 .gd-consent-flash { animation: gd-consent-flash 1.2s ease-out; }
 @keyframes gd-consent-flash {
@@ -3194,13 +4719,13 @@ const gdStyles = `
 }
 .gd-consent-body { font-size: 13px; color: var(--gd-ink-soft); line-height: 1.5; }
 .gd-consent-body b { color: var(--gd-ink); font-weight: 600; }
-.gd-consent-link { color: var(--gd-coral); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.gd-consent-link { color: var(--gd-accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .gd-consent-tag {
   display: inline-flex;
   align-items: center;
   font-size: 10px;
   font-weight: 700;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-left: 6px;
@@ -3215,9 +4740,15 @@ const gdStyles = `
   padding: 22px;
   box-shadow: 0 12px 28px rgba(26,26,46,0.07), 0 4px 12px rgba(26,26,46,0.04);
   position: sticky;
-  top: 24px;
+  /* The site navbar is position:fixed (116px, measured live into --measured-nav-height). A bare 24px stuck the aside UNDER it,
+     so the Pay button could sit behind the navbar where a tap landed on the navbar and did nothing. */
+  top: calc(var(--measured-nav-height, var(--nav-height, 116px)) + 16px);
 }
 @media (min-width: 1024px) { .gd-aside { display: block; } }
+/* Anything the page scrolls or focuses (keyboard Tab, scrollIntoView after a failed check) lands BELOW the fixed navbar, never behind it. */
+.gd-page :is(.gd-pay, .gd-consent-row, input, select, textarea, button, [tabindex="-1"]) {
+  scroll-margin-top: calc(var(--measured-nav-height, var(--nav-height, 116px)) + 16px);
+}
 
 .gd-aside-recap {
   display: grid;
@@ -3247,6 +4778,7 @@ const gdStyles = `
   line-height: 1;
 }
 .gd-aside-stay-name {
+  color: var(--gd-ink);
   font-family: "Cormorant Garamond", "Georgia", serif;
   font-weight: 500;
   font-size: 17px;
@@ -3302,7 +4834,7 @@ const gdStyles = `
   letter-spacing: 0.02em;
 }
 
-/* Pay CTA */
+/* Pay CTA — use tenant fill/label together; neutral body and error text stay readable. */
 .gd-pay {
   display: flex;
   align-items: center;
@@ -3311,7 +4843,7 @@ const gdStyles = `
   width: 100%;
   margin-top: 20px;
   background: var(--gd-coral);
-  color: #fff;
+  color: var(--text-on-cta, #fff);
   border: 0;
   border-radius: 14px;
   padding: 16px 20px;
@@ -3324,7 +4856,7 @@ const gdStyles = `
   transition: all .2s ease;
 }
 .gd-pay:hover:not(:disabled) { background: var(--gd-coral-dark); }
-.gd-pay[disabled] { background: #d4c6b8; color: #fff; cursor: not-allowed; box-shadow: none; }
+.gd-pay[disabled] { background: #d4c6b8; color: #493a32; cursor: not-allowed; box-shadow: none; }
 .gd-pay .num { font-variant-numeric: tabular-nums; }
 .gd-pay-microcopy {
   margin-top: 12px;
@@ -3354,7 +4886,7 @@ const gdStyles = `
 }
 .gd-trust-row svg { color: var(--gd-success); flex-shrink: 0; margin-top: 2px; }
 .gd-trust-row b { color: var(--gd-ink); font-weight: 600; }
-.gd-trust-row a { color: var(--gd-coral); font-weight: 600; text-decoration: none; }
+.gd-trust-row a { color: var(--gd-accent-text); font-weight: 600; text-decoration: none; }
 .gd-trust--mobile { display: none; }
 @media (max-width: 1023px) { .gd-trust--mobile { display: grid; } }
 
@@ -3371,7 +4903,7 @@ const gdStyles = `
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #94755b;
+  color: #765b45;
 }
 .gd-sec-row {
   display: flex;
@@ -3415,7 +4947,13 @@ const gdStyles = `
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #94755b;
+  color: #765b45;
+}
+.gd-pay-rail-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 .gd-pay-mark {
   display: inline-flex;
@@ -3431,6 +4969,16 @@ const gdStyles = `
   letter-spacing: 0.04em;
 }
 .gd-pay-mark.razorpay { color: #072654; }
+.gd-pay-mark--upi { color: #5f259f; font-weight: 800; }
+.gd-pay-mark--gpay { color: #1a73e8; }
+.gd-pay-mark--phonepe { color: #5f259f; }
+.gd-pay-mark--paytm { color: #002e6e; }
+.gd-pay-mark--bhim { color: #00796b; }
+.gd-pay-mark--cards { color: #4a5568; }
+.gd-pay-mark--visa { color: #1a1f71; }
+.gd-pay-mark--mastercard { color: #eb001b; }
+.gd-pay-mark--rupay { color: #097939; }
+.gd-pay-mark--netbanking { color: #2d3748; }
 .gd-pay-rail--mobile { display: flex; }
 @media (min-width: 1024px) { .gd-pay-rail--mobile { display: none; } }
 
@@ -3453,11 +5001,52 @@ const gdStyles = `
 .gd-banner b { color: #6b1e1a; font-weight: 700; }
 .gd-banner a { color: var(--gd-danger); font-weight: 600; text-decoration: underline; }
 
+/* Founder ruling 2026-10-19: house rules card (required tick before Pay) */
+.gd-rules {
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid var(--gd-line-strong);
+  border-radius: 14px;
+  background: #fff;
+  display: grid;
+  gap: 10px;
+}
+.gd-rules-title { margin: 0; font-size: 15px; font-weight: 700; color: var(--gd-ink); }
+.gd-rules-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.gd-rules-chip {
+  font-size: 12.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--gd-line-strong); color: var(--gd-ink-soft); background: var(--gd-ivory);
+}
+.gd-rules-chip--no { color: #8a2a17; background: #fff1ec; border-color: #f1c2b3; }
+.gd-rules-chip--ok { color: var(--gd-success); background: var(--gd-success-bg); border-color: var(--gd-success-border); }
+.gd-rules-text { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--gd-ink-soft); white-space: pre-line; }
+.gd-rules-more { background: none; border: none; padding: 0; color: var(--gd-accent-text); font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: underline; }
+.gd-rules-pdf { margin: 0; font-size: 13px; }
+.gd-rules-pdf a { color: var(--gd-accent-text); font-weight: 600; }
+.gd-rules .gd-consent-row { margin-top: 2px; }
+
+/* Founder ruling 2026-10-19: "Payment didn't go through" panel (Try again + message the host) */
+.gd-banner.gd-fail { grid-template-columns: 1fr; padding: 16px; }
+.gd-fail-title { display: block; font-size: 16px; margin-bottom: 2px; }
+.gd-fail-sub, .gd-fail-hold, .gd-fail-note { display: block; }
+.gd-fail-hold { margin-top: 4px; font-weight: 600; }
+.gd-fail-note { margin-top: 8px; font-size: 12px; color: var(--gd-muted); }
+.gd-fail-actions { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.gd-fail-try {
+  min-height: 44px; padding: 0 20px; border-radius: 10px; border: none; cursor: pointer;
+  background: var(--gd-coral); color: #fff; font-weight: 700; font-size: 14px;
+}
+.gd-fail-try:disabled { opacity: .6; cursor: default; }
+.gd-banner a.gd-fail-host {
+  min-height: 44px; padding: 0 18px; border-radius: 10px; display: inline-flex; align-items: center;
+  border: 1.5px solid var(--gd-ink); color: var(--gd-ink); background: #fff; text-decoration: none; font-weight: 700; font-size: 14px;
+}
+
 /* Resume payment button */
 .gd-resume-btn {
   background: none;
   border: none;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -3492,7 +5081,7 @@ const gdStyles = `
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-weight: 700;
   font-size: 15px;
-  color: var(--gd-coral);
+  color: var(--gd-accent-text);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -3507,7 +5096,7 @@ const gdStyles = `
 }
 .gd-mobile-bar-cta {
   background: var(--gd-coral);
-  color: #fff;
+  color: var(--text-on-cta, #fff);
   border: 0;
   border-radius: 12px;
   padding: 14px 16px;
@@ -3521,7 +5110,7 @@ const gdStyles = `
   gap: 6px;
   box-shadow: 0 4px 12px rgba(196, 90, 63,0.28);
 }
-.gd-mobile-bar-cta[disabled] { background: #d4c6b8; box-shadow: none; cursor: not-allowed; }
+.gd-mobile-bar-cta[disabled] { background: #d4c6b8; color: #493a32; box-shadow: none; cursor: not-allowed; }
 .gd-mobile-bar-cta .num { font-variant-numeric: tabular-nums; }
 `;
 

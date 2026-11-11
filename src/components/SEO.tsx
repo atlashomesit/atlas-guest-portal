@@ -6,7 +6,7 @@ import { getTenantContext } from "../tenant/tenantContext";
 // TASK-7468 #5: Neutral / white-label hosts must NOT fall back to this Atlas-branded asset.
 // Uses getTenantContext only (not displayBrand helpers) so page tests that mock displayBrand
 // without exporting isNeutralBrandingMode keep working.
-const DEFAULT_OG_IMAGE = "/og-image.svg";
+export const DEFAULT_OG_IMAGE = "/og-image.png";
 
 function resolveOgImageFallback(explicit?: string): string {
   if (explicit) return explicit;

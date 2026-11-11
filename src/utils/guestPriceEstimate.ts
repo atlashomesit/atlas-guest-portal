@@ -1,3 +1,5 @@
+import { feePercent } from './paymentFeeCopy';
+import { alignPromotionLabelPercent } from './directBookingPrice';
 /** TASK-2903 / TASK-2870: shared GST + est-total for guest pricing surfaces. */
 
 export const ACCOMMODATION_GST_THRESHOLD_INR = 7500;
@@ -154,7 +156,7 @@ export function estimateStayNights(checkIn: Date | null, checkOut: Date | null):
 export function estTotal(
   perNight: number,
   nights: number,
-  convenienceFeePercent: number = 3,
+  convenienceFeePercent: number,
 ): number {
   const stayNights = Math.max(1, nights);
   const baseTotal = perNight * stayNights;
@@ -166,20 +168,203 @@ export function formatEstTotal(
   perNight: number,
   nights: number,
   formatCurrency: (amount: number, options?: { maximumFractionDigits?: number }) => string,
-  convenienceFeePercent: number = 3,
+  convenienceFeePercent: number | null = null,
 ): string {
+  if (feePercent(convenienceFeePercent) === null) return "Total confirmed after choosing dates.";
   const stayNights = Math.max(1, nights);
-  const total = estTotal(perNight, stayNights, convenienceFeePercent);
+  const total = estTotal(perNight, stayNights, convenienceFeePercent!);
   const nightLabel = stayNights === 1 ? '1 night' : `${stayNights} nights`;
-  const feeLabel = convenienceFeePercent > 0 ? `${convenienceFeePercent}% payment processing ` : '';
+  const feeLabel = convenienceFeePercent! > 0 ? `${convenienceFeePercent}% payment processing ` : '';
   return `${formatCurrency(total, { maximumFractionDigits: 0 })} est. total ${feeLabel}(${nightLabel})`.trim();
+}
+
+/**
+ * TASK-102392: plug row so the rendered breakdown lines sum EXACTLY to the
+ * displayed Total.
+ *
+ * The base row shows the pre-discount `baseAmount` while `displayTotal` nets
+ * the global discount (via `computeCheckoutTotal`, directly or inside the
+ * server `finalAmount`). With no discount row, lines and Total disagree
+ * whenever a discount applies (board case: lines sum 12,320 vs Total 12,000).
+ *
+ * Given the rendered additive rows (gross = base + cleaning + tourist tax +
+ * convenience fee; net adjustments = add-ons − promo − referral), the missing
+ * row is `gross + net − displayTotal`: positive means an unbilled discount,
+ * negative means the Total carries something the rows do not. Rendered as a
+ * signed row, lines always reconcile with the Total by construction.
+ */
+export function discountPlugRow(grossRows: number, netAdjustRows: number, displayTotal: number): number {
+  return Math.round(grossRows + netAdjustRows - displayTotal);
+}
+
+/**
+ * GUEST-049: Transparent checkout charge reconciliation so vague "Other charges"
+ * never appears to guests while keeping visible line items 100% equal to `displayTotal`.
+ */
+export type CheckoutChargeReconciliationInput = {
+  baseAmount: number;
+  cleaningFeeAmount: number;
+  breakfastExtraAmount?: number;
+  petFeeAmount?: number;
+  extraGuestFeeAmount?: number;
+  weekendRateAdjustmentAmount?: number;
+  touristTaxAmount: number;
+  displayedFeeAmount?: number;
+  addOnsTotal?: number;
+  confirmedPromoDiscount?: number;
+  referralDiscountAmount?: number;
+  displayTotal: number;
+  nights?: number;
+  stayGuestCount?: number;
+  hasWeekendNight?: boolean;
+  appliedPromotionLabel?: string | null;
+  serviceFeeAmount?: number;
+  convenienceFeeAmount?: number;
+  gstLineAmount?: number;
+  promoDiscountAmount?: number;
+  extraGuestCharge?: number;
+  securityDepositAmount?: number;
+  globalDiscountPercent?: number;
+  globalDiscountAmount?: number;
+};
+
+export type CheckoutChargeReconciliationResult = {
+  effectiveBaseAmount: number;
+  effectivePerNight: number;
+  petFeeRow: { label: string; amount: number } | null;
+  extraGuestFeeRow: { label: string; amount: number } | null;
+  weekendAdjustmentRow: { label: string; amount: number } | null;
+  discountRow: { label: string; amount: number } | null;
+  reconciledIntoBaseAmount: number;
+  accommodationRowAmount: number;
+  discountRowAmount: number;
+  grossRowsTotal: number;
+};
+
+/** Returns true when [checkInIso, checkOutIso) includes a Friday (5) or Saturday (6) night. */
+export function stayIncludesWeekendNight(
+  checkInIso: string | null | undefined,
+  checkOutIso: string | null | undefined,
+): boolean {
+  if (!checkInIso || !checkOutIso) return false;
+  const start = new Date(checkInIso);
+  const end = new Date(checkOutIso);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end.getTime() <= start.getTime()) {
+    return false;
+  }
+  const cursor = new Date(start.getTime());
+  let guard = 0;
+  while (cursor.getTime() < end.getTime() && guard < 366) {
+    // Shift by +05:30 so IST civil day-of-week is evaluated consistently across host timezones
+    const istDay = new Date(cursor.getTime() + 330 * 60 * 1000).getUTCDay();
+    if (istDay === 5 || istDay === 6) return true;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+    guard += 1;
+  }
+  return false;
+}
+
+export function resolveCheckoutChargeReconciliation(
+  input: CheckoutChargeReconciliationInput,
+): CheckoutChargeReconciliationResult {
+  const base = Math.max(0, Math.round(Number(input.baseAmount) || 0));
+  if (base <= 0) {
+    return {
+      effectiveBaseAmount: 0,
+      effectivePerNight: 0,
+      petFeeRow: null,
+      extraGuestFeeRow: null,
+      weekendAdjustmentRow: null,
+      discountRow: null,
+      reconciledIntoBaseAmount: 0,
+      accommodationRowAmount: 0,
+      discountRowAmount: 0,
+      grossRowsTotal: 0,
+    };
+  }
+  const cleaning = Math.max(0, Math.round(Number(input.cleaningFeeAmount) || 0));
+  const breakfastExtra = Math.max(0, Math.round(Number(input.breakfastExtraAmount) || 0));
+  const petFee = Math.max(0, Math.round(Number(input.petFeeAmount) || 0));
+  const extraGuest = Math.max(0, Math.round(Number(input.extraGuestFeeAmount ?? input.extraGuestCharge) || 0));
+  const explicitWeekend = Math.max(0, Math.round(Number(input.weekendRateAdjustmentAmount) || 0));
+  const touristTax = Math.max(0, Math.round(Number(input.touristTaxAmount) || 0));
+  const fee = Math.max(0, Number(input.displayedFeeAmount ?? input.serviceFeeAmount ?? input.convenienceFeeAmount) || 0);
+  const confirmedPromo = Number(input.confirmedPromoDiscount ?? input.promoDiscountAmount) || 0;
+  const netAdjust =
+    (Number(input.addOnsTotal) || 0) -
+    confirmedPromo -
+    (Number(input.referralDiscountAmount) || 0);
+
+  const petFeeRow =
+    petFee > 0
+      ? {
+          label: 'Pet fee',
+          amount: petFee,
+        }
+      : null;
+
+  const stayGuests = input.stayGuestCount ?? 2;
+  const extraGuestFeeRow =
+    extraGuest > 0
+      ? {
+          label: `Extra guest fee (${stayGuests} ${stayGuests === 1 ? 'guest' : 'guests'})`,
+          amount: extraGuest,
+        }
+      : null;
+
+  const grossRows = base + cleaning + breakfastExtra + petFee + extraGuest + explicitWeekend + touristTax + fee;
+  const plug = discountPlugRow(grossRows, netAdjust, input.displayTotal);
+
+  let effectiveBaseAmount = base;
+  let weekendAdjustmentRow: { label: string; amount: number } | null =
+    explicitWeekend > 0 ? { label: 'Weekend rate adjustment', amount: explicitWeekend } : null;
+  let discountRow: { label: string; amount: number } | null = null;
+  let reconciledIntoBaseAmount = 0;
+
+  if (plug > 0) {
+    const rawPromoLabel = input.appliedPromotionLabel?.trim();
+    const promoLabel = rawPromoLabel
+      ? alignPromotionLabelPercent(rawPromoLabel, base, Math.max(0, base - plug))
+      : '';
+    discountRow = {
+      label: promoLabel || 'Discount',
+      amount: plug,
+    };
+  } else if (plug < 0) {
+    const positiveVariance = Math.abs(plug);
+    if (input.hasWeekendNight && explicitWeekend === 0) {
+      weekendAdjustmentRow = {
+        label: 'Weekend rate adjustment',
+        amount: positiveVariance,
+      };
+    } else {
+      effectiveBaseAmount = base + positiveVariance;
+      reconciledIntoBaseAmount = positiveVariance;
+    }
+  }
+
+  const effectivePerNight =
+    input.nights && input.nights > 0 ? Math.round(effectiveBaseAmount / input.nights) : 0;
+
+  return {
+    effectiveBaseAmount,
+    effectivePerNight,
+    petFeeRow,
+    extraGuestFeeRow,
+    weekendAdjustmentRow,
+    discountRow,
+    reconciledIntoBaseAmount,
+    accommodationRowAmount: effectiveBaseAmount,
+    discountRowAmount: discountRow?.amount ?? 0,
+    grossRowsTotal: grossRows,
+  };
 }
 
 /** Legacy aliases retained for zero-GST compatibility (ADR-0107) */
 export function estTotalInclGst(
   perNight: number,
   nights: number,
-  convenienceFeePercent: number = 3,
+  convenienceFeePercent: number,
   _isGstRegistered: boolean = true,
   _chargedPerNight: number = perNight,
 ): number {
@@ -190,7 +375,7 @@ export function formatEstTotalInclGst(
   perNight: number,
   nights: number,
   formatCurrency: (amount: number, options?: { maximumFractionDigits?: number }) => string,
-  convenienceFeePercent: number = 3,
+  convenienceFeePercent: number | null = null,
   _isGstRegistered: boolean = true,
   _chargedPerNight: number = perNight,
 ): string {

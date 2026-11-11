@@ -1,0 +1,225 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  isMarketplaceRewriteRoute,
+  extractListingIdFromPath,
+  formatCityNameFromSlug,
+  buildMarketplaceMetaValues,
+  fetchMarketplaceListingsCached,
+  clearMarketplaceListingsCache,
+  type MarketplaceListingMetaRow,
+} from "../functions/_lib/marketplaceSiteMeta";
+
+describe("marketplaceSiteMeta pure logic (MKT-013)", () => {
+  beforeEach(() => {
+    clearMarketplaceListingsCache();
+  });
+
+  describe("route classification & ID extraction", () => {
+
+    it("recognizes /, /homestays-in-*, and /homes/* as marketplace rewrite routes", () => {
+      expect(isMarketplaceRewriteRoute("/")).toBe(true);
+      expect(isMarketplaceRewriteRoute("")).toBe(true);
+      expect(isMarketplaceRewriteRoute("/homestays-in-hyderabad")).toBe(true);
+      expect(isMarketplaceRewriteRoute("/homestays-in-bengaluru")).toBe(true);
+      expect(isMarketplaceRewriteRoute("/homestays-in-new-delhi")).toBe(true);
+      expect(isMarketplaceRewriteRoute("/homes/cozy-villa/123")).toBe(true);
+      expect(isMarketplaceRewriteRoute("/homes/456")).toBe(true);
+
+      // Other routes should not be intercepted for marketplace head rewrite
+      expect(isMarketplaceRewriteRoute("/about")).toBe(false);
+      expect(isMarketplaceRewriteRoute("/faq")).toBe(false);
+      expect(isMarketplaceRewriteRoute("/policies")).toBe(false);
+    });
+
+    it("extracts listing ID from various /homes/ paths", () => {
+      expect(extractListingIdFromPath("/homes/the-estate-by-grove-co/676")).toBe(676);
+      expect(extractListingIdFromPath("/homes/676")).toBe(676);
+      expect(extractListingIdFromPath("/homes/676/")).toBe(676);
+      expect(extractListingIdFromPath("/homes/my-home/42/details")).toBe(42);
+      expect(extractListingIdFromPath("/homes/no-id-here")).toBeNull();
+      expect(extractListingIdFromPath("/")).toBeNull();
+    });
+
+    it("formats city names from slugs correctly", () => {
+      expect(formatCityNameFromSlug("hyderabad")).toBe("Hyderabad");
+      expect(formatCityNameFromSlug("bengaluru")).toBe("Bengaluru");
+      expect(formatCityNameFromSlug("new-delhi")).toBe("New Delhi");
+    });
+  });
+
+  describe("buildMarketplaceMetaValues", () => {
+    const origin = "https://atlastays.com";
+
+    it("produces unique title, description, self canonical and raster image for homepage /", () => {
+      const meta = buildMarketplaceMetaValues("/", "", origin, null);
+      expect(meta.title).toBe("Atlastays — Book Homestays Directly with Hosts");
+      expect(meta.description).toContain("vacation homes");
+      expect(meta.title).not.toMatch(/verified/i);
+      expect(meta.description).not.toMatch(/verified/i);
+      expect(meta.canonical).toBe("https://atlastays.com/");
+      expect(meta.url).toBe("https://atlastays.com/");
+      expect(meta.image).toBe("https://atlastays.com/icons/logo512.png");
+      expect(meta.image.endsWith(".svg")).toBe(false);
+      expect(meta.jsonLd).toBeNull();
+    });
+
+    it("produces city-specific title, description, self canonical and raster image for /homestays-in-*", () => {
+      const meta = buildMarketplaceMetaValues("/homestays-in-hyderabad", "", origin, null);
+      expect(meta.title).toBe("Homestays in Hyderabad — Book Direct with Hosts | Atlastays");
+      expect(meta.description).toContain("Hyderabad");
+      expect(meta.title).not.toMatch(/verified/i);
+      expect(meta.description).not.toMatch(/verified/i);
+      expect(meta.canonical).toBe("https://atlastays.com/homestays-in-hyderabad");
+      expect(meta.url).toBe("https://atlastays.com/homestays-in-hyderabad");
+      expect(meta.image).toBe("https://atlastays.com/icons/logo512.png");
+      expect(meta.image.endsWith(".svg")).toBe(false);
+      expect(meta.jsonLd).toBeNull();
+    });
+
+    it("produces listing-specific title, raster image, and LodgingBusiness JSON-LD for /homes/*", () => {
+      const sampleListing: MarketplaceListingMetaRow = {
+        id: 676,
+        title: "The Estate by Grove & Co.",
+        city: "Hyderabad",
+        state: "Telangana",
+        description: "Luxury 4-BHK villa with private pool and garden.",
+        coverPhotoUrl: "https://imagedelivery.net/abc/hero.jpg",
+        tenantSlug: "grove-and-co",
+        tenantName: "Grove & Co.",
+        pricePerNight: 12000,
+        maxGuests: 8,
+      };
+
+      const meta = buildMarketplaceMetaValues(
+        "/homes/the-estate-by-grove-co/676",
+        "?tenant=grove-and-co",
+        origin,
+        sampleListing,
+      );
+
+      expect(meta.title).toBe("The Estate by Grove & Co. in Hyderabad — Atlastays");
+      expect(meta.description).toContain("Luxury 4-BHK villa");
+      expect(meta.title).not.toMatch(/verified/i);
+      expect(meta.description).not.toMatch(/verified/i);
+      expect(meta.canonical).toBe("https://atlastays.com/homes/the-estate-by-grove-co/676?tenant=grove-and-co");
+      expect(meta.image).toBe("https://imagedelivery.net/abc/hero.jpg");
+      expect(meta.image.endsWith(".svg")).toBe(false);
+
+      expect(meta.jsonLd).toEqual({
+        "@context": "https://schema.org",
+        "@type": "LodgingBusiness",
+        name: "The Estate by Grove & Co.",
+        description: "Luxury 4-BHK villa with private pool and garden.",
+        image: "https://imagedelivery.net/abc/hero.jpg",
+        url: "https://atlastays.com/homes/the-estate-by-grove-co/676?tenant=grove-and-co",
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: "Hyderabad",
+          addressCountry: "IN",
+        },
+        priceRange: "₹12000",
+      });
+    });
+
+    it("populates meta.image from coverImageUrl returned by /api/marketplace/listings", () => {
+      const sampleListing: MarketplaceListingMetaRow = {
+        id: 777,
+        title: "Coorg Mist Villa",
+        city: "Coorg",
+        coverImageUrl: "https://imagedelivery.net/abc/coorg-cover.jpg",
+        tenantSlug: "coorg-stays",
+      };
+
+      const meta = buildMarketplaceMetaValues("/homes/coorg-mist-villa/777", "", origin, sampleListing);
+      expect(meta.image).toBe("https://imagedelivery.net/abc/coorg-cover.jpg");
+      expect(meta.title).not.toMatch(/verified/i);
+      expect(meta.description).not.toMatch(/verified/i);
+    });
+
+    it("falls back to raster logo when listing photo is svg or missing", () => {
+      const sampleListing: MarketplaceListingMetaRow = {
+        id: 99,
+        title: "Comfort Cove",
+        city: "Guwahati",
+        coverPhotoUrl: "/icons/placeholder.svg",
+        tenantSlug: "mitali-saikia",
+      };
+
+      const meta = buildMarketplaceMetaValues("/homes/comfort-cove/99", "", origin, sampleListing);
+      expect(meta.image).toBe("https://atlastays.com/icons/logo512.png");
+      expect(meta.image.endsWith(".svg")).toBe(false);
+    });
+
+    it("handles not-found listing gracefully", () => {
+      const meta = buildMarketplaceMetaValues("/homes/unknown-slug/999", "", origin, null);
+      expect(meta.title).toBe("Home not found — Atlastays");
+      expect(meta.image).toBe("https://atlastays.com/icons/logo512.png");
+      expect(meta.jsonLd).toBeNull();
+    });
+  });
+
+  describe("fetchMarketplaceListingsCached", () => {
+    it("fetches listings from API and returns items", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          items: [{ id: 1, title: "Listing 1", tenantSlug: "t1" }],
+        }),
+      });
+
+      const items = await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(items).toHaveLength(1);
+      expect(items[0].id).toBe(1);
+    });
+
+    it("TASK-1040071: pages through every listing so a home ranked 101+ is found (115 listings, server pageSize max 100)", async () => {
+      const all: MarketplaceListingMetaRow[] = Array.from({ length: 115 }, (_, i) => ({
+        id: 1000 + i,
+        title: `Home ${i + 1}`,
+        tenantSlug: "t1",
+      }));
+      const mockFetch = vi.fn(async (url: string) => {
+        const u = new URL(String(url));
+        const page = Number(u.searchParams.get("page"));
+        const pageSize = Number(u.searchParams.get("pageSize"));
+        // the real server clamps pageSize > 100 to 20; a client that asks for <= 100 gets exactly that
+        const effective = pageSize <= 0 || pageSize > 100 ? 20 : pageSize;
+        const items = all.slice((page - 1) * effective, page * effective);
+        return { ok: true, json: async () => ({ items, total: all.length, page, pageSize: effective }) };
+      });
+
+      const items = await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(items).toHaveLength(115);
+      expect(items.find((l) => l.id === 1114)?.title).toBe("Home 115");
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      for (const call of mockFetch.mock.calls) {
+        expect(Number(new URL(String(call[0])).searchParams.get("pageSize"))).toBeLessThanOrEqual(100);
+      }
+
+      // second call is served from the cache
+      await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it("TASK-1040071: a failing later page returns what was gathered and does not cache the partial list", async () => {
+      const page1 = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, title: `H${i + 1}`, tenantSlug: "t" }));
+      let calls = 0;
+      const mockFetch = vi.fn(async () => {
+        calls++;
+        if (calls === 2) throw new Error("boom");
+        return { ok: true, json: async () => ({ items: calls === 1 ? page1 : [], total: 101 }) };
+      });
+      const first = await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(first).toHaveLength(100);
+      const callsAfterFirst = mockFetch.mock.calls.length;
+      await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(mockFetch.mock.calls.length).toBeGreaterThan(callsAfterFirst); // retried, not cached
+    });
+
+    it("fails open on API error and returns empty array", async () => {
+      const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
+      const items = await fetchMarketplaceListingsCached("https://api.test.in", mockFetch as unknown as typeof fetch);
+      expect(items).toEqual([]);
+    });
+  });
+});

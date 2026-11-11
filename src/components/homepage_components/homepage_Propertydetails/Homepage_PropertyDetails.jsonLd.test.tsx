@@ -1,0 +1,618 @@
+import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Suspense } from 'react';
+import Homepage_PropertyDetails from './Homepage_PropertyDetails';
+import { resolveEffectiveListingAddress } from '../../../utils/listingAddress';
+import { settle } from '../../../test/settle';
+import { _setTenantContextForTests, _resetTenantContextForTests } from '@/tenant/tenantContext';
+
+vi.mock('@/components/availability/UnitBookingWidget', () => ({
+  __esModule: true,
+  default: () => <div>Booking Widget</div>,
+}));
+
+vi.mock('@/components/AvailabilityCalendar', () => ({
+  __esModule: true,
+  default: () => <div>Availability Calendar</div>,
+}));
+
+vi.mock('@/components/GuestAssistant', () => ({
+  __esModule: true,
+  default: () => <div>Guest Assistant</div>,
+}));
+
+vi.mock('@/components/homepage_components/hotelBooking_form/BookingCard.tsx', () => ({
+  __esModule: true,
+  default: () => <div id="booking-form">Booking Form</div>,
+}));
+
+vi.mock('@/utils/analytics', () => ({
+  trackEvent: vi.fn(),
+}));
+
+vi.mock('@/utils/pricing', () => ({
+  calculateNightlyPrice: vi.fn(() => ({ finalNightlyPrice: 1000 })),
+  inferUnitType: vi.fn(() => 'test-unit'),
+}));
+
+vi.mock('@/config/policyConfig', () => ({
+  getUnitPolicy: () => ({ checkIn: '2:00 PM', checkOut: '11:00 AM' }),
+}));
+
+vi.mock('@/content/terms', () => ({
+  inlinePolicySnippets: { cancellation: 'Flexible cancellation', houseRules: 'Be kind' },
+}));
+
+vi.mock('@/contexts/BookingContext', () => ({
+  useBooking: () => ({
+    booking: { propertyId: null, checkIn: null, checkOut: null, guests: 2 },
+    setProperty: vi.fn(),
+    setPendingScrollTarget: vi.fn(),
+    updateBooking: vi.fn(),
+    setDates: vi.fn(),
+    setGuests: vi.fn(),
+    pendingScrollTarget: null,
+  }),
+  BookingProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock('@fancyapps/ui', () => ({
+  Fancybox: {
+    bind: vi.fn(),
+    destroy: vi.fn(),
+    show: vi.fn(),
+  },
+}));
+
+const mockResolveListing = vi.fn();
+vi.mock('@/utils/listingResolver', () => ({
+  resolveListing: (...args: unknown[]) => mockResolveListing(...args),
+  resolveEffectiveListingAddress: (source: unknown) => resolveEffectiveListingAddress(source),
+  normalizeListingPayload: vi.fn((raw) => raw),
+}));
+
+const mockUseTenantListings = vi.fn();
+vi.mock('@/hooks/useTenantListings', () => ({
+  useTenantListings: () => mockUseTenantListings(),
+}));
+
+const readJsonLd = (): Record<string, unknown>[] => {
+  const script = document.head.querySelector('script[data-seo-json-ld]');
+  expect(script?.textContent).toBeTruthy();
+  return JSON.parse(script!.textContent!);
+};
+
+describe('Homepage_PropertyDetails listing JSON-LD (TASK-102732 item 4)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetTenantContextForTests();
+    document.head.querySelector('script[data-seo-json-ld]')?.remove();
+    mockUseTenantListings.mockReturnValue({
+      listings: [],
+      properties: [
+        {
+          id: 101,
+          listingId: 101,
+          property_name: 'Atlas101',
+          property_location: '165, KPHB 7th Phase',
+          property_img: ['https://cdn.example.com/img1.jpg'],
+          property_amenities: [],
+          property_description: '',
+          property_rating: 4.9,
+          property_reviews: 10,
+          property_price: 2500,
+        },
+      ],
+      state: 'success',
+      refetch: vi.fn(),
+    });
+  });
+
+  it('uses the guest-facing display name, not the raw SKU', async () => {
+    render(
+      <MemoryRouter initialEntries={['/homes/atlas101/101']}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
+            <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+          </Routes>
+        </Suspense>
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const nodes = readJsonLd();
+    const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness');
+    expect(lodging).toBeDefined();
+    expect(lodging!['name']).toBe('Studio 101');
+  });
+
+  it('omits an empty description and puts the street in streetAddress', async () => {
+    render(
+      <MemoryRouter initialEntries={['/homes/atlas101/101']}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
+            <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+          </Routes>
+        </Suspense>
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const nodes = readJsonLd();
+    const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness') as Record<string, unknown>;
+    expect('description' in lodging).toBe(false);
+    const address = lodging['address'] as Record<string, unknown>;
+    expect(address['streetAddress']).toBe('165, KPHB 7th Phase');
+    expect('addressLocality' in address).toBe(false);
+    expect('addressRegion' in address).toBe(false);
+    expect(address['addressRegion']).toBeUndefined();
+    expect(address['addressCountry']).toBe('IN');
+  });
+
+  it('GUEST-013: outputs addressRegion: "Goa" and addressLocality: "Calangute" when present and does not default to Telangana when missing', async () => {
+    mockUseTenantListings.mockReturnValue({
+      listings: [],
+      properties: [
+        {
+          id: 202,
+          listingId: 202,
+          property_name: 'GoaVilla',
+          property_location: 'Near Calangute Beach',
+          city: 'Calangute',
+          state: 'Goa',
+          country: 'IN',
+          property_img: ['https://cdn.example.com/goa.jpg'],
+          property_amenities: [],
+          property_description: 'Cozy villa near the beach',
+          property_rating: 4.8,
+          property_reviews: 5,
+          property_price: 5000,
+        },
+      ],
+      state: 'success',
+      refetch: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/homes/goavilla/202']}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
+            <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+          </Routes>
+        </Suspense>
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const nodes = readJsonLd();
+    const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness') as Record<string, unknown>;
+    expect(lodging).toBeDefined();
+    const address = lodging['address'] as Record<string, unknown>;
+    expect(address).toBeDefined();
+    expect(address['addressLocality']).toBe('Calangute');
+    expect(address['addressRegion']).toBe('Goa');
+    expect(address['addressCountry']).toBe('IN');
+    expect(address['streetAddress']).toBe('Near Calangute Beach');
+  });
+
+  it('GUEST-013: falls back to tenant legalContactPack state when listing state is missing', async () => {
+    _setTenantContextForTests({
+      name: 'Kerala Homestay',
+      slug: 'kerala-homestay',
+      legalContactPack: {
+        state: 'Kerala',
+        city: 'Kochi',
+        showAtlasFooterCredit: false,
+        isCustomDomain: false,
+      },
+    });
+
+    mockUseTenantListings.mockReturnValue({
+      listings: [],
+      properties: [
+        {
+          id: 303,
+          listingId: 303,
+          property_name: 'KeralaHome',
+          property_location: 'Fort Kochi Road',
+          property_img: ['https://cdn.example.com/kerala.jpg'],
+          property_amenities: [],
+          property_description: '',
+          property_rating: 4.9,
+          property_reviews: 8,
+          property_price: 3500,
+        },
+      ],
+      state: 'success',
+      refetch: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/homes/keralahome/303']}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
+            <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+          </Routes>
+        </Suspense>
+      </MemoryRouter>,
+    );
+
+    await settle();
+    const nodes = readJsonLd();
+    const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness') as Record<string, unknown>;
+    const address = lodging['address'] as Record<string, unknown>;
+    expect(address['addressRegion']).toBe('Kerala');
+    expect('addressLocality' in address).toBe(false);
+  });
+
+  it('REV-013: includes external reviews and blended rating in aggregateRating and review nodes', async () => {
+    mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/public/listings/101') || url.includes('/public/listings/101')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              externalReviews: [
+                {
+                  guestName: 'Sita',
+                  rating: 5,
+                  body: 'Wonderful vacation at the villa!',
+                  reviewDate: '2026-10-01',
+                  source: 'Airbnb',
+                },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      if (url.includes('/api/listings/101/reviews') || url.includes('/listings/101/reviews')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              averageRating: 0,
+              totalCount: 0,
+              reviews: [],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      );
+    });
+
+    try {
+      render(
+        <MemoryRouter initialEntries={['/homes/atlas101/101']}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+            </Routes>
+          </Suspense>
+        </MemoryRouter>,
+      );
+
+      await settle();
+      const nodes = readJsonLd();
+      const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness') as Record<string, unknown>;
+      expect(lodging).toBeDefined();
+
+      const aggregateRating = lodging['aggregateRating'] as Record<string, unknown>;
+      expect(aggregateRating).toBeDefined();
+      expect(aggregateRating['@type']).toBe('AggregateRating');
+      expect(aggregateRating['ratingValue']).toBe(5);
+      expect(aggregateRating['reviewCount']).toBe(1);
+
+      const reviews = lodging['review'] as Record<string, unknown>[];
+      expect(reviews).toBeDefined();
+      expect(reviews).toHaveLength(1);
+      expect(reviews[0]['@type']).toBe('Review');
+      expect((reviews[0]['author'] as Record<string, unknown>)['name']).toBe('Sita');
+      expect((reviews[0]['reviewRating'] as Record<string, unknown>)['ratingValue']).toBe(5);
+      expect(reviews[0]['reviewBody']).toBe('Wonderful vacation at the villa!');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  describe('REV-046: review-QR "Guest feedback" notes', () => {
+    const feedback = [
+      { guestName: 'Priya Nair', rating: 5, comment: 'Garden breakfast was lovely', date: '2026-10-27', label: 'Guest feedback' },
+      { guestName: 'Dev', rating: 4, comment: 'Quiet and clean', date: '2026-10-20', label: 'Guest feedback' },
+      // The API never sends these two; the page must still never show them.
+      { guestName: 'Low', rating: 3, comment: 'AC was loud', date: '2026-10-26', label: 'Guest feedback' },
+      { guestName: 'Blank', rating: 5, comment: '   ', date: '2026-10-25', label: 'Guest feedback' },
+    ];
+
+    const stubReviewApi = (opts: {
+      externalReviews: unknown[];
+      nativeReviews?: unknown[];
+      totalCount?: number;
+      averageRating?: number;
+    }) => {
+      global.fetch = vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        const json = (body: unknown) =>
+          Promise.resolve(
+            new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+          );
+        if (url.includes('/api/public/listings/101') || url.includes('/public/listings/101')) {
+          return json({ externalReviews: opts.externalReviews, guestFeedback: feedback });
+        }
+        if (url.includes('/api/listings/101/reviews') || url.includes('/listings/101/reviews')) {
+          return json({
+            averageRating: opts.averageRating ?? 0,
+            totalCount: opts.totalCount ?? 0,
+            reviews: opts.nativeReviews ?? [],
+            guestFeedback: feedback,
+          });
+        }
+        return json({});
+      }) as unknown as typeof fetch;
+    };
+
+    const renderListing = async () => {
+      render(
+        <MemoryRouter initialEntries={['/homes/atlas101/101']}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+            </Routes>
+          </Suspense>
+        </MemoryRouter>,
+      );
+      await settle();
+      await settle();
+    };
+
+    it('shows the notes as labelled cards after the reviews, and never counts them, charts them or puts them in the JSON-LD', async () => {
+      mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+      const originalFetch = global.fetch;
+      stubReviewApi({
+        externalReviews: [
+          { guestName: 'Sita', rating: 5, body: 'Wonderful vacation at the villa!', reviewDate: '2026-10-01', source: 'Airbnb' },
+        ],
+      });
+
+      try {
+        await renderListing();
+
+        // The score, the count and the bars come from the one real review only.
+        const headerRating = screen.getByTestId('property-header-rating');
+        expect(headerRating).toHaveTextContent('5.0');
+        expect(headerRating).toHaveTextContent('(1 review)');
+        const reviewsSection = screen.getByTestId('reviews-section');
+        expect(within(reviewsSection).getByRole('heading', { level: 2 })).toHaveTextContent('★ 5.0 from 1 guest');
+        expect(reviewsSection).toHaveTextContent('1 review');
+        expect(within(screen.getByTestId('reviews-grid')).getAllByRole('article')).toHaveLength(1);
+        for (const text of ['Priya', 'Garden breakfast was lovely', 'Quiet and clean']) {
+          expect(reviewsSection).not.toHaveTextContent(text);
+        }
+
+        // The notes: their own block, after the reviews, two cards (the 3-star and the no-comment row are dropped).
+        const feedbackSection = screen.getByTestId('guest-feedback-section');
+        expect(reviewsSection.compareDocumentPosition(feedbackSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const cards = within(feedbackSection).getAllByTestId('guest-feedback-card');
+        expect(cards).toHaveLength(2);
+        for (const card of cards) {
+          expect(within(card).getByTestId('guest-feedback-label')).toHaveTextContent('Guest feedback');
+          expect(card).not.toHaveTextContent(/verified/i);
+        }
+        expect(within(cards[0]).getByText('Priya')).toBeInTheDocument();
+        expect(cards[0]).not.toHaveTextContent('Nair');
+        expect(within(cards[0]).getByText('Garden breakfast was lovely')).toBeInTheDocument();
+        expect(within(cards[1]).getByText('Dev')).toBeInTheDocument();
+        expect(feedbackSection).not.toHaveTextContent('AC was loud');
+
+        // JSON-LD: one rating, one review, and no trace of the notes.
+        const nodes = readJsonLd();
+        const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness') as Record<string, unknown>;
+        const aggregateRating = lodging['aggregateRating'] as Record<string, unknown>;
+        expect(aggregateRating['ratingValue']).toBe(5);
+        expect(aggregateRating['reviewCount']).toBe(1);
+        expect(lodging['review'] as unknown[]).toHaveLength(1);
+        const ld = JSON.stringify(nodes);
+        for (const text of ['Priya', 'Dev', 'Garden breakfast', 'Quiet and clean', 'Guest feedback']) {
+          expect(ld).not.toContain(text);
+        }
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('shows the notes for a listing with no reviews yet, without inventing a score, a count or JSON-LD ratings', async () => {
+      mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+      const originalFetch = global.fetch;
+      stubReviewApi({ externalReviews: [] });
+
+      try {
+        await renderListing();
+
+        expect(screen.queryByTestId('property-header-rating')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('reviews-section')).not.toBeInTheDocument();
+
+        const feedbackSection = screen.getByTestId('guest-feedback-section');
+        expect(within(feedbackSection).getAllByTestId('guest-feedback-card')).toHaveLength(2);
+
+        const nodes = readJsonLd();
+        const lodging = nodes.find((n) => n['@type'] === 'LodgingBusiness') as Record<string, unknown>;
+        expect(lodging['aggregateRating']).toBeUndefined();
+        expect(lodging['review']).toBeUndefined();
+        expect(JSON.stringify(nodes)).not.toContain('Garden breakfast');
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    // TASK-1040061: the API's totalCount is native + external combined, so an external-only listing arrives as
+    // { reviews: [], totalCount: 4 }. It must never claim "verified stays" or "all through this platform".
+    it('TASK-1040061: an external-only listing makes no verified-stay claim', async () => {
+      mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+      const originalFetch = global.fetch;
+      const externalReviews = [
+        { guestName: 'A', rating: 5, body: 'Lovely stay five star', reviewDate: '2026-10-01', source: 'Airbnb' },
+        { guestName: 'B', rating: 4, body: 'Four star good', reviewDate: '2026-10-02', source: 'Booking.com' },
+        { guestName: 'C', rating: 4, body: 'Google four star', reviewDate: '2026-10-03', source: 'Google' },
+        { guestName: 'D', rating: 5, body: 'Wonderful place', reviewDate: '2026-10-04', source: 'Google' },
+      ];
+      stubReviewApi({ externalReviews, nativeReviews: [], totalCount: 4, averageRating: 0 });
+
+      try {
+        await renderListing();
+
+        const reviewsSection = screen.getByTestId('reviews-section');
+        expect(reviewsSection).toHaveTextContent('4 reviews');
+        expect(reviewsSection).not.toHaveTextContent(/verified stay/i);
+        expect(reviewsSection).not.toHaveTextContent(/verified review/i);
+        expect(reviewsSection).not.toHaveTextContent(/through this platform/i);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
+    it('leaves a verified native review exactly as counted when notes arrive too', async () => {
+      mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+      const originalFetch = global.fetch;
+      stubReviewApi({
+        externalReviews: [],
+        totalCount: 1,
+        averageRating: 4,
+        nativeReviews: [
+          {
+            id: 9,
+            guestName: 'Meera Iyer',
+            rating: 4,
+            body: 'Warm hosts and a clean room.',
+            createdAt: '2026-10-02T10:00:00Z',
+            isVerifiedStay: true,
+          },
+        ],
+      });
+
+      try {
+        await renderListing();
+
+        const reviewsSection = screen.getByTestId('reviews-section');
+        expect(within(reviewsSection).getByRole('heading', { level: 2 })).toHaveTextContent('★ 4.0 from 1 guest');
+        expect(reviewsSection).toHaveTextContent('1 verified stay');
+        const verifiedCard = within(screen.getByTestId('reviews-grid')).getByRole('article');
+        expect(verifiedCard).toHaveTextContent('Verified stay');
+        expect(verifiedCard).not.toHaveTextContent('Guest feedback');
+
+        const feedbackSection = screen.getByTestId('guest-feedback-section');
+        expect(feedbackSection).not.toHaveTextContent(/verified/i);
+        expect(within(feedbackSection).getAllByTestId('guest-feedback-card')).toHaveLength(2);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+  });
+});
+
+
+describe('REV-041: reviewer name and language chip on guest review cards', () => {
+  const stub = () => {
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const json = (body: unknown) =>
+        Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+      if (url.includes('/public/listings/101')) {
+        return json({
+          externalReviews: [
+            {
+              guestName: 'Guest',
+              authorName: 'Amelie Dubois',
+              locale: 'fr-FR',
+              rating: 5,
+              body: 'Superbe séjour, hôtes adorables.',
+              reviewDate: '2026-10-03',
+              source: 'Airbnb',
+            },
+            { guestName: 'Rahul', rating: 5, body: 'Peaceful stay with great views.', reviewDate: '2026-10-02', source: 'Airbnb' },
+            {
+              guestName: 'Mallory',
+              locale: '<img src=x onerror=alert(1)>',
+              rating: 5,
+              body: 'Hostile locale string must not render.',
+              reviewDate: '2026-10-01',
+              source: 'Airbnb',
+            },
+          ],
+        });
+      }
+      if (url.includes('/listings/101/reviews')) return json({ averageRating: 0, totalCount: 0, reviews: [] });
+      return json({});
+    }) as unknown as typeof fetch;
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetTenantContextForTests();
+    document.head.querySelector('script[data-seo-json-ld]')?.remove();
+    mockUseTenantListings.mockReturnValue({
+      listings: [],
+      properties: [
+        {
+          id: 101,
+          listingId: 101,
+          property_name: 'Atlas101',
+          property_location: '165, KPHB 7th Phase',
+          property_img: ['https://cdn.example.com/img1.jpg'],
+          property_amenities: [],
+          property_description: '',
+          property_rating: 4.9,
+          property_reviews: 10,
+          property_price: 2500,
+        },
+      ],
+      state: 'success',
+      refetch: vi.fn(),
+    });
+  });
+
+  it('shows the real author name and a language chip, as plain text', async () => {
+    mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+    const originalFetch = global.fetch;
+    stub();
+    try {
+      render(
+        <MemoryRouter initialEntries={['/homes/atlas101/101']}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/homes/:propertySlug/:unitSlug" element={<Homepage_PropertyDetails />} />
+            </Routes>
+          </Suspense>
+        </MemoryRouter>,
+      );
+      await settle();
+      await settle();
+
+      const grid = screen.getByTestId('reviews-grid');
+      const cards = within(grid).getAllByRole('article');
+      expect(cards).toHaveLength(3);
+
+      const amelie = cards.find((c) => c.textContent?.includes('Superbe'))!;
+      expect(within(amelie).getByText('Amelie Dubois')).toBeInTheDocument();
+      expect(amelie).not.toHaveTextContent(/\bGuest\b/);
+      expect(within(amelie).getByTestId('review-locale-chip')).toHaveTextContent('French (France)');
+
+      const rahul = cards.find((c) => c.textContent?.includes('Peaceful'))!;
+      expect(within(rahul).queryByTestId('review-locale-chip')).not.toBeInTheDocument();
+
+      const mallory = cards.find((c) => c.textContent?.includes('Hostile'))!;
+      expect(within(mallory).queryByTestId('review-locale-chip')).not.toBeInTheDocument();
+      expect(grid.querySelector('img[src="x"]')).toBeNull();
+
+      // The JSON-LD author is the real name too.
+      const ld = JSON.stringify(readJsonLd());
+      expect(ld).toContain('Amelie Dubois');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+});

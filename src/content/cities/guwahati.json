@@ -1,0 +1,73 @@
+{
+  "slug": "guwahati",
+  "cityName": "Guwahati",
+  "h1": "Homestays in Guwahati — Brahmaputra sunsets and Kamakhya temple circuits",
+  "metaTitle": "Guwahati homestays | Kamakhya, Paltan Bazaar & Brahmaputra | {{TENANT_BRAND}}",
+  "metaDescription": "Find Guwahati homestays near Kamakhya, Paltan Bazaar, and the Brahmaputra riverfront. Quiet homes with reliable WiFi—book direct on {{TENANT_BRAND}}.",
+  "listingKeywords": [
+    "guwahati",
+    "assam",
+    "kamakhya",
+    "paltan bazaar",
+    "paltan",
+    "bharalumukh",
+    "ganeshguri",
+    "dispur",
+    "beltola",
+    "khanapara",
+    "maligaon",
+    "fancy bazaar",
+    "fancy bazar",
+    "noonmati"
+  ],
+  "introParagraphs": [
+    "Guwahati is the gateway to the Northeast—riverfront walks, traditional Assamese cuisine, and short drives into Kaziranga and Shillong. Homestays give travellers a residential feel that hotels rarely match: hosts who know the river crossing timings, local transport, and temple darshan windows.",
+    "Pick your anchor before booking. Kamakhya and Paltan Bazaar suit pilgrims and short city stays; Dispur and Khanapara work for longer visits and quieter residential pockets; Beltola and Ganeshguri are convenient for work trips.",
+    "{{TENANT_BRAND}} focuses on transparent nightly pricing and structured booking confirmations. The cards below filter live listings whose addresses reference Guwahati or its surrounding areas—verify pin codes and landmarks on the listing page before you pay.",
+    "The Brahmaputra is the constant. Sunset cruises and ferry rides are a regular evening ritual—ask your host for vetted operators rather than informal boat pickups.",
+    "Food centres on traditional thalis, fish preparations, and Assamese breakfast staples. Ask hosts about local markets and seasonal specialties during your stay."
+  ],
+  "areasTitle": "Top areas in Guwahati for homestay guests",
+  "areas": [
+    {
+      "title": "Kamakhya and Paltan Bazaar",
+      "body": "Walking distance to the temple and the main commercial district. Ideal for pilgrim visits and short city stays where proximity matters more than acreage."
+    },
+    {
+      "title": "Dispur, Khanapara, and Beltola",
+      "body": "Quieter residential pockets suited to longer stays and work trips. Listings here tend to advertise quieter streets and easier access to the airport corridor."
+    },
+    {
+      "title": "Beltola and Ganeshguri",
+      "body": "Convenient residential areas with good connectivity to the airport and the railway station. Suitable for travellers making short stops before or after Northeast circuits."
+    }
+  ],
+  "seasonTitle": "Best time to visit Guwahati",
+  "seasonParagraphs": [
+    "October to April brings pleasant weather and clearer river views—ideal for sunset cruises and outdoor temple visits.",
+    "May to June is hot and humid; plan indoor activities during midday and prioritise AC if your work depends on uptime.",
+    "July to September is the heavy monsoon; the Brahmaputra rises and some riverside roads become difficult. Confirm access expectations with your host before booking."
+  ],
+  "faq": [
+    {
+      "question": "Are Guwahati homestays suited to family visits?",
+      "answer": "Many hosts welcome families and provide extra mattresses on request. Confirm max guest counts and stair access in writing."
+    },
+    {
+      "question": "How do I pick between Kamakhya and Dispur?",
+      "answer": "Kamakhya suits pilgrim visits with walking access; Dispur and Khanapara suit longer stays and quieter residential pockets. Match the area to your itinerary."
+    },
+    {
+      "question": "Is parking available at Guwahati homestays?",
+      "answer": "Varies by property. Ask the host whether sedan or SUV height fits their driveway and whether the road remains accessible during monsoon."
+    },
+    {
+      "question": "Can hosts arrange a Brahmaputra cruise?",
+      "answer": "Some do via vetted operators familiar with the river. Confirm rates and timing through booking messaging rather than informal arrangements."
+    },
+    {
+      "question": "Why book Guwahati stays direct on {{TENANT_BRAND}}?",
+      "answer": "Direct booking keeps communication transparent and shows cancellation tiers when configured. Confirmations anchor support if plans change."
+    }
+  ]
+}

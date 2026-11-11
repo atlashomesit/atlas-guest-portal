@@ -3,17 +3,11 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getTenantBrandName } from "./displayBrand";
 import { applyTenantBranding } from "./tenantBranding";
-import type { TenantInfo } from "./tenantContext";
-
-vi.mock("./tenantContext", () => ({
-  getTenantContext: vi.fn(),
-}));
+import { _setTenantContextForTests, type TenantInfo } from "./tenantContext";
 
 vi.mock("./tenantOverrides", () => ({
   getTenantOverrides: () => ({}),
 }));
-
-import { getTenantContext } from "./tenantContext";
 
 const millionaireTenant = {
   slug: "millionairesmansion",
@@ -31,7 +25,7 @@ const millionaireTenant = {
 
 describe("TASK-7431 brand slots", () => {
   beforeEach(() => {
-    vi.mocked(getTenantContext).mockReturnValue(millionaireTenant as ReturnType<typeof getTenantContext>);
+    _setTenantContextForTests(millionaireTenant);
     document.title = "";
     document.head.querySelectorAll('meta[name="apple-mobile-web-app-title"]').forEach((n) => n.remove());
   });

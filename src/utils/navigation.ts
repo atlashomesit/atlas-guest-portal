@@ -94,3 +94,15 @@ export const navigateToHomeUnit = (
   navigate(path, options);
   return path;
 };
+
+/**
+ * TASK-10298822 / TASK-10298929: Prevents double question mark URLs when basePath already includes
+ * query parameters (e.g. ?tenant=...) and suffix is appended.
+ */
+export function appendQuerySuffix(basePath: string, suffix: string): string {
+  if (!suffix) return basePath;
+  const cleanSuffix = suffix.replace(/^[?&]+/, '');
+  if (!cleanSuffix) return basePath;
+  const separator = basePath.includes('?') ? '&' : '?';
+  return `${basePath}${separator}${cleanSuffix}`;
+}
