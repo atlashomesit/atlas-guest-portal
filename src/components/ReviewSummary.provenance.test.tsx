@@ -51,8 +51,8 @@ describe('TASK-10089 ReviewSummary provenance gating', () => {
   it('hides the chip when the summary count disagrees with the card', async () => {
     stubSummary(SUMMARY);
     render(<ReviewSummary listingId={9} verifiedStayCount={7} />);
-    // Let the fetch resolve; the chip must never appear.
-    await new Promise((r) => setTimeout(r, 100));
+    // Let the fetch resolve (drained, not slept: HEALTH-1110); the chip must never appear.
+    await settle();
     expect(screen.queryByText(/Mostly positive/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Guests mention/)).not.toBeInTheDocument();
   });

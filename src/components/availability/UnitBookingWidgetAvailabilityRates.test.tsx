@@ -187,7 +187,7 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
       </MemoryRouter>,
     );
     await settle();
-    const trigger = screen.getByLabelText('Select check-in date');
+    const trigger = screen.getByRole('button', { name: /^check-in/i });
     await act(async () => {
       fireEvent.click(trigger);
     });
@@ -220,7 +220,7 @@ describe('UnitBookingWidget - TASK-7491: availability-rates bookable gate (rende
     // Unselectable: a click must not be able to pick it as check-in — the trigger still shows
     // the empty placeholder, never the clicked (unusable) date.
     fireEvent.click(cell);
-    expect(screen.getByLabelText('Select check-in date').textContent).toContain('Add date');
+    expect(screen.getByRole('button', { name: /^check-in/i }).textContent).toContain('Add date');
   });
 
   it('a carried_forward day (bookable:true) stays selectable and keeps showing its carried price (unchanged)', async () => {

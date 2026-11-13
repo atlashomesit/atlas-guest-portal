@@ -70,7 +70,7 @@ import {
   buildPropertyDetailBackHref,
   buildSimilarStayHref,
   extractSimilarStayMeta,
-  formatSimilarStayPrice,
+  SIMILAR_STAY_PRICE_HINT,
   hasPropertyDetailSearchFilters,
   selectSimilarStaysForParty,
   keepSimilarStaysInSameCity,
@@ -98,11 +98,14 @@ import StateMessage from '@/components/StateMessage';
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap';
 import SinglePinGoogleMap from '@/components/map/SinglePinGoogleMap';
 import EmbeddedListingMap from '@/components/map/EmbeddedListingMap';
+import ListingHouseRules from '@/components/listing/ListingHouseRules';
+import { readHostRulesFields } from '@/components/listing/readHostRulesFields';
 import { selectPropertyMapMode } from '@/components/homepage_components/homepage_Propertydetails/propertyMapMode';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
 import { addRecentlyViewed, isFavorite, toggleFavorite } from '@/utils/guestHistory';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '@/components/apartments/SkeletonCard';
+import { getTodayBreakdownFromListing } from '@/api/pricingClient';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
 import ListingWhatsAppFloat, { buildListingWhatsAppUrl } from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
@@ -394,6 +397,11 @@ interface Property {
     cancellationTier?: 'Flexible' | 'Moderate' | 'Strict' | null;
     /** TASK-4356: free-cancellation window hours before check-in (server-resolved). */
     cancellationWindowHours?: number | null;
+    /** GUEST-069: the host's own rules and map link, from the public listing. */
+    houseRulesText?: string | null;
+    houseRulesPdfUrl?: string | null;
+    houseRulesStructured?: string | null;
+    googleMapsUrl?: string | null;
     /** TASK-4405: server-resolved universal grace-window hours. Null when the flag is off (flag-off parity). */
     graceHours?: number | null;
     /** TASK-5205 / TASK-956: minimum stay nights from listing payload. */
@@ -449,6 +457,11 @@ function coerceProperty(item: Partial<Property> & { id?: number | string }): Pro
         propertyAddress: item.propertyAddress,
         property_address: item.property_address,
         virtualTourUrl: item.virtualTourUrl,
+        // GUEST-069: the host's rules and map link survive the coercion.
+        houseRulesText: item.houseRulesText,
+        houseRulesPdfUrl: item.houseRulesPdfUrl,
+        houseRulesStructured: item.houseRulesStructured,
+        googleMapsUrl: item.googleMapsUrl,
         cancellationTier: item.cancellationTier,
         cancellationWindowHours: (item as unknown as { cancellationWindowHours?: number | null }).cancellationWindowHours ?? null,
         graceHours: item.graceHours,
@@ -781,11 +794,14 @@ const PropertyDetails = () => {
         return dailyPricing.data?.listings?.find((l) => l.listingId === listingNumericForPricing);
     }, [dailyPricing.data?.listings, listingNumericForPricing]);
 
+    // GUEST-064: ONE from-price, the one the search card and the booking box show
+    // (getTodayBreakdownFromListing().actualPrice). No synthetic estimate: until the real rate has
+    // loaded this is 0 and the mobile bar shows a skeleton instead of a number that changes.
     const directBookingNightly = useMemo(() => {
-        const fromApi = dailyPricingRow?.finalAmount;
-        if (fromApi != null && Number(fromApi) > 0) return Math.round(Number(fromApi));
-        return nightlyPrice?.finalNightlyPrice ?? 0;
-    }, [dailyPricingRow?.finalAmount, nightlyPrice?.finalNightlyPrice]);
+        if (!dailyPricingRow) return 0;
+        const actual = getTodayBreakdownFromListing(dailyPricingRow).actualPrice;
+        return Number.isFinite(actual) && actual > 0 ? actual : 0;
+    }, [dailyPricingRow]);
 
 
     useEffect(() => {
@@ -860,6 +876,7 @@ const PropertyDetails = () => {
     // object, re-ran the effect, and stacked 2–6 identical GET /listings/{id} calls. Depend on
     // listing-id primitives only; `dedupedJsonFetch` still collapses this caller with resolveListing.
     const detailPhotosHydratedRef = React.useRef<number | null>(null);
+    const [photoDetailSettledFor, setPhotoDetailSettledFor] = useState<number | null>(null);
     const hasPropertyRow = data != null;
     const dataListingId = data?.listingId ?? null;
     useEffect(() => {
@@ -890,6 +907,7 @@ const PropertyDetails = () => {
                 );
                 const hydratedImages = photoUrls.length > 0 ? photoUrls : (coverUrl ? [coverUrl] : []);
                 detailPhotosHydratedRef.current = lid;
+                setPhotoDetailSettledFor(lid);
 
                 setData((prev) => {
                     if (!prev) return prev;
@@ -917,7 +935,10 @@ const PropertyDetails = () => {
                     return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
                 });
             })
-            .catch(() => {});
+            .catch(() => {
+                // A failed detail call is a settled answer too: show what we have, not a skeleton forever.
+                if (!ac.signal.aborted) setPhotoDetailSettledFor(lid);
+            });
         return () => ac.abort();
     }, [hasPropertyRow, resolvedListingId, dataListingId, listingId]);
 
@@ -1317,6 +1338,7 @@ const PropertyDetails = () => {
                                 pub.cancellationWindowHours;
                             return typeof raw === 'number' && raw > 0 ? raw : null;
                         })(), // TASK-4356 / TASK-5205
+                        ...readHostRulesFields(apiListing as Record<string, unknown>), // GUEST-069
                         ...readIncludedGuestFields(apiListing as Record<string, unknown>), // GUEST-060
                         graceHours: (() => {
                             const raw = (apiListing as Record<string, unknown>).graceHours ?? pub.graceHours;
@@ -1824,10 +1846,16 @@ useEffect(() => {
       typeof data.longitude === 'number' &&
       Number.isFinite(data.latitude) &&
       Number.isFinite(data.longitude);
-    const ppStickyNightly =
-      directBookingNightly > 0 ? directBookingNightly : (nightlyPrice?.finalNightlyPrice ?? 0);
-    const directBookingNightlyIsSynthetic =
-      !(dailyPricingRow?.finalAmount != null && Number(dailyPricingRow.finalAmount) > 0);
+    const ppStickyNightly = directBookingNightly;
+    const ppStickyNightlyPending = dailyPricing.loading && directBookingNightly <= 0;
+    // GUEST-064: hero shows a skeleton (not "Photos coming soon") until GET /listings/{id} has
+    // answered; the "N photos" count waits for the same answer so it never reads 1 and then 8.
+    const ppPhotoLookupId = Number(resolvedListingId ?? data?.listingId ?? listingId ?? NaN);
+    const ppPhotosPending =
+      Number.isFinite(ppPhotoLookupId) && ppPhotoLookupId > 0 && photoDetailSettledFor !== ppPhotoLookupId;
+    // GUEST-064: the public list row carries only the cover, so until the detail answers the hero is a
+    // skeleton (card rule) rather than one photo that is then joined by the rest of the gallery.
+    const ppHeroUrl = ppPhotosPending ? undefined : galleryUrls[0];
 
     return (
         <>
@@ -2011,16 +2039,16 @@ useEffect(() => {
             <div className="pp-gallery" role="region" aria-label="Property photos" data-testid="property-photo-gallery">
               {/* Hero cell */}
               <div
-                className={`pp-cell pp-cell-hero${galleryUrls[0] ? ' pp-cell--photo' : ''}`}
+                className={`pp-cell pp-cell-hero${ppHeroUrl ? ' pp-cell--photo' : ''}`}
                 
-                role={galleryUrls[0] ? undefined : 'img'}
-                aria-label={galleryUrls[0] ? undefined : `${data.property_name} — photo coming soon`}
+                role={ppHeroUrl ? undefined : 'img'}
+                aria-label={ppHeroUrl ? undefined : ppPhotosPending ? 'Loading photos' : `${data.property_name} — photo coming soon`}
               >
-                {galleryUrls[0] ? (
+                {ppHeroUrl ? (
                   <button onClick={(e) => { e.preventDefault(); setLightboxIndex(0); setShowLightbox(true); }} className="block w-full h-full p-0 border-0 bg-transparent cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-brand-accent transition-shadow">
                     <img
-                      src={getHeritageTransformedUrl(galleryUrls[0], 768)}
-                      srcSet={getHeritageSrcSet(galleryUrls[0])}
+                      src={getHeritageTransformedUrl(ppHeroUrl, 768)}
+                      srcSet={getHeritageSrcSet(ppHeroUrl)}
                       sizes="(max-width: 767px) 100vw, (max-width: 1023px) 100vw, 600px"
                       alt={`${data.property_name} — main photo`}
                       loading="eager"
@@ -2030,6 +2058,8 @@ useEffect(() => {
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                   </button>
+                ) : ppPhotosPending ? (
+                  <div className="pp-gallery-skeleton" data-testid="gallery-skeleton" aria-busy="true" />
                 ) : (
                   <div className="pp-cell-overlay">
                     <span className="pp-dot" aria-hidden="true" />
@@ -2043,7 +2073,7 @@ useEffect(() => {
                   "Living/Kitchen/Bedroom/Balcony" placeholder tiles for sparse listings. */}
               {([1, 2, 3, 4] as const).map((i) => {
                 const photo = galleryUrls[i];
-                if (!photo) return null;
+                if (!photo || ppPhotosPending) return null;
                 return (
                   <div
                     key={i}
@@ -2113,6 +2143,14 @@ useEffect(() => {
                 <VirtualTourSection listingId={Number(resolvedListingId)} />
               </Suspense>
             )}
+
+            {/* GUEST-069: the host's house rules, above the booking box and before any date is chosen. */}
+            <ListingHouseRules
+              houseRulesText={data.houseRulesText}
+              houseRulesPdfUrl={data.houseRulesPdfUrl}
+              houseRulesStructured={data.houseRulesStructured}
+              googleMapsUrl={data.googleMapsUrl}
+            />
 
             {/* ---- v2: Location/Map promoted to upper-third (below gallery) ---- */}
             {ppHasLocation && (
@@ -2460,7 +2498,9 @@ useEffect(() => {
                   const rating = ppCombinedAverageRating;
                   const count = ppCombinedReviewCount;
                   // TASK-8019 (mirrored from the default theme): "verified stay(s) / through this platform" only for native Atlas reviews.
-                  const nativeVerifiedCount = api.totalCount;
+                  // TASK-1040061: api.totalCount is native + external combined, so an external-only listing (reviews: [])
+                  // read as "4 verified stays". Only the native rows the API actually returned may claim it.
+                  const nativeVerifiedCount = api.reviews.length;
                   const externalSources = Array.from(
                     new Set(
                       ppMergedReviews
@@ -2885,7 +2925,7 @@ useEffect(() => {
                                   <p style={{ fontSize: 12.5, color: '#64748b', margin: '0 0 6px' }}>{String(it.propertyAddress).slice(0, 60)}</p>
                                 )}
                                 {(meta.maxGuests != null || meta.rating != null) && (
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b', marginBottom: meta.nightlyRate != null ? 6 : 0 }}>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b', marginBottom: 6 }}>
                                     {meta.maxGuests != null && (
                                       <span data-testid="similar-stay-guests">Up to {meta.maxGuests} {meta.maxGuests === 1 ? 'guest' : 'guests'}</span>
                                     )}
@@ -2897,11 +2937,9 @@ useEffect(() => {
                                     )}
                                   </div>
                                 )}
-                                {meta.nightlyRate != null && (
-                                  <p data-testid="similar-stay-price" style={{ fontWeight: 700, color: '#1a1a2e', fontSize: 13.5, margin: 0 }}>
-                                    {formatSimilarStayPrice(meta.nightlyRate, meta.currency)}
-                                  </p>
-                                )}
+                                <p data-testid="similar-stay-price-hint" style={{ fontWeight: 700, color: '#1a1a2e', fontSize: 13.5, margin: 0 }}>
+                                  {SIMILAR_STAY_PRICE_HINT}
+                                </p>
                               </div>
                             </Link>
                           );
@@ -2921,7 +2959,7 @@ useEffect(() => {
 
               {/* ===== RIGHT COLUMN — sticky booking ===== */}
               <aside className="pp-booking-col" aria-label="Booking">
-                {galleryUrls.length > 0 && (
+                {galleryUrls.length > 0 && !ppPhotosPending && (
                   <p style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>
                     {galleryUrls.length} photo{galleryUrls.length !== 1 ? 's' : ''}
                   </p>
@@ -3122,7 +3160,8 @@ useEffect(() => {
           <PropertyMobileStickyBar
             bookable={ppIsBookable}
             nightlyFallback={ppStickyNightly}
-            nightlyIsSynthetic={directBookingNightlyIsSynthetic}
+            nightlyIsSynthetic={false}
+            nightlyPending={ppStickyNightlyPending}
             summary={stickyBookingSummary}
             onReserveClick={() => {
               const widget = document.querySelector('[data-testid="guest-booking-form"]');

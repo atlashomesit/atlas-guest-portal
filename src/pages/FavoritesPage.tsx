@@ -7,6 +7,7 @@ import { fetchPublicListings, type PublicListing } from "../api/listingClient";
 import { getFavoriteIds, getRecentlyViewed, toggleFavorite } from "../utils/guestHistory";
 import { appendQuerySuffix, buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { fetchAllMarketplacePages } from "../api/marketplacePaging"; // TASK-1040071
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantContext } from "../tenant/tenantContext";
 import { isMarketplaceMode } from "../tenant/tenantResolver";
@@ -93,12 +94,20 @@ export default function FavoritesPage() {
         return baseList;
       }
       try {
-        const res = await fetch(buildApiUrl("/marketplace/listings?page=1&pageSize=100"), {
-          headers: { Accept: "application/json" },
+        // TASK-1040071: page through every marketplace listing (server max 100 per page) so a saved home
+        // ranked 101+ is still merged in and keeps its tenantSlug.
+        const mktItems = await fetchAllMarketplacePages<MarketplaceFavoriteItem>({
+          buildUrl: (page, pageSize) => buildApiUrl(`/marketplace/listings?page=${page}&pageSize=${pageSize}`),
+          init: { headers: { Accept: "application/json" } },
+          readPage: (json) => {
+            const data = json as { items?: MarketplaceFavoriteItem[]; total?: number } | null;
+            return {
+              rows: Array.isArray(data?.items) ? data.items.filter((i) => typeof i?.id === "number") : [],
+              total: typeof data?.total === "number" ? data.total : undefined,
+            };
+          },
+          rowKey: (item) => item.id,
         });
-        if (!res.ok || typeof res.json !== "function") return baseList;
-        const data = (await res.json()) as { items?: MarketplaceFavoriteItem[] };
-        const mktItems = Array.isArray(data?.items) ? data.items : [];
         if (mktItems.length === 0) return baseList;
         const mktById = new Map<number, MarketplaceFavoriteItem>();
         for (const item of mktItems) {
@@ -180,16 +189,20 @@ export default function FavoritesPage() {
 
   // TASK-1299: encode saved IDs into shareable URL (no backend needed)
   const handleShareWishlist = () => {
-    const ids = getFavoriteIds();
+    const ids = sharedWishlistIds ?? getFavoriteIds();
     if (!ids.length) return;
     const token = btoa(ids.join(","));
-    const shareUrl = `${window.location.origin}/favorites?wishlist=${encodeURIComponent(token)}`;
+    const shareParams = new URLSearchParams({ wishlist: token });
+    const tenantSlug = getTenantContext()?.slug ?? getApiHeaders()["X-Tenant-Slug"];
+    if (tenantSlug) shareParams.set("tenant", tenantSlug);
+    if (isBrandAtlastaysParam) shareParams.set("brand", "atlastays");
+    const shareUrl = `${window.location.origin}/favorites?${shareParams}`;
     const waText = `Check out these ${brandName} I saved! ${shareUrl}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
     if (navigator.share) {
       navigator.share({ title: `My ${brandName} Wishlist`, url: shareUrl }).catch(() => {});
     } else {
-      navigator.clipboard.writeText(shareUrl).then(() => {
+      Promise.resolve().then(() => navigator.clipboard.writeText(shareUrl)).then(() => {
         setShareState("copied");
         setTimeout(() => setShareState("idle"), 2500);
       }).catch(() => {
@@ -223,9 +236,9 @@ export default function FavoritesPage() {
             <button
               type="button"
               onClick={handleShareWishlist}
-              className="text-sm font-medium text-brand-primary border border-brand-primary rounded-lg px-3 py-1.5 hover:bg-brand-primary/5 transition-colors"
+              className="min-h-11 text-sm font-medium text-brand-primary border border-brand-primary rounded-lg px-3 py-1.5 hover:bg-brand-primary/5 transition-colors"
             >
-              {shareState === "copied" ? "✓ Link copied!" : "Share wishlist"}
+              {shareState === "copied" ? "✓ Link copied!" : (sharedWishlistIds ? "Share this wishlist" : "Share wishlist")}
             </button>
           )}
           <Link

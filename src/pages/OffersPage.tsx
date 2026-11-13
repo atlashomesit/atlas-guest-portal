@@ -87,9 +87,9 @@ function DirectBookingCodeCopy() {
         disabled={copying}
         aria-busy={copying}
         className="self-start sm:self-center inline-flex items-center gap-2 rounded-xl bg-white border border-emerald-300 px-4 py-2 font-mono font-bold text-emerald-700 text-sm hover:bg-emerald-50 transition"
-        aria-label={"Copy " + DIRECT5_CODE + " promo code"}
+        aria-label={DIRECT5_CODE + " " + (status === "copied" ? "Copied!" : "Copy") + " promo code"}
       >
-        {DIRECT5_CODE}
+        {DIRECT5_CODE}{" "}
         <span className="text-xs font-normal text-emerald-700" aria-live="polite">
           {status === "copied" ? "Copied!" : "Copy"}
         </span>

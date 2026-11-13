@@ -2,7 +2,9 @@ import {
   CSSProperties,
   ReactNode,
   RefObject,
+  Suspense,
   createContext,
+  lazy,
   useCallback,
   useContext,
   useEffect,
@@ -15,7 +17,9 @@ import { FiX } from "react-icons/fi";
 import { SUPPORT_DRAWER_COPY, getSupportDrawerHeaderSubtitle } from "../../config/supportDrawerCopy";
 import { getTenantBrandName } from "../../tenant/displayBrand";
 import { useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
-import AtlasChat from "./AtlasChat";
+// TASK-10299465: the assistant pulls in react-markdown (about 110 KB). Every page mounts this drawer, but only a guest who opens the assistant needs the chat,
+// so it is fetched then, not with the first page.
+const AtlasChat = lazy(() => import("./AtlasChat"));
 
 type SupportDrawerView = "home" | "callback" | "faq" | "chat" | "assistant";
 
@@ -220,7 +224,13 @@ const SupportDrawer = ({
         <div
           className={`min-h-0 flex-1 ${resolvedLayoutVariant === "compactDrawer" ? "overflow-y-auto" : "overflow-visible"}`}
         >
-          {view === "assistant" ? <AtlasChat key={assistantContextKey} listingId={assistantListingId} onBack={goToHome} /> : children}
+          {view === "assistant" ? (
+            <Suspense fallback={<div className="p-4 text-sm text-text-muted" role="status" aria-live="polite">Loading…</div>}>
+              <AtlasChat key={assistantContextKey} listingId={assistantListingId} onBack={goToHome} />
+            </Suspense>
+          ) : (
+            children
+          )}
         </div>
       </div>
     </SupportDrawerViewContext.Provider>

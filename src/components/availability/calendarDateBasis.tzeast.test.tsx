@@ -224,7 +224,7 @@ describe('UnitBookingWidget — the gated night is the night the guest sees (eas
       </MemoryRouter>,
     );
     await settle();
-    const trigger = screen.getByLabelText('Select check-in date');
+    const trigger = screen.getByRole('button', { name: /^check-in/i });
     await act(async () => {
       fireEvent.click(trigger);
     });
@@ -266,8 +266,8 @@ describe('UnitBookingWidget — the gated night is the night the guest sees (eas
     // The trigger shows the date the guest actually clicked — the selection was keyed to the
     // visible cell, not silently shifted a day.
     await settle();
-    expect(screen.getByLabelText('Select check-in date').textContent).not.toContain('Add date');
-    expect(screen.getByLabelText('Select check-in date').textContent).toContain(
+    expect(screen.getByRole('button', { name: /^check-in/i }).textContent).not.toContain('Add date');
+    expect(screen.getByRole('button', { name: /^check-in/i }).textContent).toContain(
       format(dayAfterBlocked, 'd'),
     );
   });
@@ -277,7 +277,7 @@ describe('UnitBookingWidget — the gated night is the night the guest sees (eas
 
     const neighbourCell = await findDayCell(neighbourBefore);
     await settle();
-    expect(screen.getByLabelText('Select check-in date')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^check-in/i })).toBeInTheDocument();
     expect(neighbourCell).not.toBeDisabled();
     expect(neighbourCell.className).not.toContain('bc-unavail');
   });

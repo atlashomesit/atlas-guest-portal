@@ -34,6 +34,8 @@ type Props = {
   bookable: boolean;
   nightlyFallback: number;
   nightlyIsSynthetic: boolean;
+  /** GUEST-064: the real nightly rate has not loaded yet: show a skeleton, never an interim price. */
+  nightlyPending?: boolean;
   summary: BookingStickySummary | null;
   /** Fallback when the date-picker sheet cannot be triggered (scrolls to the booking form). */
   onReserveClick: () => void;
@@ -81,6 +83,7 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
   bookable,
   nightlyFallback,
   nightlyIsSynthetic,
+  nightlyPending = false,
   summary,
   onReserveClick,
   hostWhatsAppUrl = "",
@@ -218,7 +221,10 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
     const form =
       document.querySelector<HTMLElement>(STICKY_BAR_BOOKING_FORM_SELECTOR) ??
       document.querySelector<HTMLElement>("[data-booking-widget]");
-    if (canReviewBooking) {
+    // GUEST-070: a stay the widget has marked invalid (for example shorter than the host's minimum) must not be "reserved" by a tap
+    // that then shows nothing: the invalid date cell is brought into view below, next to its own message.
+    const hasInvalidField = Boolean(form?.querySelector('[aria-invalid="true"]'));
+    if (canReviewBooking && !hasInvalidField) {
       const submit = form?.querySelector<HTMLButtonElement>('[data-testid="guest-booking-submit"]');
       // GUEST-040: one tap goes straight to checkout. The form's own Reserve handler hands the stay to the details page
       // (dates, guests, rate plan, quote, add-ons) with no network call, so the sticky bar presses that same button
@@ -366,12 +372,24 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
             <b style={{ fontWeight: 600 }}>Calculating…</b>
             <span className="pp-m-sticky-taxes">Updating your total</span>
           </>
-        ) : (
+        ) : nightlyPending ? (
+          <span
+            className="pp-m-sticky-skeleton"
+            data-testid="mobile-sticky-price-skeleton"
+            aria-busy="true"
+            aria-label="Loading price"
+          />
+        ) : nightlyFallback > 0 ? (
           <>
             <b>{nightlyIsSynthetic ? "from " : ""}{formatCurrency(nightlyFallback, { maximumFractionDigits: 0 })}</b>
             <span>/ night</span>
-            <span className="pp-m-sticky-taxes">all fees included</span>
+            {/* GUEST-064 follow-up: this is the bare nightly rate. The checkout total adds the payment
+                processing fee (online rail) and any tourist tax, cleaning fee or breakfast extra, so
+                "all fees included" is only true once dates are picked and the live total shows. */}
+            <span className="pp-m-sticky-taxes" data-testid="mobile-sticky-total-after-dates">total shown once you pick dates</span>
           </>
+        ) : (
+          <b style={{ fontWeight: 600 }} data-testid="mobile-sticky-select-dates">Select dates for price</b>
         )}
       </div>
       <button
@@ -447,7 +465,7 @@ export const PropertyMobileStickyBar: React.FC<Props> = ({
         data-testid="mobile-sticky-book-now"
         onClick={handleReserve}
         tabIndex={isVisible ? 0 : -1}
-        aria-label={canReviewBooking ? `Reserve and continue to checkout, ${formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })} total` : datesUnavailable ? "Open date picker to change dates" : "Open date picker to book"}
+        aria-label={canReviewBooking ? `Reserve — ${formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })}. Continue to checkout` : datesUnavailable ? "Change dates. Open the date picker" : "Reserve. Open the date picker to book"}
       >
         {canReviewBooking ? `Reserve — ${formatCurrency(summary!.totalAmount!, { maximumFractionDigits: 0 })}` : datesUnavailable ? "Change dates" : "Reserve"}
       </button>

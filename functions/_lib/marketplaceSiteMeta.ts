@@ -176,6 +176,16 @@ export function clearMarketplaceListingsCache(): void {
   marketplaceListingsCache.clear();
 }
 
+/** Server clamp: MarketplaceController.NormalizePageSize turns anything above 100 into 20. */
+export const MARKETPLACE_LISTINGS_PAGE_SIZE = 100;
+/** Safety bound on paging (10 x 100 = 1,000 homes); the loop also stops on `total` or a short page. */
+export const MARKETPLACE_LISTINGS_MAX_PAGES = 10;
+
+/**
+ * TASK-1040071: page through /marketplace/listings until `total` (or a short/empty page) so a home ranked
+ * 101+ still gets its own link preview. Page 1 failing is a total failure (cached as null, fails open);
+ * a later page failing returns what was gathered WITHOUT caching it, so the next request retries.
+ */
 export async function fetchMarketplaceListingsCached(
   apiBase: string,
   fetchImpl: typeof fetch = fetch,
@@ -183,19 +193,36 @@ export async function fetchMarketplaceListingsCached(
   const cached = marketplaceListingsCache.get("all");
   if (cached !== undefined && cached !== null) return cached;
 
-
+  const all: MarketplaceListingMetaRow[] = [];
+  const seenIds = new Set<number>();
   try {
-    const res = await fetchImpl(`${apiBase}/marketplace/listings?page=1&pageSize=100`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
-      marketplaceListingsCache.set("all", null);
-      return [];
+    for (let page = 1; page <= MARKETPLACE_LISTINGS_MAX_PAGES; page++) {
+      let data: { items?: MarketplaceListingMetaRow[]; total?: number };
+      try {
+        const res = await fetchImpl(
+          `${apiBase}/marketplace/listings?page=${page}&pageSize=${MARKETPLACE_LISTINGS_PAGE_SIZE}`,
+          { headers: { Accept: "application/json" } },
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        data = (await res.json()) as { items?: MarketplaceListingMetaRow[]; total?: number };
+      } catch (err) {
+        if (page === 1) throw err;
+        return all; // partial: serve it, do not cache it
+      }
+      const items = Array.isArray(data.items) ? data.items : [];
+      let added = 0;
+      for (const item of items) {
+        if (typeof item?.id !== "number" || seenIds.has(item.id)) continue;
+        seenIds.add(item.id);
+        all.push(item);
+        added++;
+      }
+      const total = typeof data.total === "number" ? data.total : null;
+      if (items.length < MARKETPLACE_LISTINGS_PAGE_SIZE || added === 0) break;
+      if (total !== null && all.length >= total) break;
     }
-    const data = (await res.json()) as { items?: MarketplaceListingMetaRow[] };
-    const items = Array.isArray(data.items) ? data.items : [];
-    marketplaceListingsCache.set("all", items);
-    return items;
+    marketplaceListingsCache.set("all", all);
+    return all;
   } catch {
     marketplaceListingsCache.set("all", null);
     return [];

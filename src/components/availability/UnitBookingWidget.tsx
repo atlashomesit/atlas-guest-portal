@@ -33,7 +33,9 @@ import {
 import { describeIncludedGuests } from '@/utils/includedGuests';
 import { doesRangeIntersectBlocked } from '@/utils/dateRange';
 import { normalizePromoCodeSubmit } from '@/utils/promoCodeInput';
+import { rememberLinkPromo } from '@/utils/linkPromo';
 import { formatCurrency } from '@/utils/formatting';
+import { isPricingNotConfiguredError } from '@/utils/pricingNotConfigured';
 import { isSmallParty, SMALL_PARTY_HINT_DEFAULT } from '@/utils/smallParty';
 import { FeeInfoTip } from '@/components/ui/FeeInfoTip';
 import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
@@ -375,6 +377,9 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // Without these the quote of the PREVIOUS dates was shown as the quote of the new ones until the new fetch landed.
   const [serverPriceBreakdownKey, setServerPriceBreakdownKey] = useState<string | null>(null);
   const [quoteSettledKey, setQuoteSettledKey] = useState<string | null>(null);
+  // TASK-1040051: the server REFUSED to quote this stay (409 PRICING_NOT_CONFIGURED: the host has not set this room's pricing).
+  // Keyed like the quote, so it only ever speaks for the stay it was fetched for. While set, no total and no Reserve.
+  const [quoteRefused, setQuoteRefused] = useState<{ key: string | null; message: string } | null>(null);
   // MRP-002: Public rate plans for this listing & selected rate plan ID.
   const [publicRatePlans, setPublicRatePlans] = useState<PublicListingRatePlanDto[]>([]);
   const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
@@ -688,11 +693,52 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     try {
       const url = new URL(window.location.href);
       const promo = normalizePromoCodeSubmit(url.searchParams.get('promo') || '');
-      if (promo) window.localStorage.setItem('atlas_guest_promo_code', promo);
+      if (promo) rememberLinkPromo(promo);
     } catch {
       // no-op
     }
   }, []);
+
+  // AGT-003: a checkout link's ?promo= code that validates for THIS listing gets one plain line by the price.
+  // Display only: no price on this page is computed from it; checkout applies the code itself.
+  const [linkOfferLine, setLinkOfferLine] = useState<string | null>(null);
+  const bookingRef = useRef(booking);
+  bookingRef.current = booking;
+  useEffect(() => {
+    if (listingId == null) return;
+    let promo = '';
+    try { promo = normalizePromoCodeSubmit(new URL(window.location.href).searchParams.get('promo') || ''); } catch { /* ignore */ }
+    if (!promo || !booking.checkIn || !booking.checkOut) { setLinkOfferLine(null); return; }
+    const ac = new AbortController();
+    void (async () => {
+      try {
+        const bk = bookingRef.current;
+        const dayOf = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : toCalendarISO(getIstCalendarDate(new Date(v))));
+        // AGT-005: the same server quote checkout uses; the line shows its percent.
+        const res = await fetch(buildApiUrl('/api/promo-codes/quote'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getApiHeaders(verifiedTenantSlug) },
+          body: JSON.stringify({
+            code: promo,
+            listingId: Number(listingId),
+            checkIn: dayOf(bk.checkIn as string),
+            checkOut: dayOf(bk.checkOut as string),
+            guests: bk.guests ?? 2,
+          }),
+          signal: ac.signal,
+        });
+        if (!res.ok) { setLinkOfferLine(null); return; }
+        const data = (await res.json()) as { valid?: boolean; percent?: number };
+        if (!data.valid) { setLinkOfferLine(null); return; }
+        setLinkOfferLine(
+          Number(data.percent) > 0
+            ? `Your ${Number(data.percent)}% offer is applied at checkout.`
+            : 'Your offer is applied at checkout.',
+        );
+      } catch { if (!ac.signal.aborted) setLinkOfferLine(null); }
+    })();
+    return () => ac.abort();
+  }, [listingId, verifiedTenantSlug, booking.checkIn, booking.checkOut, booking.guests]);
 
   // TASK-2630: Listen for custom event from bottom Availability calendar (BUG-15b).
   // When user clicks a date in the AvailabilityCalendar, it dispatches atlas:set-checkin with the date (ISO string).
@@ -1298,12 +1344,14 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
         if (controller.signal.aborted) return;
         setServerPriceBreakdown(b);
         setServerPriceBreakdownKey(quoteKey);
+        setQuoteRefused(null);
         setQuoteSettledKey(quoteKey);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
         if (controller.signal.aborted) return; // superseded by a newer stay: its own answer decides
         setServerPriceBreakdown(null);
         setServerPriceBreakdownKey(null);
+        setQuoteRefused(isPricingNotConfiguredError(err) ? { key: quoteKey, message: err.message } : null);
         setQuoteSettledKey(quoteKey);
       });
     return () => controller.abort();
@@ -1529,10 +1577,12 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       bookingCreatedAt: new Date(),
       graceHours: resolvedGraceHours,
       planSummary: selectedRatePlan?.cancellationSummary ?? null,
+      serverDeadlineUtc: selectedRatePlan?.refundFreeUntilUtc ?? null, // TASK-1040050
     });
   }, [
     isSelectedRatePlanNonRefundable,
     selectedRatePlan?.cancellationSummary,
+    selectedRatePlan?.refundFreeUntilUtc,
     dateRange.startDate,
     effectiveRatePlanCancellationTier,
     selectedRatePlan?.cancellationPolicy,
@@ -1683,6 +1733,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // the footer MOR disclosure cannot drift apart again; that helper also treats MANUAL
   // (pay-on-arrival) as no-gateway, which the previous inline predicate missed.
   const showOnlinePaymentProcessing = hasOnlinePaymentRail(tenantContext !== undefined ? tenantContext : undefined);
+
+  // GUEST-065: with a Payment processing line on screen the box ties "included" to the lines below it; a host with no
+  // online payment has no such line, so the plain words stay.
+  const feesIncludedWords = showOnlinePaymentProcessing ? 'includes all fees listed below' : 'all fees included';
 
   const convenienceFeePercent = !showOnlinePaymentProcessing
     ? 0
@@ -1858,9 +1912,29 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     [effectiveDailyPricing, showOnlinePaymentProcessing],
   );
 
+  // TASK-1040051: the API refused to price THIS stay (409 PRICING_NOT_CONFIGURED). The calendar's own numbers must not
+  // stand in for a quote (they read "Accommodation INR 0 / Total INR 1"): show the API's sentence, no amount, no Reserve.
+  const pricingRefusedByApi: string | null =
+    hasSelectedRange && quoteKey != null && quoteRefused != null && quoteRefused.key === quoteKey ? quoteRefused.message : null;
+  // G3 journey 16 / price shown = price charged: when the server quote for THIS stay could not be fetched (network drop), the page falls
+  // back to the calendar's per-night sum, which has no extra-guest charge in it. For a home that charges more above its included guests,
+  // that sum is lower than the checkout total, so show no number and no Reserve (the same sentence the page already uses for an
+  // unreadable price) rather than a total the guest would then be charged more than. Homes with no guest-count pricing keep the fallback.
+  const quoteFailedForSelection =
+    hasSelectedRange && quoteKey != null && quoteSettledKey === quoteKey && serverPriceBreakdownKey !== quoteKey && quoteRefused == null;
+  const guestCountChangesPrice =
+    includedGuests != null && guests > includedGuests && ((extraGuestRate ?? 0) > 0 || priceChangesWithGuests === true);
+  const pricingRefusedMessage: string | null =
+    pricingRefusedByApi ??
+    (quoteFailedForSelection && guestCountChangesPrice
+      ? "We couldn’t work out the price for these dates. Please pick them again or try again in a moment."
+      : null);
+
   // Keep the navigation shortcut tied to the authoritative form eligibility.
   const reserveDisabled =
     isSubmitting ||
+    // TASK-1040051: no quote exists for this stay, so there is nothing to reserve at.
+    pricingRefusedMessage != null ||
     isBookingDisabled ||
     (Boolean(dateRange.startDate) && Boolean(dateRange.endDate) && invalidIstStayRange) ||
     // DESIGN-030 / TASK-4293 / TASK-4830: overlap, blocked check-in, or availability failure.
@@ -1876,6 +1950,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     // TASK-4729: guard against NaN pricing (non-numeric server response)
     (hasSelectedRange && !rangePricingPending && isNaN(finalTotal));
   const canReviewBooking = hasSelectedRange && !reserveDisabled && !calendarOpenPricingPending && displayFinalTotal > 0;
+  // TASK-1040051: the total a guest may be shown — never a calendar fallback for a stay the server refused to price.
+  const shownFinalTotal = pricingRefusedMessage != null ? 0 : displayFinalTotal;
 
   // A disabled Reserve must always say why. Every other blocker already speaks for itself (availability failed -> alert + Retry;
   // dates unavailable -> headline + alert; pricing pending -> status; pricing failed -> alert + Try again; service down -> banner;
@@ -1898,7 +1974,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       canReviewBooking,
       // DESIGN-030: never feed the sticky a bookable total for unavailable dates.
       totalAmount:
-        hasSelectedRange && !datesUnavailable && displayFinalTotal > 0 ? displayFinalTotal : null,
+        hasSelectedRange && !datesUnavailable && shownFinalTotal > 0 ? shownFinalTotal : null,
       pricingPending: !datesUnavailable && (rangePricingPending || calendarOpenPricingPending),
       freeCancelUntil: datesUnavailable
         ? null
@@ -1927,7 +2003,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     canReviewBooking,
     hasSelectedRange,
     datesUnavailable,
-    displayFinalTotal,
+    shownFinalTotal,
     rangePricingPending,
     calendarOpenPricingPending,
     freeCancellationCopy?.deadlineFormatted,
@@ -2112,7 +2188,10 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdTenantSlug,
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
-        holdBookingChannel: isMarketplaceOrigin ? 'marketplace' : null,
+        // AGT-005: the AI sales agent's link carries src=ai_receptionist; keep it across the hop to checkout (exact value only).
+        holdBookingChannel: isMarketplaceOrigin
+          ? 'marketplace'
+          : new URLSearchParams(currentSearch).get('src') === 'ai_receptionist' ? 'ai_receptionist' : null,
         holdPriceBreakdown: {
           paymentFeeDisplay: {
             percent: feePercent(Number((convenienceFeePercent * 100).toFixed(2))),
@@ -2154,6 +2233,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         },
         holdCancellationTier: effectiveRatePlanCancellationTier,
         holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
+        holdRefundFreeUntilUtc: selectedRatePlan?.refundFreeUntilUtc ?? null, // TASK-1040050: the server-quoted deadline, shown identically at checkout
         holdGraceHours: isSelectedRatePlanNonRefundable ? null : resolvedGraceHours,
         // TASK-1039977 / PAY-006: refundable security deposit forwarded to checkout
         holdSecurityDepositAmount:
@@ -2249,6 +2329,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div className="lv-booking-total" data-testid="bw-dates-unavailable-headline">
               <b style={{ fontWeight: 600 }}>Dates unavailable</b>
             </div>
+            {/* GUEST-065: "all fees included" sat next to a separate "Payment processing (3%)" line and read as a
+                contradiction. The total does include that line; say so, tied to the lines the guest can see. */}
             <p className="lv-booking-sub">
               {dateRange.startDate && dateRange.endDate
                 ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · pick different nights`
@@ -2266,6 +2348,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
             <p className="lv-booking-sub" role="status">Fetching latest prices…</p>
           </>
+        ) : hasSelectedRange && !invalidIstStayRange && pricingRefusedMessage != null ? (
+          // TASK-1040051: the server refused to price this stay. No amount at all (it used to read "Total INR 1").
+          <div className="lv-booking-total" data-testid="bw-pricing-not-configured-headline">
+            <b style={{ fontWeight: 600 }}>Not bookable online yet</b>
+          </div>
         ) : hasSelectedRange && !invalidIstStayRange && calendarPricingFailed ? (
           <div role="alert" data-testid="bw-pricing-error-alert">
             <div className="lv-booking-total">
@@ -2296,8 +2383,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
             <p className="lv-booking-sub">
               {dateRange.startDate && dateRange.endDate
-                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · all fees included`
-                : 'all fees included'}
+                ? `${format(dateRange.startDate, 'dd MMM')} — ${format(dateRange.endDate, 'dd MMM')} · ${feesIncludedWords}`
+                : feesIncludedWords}
             </p>
           </>
         ) : (
@@ -2314,12 +2401,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                     ? formatCurrency(effectiveDailyPricing.actualPrice, { maximumFractionDigits: 0 })
                     : perNightForDisplay > 0
                       ? formatCurrency(perNightForDisplay, { maximumFractionDigits: 0 })
-                      : '—'}
+                      : dailyPricingLoading
+                        ? (
+                          <span
+                            className="inline-block h-5 w-16 animate-pulse rounded bg-[#f0e6dc] align-middle"
+                            data-testid="bw-from-price-skeleton"
+                            aria-busy="true"
+                            aria-label="Loading price"
+                          />
+                        )
+                        : '—'}
               </b>
               <span> / night</span>
             </div>
             <p className="lv-booking-sub">Select dates to see total price</p>
           </>
+        )}
+        {linkOfferLine && (
+          <p className="lv-booking-sub" data-testid="bw-link-offer-line" role="status">{linkOfferLine}</p>
         )}
         {reviewCount != null && reviewCount > 0 && reviewRating != null && (
           <div className="bw-rating" data-testid="bw-rating-block" style={{ marginTop: 6 }}>
@@ -2375,7 +2474,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ref={calendarButtonRef}
             type="button"
             className="lv-date-cell"
-            aria-label="Select check-in date"
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
@@ -2396,7 +2494,6 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             ref={checkoutCellRef}
             type="button"
             className="lv-date-cell"
-            aria-label="Select check-out date"
             aria-describedby={dateError ? dateErrorId : undefined}
             aria-invalid={dateError ? true : undefined}
             disabled={isBookingDisabled}
@@ -2430,6 +2527,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             fallbackPrice={effectiveDailyPricing?.actualPrice ?? null}
             pricingLoading={calendarPricingLoading}
             shownDate={shownDate}
+            notice={dateError && dateError.startsWith('Minimum stay is ') ? dateError : null}
             onShownDateChange={(date) => {
               const nextShownDate = startOfMonth(date);
               if (
@@ -2454,13 +2552,11 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             // dead. minHeight restores a 44px hit area (WCAG 2.2 SC 2.5.5 / Apple HIG) without
             // re-introducing double padding. Applies on desktop too — it was ~38px there as well.
             style={{ padding: 0, minHeight: 44, background: 'transparent', border: 0, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-            aria-label={isDorm
-              ? `Beds: ${guests} ${guests === 1 ? 'bed' : 'beds'}. Click to change.`
-              : `Guests: ${guests} ${guests === 1 ? 'guest' : 'guests'}. Click to change.`}
+            title="Click to change"
             onClick={(e) => { e.stopPropagation(); setGuestsOpen((o) => !o); }}
           >
             <div>
-              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>{isDorm ? 'Beds' : 'Guests'}</small>
+              <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>{isDorm ? 'Beds' : 'Guests'}</small>{' '}
               <span className="lv-guest-val">
                 {isDorm ? `${guests} ${guests === 1 ? 'bed' : 'beds'}` : `${guests} ${guests === 1 ? 'adult' : 'adults'}`}
               </span>
@@ -2480,7 +2576,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   {`You asked for ${guestsOverLimit} ${isDorm ? 'beds' : 'guests'}, but this home allows up to ${effectiveMaxGuests}. We've set ${effectiveMaxGuests}.`}
                 </small>
               )}
-              {!isDorm && includedGuestsLine && (
+              {/* GUEST-065: a party SMALLER than what the price includes ("1 adult" under "Price includes up to 2 guests") read as two
+                  different guest counts. The line stays at the included count and above, where the extra-guest rule matters. */}
+              {!isDorm && includedGuestsLine && !(includedGuests != null && guests < includedGuests) && (
                 <small
                   data-testid="bw-included-guests"
                   style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}
@@ -2631,6 +2729,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       {plan.cancellationSummary}
                     </div>
                   </div>
+                  {/* TASK-1040051: no INR figure on a card while the server refuses to price this stay. */}
+                  {pricingRefusedMessage == null && (
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
                       {displayPrice(planQuoteTotal ?? plan.effectiveNightlyRate)}
@@ -2639,6 +2739,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       {planQuoteTotal != null ? 'total, all fees included' : '/ night'}
                     </div>
                   </div>
+                  )}
                 </button>
               );
             })}
@@ -2654,7 +2755,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             className="text-xs text-text-secondary"
             style={{ marginTop: 8 }}
           >
-            Select your check-out date (minimum one night after check-in).
+            Select your check-out date (minimum {effectiveMinStayNights > 1 ? `${effectiveMinStayNights} nights` : 'one night'} after check-in).
           </p>
         )}
         {/* v2 block (4): Price breakdown — hidden until both dates are selected (TASK-4276)
@@ -2687,7 +2788,17 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             These dates would be ~{displayPrice(displayFinalTotal)} — pick available dates to book.
           </p>
         )}
-        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && (
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && pricingRefusedMessage != null && (
+          <p
+            role="alert"
+            data-testid="bw-pricing-not-configured"
+            className="text-sm text-support-error"
+            style={{ marginTop: 8, lineHeight: 1.45 }}
+          >
+            {pricingRefusedMessage}
+          </p>
+        )}
+        {hasSelectedRange && !invalidIstStayRange && !datesUnavailable && !rangePricingPending && pricingRefusedMessage == null && (
         <div className="lv-price-rows">
           {/* TASK-1039948 / TASK-10299208: Direct booking pricing tier public display — only when the guest chose between options, in plain words (never internal ratePlanName) */}
           {publicRatePlans.length > 1 && selectedRatePlan && (
@@ -3048,7 +3159,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
       {!datesUnavailable && (
       <p className="bw-charge-note" data-testid="bw-charge-note" style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted, #6b5a55)', marginTop: 8 }}>
-        You won&apos;t be charged yet
+        {/* GUEST-065: a host with no online payment charges nothing here at all; "not charged yet" implies a later online charge. */}
+        {showOnlinePaymentProcessing ? "You won't be charged yet" : 'Nothing is charged online. The host confirms your booking.'}
       </p>
       )}
 

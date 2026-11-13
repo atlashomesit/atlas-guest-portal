@@ -215,7 +215,7 @@ const Navbar = () => {
                   className="util-bar-locale lang-switcher"
                   onClick={() => setLangMenuOpen(!langMenuOpen)}
                   onBlur={() => window.setTimeout(() => setLangMenuOpen(false), 150)}
-                  aria-label="Change language"
+                  aria-label={`${language.toUpperCase()} - Change language`}
                   aria-expanded={langMenuOpen}
                 >
                   {language.toUpperCase()}
@@ -293,7 +293,7 @@ const Navbar = () => {
           {!isTenantHome && <MobileSearchPill />}
 
           {/* Mobile Menu Button - Only visible on mobile */}
-          <div className="lg:hidden">
+          <div className="lg:hidden shrink-0">
             <button
               type="button"
               className={`mobile-menu-button ${isMenuOpen ? 'open' : ''}`}

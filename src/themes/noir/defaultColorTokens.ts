@@ -102,6 +102,10 @@ export const noirDefaultColorTokens: Readonly<Record<string, string>> = {
   "--success": "#3ecf8e",
   "--support-success": "#3ecf8e",
   "--support-danger": "#f2665e",
+  // Small status text on --bg-surface #12141b (cancellation timeline dates): base.css's
+  // light-tuned #047857 / #be123c measured 3.42 / 3.04:1 here (2026-11-10 UX audit).
+  "--status-positive-text": "#34d399",
+  "--status-negative-text": "#f87171",
   "--support-error": "#f2665e",
   "--border": "#232733",
   "--border-subtle": "#232733",

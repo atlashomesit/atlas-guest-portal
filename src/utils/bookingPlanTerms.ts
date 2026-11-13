@@ -40,9 +40,16 @@ function tierFor(policy: string): 'Flexible' | 'Moderate' | 'Strict' | null {
   return null;
 }
 
+/** GUEST-068: the cancellation words the SERVER wrote for this booking (the same function the "Your booking" page uses, from the deadline stamped on the booking). */
+export interface ServerCancellationWording {
+  headline?: string | null;
+  detail?: string | null;
+}
+
 export function resolveBookingPlanTerms(
   mealPlanCode: string | null | undefined,
   cancellationPolicy: string | null | undefined,
+  serverWording?: ServerCancellationWording | null,
 ): BookingPlanTerms {
   const code = (mealPlanCode ?? '').trim().toUpperCase();
   const mealLabel = MEAL_LABEL_BY_CODE[code] ?? null;
@@ -50,7 +57,12 @@ export function resolveBookingPlanTerms(
   const policy = (cancellationPolicy ?? '').trim();
   let cancellationHeadline: string | null = null;
   let cancellationDetail: string | null = null;
-  if (policy) {
+  const serverHeadline = (serverWording?.headline ?? '').trim();
+  if (serverHeadline) {
+    // GUEST-068: one wording. The server's words win; the tier table below is only for an API that does not send them yet.
+    cancellationHeadline = serverHeadline;
+    cancellationDetail = (serverWording?.detail ?? '').trim() || null;
+  } else if (policy) {
     if (isNonRefundable(policy)) {
       cancellationHeadline = 'Non-refundable rate';
     } else {

@@ -14,6 +14,7 @@ import { logUserAction, reportError } from "../../lib/monitoring";
 import { messageFromApiResponse } from "../../utils/serverErrorFromResponse";
 import { getTenantBrandName } from "../../tenant/displayBrand";
 import { useTenantListings } from "../../hooks/useTenantListings";
+import SEO from "../../components/SEO";
 
 import "./ContactUs.css";
 
@@ -24,6 +25,8 @@ type StatusMessage = {
 
 const ContactUs = () => {
     const contactEmail = getContactEmail();
+    // G2: a host with no saved address gets no e-mail rows at all (they were a dead "mailto:" link and an empty block).
+    const hasEmail = contactEmail.trim().length > 0;
     const tenantLabel = getTenantBrandName();
     const { properties } = useTenantListings();
 
@@ -116,6 +119,11 @@ const ContactUs = () => {
 
     return (
         <section className="contact-page">
+            <SEO
+                title={`Contact Us | ${tenantLabel}`}
+                description={`Contact ${tenantLabel} about a booking, a question or a special request.`}
+                url="/contact"
+            />
             <div className="contact-title"><CommonBanner image="" PageName="Contact Us" /></div>
             <div className="contact-grid">
 <div className="contact-intro flex flex-col justify-between space-y-8">
@@ -129,7 +137,7 @@ const ContactUs = () => {
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <a
                                     href={getWhatsAppLink()}
-                                    aria-label={`Contact ${tenantLabel} on WhatsApp at ${formatDisplayNumber()}`}
+                                    aria-label={`WhatsApp ${formatDisplayNumber()}. Contact ${tenantLabel} on WhatsApp`}
                                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-cta-secondary text-[var(--text-on-cta)] px-6 py-3 font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:scale-105"
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -138,25 +146,29 @@ const ContactUs = () => {
                                 </a>
                                 <a
                                     href={getTelLink()}
-                                    aria-label={`Call ${tenantLabel} at ${formatDisplayNumber()}`}
+                                    aria-label={`Call ${formatDisplayNumber()}. Call ${tenantLabel}`}
                                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-cta-primary text-[var(--text-on-cta)] px-6 py-3 font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:scale-105"
                                 >
                                     Call {formatDisplayNumber()}
                                 </a>
+                                {hasEmail && (
                                 <a
                                     href={`mailto:${contactEmail}`}
-                                    aria-label={`Email ${tenantLabel} at ${contactEmail}`}
+                                    aria-label={`Email us at ${contactEmail}`}
                                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-cta-primary text-cta-primary bg-bg-surface px-6 py-3 font-semibold shadow-md hover:shadow-lg transition-all duration-250 hover:scale-105"
                                 >
                                     Email us
                                 </a>
+                                )}
                             </div>
+                            {hasEmail && (
                             <Typography variant="muted">
                                 Prefer email? Reach us at{" "}
                                 <a className="text-cta-primary font-semibold hover:underline" href={`mailto:${contactEmail}`}>
                                     {contactEmail}
                                 </a>
                             </Typography>
+                            )}
                         </div>
 <Card className="contact-form space-y-6">
                         <div className="space-y-3 text-center">
@@ -264,12 +276,14 @@ const ContactUs = () => {
                                     <Typography variant="muted" className="text-xs font-semibold uppercase">WhatsApp</Typography>
                                     <a className="font-semibold text-lg text-cta-primary hover:text-cta-primary/80 transition" href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer">{formatDisplayNumber()}</a>
                                 </div>
+                                {hasEmail && (
                                 <div className="space-y-2">
                                     <Typography variant="muted" className="text-xs font-semibold uppercase">Email</Typography>
                                     <a className="font-semibold text-lg text-cta-primary hover:text-cta-primary/80 transition break-all" href={`mailto:${contactEmail}`}>
                                         {contactEmail}
                                     </a>
                                 </div>
+                                )}
                             </div>
                             <div className="pt-4 border-t border-border-subtle">
                                 <Typography variant="muted" className="text-sm">Owner contact is reserved for escalations; reach out on the business line first for the fastest help.</Typography>
@@ -283,9 +297,9 @@ const ContactUs = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <Link to="/policies" aria-label="Read our guest policies" className="px-4 py-3 rounded-lg border border-border-subtle bg-bg-surface hover:border-cta-primary hover:bg-cta-primary/5 font-semibold text-text-primary transition-colors duration-250 text-center text-sm">Policies</Link>
-                            <Link to="/faq" aria-label="Frequently asked questions" className="px-4 py-3 rounded-lg border border-border-subtle bg-bg-surface hover:border-cta-primary hover:bg-cta-primary/5 font-semibold text-text-primary transition-colors duration-250 text-center text-sm">FAQs</Link>
+                            <Link to="/faq" aria-label="FAQs: frequently asked questions" className="px-4 py-3 rounded-lg border border-border-subtle bg-bg-surface hover:border-cta-primary hover:bg-cta-primary/5 font-semibold text-text-primary transition-colors duration-250 text-center text-sm">FAQs</Link>
                             <Link to="/terms" aria-label="Read our terms and conditions" className="px-4 py-3 rounded-lg border border-border-subtle bg-bg-surface hover:border-cta-primary hover:bg-cta-primary/5 font-semibold text-text-primary transition-colors duration-250 text-center text-sm">Terms</Link>
-                            <Link to={ctaNav.to} aria-label={`Book a stay with ${tenantLabel}`} className="px-4 py-3 rounded-lg border border-border-subtle bg-bg-surface hover:border-cta-primary hover:bg-cta-primary/5 font-semibold text-text-primary transition-colors duration-250 text-center text-sm">Book now</Link>
+                            <Link to={ctaNav.to} aria-label={`Book now: book a stay with ${tenantLabel}`} className="px-4 py-3 rounded-lg border border-border-subtle bg-bg-surface hover:border-cta-primary hover:bg-cta-primary/5 font-semibold text-text-primary transition-colors duration-250 text-center text-sm">Book now</Link>
                         </div>
                         <div className="bg-bg-surface border border-dashed border-cta-primary/30 rounded-lg p-5 text-sm text-text-muted space-y-2">
                             <p className="font-semibold text-text-primary">Quick response?</p>

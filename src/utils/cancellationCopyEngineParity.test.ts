@@ -49,35 +49,37 @@ describe('TASK-7819 — cancellation copy agrees with the refund engine', () => 
       expect(LATE_CANCELLATION_FEE_PERCENT[effective]).toBe(feePercent);
     });
 
-    it('never denies a refund when the engine charges no fee', () => {
+    it('never denies a refund when the engine charges no fee, and never promises more than it pays', () => {
       const { headline, afterWindowCopy } = describeCancellationPolicy(tier);
       const copy = `${headline} ${afterWindowCopy}`.trim();
 
+      // TASK-1040050: the copy leads with the free-cancellation window and never promises a refund amount or "any time".
+      expect(headline).toMatch(/^Free cancellation up to /);
+      expect(copy).not.toMatch(/any time|full refund/i);
       if (feePercent === 0) {
-        // Engine pays 100% at any time — copy must not gate or deny it.
+        // Engine pays 100% at any time — copy must not gate or deny it, so nothing is said after the date.
         expect(copy).not.toMatch(DENIES_REFUND);
         expect(afterWindowCopy).toBe('');
-        expect(headline).toMatch(/full refund/i);
+      } else if (feePercent >= 100) {
+        // Fee 100%: the engine pays nothing after the window, so "non-refundable" is exactly right.
+        expect(afterWindowCopy).toBe('After that, the booking is non-refundable.');
       } else {
-        // A real fee exists, so the copy is allowed (and expected) to state the limit.
-        expect(headline).toMatch(/full refund/i);
-        expect(afterWindowCopy).not.toBe('');
+        // A real partial fee: the copy says a fee applies and repeats no percentage (the fee is a server setting).
+        expect(afterWindowCopy).toBe('After that, a late-cancellation fee applies.');
       }
     });
 
-    it('states the actual retained percentage when a partial fee applies', () => {
+    it('repeats no retained or refunded percentage (the fee is a server setting, not copy)', () => {
       const { afterWindowCopy } = describeCancellationPolicy(tier);
-      if (feePercent > 0 && feePercent < 100) {
-        const refundPct = 100 - feePercent;
-        expect(afterWindowCopy).toContain(`${refundPct}%`);
-      }
+      expect(afterWindowCopy).not.toMatch(/\d+\s*%/);
     });
   });
 
-  it('an untiered listing reads exactly as Flexible — the server resolves null to Flexible', () => {
-    expect(describeCancellationPolicy(null)).toEqual(describeCancellationPolicy('Flexible'));
-    expect(describeCancellationPolicy(undefined)).toEqual(describeCancellationPolicy('Flexible'));
-    expect(describeCancellationPolicy('not-a-tier')).toEqual(describeCancellationPolicy('Flexible'));
+  it('an untiered listing gets the server default window (7 days), unlike a Flexible one — and says nothing after the date, like Flexible', () => {
+    expect(describeCancellationPolicy(null).headline).toBe('Free cancellation up to 7 days before check-in');
+    expect(describeCancellationPolicy(undefined)).toEqual(describeCancellationPolicy(null));
+    expect(describeCancellationPolicy('not-a-tier')).toEqual(describeCancellationPolicy(null));
+    expect(describeCancellationPolicy(null).afterWindowCopy).toBe(describeCancellationPolicy('Flexible').afterWindowCopy);
   });
 
   it('the inline listing-page snippet asserts no refund outcome at all', () => {

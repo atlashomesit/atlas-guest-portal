@@ -151,7 +151,7 @@ const Policies = () => {
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`Contact ${brandName} support on WhatsApp`}
+                aria-label={`Message on WhatsApp: contact ${brandName} support`}
                 className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Message on WhatsApp

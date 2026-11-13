@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeReviewText, stripHtmlPreservingEmoticons } from './sanitizeReviewText';
+import {
+  isRawPositiveNegativeReview,
+  sanitizeReviewText,
+  stripHtmlPreservingEmoticons,
+  stripPrivateFeedback,
+} from './sanitizeReviewText';
 
 describe('TASK-10299094 — sanitizeReviewText & stripHtmlPreservingEmoticons', () => {
   it('preserves "<3" heart emoticons and comparisons without stripping text between "<" and ">"', () => {
@@ -24,5 +29,22 @@ describe('TASK-10299094 — sanitizeReviewText & stripHtmlPreservingEmoticons', 
   it('preserves multiple heart emoticons in sequence or mixed with tags', () => {
     const input = '<p>Amazing stay! <3 <3 <3 Will return!</p>';
     expect(sanitizeReviewText(input)).toBe('Amazing stay! <3 <3 <3 Will return!');
+  });
+});
+
+describe('private feedback + raw positive/negative', () => {
+  it('cuts everything from "Private feedback:" onwards', () => {
+    expect(
+      stripPrivateFeedback('Excellent place to be in Guwahati Private feedback: Thank you for hosting us...'),
+    ).toBe('Excellent place to be in Guwahati');
+    expect(stripPrivateFeedback('Great stay\nPRIVATE  FEEDBACK : secret')).toBe('Great stay');
+  });
+  it('applies on the shared display helpers', () => {
+    expect(sanitizeReviewText('<b>Lovely</b> Private feedback: hi')).toBe('Lovely');
+    expect(sanitizeReviewText('Private feedback: only private')).toBe('');
+  });
+  it('detects raw Booking.com text', () => {
+    expect(isRawPositiveNegativeReview('Positive: nice Negative: noisy')).toBe(true);
+    expect(isRawPositiveNegativeReview('Lovely stay')).toBe(false);
   });
 });

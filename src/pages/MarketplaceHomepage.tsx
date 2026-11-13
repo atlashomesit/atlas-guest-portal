@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FaHeart, FaRegHeart } from 'react-icons/fa';
 import { buildApiUrl } from '@/api/client';
+import { fetchAllMarketplacePages } from '@/api/marketplacePaging'; // TASK-1040072
 import { formatCurrency } from '@/utils/formatting'; // TASK-1872
 import { getFavoriteIds, toggleFavorite } from '@/utils/guestHistory'; // TASK-1873
 import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
@@ -593,7 +594,7 @@ export default function MarketplaceHomepage() {
   // forwarding active city/location, checkIn, checkOut, and guests query parameters.
   const propertiesQuery = useMemo(() => {
     const p = new URLSearchParams();
-    p.set('pageSize', '200');
+    // TASK-1040072: no pageSize here - fetchAllMarketplacePages adds page + pageSize (server max 100).
     const activeCity =
       query.trim() ||
       searchParams.get('city')?.trim() ||
@@ -611,8 +612,13 @@ export default function MarketplaceHomepage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(buildApiUrl(`/marketplace/properties?${propertiesQuery}`))
-      .then(async (r) => (r.ok ? ((await r.json()) as MarketplacePropertyApi[]) : []))
+    fetchAllMarketplacePages<MarketplacePropertyApi>({
+      buildUrl: (page, pageSize) =>
+        buildApiUrl(`/marketplace/properties?${propertiesQuery}&page=${page}&pageSize=${pageSize}`),
+      readPage: (json) => ({ rows: Array.isArray(json) ? (json as MarketplacePropertyApi[]) : [] }),
+      rowKey: (row) => `${row.propertyId}:${row.listingId}`,
+      shouldStop: () => cancelled,
+    })
       .then((rows) => {
         if (cancelled) return;
         setMarketplaceProperties(rows ?? []);

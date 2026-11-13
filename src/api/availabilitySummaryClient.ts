@@ -14,12 +14,11 @@ function normalizeSummary(row: Record<string, unknown>): ListingAvailabilitySumm
   if (!Number.isFinite(listingId) || listingId <= 0) return null;
   const pct = Number(row.percentBookedNext30Days ?? row.PercentBookedNext30Days ?? 0);
   const rawNext = row.nextAvailableDate ?? row.NextAvailableDate;
-  const next =
-    rawNext == null || rawNext === ''
-      ? null
-      : typeof rawNext === 'string'
-        ? rawNext
-        : null;
+  // The API sends the night as a UTC-midnight timestamp ("2026-11-11T00:00:00.0000000Z"), but the cards build a
+  // date with `${next}T12:00:00`, which is not a date when the string already carries a time. Keep only the day
+  // (seen in a browser 2026-11-09: "Next open night" never showed on the sold-tonight card; search chip said "Check dates").
+  const dayOnly = typeof rawNext === 'string' ? /^\d{4}-\d{2}-\d{2}/.exec(rawNext.trim())?.[0] ?? null : null;
+  const next = rawNext == null || rawNext === '' ? null : dayOnly ?? (typeof rawNext === 'string' ? rawNext : null);
   const tonight = Boolean(row.isAvailableTonight ?? row.IsAvailableTonight);
   return {
     listingId,

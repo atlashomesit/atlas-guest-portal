@@ -10,6 +10,7 @@ import { getApiHeaders, buildApiUrl } from '@/api/client';
 import { hasRuntimeConfig, getRuntimeConfig, isProductionEnvironment } from '@/runtime-config';
 import { setDomainResolvedSlug, setMarketplaceMode, isAtlastaysMarketplaceSurface } from '@/tenant/tenantResolver';
 import { normalizeHostForDomainLookup } from '@/tenant/normalizeHostForDomainLookup';
+import { fetchWithEarly } from '@/boot/earlyFetch';
 
 export interface TenantInfo {
   id?: number;
@@ -242,10 +243,18 @@ export function getInternalTenantRobots(): string | undefined {
  * brand-neutral "site not set up" page instead of falling back to the Atlas-branded default.
  */
 export class SubdomainNotActivatedError extends Error {
-  constructor() {
+  /** True when the host is a real, previously-live tenant that is blocked (not taking bookings). */
+  readonly notTakingBookings: boolean;
+  constructor(notTakingBookings = false) {
     super('SUBDOMAIN_NOT_ACTIVATED');
     this.name = 'SubdomainNotActivatedError';
+    this.notTakingBookings = notTakingBookings;
   }
+}
+
+/** Reads the from-domain 404 body: blocker NOT_TAKING_BOOKINGS_RIGHT_NOW or notTakingBookings === true. */
+export function isNotTakingBookingsBody(body: { blocker?: unknown; notTakingBookings?: unknown } | null | undefined): boolean {
+  return body?.blocker === 'NOT_TAKING_BOOKINGS_RIGHT_NOW' || body?.notTakingBookings === true;
 }
 
 export async function resolveFromDomain(apiBaseUrl: string, domain: string): Promise<TenantInfo | null> {
@@ -271,7 +280,8 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
         import.meta.env.DEV && typeof window !== 'undefined'
           ? `/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`
           : `${apiBaseUrl.replace(/\/$/, '')}/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`;
-      const res = await fetch(url); // No auth headers — this is the bootstrap endpoint
+      // TASK-10299465: public/boot-prefetch.js starts this exact request while the scripts download; take it when it is there.
+      const res = await fetchWithEarly(url); // No auth headers — this is the bootstrap endpoint
 
       if (!res.ok) {
         // TASK-2642: a 404 SUBDOMAIN_NOT_ACTIVATED means the slug is a real tenant that hasn't bought
@@ -281,7 +291,12 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
           try {
             const body = await res.json();
             if (body?.error === 'SUBDOMAIN_NOT_ACTIVATED') {
-              throw new SubdomainNotActivatedError();
+              throw new SubdomainNotActivatedError(isNotTakingBookingsBody(body));
+            }
+            // G2 journey 26 (TASK-101721): a real host that is suspended (IsActive=false) answers TENANT_SUSPENDED. It gets the same plain
+            // "not taking bookings" notice, never the fallback site (which carried another brand, its contact address and its listings).
+            if (body?.error === 'TENANT_SUSPENDED') {
+              throw new SubdomainNotActivatedError(true);
             }
           } catch (bodyErr) {
             if (bodyErr instanceof SubdomainNotActivatedError) throw bodyErr;

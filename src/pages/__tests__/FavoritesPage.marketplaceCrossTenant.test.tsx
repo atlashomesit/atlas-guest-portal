@@ -99,6 +99,53 @@ describe('TASK-1040103 marketplace cross-tenant Favorites & Reserve navigation',
     expect(cardLink.getAttribute('href')).toContain('/homes/kashi-heritage-villa/502?tenant=kashi-villa&brand=atlastays');
   });
 
+  it('TASK-1040071: resolves a saved home ranked beyond the first 100 marketplace listings (page 2)', async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      id: 9000 + i,
+      tenantSlug: 'other',
+      title: `Filler ${i}`,
+      city: 'Goa',
+      pricePerNight: 1000,
+      maxGuests: 2,
+    }));
+    const page2 = [
+      {
+        id: 502,
+        tenantSlug: 'kashi-villa',
+        title: 'Kashi Heritage Villa',
+        displayName: 'Kashi Heritage Villa',
+        city: 'Varanasi',
+        pricePerNight: 4800,
+        maxGuests: 6,
+      },
+    ];
+    const fetchMock = vi.fn<typeof fetch>(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/marketplace/listings')) {
+        const page = Number(new URL(url).searchParams.get('page') ?? '1');
+        return new Response(JSON.stringify({ items: page === 1 ? page1 : page2, total: 101 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={['/favorites?brand=atlastays']}>
+        <GuestAuthContext.Provider value={{ auth: signedOut, isLoading: false, login: vi.fn(), logout: vi.fn() }}>
+          <FavoritesPage />
+        </GuestAuthContext.Provider>
+      </MemoryRouter>
+    );
+
+    await settle();
+    expect(screen.getByText('Kashi Heritage Villa')).toBeInTheDocument();
+    const cardLink = screen.getByRole('link', { name: /View Kashi Heritage Villa/i });
+    expect(cardLink.getAttribute('href')).toContain('tenant=kashi-villa');
+  });
+
   it('appends checkIn, checkOut, and guests cleanly in Reserve without creating a duplicate ? when listingDetailPath has ?tenant=', async () => {
     render(
       <MemoryRouter initialEntries={['/reserve']}>

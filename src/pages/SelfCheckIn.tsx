@@ -4,6 +4,8 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import ArrivalDetailsEditor, { type ArrivalDetailsDraft } from "../components/ArrivalDetailsEditor";
 import { getTenantBrandName } from "../tenant/displayBrand";
+import PoweredByAtlasLink from "../components/PoweredByAtlasLink";
+import { getPoweredBySlug } from "../tenant/poweredByAtlas";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
@@ -59,6 +61,10 @@ interface CheckinDetails {
   guidebookTrashParkingText?: string | null;
   guidebookCheckoutChecklistText?: string | null;
   guidebookFoodThingsTodoText?: string | null;
+  /** Dorm bookings: each guest's ID photo is stored against their own bed. Absent/false for regular bookings. */
+  isHostelDorm?: boolean;
+  bedsBooked?: number | null;
+  occupantIdUploadedSlots?: number[] | null;
 }
 
 /**
@@ -250,6 +256,7 @@ const ISO_NATIONALITIES = [
 
 export default function SelfCheckIn() {
   const brandName = getTenantBrandName();
+  const poweredBySlug = getPoweredBySlug();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
   const [searchParams] = useSearchParams();
   const token = (searchParams.get("t") ?? searchParams.get("token") ?? "").trim();
@@ -823,12 +830,47 @@ export default function SelfCheckIn() {
         idDocumentUrl = uploadData.url || null;
       }
 
+      // Dorm bookings: also store each guest's ID photo against their own bed (guest N -> bed N), where staff see it
+      // in the occupants roster. Regular bookings never take this path, so their flow is unchanged.
+      const isDormBooking = details?.isHostelDorm === true;
+      const bedCount = details?.bedsBooked ?? 0;
+      const uploadBedDocument = async (slot: number, file: File, idType: string): Promise<string | null> => {
+        const bedForm = new FormData();
+        bedForm.append("file", file);
+        const idTypeQuery = idType ? `&idType=${encodeURIComponent(idType)}` : "";
+        const bedRes = await fetch(
+          buildApiUrl(
+            `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/occupants/${slot}/id-document?lastName=${encodeURIComponent(lastName.trim())}${idTypeQuery}${tokenQuery}`
+          ),
+          { method: "POST", headers: getApiHeaders(), body: bedForm }
+        );
+        if (!bedRes.ok) return null;
+        const bedData = (await bedRes.json()) as { url?: string };
+        return bedData.url || "";
+      };
+      if (isDormBooking && primaryFile && bedCount >= 1) {
+        const bedUrl = await uploadBedDocument(1, primaryFile, guests[0]?.govtIdType || govtIdType);
+        if (bedUrl === null) {
+          setError("Could not upload your ID document. Please try again or skip this step.");
+          setBusy(false);
+          return;
+        }
+      }
+
       // Upload files for additional guests (Guest 2..N) if any
       const additionalGuestsPayload = [];
       for (let i = 1; i < guests.length; i++) {
         const g = guests[i];
         let fileUrl = g.uploadedFileUrl || null;
-        if (g.idFile && !fileUrl) {
+        if (isDormBooking && g.idFile && !fileUrl && i + 1 <= bedCount) {
+          const bedUrl = await uploadBedDocument(i + 1, g.idFile, g.govtIdType);
+          if (bedUrl === null) {
+            setError(`Could not upload the ID document for Guest ${i + 1}. Please try again or skip this step.`);
+            setBusy(false);
+            return;
+          }
+          fileUrl = bedUrl || null;
+        } else if (g.idFile && !fileUrl) {
           const formData = new FormData();
           formData.append("file", g.idFile);
           const uploadRes = await fetch(
@@ -1960,6 +2002,13 @@ export default function SelfCheckIn() {
               </a>
             </div>
           </div>
+        )}
+
+        {/* TASK-10299422: one quiet credit line, tagged utm_medium=checkin (the page footer skips this route so there is exactly one). */}
+        {poweredBySlug && (
+          <p className="mt-8 text-center text-xs text-text-muted" data-testid="checkin-powered-by">
+            <PoweredByAtlasLink slug={poweredBySlug} medium="checkin" className="underline-offset-2 hover:underline" />
+          </p>
         )}
       </div>
     </div>

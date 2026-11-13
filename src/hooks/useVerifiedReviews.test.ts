@@ -139,6 +139,25 @@ describe('useVerifiedReviews (REV-019)', () => {
     expect(result.current.reviews[1].source).toBe('Google');
   });
 
+  it('drops private feedback text and skips raw Positive/Negative reviews', async () => {
+    const fetcher = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        reviews: [],
+        guestFeedback: [],
+        externalReviews: [
+          { guestName: 'Asha Rao', rating: 5, body: 'Excellent place Private feedback: thanks for hosting us', reviewDate: '2026-09-15', source: 'airbnb' },
+          { guestName: 'Ravi K', rating: 5, body: 'Positive: nice Negative: noisy', reviewDate: '2026-09-20', source: 'booking_com' },
+        ],
+      }),
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const { result } = renderHook(() => useVerifiedReviews([101], 5));
+    await settle();
+    expect(result.current.reviews).toHaveLength(1);
+    expect(result.current.reviews[0].text).toBe('Excellent place');
+  });
+
   it('returns empty array when neither native nor external reviews meet criteria', async () => {
     const fetcher = vi.fn().mockResolvedValue({
       ok: true,

@@ -449,6 +449,32 @@ describe('Homepage_PropertyDetails listing JSON-LD (TASK-102732 item 4)', () => 
       }
     });
 
+    // TASK-1040061: the API's totalCount is native + external combined, so an external-only listing arrives as
+    // { reviews: [], totalCount: 4 }. It must never claim "verified stays" or "all through this platform".
+    it('TASK-1040061: an external-only listing makes no verified-stay claim', async () => {
+      mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
+      const originalFetch = global.fetch;
+      const externalReviews = [
+        { guestName: 'A', rating: 5, body: 'Lovely stay five star', reviewDate: '2026-10-01', source: 'Airbnb' },
+        { guestName: 'B', rating: 4, body: 'Four star good', reviewDate: '2026-10-02', source: 'Booking.com' },
+        { guestName: 'C', rating: 4, body: 'Google four star', reviewDate: '2026-10-03', source: 'Google' },
+        { guestName: 'D', rating: 5, body: 'Wonderful place', reviewDate: '2026-10-04', source: 'Google' },
+      ];
+      stubReviewApi({ externalReviews, nativeReviews: [], totalCount: 4, averageRating: 0 });
+
+      try {
+        await renderListing();
+
+        const reviewsSection = screen.getByTestId('reviews-section');
+        expect(reviewsSection).toHaveTextContent('4 reviews');
+        expect(reviewsSection).not.toHaveTextContent(/verified stay/i);
+        expect(reviewsSection).not.toHaveTextContent(/verified review/i);
+        expect(reviewsSection).not.toHaveTextContent(/through this platform/i);
+      } finally {
+        global.fetch = originalFetch;
+      }
+    });
+
     it('leaves a verified native review exactly as counted when notes arrive too', async () => {
       mockResolveListing.mockResolvedValue({ id: 101, propertyId: 101 });
       const originalFetch = global.fetch;

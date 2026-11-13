@@ -204,7 +204,8 @@ describe("Navbar CTA", () => {
 
     const pill = screen.getByTestId("mobile-search-pill");
     expect(pill).toBeInTheDocument();
-    expect(pill).toHaveAttribute("aria-label", "Search stays");
+    // G2 journey 19: the accessible name starts with the visible text (WCAG 2.5.3 label in name).
+    expect(pill).toHaveAttribute("aria-label", "Where to? Search stays");
     expect(pill).toHaveTextContent("Where to?");
   });
 
@@ -269,6 +270,15 @@ describe("Navbar CTA", () => {
     for (const name of expectedNames) {
       expect(menu).toHaveTextContent(name);
     }
+  });
+
+  it("a11y label-content-name-mismatch: the language button's accessible name starts with its visible code", () => {
+    renderNavbar();
+
+    const toggle = screen.getByRole("button", { name: /change language/i });
+    const visible = (toggle.textContent ?? "").trim();
+    expect(visible).not.toBe("");
+    expect(toggle.getAttribute("aria-label")!.toLowerCase()).toContain(visible.toLowerCase());
   });
 
   it("TASK-8103: selecting a stub locale (Marathi) does not blank the switcher — it stays a real language code", () => {

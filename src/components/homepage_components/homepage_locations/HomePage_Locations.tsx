@@ -10,6 +10,7 @@ import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { trackEvent } from "../../../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug } from "../../../utils/navigation";
 import OptimizedImage from "../../ui/OptimizedImage";
+import HostelDormBadge, { isHostelDorm } from "../../hostel/HostelDormBadge";
 import { useDailyPricingSummary } from "../../../hooks/useDailyPricingSummary";
 import { useListingPhotosFromApi } from "../../../contexts/ListingPhotosContext";
 import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/useTenantListings";
@@ -22,6 +23,7 @@ import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOv
 import { useCurrency } from "../../../contexts/CurrencyContext";
 import { getListingDisplayName } from "../../../lib/listingDisplayName";
 import { getHomeDescriptor } from "../../../content/homeDescriptors";
+import { fetchAvailabilitySummary, type ListingAvailabilitySummary } from "../../../api/availabilitySummaryClient";
 import { allInTotalLabel, directPriceDisplay, directSavingsLabel } from "../../../utils/directBookingPrice";
 import {
   useMarketplaceCardPrices,
@@ -33,6 +35,7 @@ import {
 
 import { resolveHomesPlace } from "../../../utils/listingCities";
 import "./homepage_location.css";
+import { sameHands } from '@/utils/sameHandsCopy';
 import "../atlas-home-v2.css";
 
 type HomePageLocationsProps = {
@@ -138,6 +141,17 @@ const createListingModel = (
   return { listing, property, images, price };
 };
 
+/** GUEST-065: the one line under "Booked tonight": when it is next open, and where to see a price. */
+function soldTonightHint(nextAvailableDate?: string | null): string {
+  if (nextAvailableDate) {
+    const d = new Date(`${nextAvailableDate}T12:00:00`);
+    if (!Number.isNaN(d.getTime())) {
+      return `Next open night: ${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}. Pick your dates to see the price.`;
+    }
+  }
+  return "Pick your dates to see the price.";
+}
+
 const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -210,6 +224,33 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
       cardStay.checkOut &&
       marketplaceStayNights(cardStay.checkIn, cardStay.checkOut) != null,
   );
+
+  // GUEST-065: is each home open tonight? A card with no dates picked shows tonight's price, so a home that is
+  // sold tonight must not say "/ night tonight". null = still asking; a failed ask becomes {} (cards stay as before).
+  const [tonightById, setTonightById] = React.useState<Record<number, ListingAvailabilitySummary> | null>(null);
+  const tonightIdsKey = React.useMemo(
+    () =>
+      sortedListings
+        .map((listing) => Number(propertyLookup[listing.id]?.listingId ?? listing.id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .join(","),
+    [sortedListings, propertyLookup],
+  );
+  React.useEffect(() => {
+    if (hasStayDates || !tonightIdsKey) return;
+    const controller = new AbortController();
+    fetchAvailabilitySummary(tonightIdsKey.split(",").map(Number), controller.signal)
+      .then((rows) => {
+        if (controller.signal.aborted) return;
+        const next: Record<number, ListingAvailabilitySummary> = {};
+        for (const row of rows) next[row.listingId] = row;
+        setTonightById(next);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setTonightById({});
+      });
+    return () => controller.abort();
+  }, [hasStayDates, tonightIdsKey]);
 
   const quoteItems = React.useMemo<MarketplaceCardPriceItem[]>(() => {
     if (!hasStayDates) return [];
@@ -284,6 +325,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const renderPrice = (model: ListingModel) => {
     const apiListingId = model.property?.listingId ?? model.listing.id;
     const numericListingId = Number(apiListingId);
+    // TASK-1040089: a dorm is sold by the bed, so its tile prices "per bed" like the listing card does (same API field, never the name).
+    const perBed = isHostelDorm({ accommodationType: model.property?.accommodationType });
+    const nightUnit = perBed ? "bed / night" : "night";
 
     if (hasStayDates) {
       const stayPrice = stayPrices.get(numericListingId);
@@ -316,7 +360,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
               <span className="ahv2-price-amt" data-testid="home-card-real-price">
                 {formatCurrency(display.realNightly)}
               </span>
-              <span className="ahv2-price-meta">/ night</span>
+              <span className="ahv2-price-meta">{`/ ${nightUnit}`}</span>
             </div>
             {display.savingsPercent > 0 && (
               <span className="ahv2-price-save" data-testid="home-card-saving">
@@ -343,10 +387,23 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
     const specialLabel = priceDisplayConfig.specialPricingLabels[dateKey];
     const todayBreakdown = getListingPricing(apiListingId);
 
-    if (dailyPricingLoading) {
+    if (dailyPricingLoading || (tonightById === null && Boolean(tonightIdsKey))) {
       return (
         <div className="ahv2-price">
           <span className="ahv2-price-meta">Loading price…</span>
+        </div>
+      );
+    }
+
+    // GUEST-065: sold tonight = say so once, and show no number. Tonight's price is not a price the guest can book.
+    const tonightSummary = tonightById?.[numericListingId];
+    if (tonightSummary && !tonightSummary.isAvailableTonight) {
+      return (
+        <div className="ahv2-price" data-testid="home-card-sold-tonight">
+          <span className="ahv2-price-amt">Booked tonight</span>
+          <span className="ahv2-price-meta" data-testid="home-card-sold-tonight-hint">
+            {soldTonightHint(tonightSummary.nextAvailableDate)}
+          </span>
         </div>
       );
     }
@@ -380,7 +437,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             </span>
             {/* GUEST-048: this card is today's price (no dates picked); the booking box prices the chosen dates, so a weekend
                 rate there can differ. Say "tonight" instead of leaving a bare nightly figure. [FG: pricing] wording. */}
-            <span className="ahv2-price-meta" data-testid="home-card-night-label">/ night tonight</span>
+            <span className="ahv2-price-meta" data-testid="home-card-night-label">{`/ ${nightUnit} tonight`}</span>
           </div>
           {display.savingsPercent > 0 && (
             <span className="ahv2-price-save" data-testid="home-card-saving">
@@ -417,7 +474,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
           )}
         </div>
         <span className="ahv2-price-meta">
-          per night · taxes included
+          {perBed ? "per bed" : "per night"} · taxes included
           {hasSpecialDateMultiplier || specialLabel
             ? ` · ${specialLabel ?? priceDisplayConfig.defaultSpecialLabel}`
             : ""}
@@ -484,9 +541,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                 tenant?.legalContactPack?.city,
               );
               if (hideAtlasBranding) {
-                return `${sortedListings.length} owner-run ${noun}${city ? ` in ${city}` : ''}. Same hands clean them, restock them, and answer the door.`;
+                return `${sortedListings.length} owner-run ${noun}${city ? ` in ${city}` : ''}. ${sameHands(sortedListings.length)}`;
               }
-              return `${sortedListings.length} owner-run ${noun} in this neighbourhood. Same hands clean them, restock them, and answer the door.`;
+              return `${sortedListings.length} owner-run ${noun} in this neighbourhood. ${sameHands(sortedListings.length)}`;
             })()}
           </p>
         </div>
@@ -526,7 +583,6 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   }
                 }}
                 className="ahv2-card property-card"
-                aria-label={`See ${cardTitle}`}
               >
                 {/* Photo — 4:5 portrait, dusty-rose wash, dots reveal on hover/focus */}
                 <div className="ahv2-card-photo-wrap">
@@ -567,6 +623,12 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                   {!hideAtlasBranding && <span className="ahv2-eyebrow">{getTenantBrandName()}</span>}
                   <h3 className="ahv2-card-title">{cardTitle}</h3>
                   <p className="ahv2-card-desc">{descriptor}</p>
+
+                  {/* TASK-1040089: dorm + Women-only / Men-only / Mixed chips, straight from the API fields the listing card uses. */}
+                  <HostelDormBadge
+                    accommodationType={model.property?.accommodationType}
+                    genderPolicy={model.property?.dormGenderPolicy}
+                  />
 
                   {renderAmenities(model.property)}
 

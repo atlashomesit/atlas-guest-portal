@@ -179,6 +179,51 @@ describe('Heritage PropertyDetails listing JSON-LD (REV-013)', () => {
     }
   });
 
+  it('TASK-1040061: an external-only listing makes no verified-stay claim', async () => {
+    mockResolveListing.mockResolvedValue({ id: 505, propertyId: 505 });
+    const originalFetch = global.fetch;
+    const json = (body: unknown) =>
+      Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/public/listings/505')) {
+        return json({
+          externalReviews: [
+            { guestName: 'A', rating: 5, body: 'Lovely stay five star', reviewDate: '2026-10-01', source: 'Airbnb' },
+            { guestName: 'B', rating: 4, body: 'Four star good', reviewDate: '2026-10-02', source: 'Booking.com' },
+            { guestName: 'C', rating: 4, body: 'Google four star', reviewDate: '2026-10-03', source: 'Google' },
+            { guestName: 'D', rating: 5, body: 'Wonderful place', reviewDate: '2026-10-04', source: 'Google' },
+          ],
+        });
+      }
+      // totalCount is native + external combined on the API; the native list itself is empty.
+      if (url.includes('/listings/505/reviews')) return json({ averageRating: 0, totalCount: 4, reviews: [] });
+      return json({});
+    }) as unknown as typeof fetch;
+
+    try {
+      render(
+        <MemoryRouter initialEntries={['/homes/heritagevilla/505']}>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/homes/:propertySlug/:unitSlug" element={<HeritagePropertyDetails />} />
+            </Routes>
+          </Suspense>
+        </MemoryRouter>,
+      );
+      await settle();
+      await settle();
+
+      const reviewsSection = screen.getByTestId('reviews-section');
+      expect(reviewsSection).toHaveTextContent('4 reviews');
+      expect(reviewsSection).not.toHaveTextContent(/verified stay/i);
+      expect(reviewsSection).not.toHaveTextContent(/verified review/i);
+      expect(reviewsSection).not.toHaveTextContent(/through this platform/i);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it('REV-046: shows review-QR "Guest feedback" cards after the reviews and never counts them or puts them in the JSON-LD', async () => {
     mockResolveListing.mockResolvedValue({ id: 505, propertyId: 505 });
     const originalFetch = global.fetch;

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { onRequest } from "../functions/_middleware";
+import { clearMarketplaceListingsCache } from "../functions/_lib/marketplaceSiteMeta";
 
 class FakeHTMLRewriter {
   private handlers: Array<{ selector: string; handlers: { element(el: unknown): void } }> = [];
@@ -166,6 +167,41 @@ describe("marketplaceSiteMetaMiddleware (MKT-013)", () => {
     // Check JSON-LD injection
     const headAppended = body.appended["head"] || [];
     expect(headAppended.some((s) => s.includes("LodgingBusiness") && s.includes("The Estate by Grove & Co."))).toBe(true);
+  });
+
+  it("TASK-1040071: a home ranked 101+ gets its own title, not 'Home not found' (115 listings over 2 pages)", async () => {
+    clearMarketplaceListingsCache();
+    const all = Array.from({ length: 115 }, (_, i) => ({
+      id: 500 + i,
+      title: `Rank ${i + 1} Villa`,
+      city: "Goa",
+      tenantSlug: "t1",
+      pricePerNight: 4000,
+    }));
+    const globalFetch = vi.fn(async (url: string) => {
+      const u = new URL(String(url));
+      const page = Number(u.searchParams.get("page"));
+      const pageSize = Number(u.searchParams.get("pageSize"));
+      const effective = pageSize <= 0 || pageSize > 100 ? 20 : pageSize;
+      return new Response(
+        JSON.stringify({ items: all.slice((page - 1) * effective, page * effective), total: all.length }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", globalFetch);
+
+    const request = new Request("https://atlastays.com/homes/rank-115-villa/614?tenant=t1", {
+      headers: { Accept: "text/html" },
+    });
+    const res = await onRequest({
+      request,
+      env: { ATLAS_API_BASE_URL: "https://api.test.in" },
+      next: async () => makeHtmlResponse(),
+    });
+    const body = (await res.json()) as { innerContents: Record<string, string> };
+    expect(body.innerContents["title"]).toContain("Rank 115 Villa");
+    expect(body.innerContents["title"]).not.toMatch(/not found/i);
+    clearMarketplaceListingsCache();
   });
 
   it("fails open if HTMLRewriter throws", async () => {

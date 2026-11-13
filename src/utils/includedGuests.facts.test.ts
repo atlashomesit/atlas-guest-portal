@@ -5,7 +5,7 @@ import { describeIncludedGuests, pickIncludedGuestFacts, readIncludedGuestFields
 
 /**
  * Seen on hosted dev after the API deploy: GET /api/public/listings/3 and /listings/public both send
- * includedGuests 2 and extraGuestRate 500, but the home page showed no "Includes 2 guests" line, because the
+ * includedGuests 2 and extraGuestRate 500, but the home page showed no included-guests line, because the
  * page's listing row comes from the catalog or GET /listings/{id}, which drop or never carry those facts.
  */
 describe('the included-guests line reads the public listing reply', () => {
@@ -14,14 +14,14 @@ describe('the included-guests line reads the public listing reply', () => {
   it('uses the public reply when the listing row has no facts', () => {
     const facts = pickIncludedGuestFacts(readIncludedGuestFields({ includedGuests: 2, extraGuestRate: 500 }), {});
     expect(describeIncludedGuests(facts.includedGuests, facts.extraGuestRate, 5, inr, facts.priceChangesWithGuests)).toBe(
-      'Includes 2 guests, then ₹500 per extra guest per night',
+      'Price includes up to 2 guests, then ₹500 for each extra guest per night',
     );
   });
 
   it('keeps the wording for a price that changes with the guest count, with no number', () => {
     const facts = pickIncludedGuestFacts(readIncludedGuestFields({ includedGuests: 2, priceChangesWithGuests: true }), {});
     expect(describeIncludedGuests(facts.includedGuests, facts.extraGuestRate, 5, inr, facts.priceChangesWithGuests)).toBe(
-      'Includes 2 guests. Price changes with the number of guests',
+      'Price includes up to 2 guests. It changes with the number of guests',
     );
   });
 

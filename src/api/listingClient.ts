@@ -128,6 +128,11 @@ export type PublicListing = {
   hasCoworkingDesk?: boolean;
   /** TASK-1025: Minimum stay requirement in nights. */
   minStay?: number | null;
+  /** GUEST-069: the host's own house rules, rules PDF and Google Maps link (null when none). */
+  houseRulesText?: string | null;
+  houseRulesPdfUrl?: string | null;
+  houseRulesStructured?: string | null;
+  googleMapsUrl?: string | null;
   /** TASK-1695: LOS auto-discount tier 1 — minimum nights threshold (null = disabled). */
   losDiscountMinNights?: number | null;
   /** TASK-1695: LOS auto-discount tier 1 — discount percent (null = disabled). */
@@ -275,6 +280,10 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
         : Number(payload.wifiSpeedMbps),
     hasCoworkingDesk: Boolean(payload.hasCoworkingDesk),
     minStay: minStay != null && Number.isFinite(minStay) && minStay > 0 ? minStay : null,
+    houseRulesText: typeof payload.houseRulesText === 'string' && payload.houseRulesText.trim() ? payload.houseRulesText.trim() : null, // GUEST-069
+    houseRulesPdfUrl: typeof payload.houseRulesPdfUrl === 'string' && payload.houseRulesPdfUrl.trim() ? payload.houseRulesPdfUrl.trim() : null,
+    houseRulesStructured: typeof payload.houseRulesStructured === 'string' && payload.houseRulesStructured.trim() ? payload.houseRulesStructured : null,
+    googleMapsUrl: typeof payload.googleMapsUrl === 'string' && payload.googleMapsUrl.trim() ? payload.googleMapsUrl.trim() : null,
     losDiscountMinNights:
       payload.losDiscountMinNights != null ? Number(payload.losDiscountMinNights) : null,
     losDiscountPercent:

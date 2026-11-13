@@ -201,7 +201,6 @@ export const GuestTypeSelector: React.FC<GuestTypeSelectorProps> = ({
         onClick={onToggle}
         className="field-card flex h-full min-h-[112px] flex-col justify-start gap-2.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-level-1)] hover:shadow-[var(--shadow-level-2)] text-left w-full transition-shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--cta-primary)]"
         aria-expanded={isOpen}
-        aria-label="Select guests"
         data-testid="hero-guest-toggle"
       >
         <span className="hf-field-label flex items-center gap-2 text-xs font-bold uppercase tracking-[0.10em] text-[var(--text-muted)]">

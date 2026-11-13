@@ -28,9 +28,10 @@ import { getCurrentLayoutThemeId, loadLayoutTheme } from "./themes/registry"
 // resolved from the boot-resolved layout theme's package instead of a fixed page-file path.
 // `getCurrentLayoutThemeId()` is read lazily inside each loader — safe because React only
 // invokes a `React.lazy()` loader on first render, well after `src/main.tsx`'s boot sequence
-// has already called `setCurrentLayoutThemeId()`. Stubbed to "classic" until TASK-4904 lands
-// `effectiveThemeId` server-side — today this resolves identically to the pre-4903 direct
-// imports below (classic re-exports the same page components verbatim).
+// has already called `setCurrentLayoutThemeId()`. The id comes from the tenant's server-resolved
+// `effectiveThemeId` (TASK-4904 shipped it on `/tenants/from-domain`); it falls back to "classic" only
+// when the tenant sets nothing, which renders the same page components as the pre-4903 direct
+// imports below (classic re-exports them verbatim).
 const Home = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Home })))
 const ContactUs = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.Contact })))
 const Homepage_PropertyDetails = React.lazy(() => loadLayoutTheme(getCurrentLayoutThemeId()).then((mod) => ({ default: mod.PropertyDetails })))
@@ -59,6 +60,7 @@ const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirma
 const SecurityDepositPage = React.lazy(() => import("./pages/SecurityDepositPage")) // TASK-10299239
 const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
 const HouseRulesAcceptPage = React.lazy(() => import("./pages/HouseRulesAcceptPage")) // TASK-guest-automation-phase3
+const YourBookingPage = React.lazy(() => import("./pages/YourBookingPage")) // TASK-10299444
 const PayLinkPage = React.lazy(() => import("./pages/PayLinkPage")) // PAY-016
 const ReviewSubmitPage = React.lazy(() => import("./pages/ReviewSubmitPage"))
 const CommunicationPreferences = React.lazy(() => import("./pages/CommunicationPreferences"))
@@ -324,6 +326,7 @@ function AppWrapper() {
           <Route path="/portal" element={withBoundary(<GuestPortalAliasRedirect />, "portal-alias-route")} />
           <Route path="/pay/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><PayLinkPage /></Suspense>, "pay-link-route")} />
           <Route path="/house-rules/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><HouseRulesAcceptPage /></Suspense>, "house-rules-accept-route")} />
+          <Route path="/your-booking/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><YourBookingPage /></Suspense>, "your-booking-route")} />
           <Route path="/review/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewSubmitPage /></Suspense>, "review-submit-route")} />
           <Route path="/communication-preferences" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-route")} />
           <Route path="/preferences/:guestToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><CommunicationPreferences /></Suspense>, "communication-preferences-token-route")} />

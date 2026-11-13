@@ -12,6 +12,8 @@ import { hasOnlinePaymentRail } from '../../../tenant/paymentRail';
 import { getTenantBrandName } from '../../../tenant/displayBrand';
 import { getTenantOverrides, shouldHideAtlasBranding } from '../../../tenant/tenantOverrides';
 import { getTenantSlug, isMarketplaceMode } from '../../../tenant/tenantResolver';
+import PoweredByAtlasLink from '../../PoweredByAtlasLink';
+import { getPoweredBySlug } from '../../../tenant/poweredByAtlas';
 import { hasRuntimeConfig, getRuntimeConfig } from '../../../runtime-config';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink, getGuestFacingPhone, getWhatsAppPhone } from '../../../config/contact';
 
@@ -25,6 +27,20 @@ const iconMap = {
     IoIosCall,
     IoIosArrowForward
 };
+
+/** Wrap an e-mail address only after the "@" (never mid-word). */
+// eslint-disable-next-line react-refresh/only-export-components -- tiny helper co-located with Footer
+export function renderEmailWrappableAfterAt(email: string): ReactNode {
+    const at = email.indexOf('@');
+    if (at < 0) return email;
+    return (
+        <>
+            {email.slice(0, at + 1)}
+            <wbr />
+            {email.slice(at + 1)}
+        </>
+    );
+}
 
 const Footer = () => {
     const tenant = getTenantContext();
@@ -63,6 +79,11 @@ const Footer = () => {
         ? (tenant?.tagline?.trim() || "Comfortable stays with responsive support.")
         : (tenant?.tagline?.trim() || "Thoughtfully curated stays in Hyderabad");
     const year = new Date().getFullYear();
+    // TASK-10299421: every published host site carries the link (ships ON, no hide switch until the founder rules);
+    // the Atlas marketplace itself is Atlas, not a host site, so it does not credit itself.
+    // The check-in page carries its own utm_medium=checkin line, so the footer skips that route.
+    const poweredBySlug = location.pathname.startsWith('/check-in') ? null : getPoweredBySlug();
+    const showPoweredBy = Boolean(poweredBySlug) && !isMarketplaceNav;
 
     const socialLinks = Array.isArray(footerData?.socialLinks) ? footerData.socialLinks : [];
 
@@ -86,8 +107,8 @@ const Footer = () => {
             key: "email",
             icon: <IoIosMail className="shrink-0 text-lg" aria-hidden />,
             content: (
-                <a href={`mailto:${email}`} className="break-all text-left hover:text-[var(--footer-link-hover)]">
-                    {email}
+                <a href={`mailto:${email}`} className="break-normal text-left hover:text-[var(--footer-link-hover)]">
+                    {renderEmailWrappableAfterAt(email)}
                 </a>
             ),
         });
@@ -236,6 +257,10 @@ const Footer = () => {
                     <Link to="/privacy" className='hover:text-[var(--footer-link-hover)] transition-colors'>Privacy</Link>
                     <span>|</span>
                     <Link to="/contact" className='hover:text-[var(--footer-link-hover)] transition-colors'>Contact</Link>
+                    {showPoweredBy && (<>
+                        <span>|</span>
+                        <PoweredByAtlasLink slug={poweredBySlug} medium="tenant-site" />
+                    </>)}
                 </div>
             </div>
 

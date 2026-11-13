@@ -398,7 +398,7 @@ const PrivacyPage = () => {
                 <div className="flex flex-wrap gap-3">
                   <a
                     href={`mailto:${pack.contactEmail}`}
-                    aria-label={`Email ${pack.legalName} Grievance Officer at ${pack.contactEmail}`}
+                    aria-label={`Email Grievance Officer: ${pack.legalName}, ${pack.contactEmail}`}
                     className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
                   >
                     Email Grievance Officer
@@ -407,7 +407,7 @@ const PrivacyPage = () => {
                     href={whatsappLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={`Contact ${pack.legalName} on WhatsApp`}
+                    aria-label={`Message on WhatsApp: contact ${pack.legalName}`}
                     className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
                   >
                     Message on WhatsApp

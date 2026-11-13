@@ -83,7 +83,7 @@ describe("PropertyMobileStickyBar", () => {
     expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
   });
 
-  it("shows all fees included on per-night fallback when dates are incomplete (GUEST-020)", () => {
+  it("per-night fallback never claims all fees are included: the checkout total adds fees (GUEST-064 follow-up, price shown = charged)", () => {
     render(
       <PropertyMobileStickyBar
         bookable
@@ -96,8 +96,38 @@ describe("PropertyMobileStickyBar", () => {
 
     expect(screen.queryByTestId("mobile-sticky-total")).not.toBeInTheDocument();
     expect(screen.getByText(/\/ night/i)).toBeInTheDocument();
-    expect(screen.getByText(/all fees included/i)).toBeInTheDocument();
+    expect(screen.queryByText(/all fees included/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("mobile-sticky-total-after-dates")).toHaveTextContent("total shown once you pick dates");
     expect(screen.queryByText(/\+ taxes & fees/i)).not.toBeInTheDocument();
+  });
+
+  it("shows a skeleton and no price while the real nightly rate is loading (GUEST-064)", () => {
+    render(
+      <PropertyMobileStickyBar
+        bookable
+        nightlyFallback={0}
+        nightlyIsSynthetic={false}
+        nightlyPending
+        summary={null}
+        onReserveClick={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("mobile-sticky-price-skeleton")).toBeTruthy();
+    expect(document.body.textContent ?? "").not.toMatch(/₹|Rs\s?\d|\/ night|all fees included/);
+  });
+
+  it("shows no price at all (not Rs 0) when the rate never loaded (GUEST-064)", () => {
+    render(
+      <PropertyMobileStickyBar
+        bookable
+        nightlyFallback={0}
+        nightlyIsSynthetic={false}
+        summary={null}
+        onReserveClick={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("mobile-sticky-select-dates")).toBeTruthy();
+    expect(document.body.textContent ?? "").not.toMatch(/₹\s?0/);
   });
 
   it("is visible from the first view with price and next step (TOP10-2026-10-27-01-C)", () => {
@@ -282,5 +312,24 @@ describe("one-tap reserve from the sticky bar (GUEST-040, supersedes the UXV-202
 
     form.remove();
     HTMLElement.prototype.scrollIntoView = oldScroll;
+  });
+});
+
+describe("GUEST-070: a tap on Reserve never does nothing for a stay the widget marked invalid", () => {
+  it("brings the invalid date cell into view and does not press Reserve, even though a total is on the bar", () => {
+    const trigger = document.createElement("button"); trigger.id = "unit-booking-dates";
+    const openDates = vi.fn(); trigger.addEventListener("click", openDates);
+    const form = document.createElement("form"); form.dataset.testid = "guest-booking-form"; form.dataset.canReviewBooking = "true";
+    const reserve = document.createElement("button"); reserve.dataset.testid = "guest-booking-submit"; reserve.type = "submit"; form.append(reserve);
+    const reserveClick = vi.fn(); reserve.addEventListener("click", reserveClick);
+    const invalidCell = document.createElement("button"); invalidCell.setAttribute("aria-invalid", "true"); invalidCell.scrollIntoView = vi.fn();
+    form.append(invalidCell);
+    document.body.append(trigger, form);
+    render(<PropertyMobileStickyBar bookable nightlyFallback={2500} nightlyIsSynthetic={false} onReserveClick={vi.fn()} summary={{ hasCompleteDates: true, totalAmount: 5050, pricingPending: false, freeCancelUntil: null, canReviewBooking: true }} />);
+    fireEvent.click(screen.getByTestId("mobile-sticky-book-now"));
+    expect(reserveClick).not.toHaveBeenCalled();
+    expect(invalidCell.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    expect(invalidCell).toHaveFocus();
+    form.remove(); trigger.remove();
   });
 });

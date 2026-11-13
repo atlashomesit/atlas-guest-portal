@@ -84,6 +84,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
   const checkoutToggleButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const lastFocusedTriggerRef = React.useRef<HTMLElement | null>(null);
   const hasHydratedRef = React.useRef(false);
+  // TASK-10299460: the box SHOWS today -> tomorrow when nothing was chosen, but those dates are
+  // only a display default. They are written into BookingContext (and so persisted to
+  // localStorage as atlasHeroSearch) only once the guest has chosen them: picked a date, pressed
+  // Check availability, or arrived with dates (URL, prefill, or a previously saved search).
+  // Otherwise a home that is booked tonight opened as "Dates unavailable" for a guest who never
+  // chose tonight.
+  const datesChosenRef = React.useRef(false);
   const calendarContentId = React.useId();
   const calendarLabelId = React.useId();
   const dateErrorId = React.useId();
@@ -200,6 +207,15 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     const endDate = stateRange?.endDate ?? paramRange.endDate ?? stored?.endDate ?? defaultRange.endDate;
 
     const nextRange = clampRange(startDate, endDate);
+    const arrivedWithDates = Boolean(
+      stateRange?.startDate ||
+        stateRange?.endDate ||
+        paramRange.startDate ||
+        paramRange.endDate ||
+        stored?.startDate ||
+        stored?.endDate,
+    );
+    datesChosenRef.current = arrivedWithDates;
     const nextGuests =
       (stateRange?.guests && stateRange.guests > 0
         ? stateRange.guests
@@ -225,8 +241,13 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       // BookingContext's wire format is an IST-midnight ISO instant (UnitBookingWidget emits it
       // the same way and reads it back with getIstCalendarDate). A bare `.toISOString()` on a
       // local-midnight Date does not round-trip through that east of +05:30 — it loses a day.
-      checkIn: nextRange.startDate ? istInstantFromCalendarDate(nextRange.startDate).toISOString() : null,
-      checkOut: nextRange.endDate ? istInstantFromCalendarDate(nextRange.endDate).toISOString() : null,
+      // TASK-10299460: only when the guest arrived with dates; the default is display-only.
+      ...(arrivedWithDates
+        ? {
+            checkIn: nextRange.startDate ? istInstantFromCalendarDate(nextRange.startDate).toISOString() : null,
+            checkOut: nextRange.endDate ? istInstantFromCalendarDate(nextRange.endDate).toISOString() : null,
+          }
+        : {}),
       guests: totalGuests,
       adults: nextGuestCounts.adults,
       children: nextGuestCounts.children,
@@ -328,8 +349,14 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     const totalGuests = guestCounts.adults + guestCounts.children;
     updateBooking({
       // IST-midnight instant — the BookingContext wire format. See the hydration effect above.
-      checkIn: dateRange.startDate ? istInstantFromCalendarDate(dateRange.startDate).toISOString() : null,
-      checkOut: dateRange.endDate ? istInstantFromCalendarDate(dateRange.endDate).toISOString() : null,
+      // TASK-10299460: the dates travel only once the guest has chosen them (datesChosenRef is
+      // set by the hydration effect, a date pick, or Check availability, before this runs).
+      ...(datesChosenRef.current
+        ? {
+            checkIn: dateRange.startDate ? istInstantFromCalendarDate(dateRange.startDate).toISOString() : null,
+            checkOut: dateRange.endDate ? istInstantFromCalendarDate(dateRange.endDate).toISOString() : null,
+          }
+        : {}),
       guests: totalGuests,
       adults: guestCounts.adults,
       children: guestCounts.children,
@@ -455,6 +482,14 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
       { route: `/search?${validation.searchParams.toString()}` },
     );
 
+    // TASK-10299460: Check availability is a deliberate choice of these nights (even when they are
+    // the untouched default), so they now carry over to the pages that follow.
+    datesChosenRef.current = true;
+    updateBooking({
+      checkIn: istInstantFromCalendarDate(validation.startDate).toISOString(),
+      checkOut: istInstantFromCalendarDate(validation.endDate).toISOString(),
+    });
+
     // P0 fix (5th-pass): navigate directly to /search — no split-stays modal
     navigate({ pathname: '/search', search: validation.searchParams.toString() });
   };
@@ -480,6 +515,8 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
     }
 
     const nextRange = clampRange(normalizedStart, normalizedEnd);
+    // TASK-10299460: the guest touched the dates, so from here they are written to BookingContext.
+    datesChosenRef.current = true;
     setStatusMessage(nextRange.error ?? 'Updated dates.');
     setDateError(nextRange.error);
     setDateRange({ startDate: nextRange.startDate, endDate: nextRange.endDate });
@@ -499,6 +536,9 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
 
   const clearDates = () => {
     markHeroInteraction();
+    // TASK-10299460: back to the display default means "no dates chosen" again — drop the saved ones.
+    datesChosenRef.current = false;
+    updateBooking({ checkIn: null, checkOut: null });
     setDateRange(defaultRange);
     setDateError(null);
     setError(null);
@@ -566,7 +606,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
           <button
             type="button"
             className={`${dateFieldShellClass} w-full text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkin' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
-            aria-label="Click to select check-in date, then choose from calendar"
             title="Click to select check-in date, then choose from calendar"
             aria-expanded={isCalendarOpen}
             aria-describedby={dateError ? dateErrorId : undefined}
@@ -596,7 +635,6 @@ export const SearchAvailabilityWidget: React.FC<SearchAvailabilityWidgetProps> =
         <button
           type="button"
           className={`${dateFieldShellClass} w-full text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cta-secondary${activeField === 'checkout' && isCalendarOpen ? ' ring-2 ring-[var(--cta-primary)] ring-offset-2' : ''}`}
-          aria-label="Click to select check-out date, then choose from calendar"
           title="Click to select check-out date, then choose from calendar"
           aria-expanded={isCalendarOpen}
           aria-describedby={dateError ? dateErrorId : undefined}

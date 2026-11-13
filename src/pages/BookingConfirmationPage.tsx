@@ -42,6 +42,18 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+/**
+ * G3 journey 12: the API stores a guest's cancellation reason as "CANCELLATION_REQUEST — <reason>" (an internal marker for the host
+ * queue), and "Guest requested cancellation" when none was typed. The guest sees only what they typed.
+ */
+function guestFacingRequestNote(note: string | null | undefined): string | null {
+  const raw = (note ?? "").trim();
+  if (!raw) return null;
+  const stripped = raw.replace(/^CANCELLATION_REQUEST\s*[—–-]\s*/, "").trim();
+  if (!stripped || stripped === "Guest requested cancellation") return null;
+  return stripped;
+}
+
 /** Guest summary API returns ISO dates or formatted strings (e.g. "Sat, 3 May 2026") — normalize for ICS. */
 function summaryDisplayDateToIso(displayDate: string): string {
   const t = displayDate.trim();
@@ -228,6 +240,9 @@ interface BookingSummary {
   ratePlanName?: string | null;
   mealPlanCode?: string | null;
   cancellationPolicy?: string | null;
+  /** GUEST-068: the server's one wording of this booking's cancellation rule (same as the "Your booking" page). */
+  cancellationHeadline?: string | null;
+  cancellationDetail?: string | null;
   /** BNB-009: saved meal choices + whether to ask + the API's one list of options. Absent on older API builds (selector hidden). */
   mealPreferences?: GuestMealPreferences | null;
   /** PAY-009: refunds on this booking (newest first); empty/absent = no tracker. */
@@ -369,7 +384,7 @@ export default function BookingConfirmationPage() {
   const [modNote, setModNote] = useState("");
   const [modSubmitting, setModSubmitting] = useState(false);
   const [modMessage, setModMessage] = useState<string>("");
-  interface ModRequestSummary { id: number; requestedCheckinDateUtc: string; requestedCheckoutDateUtc: string; requestedGuestCount?: number | null; note?: string | null; status: string; decisionNote?: string | null; decisionMadeAtUtc?: string | null; createdAtUtc: string; }
+  interface ModRequestSummary { id: number; requestedCheckinDateUtc: string; requestedCheckoutDateUtc: string; requestedGuestCount?: number | null; note?: string | null; status: string; decisionNote?: string | null; decisionMadeAtUtc?: string | null; createdAtUtc: string; isCancellation?: boolean; }
   const [modRequests, setModRequests] = useState<ModRequestSummary[]>([]);
   // TASK-350: guest self-service cancellation request
   const [cancelReason, setCancelReason] = useState("");
@@ -551,6 +566,8 @@ export default function BookingConfirmationPage() {
             nearbyLandmarks: b.nearbyLandmarks,
             mealPlanCode: b.mealPlanCode,
             cancellationPolicy: b.cancellationPolicy,
+            cancellationHeadline: b.cancellationHeadline,
+            cancellationDetail: b.cancellationDetail,
             savedAtUtc: new Date().toISOString(),
           };
           const serialized = JSON.stringify(snapshot);
@@ -836,7 +853,10 @@ export default function BookingConfirmationPage() {
   }
 
   const isCancelled = booking.status === "Cancelled";
-  const planTerms = resolveBookingPlanTerms(booking.mealPlanCode, booking.cancellationPolicy);
+  const planTerms = resolveBookingPlanTerms(booking.mealPlanCode, booking.cancellationPolicy, {
+    headline: booking.cancellationHeadline,
+    detail: booking.cancellationDetail,
+  });
   // TASK-2071: pick language strings from guest profile preference
   const langCode = (booking.preferredLanguage ?? "en").toLowerCase();
   const pa = PRE_ARRIVAL_STRINGS[langCode] ?? PRE_ARRIVAL_STRINGS.en;
@@ -881,7 +901,12 @@ export default function BookingConfirmationPage() {
     : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
-  const hasPendingModRequest = modRequests.some((r) => r.status === "Pending");
+  const isCancellationRequestRow = (r: ModRequestSummary) => r.isCancellation === true || /^CANCELLATION_REQUEST/.test(r.note ?? "");
+  // GUEST-075: only a date or guest change counts as a "change request"; a cancellation request is its own thing.
+  const hasPendingModRequest = modRequests.some((r) => r.status === "Pending" && !isCancellationRequestRow(r));
+  // G3 journey 12: a cancellation request already sent (this visit or an earlier one) is shown as received; the form is not offered a second time.
+  // The guest list endpoint has sent isCancellation=false for these rows, so the stored marker in the note counts too.
+  const hasPendingCancellationRequest = modRequests.some((r) => isCancellationRequestRow(r) && r.status === "Pending");
 
   const modDatesInvalid = Boolean(modCheckinError || modCheckoutError);
 
@@ -2124,7 +2149,7 @@ export default function BookingConfirmationPage() {
                       {fmtDate(r.requestedCheckinDateUtc)} – {fmtDate(r.requestedCheckoutDateUtc)}
                       {r.requestedGuestCount ? ` · ${r.requestedGuestCount} guests` : ""}
                     </p>
-                    {r.note && <p className="text-xs text-text-muted">Your note: {r.note}</p>}
+                    {guestFacingRequestNote(r.note) && <p className="text-xs text-text-muted">Your note: {guestFacingRequestNote(r.note)}</p>}
                     {!isPending && r.decisionNote && (
                       <p className="text-xs text-text-secondary">Host note: {r.decisionNote}</p>
                     )}
@@ -2143,6 +2168,8 @@ export default function BookingConfirmationPage() {
             <h2 className="text-sm font-semibold text-text-primary">Request booking changes</h2>
             {hasPendingModRequest
               ? <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 border border-yellow-200">You have a pending change request. Our team will review it shortly.</p>
+              : (cancelRequested || hasPendingCancellationRequest)
+              ? <p className="text-sm text-yellow-700 bg-yellow-50 rounded-lg px-3 py-2 border border-yellow-200" data-testid="change-request-paused-by-cancellation">Your cancellation request is with our team. Date changes can wait for their answer.</p>
               : <p className="text-sm text-text-secondary">Need a different date or guest count? Send a request and we will review it.</p>
             }
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2191,7 +2218,7 @@ export default function BookingConfirmationPage() {
             <button
               type="button"
               onClick={submitModificationRequest}
-              disabled={modSubmitting || modDatesInvalid || hasPendingModRequest}
+              disabled={modSubmitting || modDatesInvalid || hasPendingModRequest || hasPendingCancellationRequest}
               className="inline-flex items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3.5 disabled:opacity-50"
               data-testid="mod-request-submit"
             >
@@ -2202,7 +2229,7 @@ export default function BookingConfirmationPage() {
         )}
 
         {/* TASK-350: guest self-service cancellation request */}
-        {canRequestModification && !cancelRequested && (
+        {canRequestModification && !cancelRequested && !hasPendingCancellationRequest && (
           <div className="rounded-2xl border border-red-100 bg-red-50/40 p-5 space-y-3">
             <h2 className="text-sm font-semibold text-red-800">Request cancellation</h2>
             <p className="text-sm text-red-700">
@@ -2270,7 +2297,7 @@ export default function BookingConfirmationPage() {
             )}
           </div>
         )}
-        {cancelRequested && (
+        {(cancelRequested || hasPendingCancellationRequest) && (
           <div className="rounded-2xl border border-green-200 bg-green-50/60 p-4 text-base text-green-800 space-y-2" role="status" aria-live="polite">
             <p>✅ {REFUND_CANCELLATION_RECEIVED_MESSAGE}</p>
             <Link

@@ -3,6 +3,7 @@ import {
   type CancellationTier,
   computeEffectiveCancellationDeadline,
   formatCancellationDeadline,
+  parseServerDeadline,
   isFreeCancellationDeadlineActive,
   resolveEffectiveCancellationTier,
 } from '@/utils/cancellationPolicy';
@@ -13,6 +14,8 @@ export interface CancellationMilestoneTimelineProps {
   cancellationTier?: CancellationTier | string | null;
   windowHoursOverride?: number | null;
   graceHours?: number | null;
+  /** TASK-1040050: the deadline the server quoted for the selected plan; when present it is the cutoff shown, the same date as every other screen. */
+  refundFreeUntilUtc?: Date | string | null;
   bookingCreatedAt?: Date;
   className?: string;
 }
@@ -22,6 +25,7 @@ export default function CancellationMilestoneTimeline({
   cancellationTier,
   windowHoursOverride,
   graceHours,
+  refundFreeUntilUtc,
   bookingCreatedAt = new Date(),
   className = '',
 }: CancellationMilestoneTimelineProps) {
@@ -31,13 +35,14 @@ export default function CancellationMilestoneTimeline({
   if (Number.isNaN(checkIn.getTime())) return null;
 
   const effectiveTier = resolveEffectiveCancellationTier(cancellationTier);
-  const deadline = computeEffectiveCancellationDeadline(
-    checkIn,
-    effectiveTier,
-    windowHoursOverride,
-    bookingCreatedAt,
-    graceHours,
-  );
+  // TASK-1040050: the cutoff is computed from the RAW tier, exactly like the "Free cancellation until" line on the same
+  // page (resolveFreeCancellationTrustCopy) and the deadline the API stamps on the booking (RefundDeadlineResolver: a
+  // listing or plan with no named tier gets the platform 7-day window). Passing the Flexible fallback here used to put
+  // "Full refund cutoff: 8 Dec" (48 h) beside "Free cancellation until 3 Dec" for the same stay. The tier label and fee
+  // wording below still use effectiveTier, which is how the refund calculator names an untiered stay.
+  const deadline =
+    parseServerDeadline(refundFreeUntilUtc) ??
+    computeEffectiveCancellationDeadline(checkIn, cancellationTier, windowHoursOverride, bookingCreatedAt, graceHours);
 
   const isActive = isFreeCancellationDeadlineActive(deadline);
   const deadlineFormatted = formatCancellationDeadline(deadline);
@@ -80,7 +85,7 @@ export default function CancellationMilestoneTimeline({
           <div>
             <div className="text-xs font-semibold text-text-primary flex items-center gap-1.5 flex-wrap">
               <span>Full refund cutoff:</span>
-              <span className="font-bold text-emerald-700">{deadlineFormatted}</span>
+              <span className="font-bold text-[color:var(--status-positive-text)]">{deadlineFormatted}</span>
             </div>
             <div className="text-[11px] text-text-secondary mt-0.5">
               {effectiveTier === 'Strict' && (
@@ -104,7 +109,7 @@ export default function CancellationMilestoneTimeline({
           <div>
             <div className="text-xs font-semibold text-text-primary flex items-center gap-1.5 flex-wrap">
               <span>Non-refundable cutoff:</span>
-              <span className="font-bold text-rose-700">
+              <span className="font-bold text-[color:var(--status-negative-text)]">
                 {effectiveTier === 'Strict' ? deadlineFormatted : checkInFormatted}
               </span>
             </div>
