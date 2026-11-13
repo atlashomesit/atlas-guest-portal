@@ -1506,7 +1506,7 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
           </details></aside>
           <div className="search-results-workspace">
         {/* TASK-1457: list/map toggle · TASK-1714: sort */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="search-results-controls flex flex-wrap items-center justify-between gap-3">
           <div
             className="inline-flex rounded-xl border border-border-subtle bg-bg-surface p-1 shadow-sm"
             role="group"

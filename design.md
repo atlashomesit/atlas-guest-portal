@@ -1,5 +1,11 @@
 # Guest portal design contract
 
+## Autonomous UX campaign — B02 Guest Search, 14 November 2026
+
+Under this campaign's existing delegated authority, both independent reviewers passed `B02/proposal-r2` (archive `6006c13a9c81733bc26c6a1a44f04d14abca988e`), retaining unchanged 03-A's full contract in `B02/proposal-r1/DESIGN.md` and original design reviews. UXC-2026-11-13-B02-03-A compacts only Search chrome at CSS widths up to 600px: meaningful H1 and full explanatory/availability text, directly editable 44px date/guest controls (three columns at 360–600px, existing narrow fallback), count/reset row, and the native More filters frame. Every secondary choice, active chip, qualifier, List/Map and Sort remains available in the same order.
+
+This supersedes only the disclosed phone spacing and primary-row placement; October 11/12 grouping/disclosure, desktop horizontal cards/wider grids and November 3 empty recovery remain authoritative. Result cards, themes, amounts, availability and URL/date/filter logic are unchanged. Deferred Guest property facts 05 and checkout/API/domain/schema changes are outside scope. Actual first-result image/name positions must be measured; no complete-card-first-fold promise is made. Evidence belongs in private `B02/implementation-guest-r1/`; keep the draft dev PR held, auto-merge off, pending both actual exact-head implementation reviews. No merge or deployment authority is granted to the implementation worker.
+
 ## Autonomous UX campaign — B01, 13 November 2026
 
 Campaign authority is private `docs/ux/autonomous-campaign-2026-11-13/AUTHORIZATION.md`; this campaign alone delegates the design and exact-head dev-merge gates to independent CPO and Chief UX Officer reviewers. Both passed immutable `B01/proposal-r1` (archive `7acda60fb1b10ff0edc4c368b6f059fa4689c3ec`) before implementation. This does not change the human gates of other daily batches.
