@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import SEO from "../components/SEO";
 import StateMessage, { type StateAction } from "../components/StateMessage";
@@ -63,6 +63,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 type BookingsTab = "upcoming" | "past" | "cancelled";
+const BOOKINGS_TABS = ["upcoming", "past", "cancelled"] as const;
 
 // TASK-6061: this was previously named `startOfTodayUtc` despite computing LOCAL midnight
 // (`setHours` is local-time) — the name lied, and the mismatch against the *actually* UTC-parsed
@@ -100,6 +101,24 @@ export default function MyBookingsPage() {
   const [errorKind, setErrorKind] = useState<BookingsErrorKind | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [tab, setTab] = useState<BookingsTab>("upcoming");
+  const tabsId = useId();
+  const panelId = `${tabsId}-results`;
+  const tabRefs = useRef<Partial<Record<BookingsTab, HTMLButtonElement | null>>>({});
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, current: BookingsTab) => {
+    const index = BOOKINGS_TABS.indexOf(current);
+    let next: BookingsTab;
+    switch (event.key) {
+      case "ArrowRight": next = BOOKINGS_TABS[(index + 1) % BOOKINGS_TABS.length]; break;
+      case "ArrowLeft": next = BOOKINGS_TABS[(index + BOOKINGS_TABS.length - 1) % BOOKINGS_TABS.length]; break;
+      case "Home": next = BOOKINGS_TABS[0]; break;
+      case "End": next = BOOKINGS_TABS[BOOKINGS_TABS.length - 1]; break;
+      default: return;
+    }
+    event.preventDefault();
+    setTab(next);
+    tabRefs.current[next]?.focus();
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -268,12 +287,17 @@ export default function MyBookingsPage() {
 
         {bookings.length > 0 && (
           <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter bookings">
-            {(["upcoming", "past", "cancelled"] as const).map((id) => (
+            {BOOKINGS_TABS.map((id) => (
               <button
                 key={id}
                 type="button"
                 role="tab"
+                id={`${tabsId}-${id}`}
+                ref={(element) => { tabRefs.current[id] = element; }}
+                aria-controls={panelId}
                 aria-selected={tab === id}
+                tabIndex={tab === id ? 0 : -1}
+                onKeyDown={(event) => handleTabKeyDown(event, id)}
                 onClick={() => setTab(id)}
                 className={`min-h-11 rounded-full px-4 py-2.5 text-sm font-semibold capitalize transition-colors border ${
                   tab === id
@@ -296,7 +320,9 @@ export default function MyBookingsPage() {
             primaryAction={{ label: "Browse our homes", to: "/" }}
             secondaryActions={hasHostContact() ? [{ label: "Call us to find a booking", href: getTelLink() }] : []}
           />
-        ) : filteredBookings.length === 0 ? (
+        ) : (
+          <div role="tabpanel" id={panelId} aria-labelledby={`${tabsId}-${tab}`} tabIndex={0}>
+          {filteredBookings.length === 0 ? (
           <StateMessage
             data-testid="my-bookings-filter-empty"
             icon="🔍"
@@ -348,7 +374,10 @@ export default function MyBookingsPage() {
                         <p className="text-base font-semibold text-text-primary">{b.listingName}</p>
                         {/* TASK-4359: unread message indicator on booking card */}
                         {b.hasUnreadMessages && (
-                          <span className="inline-flex w-2 h-2 bg-blue-500 rounded-full" data-testid="my-bookings-unread-dot" />
+                          <>
+                            <span aria-hidden="true" className="inline-flex w-2 h-2 bg-blue-500 rounded-full" data-testid="my-bookings-unread-dot" />
+                            <span className="sr-only">Unread messages</span>
+                          </>
                         )}
                       </div>
                       <p className="text-sm text-text-muted">{b.propertyName}</p>
@@ -404,6 +433,8 @@ export default function MyBookingsPage() {
                 </div>
               );
             })}
+          </div>
+          )}
           </div>
         )}
 

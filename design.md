@@ -1,5 +1,15 @@
 # Guest portal design contract
 
+## Autonomous UX campaign — B01, 13 November 2026
+
+Campaign authority is private `docs/ux/autonomous-campaign-2026-11-13/AUTHORIZATION.md`; this campaign alone delegates the design and exact-head dev-merge gates to independent CPO and Chief UX Officer reviewers. Both passed immutable `B01/proposal-r1` (archive `7acda60fb1b10ff0edc4c368b6f059fa4689c3ec`) before implementation. This does not change the human gates of other daily batches.
+
+UXC-2026-11-13-B01-05-A keeps all three My Bookings pills and immediate native activation, with automatic Left/Right wrapping and Home/End selection, one selected tab in normal tab order, stable tab/panel association and a focusable named results panel. Keys are handled only by the tabs; booking actions retain their own native behavior. Both filtered-empty content and cards belong to that panel; all-results empty, loading and errors retain their existing surfaces.
+
+05-B retains the decorative 8px blue unread dot and adds exactly one visually hidden **Unread messages** phrase inside each existing flagged booking link. Preserve its full name and token destination, date grouping, amounts, status colors, conditional review/rebook/in-stay actions, contact/preferences links and tenant branding. No API, booking, inventory, payment, permission or schema change is authorized.
+
+Actual evidence and checks belong in private `B01/implementation-guest/` and the campaign's final comparison bundle. Keep the ordinary dev PR draft with `hold-for-review` and auto-merge off until both independent reviewers PASS the actual running exact head and all commitments. No deployment is authorized.
+
 ## Daily ten — 17 October 2026 implementation approval
 
 Sreekar said **“i approve”** while viewing the immutable [2026-10-17/r1 gallery](https://github.com/atlashomesit/atlas-ux-evidence/blob/df538417675db34dc2fb69bcecd6a1a95b2b1c74/docs/ux/daily-five/2026-10-17/r1/index.html). Binding approval: private evidence 2026-10-17/implemented-r1/APPROVAL.json. Prototype SHA256: e89d22a9a08658a0b94e4d6a8b4f832459cd5b2ee1659388259ae0e6695f7c97.
