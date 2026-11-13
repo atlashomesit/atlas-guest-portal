@@ -350,3 +350,40 @@
   .search-empty-recovery > div:last-of-type { margin-top: 16px; flex-direction: row; flex-wrap: wrap; gap: 8px; }
   .search-empty-recovery > div:last-of-type > * { width: auto; max-width: none; padding: 10px 14px; }
 }
+
+/* UXC-2026-11-13-B02-03-A: compact only the phone search chrome.
+   Native controls, full availability qualifiers and the existing disclosure remain in flow.
+   Keep every >600px layout and all result-card geometry unchanged. */
+@media (max-width: 600px) {
+  .search-page__shell { gap: 8px; padding-top: 12px; }
+  .search-page__shell > header > p:first-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+  .search-page__shell > header h1 { font-size: 24px; line-height: 29px; margin: 0; }
+  .search-page__shell > header > p:last-child { font-size: 14px; line-height: 20px; margin-top: 6px; }
+  .search-filters { padding: 12px; }
+  .search-filters__row--scope { gap: 8px; }
+  .search-filters__row--scope input { min-height: 44px; font-size: 13px; padding-inline: 6px; }
+  .search-filters__row--meta,
+  .search-filters__row--meta button { min-height: 44px; }
+  .search-secondary-region { padding: 4px 12px; }
+  .search-filters__secondary summary { min-height: 44px; }
+  .search-filters__summary-hint { display: inline; margin: 0 0 0 .35rem; font-size: 12px; line-height: 18px; }
+  .search-browse,
+  .search-results-workspace,
+  .search-results-controls { gap: 8px; }
+}
+
+/* Below 360px the existing two-date row and full-width Guests remain the fallback. */
+@media (min-width: 360px) and (max-width: 600px) {
+  .search-filters__row--scope { grid-template-columns: repeat(2, minmax(0, 1fr)) 64px; }
+  .search-filters__row--scope > :last-child { grid-column: auto; }
+}
