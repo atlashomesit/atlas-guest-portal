@@ -1,5 +1,21 @@
 /* Search results — designer layout: clear rows, equal cards, no overlap */
 
+/* B03: DOM order remains summary, primary scope, help. Only CSS changes the
+   visual desktop band; the same React target/button survives 767/768 resizing. */
+.search-support-group { display: contents; }
+.search-support-slot { display: flex; justify-content: flex-end; min-width: 0; min-height: 62px; }
+@media (min-width: 768px) {
+  .search-support-group:not(.search-support-group--empty) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 16px;
+    align-items: center;
+  }
+  .search-support-group > .search-filter-summary { grid-column: 1; grid-row: 1; min-width: 0; }
+  .search-support-group > .search-filters { grid-column: 1 / -1; grid-row: 2; }
+  .search-support-slot { grid-column: 2; grid-row: 1; min-height: 44px; }
+}
+
 .search-page {
   --search-pad: 1.25rem;
   --search-gap: 1.25rem;

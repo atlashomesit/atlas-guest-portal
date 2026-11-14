@@ -1,5 +1,11 @@
 # Guest portal design contract
 
+## Autonomous UX campaign — B03 Search support, 14 November 2026
+
+Both independent reviewers passed B03/proposal-r2 (CPO report SHA256 `f2e2e3052f6248179bd0c98160136c9125706512eeff05ee1c9903445c8cdd15`, Chief UX Officer `5ae56d56136572a3da3a05f71957d9811b069d6bb886418ebb5b0ed1d8471a06`). UXC-2026-11-13-B03-01-A uses one shared React widget/state owner and a stable Search launcher target. Up to767px help follows full-width primary scope in normal flow; from768px its compact44px labelled control reserves a separate summary-right column, while keyboard order remains summary, scope, help. Reserve the slot while the drawer opens. Existing confirmed-empty Search and marketplace-home inline placement remain; absent Search shell uses one normal-flow fallback.
+
+This supersedes only eligible Search launcher placement, retaining B02 controls/cards and full dynamic chips/qualifiers. Drawer bottomSpacing and behavior, callback/assistant/session state, other routes/property chooser/sticky offsets and hidden surfaces remain authoritative. Dev Theme is excluded. Actual native200 Guests touch, second1280 View home activation, matched-scroll drawer and767/768/fallback/route focus/state evidence are required; no prototype behavior substitutes for React verification. Evidence: private campaign B03/implementation-guest-r1 and final lead capture packet. Draft dev PR stays held, auto-merge off, pending both independent exact-head implementation reviews; worker has no merge/deployment authority.
+
 ## Autonomous UX campaign — B02 Guest Search, 14 November 2026
 
 Under this campaign's existing delegated authority, both independent reviewers passed `B02/proposal-r2` (archive `6006c13a9c81733bc26c6a1a44f04d14abca988e`), retaining unchanged 03-A's full contract in `B02/proposal-r1/DESIGN.md` and original design reviews. UXC-2026-11-13-B02-03-A compacts only Search chrome at CSS widths up to 600px: meaningful H1 and full explanatory/availability text, directly editable 44px date/guest controls (three columns at 360–600px, existing narrow fallback), count/reset row, and the native More filters frame. Every secondary choice, active chip, qualifier, List/Map and Sort remains available in the same order.

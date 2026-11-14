@@ -22,6 +22,7 @@ import { resolveEffectiveListingAddress } from "../utils/listingAddress";
 import { LoadingState } from "../components/LoadingState";
 import ErrorBanner from "../components/ErrorBanner"; // TASK-7195
 import SEO from "../components/SEO"; // TASK-4290
+import { SupportTriggerSlot } from "../components/support-drawer/SupportTriggerSlot";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
 import DirectDiscountBanner from "../components/DirectDiscountBanner"; // TASK-1708
@@ -1203,6 +1204,7 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
 
         <RecentlyViewedStrip />
 
+        <div className={!showEmptyState || isMarketplaceSearch ? "search-support-group" : "search-support-group search-support-group--empty"}>
         <div className="search-filter-summary">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-text-primary">Filters</span>
@@ -1316,6 +1318,9 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
             )}
           </div>
 
+        </div>
+
+        {(!showEmptyState || isMarketplaceSearch) && <SupportTriggerSlot />}
         </div>
 
         <div className="search-browse">

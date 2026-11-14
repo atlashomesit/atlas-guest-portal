@@ -1,5 +1,6 @@
 import { useBookingContentVisible } from '@/hooks/useBookingContentVisible';
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { matchPath, useLocation } from "react-router-dom";
 
 import { CONTACT } from "../../config/contact";
@@ -18,13 +19,14 @@ import SupportActionGrid from "./SupportActionGrid";
 import { SupportDrawerFlagsProvider, useSupportDrawerFlags } from "./SupportDrawerFlagsContext";
 import SupportDrawer, { useSupportDrawerView } from "./SupportDrawer";
 import SupportWidgetTrigger from "./SupportWidgetTrigger";
+import { useSupportTriggerSlot } from "./SupportTriggerSlot";
 import StayIssueActions from "./StayIssueActions";
 import { CallbackStatus, SupportAnalyticsMetadata } from "./supportDrawer.types";
 
 const SCROLL_BUFFER_PX = 320;
 const DISMISS_KEY = "supportDrawer:dismissed";
 
-type SupportWidgetProps = { placement?: "floating" | "inline" };
+type SupportWidgetProps = { placement?: "floating" | "inline" | "search" };
 
 const SupportWidgetContent = ({ placement = "floating" }: SupportWidgetProps) => {
   const brandName = getTenantBrandName();
@@ -62,6 +64,19 @@ const SupportWidgetContent = ({ placement = "floating" }: SupportWidgetProps) =>
   // own unmount cleanup cannot restore focus to it — focus the remounted
   // trigger on the open→closed transition instead (WCAG 2.4.3).
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const { target: searchTarget } = useSupportTriggerSlot();
+  const restoreMovedTrigger = useRef(false);
+  const triggerOwnsFocus = useRef(false);
+  const bindTrigger = useCallback((element: HTMLButtonElement | null) => {
+    if (!element && triggerOwnsFocus.current) restoreMovedTrigger.current = true;
+    triggerRef.current = element;
+    if (element && restoreMovedTrigger.current) {
+      // A portal target can disappear during Suspense/route/empty transitions. Restore
+      // only the support action that owned focus, never an unrelated input's focus.
+      if (document.activeElement === document.body) element.focus();
+      restoreMovedTrigger.current = false;
+    }
+  }, []);
   const wasOpenRef = useRef(false);
   useEffect(() => {
     if (wasOpenRef.current && !isOpen) {
@@ -284,9 +299,18 @@ const SupportWidgetContent = ({ placement = "floating" }: SupportWidgetProps) =>
     return null;
   }
 
+  const launcher = !isOpen && !bookingContentVisible ? (
+    <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={bindTrigger} placement={placement}
+      onFocus={() => { triggerOwnsFocus.current = true; }} onBlur={() => { triggerOwnsFocus.current = false; }} />
+  ) : null;
+
   return (
     <>
-      {!isOpen && !bookingContentVisible ? <SupportWidgetTrigger bottomSpacing={bottomSpacing} onOpen={handleOpen} triggerRef={triggerRef} placement={placement} /> : null}
+      {placement === "search"
+        ? searchTarget
+          ? createPortal(launcher, searchTarget)
+          : <div className="search-support-fallback">{launcher}</div>
+        : launcher}
 
       {isOpen ? (
         <>
