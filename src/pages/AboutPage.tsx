@@ -137,7 +137,7 @@ const AboutPage = () => {
     <div className="about-page px-4 md:px-10 lg:px-20 py-20 space-y-16">
       <section className="about-intro bg-bg-surface border border-border-subtle shadow-level2 rounded-3xl p-8 md:p-12 grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-center" data-testid="mission-section">
         <div className="space-y-6">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
+          <p className="uppercase tracking-[0.2em] text-primary-dark font-semibold">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold leading-tight">Where dependable stays meet human hospitality</h1>
           <nav className="about-topic-links" aria-label="About page topics">
             {[["about-standards", "Standards"], ["about-host", "Your host"], ["about-promises", "Booking promises"]].map(([id, label]) => (
@@ -157,13 +157,13 @@ const AboutPage = () => {
           <ul className="space-y-3 text-base text-text-muted leading-relaxed">
             {missionHighlights.map((highlight) => (
               <li key={highlight} className="flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-primary mt-1" />
+                <CheckCircle2 className="w-5 h-5 text-primary-dark mt-1" />
                 <span>{highlight}</span>
               </li>
             ))}
           </ul>
           <div className="flex flex-wrap gap-3">
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary-dark font-semibold">
               <HeartHandshake className="w-4 h-4" />
               Guest-first by design
             </span>
@@ -181,7 +181,7 @@ const AboutPage = () => {
 
       <section id="about-standards" tabIndex={-1} className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] items-center" data-testid="hospitality-section">
         <div className="space-y-4">
-          <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Hospitality standards</p>
+          <p className="text-base uppercase tracking-[0.18em] text-primary-dark font-semibold">Hospitality standards</p>
           <h2 className="text-2xl md:text-3xl font-bold">Standards that travel with you</h2>
           <p className="text-base text-text-muted max-w-3xl leading-relaxed">
             Every {brandName} home is audited on the same quality framework. We match hotel-grade consistency with the warmth of local hosts so travelers never have to choose between comfort and character.
@@ -189,7 +189,7 @@ const AboutPage = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             {hospitalityStandards.map(({ title, description, icon: Icon }) => (
               <article key={title} className="bg-bg-surface border border-border-subtle rounded-2xl p-4 shadow-level1 flex gap-3">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary-dark flex items-center justify-center">
                   <Icon className="w-5 h-5" />
                 </div>
                 <div className="space-y-1">
@@ -214,7 +214,7 @@ const AboutPage = () => {
       <section id="about-host" tabIndex={-1} className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="team-section">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Who you're booking with</p>
+            <p className="text-base uppercase tracking-[0.18em] text-primary-dark font-semibold">Who you're booking with</p>
             <h2 className="text-2xl md:text-3xl font-bold">{brandName} is owner-run</h2>
             <p className="text-base text-text-muted max-w-2xl mt-2 leading-relaxed">
               There's no distant call center and no cast of department heads here. Every {brandName} home is looked after by the people who actually own it — the same person who checks the linens is the one who'll reply to your message.
@@ -230,13 +230,13 @@ const AboutPage = () => {
       <section id="about-promises" tabIndex={-1} className="bg-bg-surface border border-border-subtle rounded-3xl p-8 shadow-level1" data-testid="trust-section">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-base uppercase tracking-[0.18em] text-primary font-semibold">Trust badges</p>
+            <p className="text-base uppercase tracking-[0.18em] text-primary-dark font-semibold">Trust badges</p>
             <h2 className="text-2xl md:text-3xl font-bold">Confidence built into every booking</h2>
             <p className="text-base text-text-muted max-w-3xl mt-2 leading-relaxed">
               We publish the promises that guide our team, so guests know exactly how we operate before they arrive.
             </p>
           </div>
-          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold">
+          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary-dark font-semibold">
             <ShieldCheck className="w-4 h-4" />
             Verified stays network
           </span>
