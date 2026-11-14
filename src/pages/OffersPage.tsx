@@ -192,7 +192,7 @@ export default function OffersPage() {
       <div className="max-w-3xl mx-auto space-y-10">
         {/* Header */}
         <div className="space-y-2">
-          <p className="uppercase tracking-[0.2em] text-brand-primary font-semibold text-sm">{brandName}</p>
+          <p className="uppercase tracking-[0.2em] text-primary-dark font-semibold text-sm">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">Exclusive Offers</h1>
           <p className="text-lg text-text-muted">Book direct and unlock the best rates — no OTA fees, no middlemen.</p>
         </div>

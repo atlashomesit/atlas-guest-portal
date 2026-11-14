@@ -92,7 +92,7 @@ const Policies = () => {
               >
                 <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-primary">Policy</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-primary-dark">Policy</p>
                     <h2 className="text-2xl font-bold text-text-primary">{section.title}</h2>
                     <p className="text-text-muted mt-1">{section.summary}</p>
                   </div>
@@ -102,7 +102,7 @@ const Policies = () => {
                       return (
                         <a
                           key={ref}
-                          className="text-base px-4 py-3 min-h-11 inline-flex items-center rounded-full bg-bg-muted text-primary font-semibold hover:bg-primary/10"
+                          className="text-base px-4 py-3 min-h-11 inline-flex items-center rounded-full bg-bg-muted text-primary-dark font-semibold hover:bg-primary/10"
                           href={`/terms#${ref}`}
                         >
                           Terms: {term?.title || ref}
@@ -112,7 +112,7 @@ const Policies = () => {
                     <button
                       type="button"
                       onClick={() => toggle(section.id)}
-                      className="text-sm font-semibold px-3 py-3 rounded-full border border-border-subtle hover:border-cta-primary text-primary"
+                      className="text-sm font-semibold px-3 py-3 rounded-full border border-border-subtle hover:border-cta-primary text-primary-dark"
                       aria-expanded={open.has(section.id)}
                       aria-controls={`${section.id}-details`}
                       aria-label={open.has(section.id) ? `Hide details for ${section.title}` : `Read details for ${section.title}`}
@@ -152,7 +152,7 @@ const Policies = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Message on WhatsApp: contact ${brandName} support`}
-                className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                className="inline-flex min-h-11 items-center gap-2 px-4 py-3 bg-bg-surface text-primary-dark font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Message on WhatsApp
               </a>

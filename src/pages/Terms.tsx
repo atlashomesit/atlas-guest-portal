@@ -87,14 +87,14 @@ const Terms = () => {
             <button
               type="button"
               onClick={() => setOpen(new Set(localizedSections.map((section) => section.id)))}
-              className="min-h-11 px-5 py-3 rounded-full border border-border-subtle text-base font-semibold text-primary hover:border-primary"
+              className="min-h-11 px-5 py-3 rounded-full border border-border-subtle text-base font-semibold text-primary-dark hover:border-primary"
             >
               Expand all
             </button>
             <button
               type="button"
               onClick={() => setOpen(new Set())}
-              className="min-h-11 px-5 py-3 rounded-full border border-border-subtle text-base font-semibold text-primary hover:border-primary"
+              className="min-h-11 px-5 py-3 rounded-full border border-border-subtle text-base font-semibold text-primary-dark hover:border-primary"
             >
               Collapse all
             </button>
@@ -117,14 +117,14 @@ const Terms = () => {
               >
                 <header className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.2em] text-primary">Legal</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-primary-dark">Legal</p>
                     <h2 className="text-2xl font-bold text-text-primary">{section.title}</h2>
                     {section.summary && <p className="text-text-muted mt-1">{section.summary}</p>}
                   </div>
                   <button
                     type="button"
                     onClick={() => toggle(section.id)}
-                    className="min-h-11 text-base font-semibold px-4 py-3 rounded-full border border-border-subtle hover:border-cta-primary text-primary"
+                    className="min-h-11 text-base font-semibold px-4 py-3 rounded-full border border-border-subtle hover:border-cta-primary text-primary-dark"
                     aria-expanded={open.has(section.id)}
                     aria-controls={`${section.id}-body`}
                   >
@@ -151,7 +151,7 @@ const Terms = () => {
           </div>
 
           <div className="bg-bg-muted border border-border-subtle rounded-2xl p-6 text-text-primary">
-            <p className="text-sm uppercase tracking-[0.2em] text-primary">Payment data sharing</p>
+            <p className="text-sm uppercase tracking-[0.2em] text-primary-dark">Payment data sharing</p>
             <p className="mt-2">{localizedPaymentNote}</p>
           </div>
         </div>
