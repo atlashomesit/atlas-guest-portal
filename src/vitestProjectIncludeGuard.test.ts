@@ -94,9 +94,10 @@ describe("vitest projects pin the collected set (nested agent worktrees)", () =>
       expect((mocked?.test?.pool as { name?: string } | undefined)?.name).toBe("atlas-isolated-batch");
       expect(gateFresh).toBeDefined();
       expect(gateFresh?.test?.isolate).toBe(true);
+      expect(gateFresh?.test?.pool).toBe("forks");
       expect(Array.isArray(gateFresh?.test?.include) ? gateFresh.test.include.length : 0).toBe(7);
     } else {
-      expect(mocked?.test?.pool).toBe("threads");
+      expect(mocked?.test?.pool).toBe("forks");
       expect(gateFresh).toBeUndefined();
     }
   });
