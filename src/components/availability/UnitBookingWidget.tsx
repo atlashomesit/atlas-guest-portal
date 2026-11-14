@@ -3137,6 +3137,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             availability={clusterAvailability}
             checkIn={crossSellCheckIn}
             checkOut={crossSellCheckOut}
+            guests={guests}
             propertySlug={propertySlug}
             onSelectChildRoom={(room: ChildRoomPreview) => room.href && navigate(room.href)}
           />
