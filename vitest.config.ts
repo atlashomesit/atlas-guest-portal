@@ -144,7 +144,14 @@ const tzEastFiles = testFiles.filter((f) => TZ_EAST_RE.test(f));
 const nonTzFiles = testFiles.filter((f) => !TZ_EAST_RE.test(f));
 const mockedFiles = nonTzFiles.filter((f) => usesModuleMocks.has(f));
 const sharedFiles = nonTzFiles.filter((f) => !usesModuleMocks.has(f));
-const gateBatchMode = process.env.ATLAS_VITEST_GATE_BATCH === "1";
+const explicitGateBatchEnv = process.env.ATLAS_VITEST_GATE_BATCH === "1";
+// Activate the reused-worker batch pool both when `npm run test:gate` sets
+// `ATLAS_VITEST_GATE_BATCH=1` and when release-gate STEP 1 runs `npm test` with
+// `ATLAS_GUEST_VITEST_MAX_WORKERS` or `ATLAS_VITEST_PROGRESS_UNIT` (`ATLAS_VITEST_NO_BATCH=1` opts out).
+const gateBatchMode =
+  process.env.ATLAS_VITEST_NO_BATCH !== "1" &&
+  (explicitGateBatchEnv ||
+    Boolean(process.env.ATLAS_GUEST_VITEST_MAX_WORKERS || process.env.ATLAS_VITEST_PROGRESS_UNIT));
 // These files depend on process-global date/fetch/tenant modules being born fresh.
 // Keep the boundary explicit and tiny; every other mocked file has passed with runner-level reset.
 const gateFreshFiles = [
@@ -185,10 +192,11 @@ const gateReusableMockedFiles = mockedFiles.filter((f) => !gateFreshFiles.includ
 // ⛔ If admin's vitest is ever returned to the 4-way window, re-evaluate — the pin was correct for
 // the contended case.
 const envGuestCap = Number.parseInt(process.env.ATLAS_GUEST_VITEST_MAX_WORKERS ?? "", 10);
-// Gate batching creates several projects at once; keep each at one worker so their
-// combined pools cannot starve one another while the API build runs beside them.
-// Normal standalone runs retain the measured four-worker default.
-const guestCapValue = Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : (gateBatchMode ? 1 : 4);
+// `npm run test:gate` (`ATLAS_VITEST_GATE_BATCH=1` with `ATLAS_GUEST_VITEST_MAX_WORKERS` unset)
+// retains its 1-worker fallback; STEP 1 passes `ATLAS_GUEST_VITEST_MAX_WORKERS` explicitly (3 or 4)
+// and standalone runs retain the measured four-worker default.
+const guestCapValue =
+  Number.isFinite(envGuestCap) && envGuestCap > 0 ? envGuestCap : explicitGateBatchEnv ? 1 : 4;
 const workerCap =
   process.platform === "win32"
     ? { maxWorkers: guestCapValue, fileParallelism: guestCapValue > 1 }
