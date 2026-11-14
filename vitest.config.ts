@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { readdirSync, readFileSync } from "node:fs";
-// JavaScript adapter intentionally mirrors Vitest's internal threads worker protocol.
+// JavaScript adapter intentionally mirrors Vitest's internal forks worker protocol.
 // @ts-expect-error no declaration file is needed by the runtime-loaded config
 import isolatedBatchPool from "./scripts/vitest-isolated-batch-pool.mjs";
 
@@ -220,8 +220,9 @@ const baseTest = {
   },
   testTimeout: 120000, // 2 minutes for heavy property tests
   hookTimeout: 60000,
-  // Use threads pool to avoid ESM/CommonJS conflicts with forks (mirrors atlas-admin-portal).
-  pool: "threads" as const,
+  // Use child_process forks pool on Windows / Node 24 to prevent native V8 0xC0000005
+  // access violations that occur under worker_threads when jsdom/canvas suites run concurrently.
+  pool: "forks" as const,
   ...workerCap,
   exclude,
 };
@@ -250,11 +251,12 @@ export default defineConfig({
           ...baseTest,
           name: "mocked-isolated",
           include: gateBatchMode ? gateReusableMockedFiles : mockedFiles,
-          // Normal test runs retain Vitest's stock fresh-worker isolation. STEP 1 reuses exactly
-          // one thread, while the adapter restores isolate:true inside the runner so Vitest still
-          // resets its module registry and mocker before every file.
+          // Normal test runs retain Vitest's stock fresh-worker isolation. STEP 1 / gate batch mode
+          // reuses forked child processes via isolatedBatchPool, which restores isolate:true inside
+          // the runner so Vitest still resets its module registry and mocker before every file and
+          // recycles child processes every MAX_FILES_PER_WORKER files.
           isolate: !gateBatchMode,
-          pool: gateBatchMode ? isolatedBatchPool : ("threads" as const),
+          pool: gateBatchMode ? isolatedBatchPool : ("forks" as const),
         },
       },
       {
@@ -275,7 +277,7 @@ export default defineConfig({
                 name: "gate-fresh-isolated",
                 include: gateFreshFiles,
                 isolate: true,
-                pool: "threads" as const,
+                pool: "forks" as const,
               },
             },
           ]
