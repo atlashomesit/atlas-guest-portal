@@ -46,6 +46,8 @@ const marketplaceListingsCache = new TtlCache<MarketplaceListingMetaRow[] | null
 export function isMarketplaceRewriteRoute(pathname: string): boolean {
   const p = (pathname || "").toLowerCase();
   if (p === "/" || p === "") return true;
+  if (p === "/destinations" || p === "/destinations/") return true;
+  if (p === "/explore" || p === "/explore/") return true;
   if (/^\/homestays-in-[a-z0-9-]+$/i.test(p)) return true;
   if (/^\/homes\//i.test(p)) return true;
   return false;
@@ -154,6 +156,35 @@ export function buildMarketplaceMetaValues(
       title,
       description,
       image,
+      url: canonical,
+      canonical,
+      jsonLd: null,
+    };
+  }
+
+  // 2b. /destinations
+  const lowerPath = normalizedPath.toLowerCase();
+  if (lowerPath === "/destinations" || lowerPath === "/destinations/") {
+    const canonical = `${origin}/destinations`;
+    return {
+      title: "Homestay Destinations Across India — Book Direct | Atlastays",
+      description:
+        "Browse curated homestay destinations across India and book directly with local hosts with zero platform booking fees on Atlastays.",
+      image: `${origin}/icons/logo512.png`,
+      url: canonical,
+      canonical,
+      jsonLd: null,
+    };
+  }
+
+  // 2c. /explore
+  if (lowerPath === "/explore" || lowerPath === "/explore/") {
+    const canonical = `${origin}/explore`;
+    return {
+      title: "Explore Homestays & Villas Across India — Book Direct | Atlastays",
+      description:
+        "Explore handpicked homestays, holiday homes, and villas across India. Book direct with hosts and skip OTA service fees on Atlastays.",
+      image: `${origin}/icons/logo512.png`,
       url: canonical,
       canonical,
       jsonLd: null,
