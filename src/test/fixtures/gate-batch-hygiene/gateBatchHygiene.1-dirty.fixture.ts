@@ -44,6 +44,7 @@ describe("gate-batch hygiene fixture 1 of 2: leave the reused worker dirty", () 
     (window as unknown as { Razorpay?: unknown }).Razorpay = function RazorpayMock() {};
     Object.defineProperty(window, "innerWidth", { value: 375, writable: true, configurable: true });
     window.scrollTo = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
     vi.stubGlobal("leakedStubbedGlobal", 1);
     vi.stubEnv("LEAKED_STUBBED_ENV", "1");
     // A lazy import that is started and not awaited (the tests/smokeBookingFlow shape): it lands after this file's

@@ -29,9 +29,16 @@ import vitestConfig from "../vitest.config";
  * else would catch it: the bar's count floor cannot see inflation, and `git status` stays
  * clean. Hence this ratchet, which makes the property intentional rather than lucky.
  */
-type ProjectLike = { test?: { name?: string; include?: unknown } };
+type ProjectLike = {
+  test?: {
+    name?: string;
+    include?: unknown;
+    isolate?: boolean;
+    pool?: unknown;
+  };
+};
 const config = vitestConfig as unknown as {
-  test?: { include?: unknown; projects?: ProjectLike[] };
+  test?: { include?: unknown; projects?: ProjectLike[]; maxWorkers?: number; fileParallelism?: boolean };
 };
 
 describe("vitest projects pin the collected set (nested agent worktrees)", () => {
@@ -62,5 +69,35 @@ describe("vitest projects pin the collected set (nested agent worktrees)", () =>
         .map((entry) => `${project.test?.name ?? "(unnamed)"}: ${entry}`);
     });
     expect(offenders).toEqual([]);
+  });
+
+  it("partitions test files disjointly across projects without duplicates", () => {
+    const allEntries = projects.flatMap((project) =>
+      Array.isArray(project.test?.include)
+        ? (project.test.include as unknown[]).filter((entry): entry is string => typeof entry === "string")
+        : [],
+    );
+    expect(new Set(allEntries).size).toBe(allEntries.length);
+  });
+
+  it("aligns mocked-isolated batch pool and gate-fresh-isolated with Step 1 / gate env flags", () => {
+    const expectedBatch =
+      process.env.ATLAS_VITEST_NO_BATCH !== "1" &&
+      (process.env.ATLAS_VITEST_GATE_BATCH === "1" ||
+        Boolean(process.env.ATLAS_GUEST_VITEST_MAX_WORKERS || process.env.ATLAS_VITEST_PROGRESS_UNIT));
+    const mocked = projects.find((project) => project.test?.name === "mocked-isolated");
+    const gateFresh = projects.find((project) => project.test?.name === "gate-fresh-isolated");
+
+    expect(mocked).toBeDefined();
+    expect(mocked?.test?.isolate).toBe(!expectedBatch);
+    if (expectedBatch) {
+      expect((mocked?.test?.pool as { name?: string } | undefined)?.name).toBe("atlas-isolated-batch");
+      expect(gateFresh).toBeDefined();
+      expect(gateFresh?.test?.isolate).toBe(true);
+      expect(Array.isArray(gateFresh?.test?.include) ? gateFresh.test.include.length : 0).toBe(7);
+    } else {
+      expect(mocked?.test?.pool).toBe("threads");
+      expect(gateFresh).toBeUndefined();
+    }
   });
 });
