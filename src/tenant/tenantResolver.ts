@@ -89,7 +89,7 @@ export function isMarketplaceHostname(hostname?: string): boolean {
  */
 export function isAtlastaysMarketplaceSurface(hostname?: string): boolean {
   if (isMarketplaceHostname(hostname) || hasMarketplaceBrandParam()) return true;
-  return import.meta.env.DEV && isLocalDev();
+  return (import.meta.env.DEV || import.meta.env.MODE === 'development') && isLocalDev();
 }
 
 /** @deprecated Use isAtlastaysMarketplaceSurface — kept for callers that only checked hostname. */
