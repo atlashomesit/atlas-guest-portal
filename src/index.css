@@ -23,6 +23,7 @@
      base.css's --border-input for why this is a new token rather than darkening the two above. */
   --color-border-input: var(--border-input);
   --color-primary: rgb(var(--cta-primary-rgb));
+  --color-primary-dark: var(--brand-primary-dark, #9e351d);
   --color-success: var(--support-success);
   --color-danger: var(--support-danger);
 

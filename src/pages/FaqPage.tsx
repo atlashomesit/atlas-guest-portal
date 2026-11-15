@@ -112,7 +112,7 @@ const FaqPage = () => {
                     <details key={item.id} className="py-3 group" id={item.id} open>
                       <summary className="flex items-center justify-between cursor-pointer">
                         <h3 className="text-lg font-semibold text-text-primary">{item.question}</h3>
-                        <span className="text-primary text-sm">Toggle</span>
+                        <span className="text-primary-dark text-sm">Toggle</span>
                       </summary>
                       <div className="mt-2 space-y-2 text-text-primary">
                         <p>{item.answer}</p>
@@ -120,7 +120,7 @@ const FaqPage = () => {
                           {item.linksTo.map((link) => (
                             <a
                               key={`${item.id}-${link.id}`}
-                              className="text-xs uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-bg-muted text-primary font-semibold"
+                              className="text-xs uppercase tracking-[0.2em] px-3 py-1 rounded-full bg-bg-muted text-primary-dark font-semibold"
                               href={`/${link.type === "policy" ? "policies" : "terms"}#${link.id}`}
                             >
                               Related: {link.type === "policy" ? "Policy" : "Terms"} – {resolveTitle(link)}
@@ -151,7 +151,7 @@ const FaqPage = () => {
                 href={whatsappLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-3 bg-bg-surface text-primary font-semibold rounded-xl shadow-level1 hover:shadow-level2"
+                className="inline-flex items-center gap-2 px-4 py-3 bg-bg-surface text-primary-dark font-semibold rounded-xl shadow-level1 hover:shadow-level2"
               >
                 Message on WhatsApp
               </a>

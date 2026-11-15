@@ -52,6 +52,12 @@ body::-webkit-scrollbar {
 
 /* Reviewed marketplace and tenant empty-search assistance must not cover controls. */
 .review-inline-support { display: flex; justify-content: center; padding: 16px; }
+.search-support-fallback { display: flex; justify-content: flex-end; padding: 16px; min-height: 62px; }
+.search-support-trigger { max-width: 100%; min-height: 62px; }
+@media (min-width: 768px) {
+  .search-support-trigger { min-height: 44px; padding: 4px 12px; gap: 8px; }
+  .search-support-trigger > span:first-child { width: 28px; height: 28px; }
+}
 
 .property-card__button {
   min-height: 44px;

@@ -12,6 +12,7 @@ export type FreeClusterChild = {
   nightlyRate: number | null;
   currency: string;
   coverPhotoUrl: string | null;
+  maxGuests?: number | null;
 };
 
 export type ClusterChildrenAvailability = {
@@ -41,6 +42,9 @@ export function parseClusterChildrenAvailability(raw: unknown): ClusterChildrenA
         nightlyRate: c.nightlyRate == null ? null : Number(c.nightlyRate),
         currency: typeof c.currency === 'string' ? c.currency : 'INR',
         coverPhotoUrl: typeof c.coverPhotoUrl === 'string' ? c.coverPhotoUrl : null,
+        ...(c.maxGuests != null && Number.isFinite(Number(c.maxGuests))
+          ? { maxGuests: Number(c.maxGuests) }
+          : {}),
       }))
       .filter((c) => Number.isInteger(c.listingId) && c.listingId > 0),
   };

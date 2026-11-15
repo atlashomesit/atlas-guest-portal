@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getTenantSlugFromHostname,
   getTenantSlug,
+  isAtlastaysMarketplaceSurface,
   isLocalDev,
 } from './tenantResolver';
 
@@ -67,6 +68,23 @@ describe('tenantResolver', () => {
     it('returns false for atlashomestays.com', () => {
       setHostname('atlashomestays.com');
       expect(isLocalDev()).toBe(false);
+    });
+  });
+
+  describe('isAtlastaysMarketplaceSurface', () => {
+    it('returns true for local dev hosts in development mode', () => {
+      setHostname('127.0.0.1');
+      expect(isAtlastaysMarketplaceSurface()).toBe(true);
+    });
+
+    it('returns true for marketplace apex domains', () => {
+      setHostname('www.atlastays.com');
+      expect(isAtlastaysMarketplaceSurface()).toBe(true);
+    });
+
+    it('returns false for non-marketplace custom domains without brand param', () => {
+      setHostname('e2e-manual.localhost');
+      expect(isAtlastaysMarketplaceSurface()).toBe(false);
     });
   });
 });

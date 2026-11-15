@@ -24,6 +24,8 @@ describe("marketplaceSiteMeta pure logic (MKT-013)", () => {
       expect(isMarketplaceRewriteRoute("/homestays-in-new-delhi")).toBe(true);
       expect(isMarketplaceRewriteRoute("/homes/cozy-villa/123")).toBe(true);
       expect(isMarketplaceRewriteRoute("/homes/456")).toBe(true);
+      expect(isMarketplaceRewriteRoute("/destinations")).toBe(true);
+      expect(isMarketplaceRewriteRoute("/explore")).toBe(true);
 
       // Other routes should not be intercepted for marketplace head rewrite
       expect(isMarketplaceRewriteRoute("/about")).toBe(false);
@@ -155,6 +157,22 @@ describe("marketplaceSiteMeta pure logic (MKT-013)", () => {
       expect(meta.title).toBe("Home not found — Atlastays");
       expect(meta.image).toBe("https://atlastays.com/icons/logo512.png");
       expect(meta.jsonLd).toBeNull();
+    });
+
+    it("produces route-specific title, description, canonical, and OG tags for /destinations and /explore", () => {
+      const dest = buildMarketplaceMetaValues("/destinations", "", "https://www.atlastays.com", null);
+      expect(dest.title).toContain("Destinations");
+      expect(dest.description.length).toBeGreaterThan(20);
+      expect(dest.canonical).toBe("https://www.atlastays.com/destinations");
+      expect(dest.url).toBe("https://www.atlastays.com/destinations");
+      expect(dest.image).toBe("https://www.atlastays.com/icons/logo512.png");
+
+      const explore = buildMarketplaceMetaValues("/explore", "", "https://www.atlastays.com", null);
+      expect(explore.title).toContain("Explore");
+      expect(explore.description.length).toBeGreaterThan(20);
+      expect(explore.canonical).toBe("https://www.atlastays.com/explore");
+      expect(explore.url).toBe("https://www.atlastays.com/explore");
+      expect(explore.image).toBe("https://www.atlastays.com/icons/logo512.png");
     });
   });
 

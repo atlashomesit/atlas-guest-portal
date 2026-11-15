@@ -165,7 +165,7 @@ const GalleryPage = () => {
 
       <div className="max-w-6xl mx-auto space-y-10">
         <div className="space-y-3 text-center md:text-left">
-          <p className="uppercase tracking-[0.2em] text-primary font-semibold">{brandName}</p>
+          <p className="uppercase tracking-[0.2em] text-primary-dark font-semibold">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">Gallery</h1>
           <p className="text-lg text-text-muted">
             Explore our homes through curated photography. Filter by suite type or select a specific room to see
@@ -187,7 +187,7 @@ const GalleryPage = () => {
                   }`}
                   aria-pressed={activeSegment === segment.id}
                 >
-                  {segment.label} <span className="text-text-muted font-normal">({segment.count})</span>
+                  {segment.label} <span className={`font-normal ${activeSegment === segment.id ? "text-[var(--text-on-cta)]" : "text-text-muted"}`}>({segment.count})</span>
                 </button>
               ))}
             </div>

@@ -51,6 +51,10 @@ describe("gate-batch hygiene fixture 2 of 2: nothing the previous file left is v
     expect(vi.isMockFunction(window.scrollTo)).toBe(false);
   });
 
+  it("DOM prototype scroll stubs do not shadow Element.prototype in later files", () => {
+    expect(Object.prototype.hasOwnProperty.call(window.HTMLElement.prototype, "scrollIntoView")).toBe(false);
+  });
+
   it("vi.stubGlobal, vi.stubEnv and fake timers are undone", () => {
     expect(g.leakedStubbedGlobal).toBeUndefined();
     expect(process.env.LEAKED_STUBBED_ENV).toBeUndefined();

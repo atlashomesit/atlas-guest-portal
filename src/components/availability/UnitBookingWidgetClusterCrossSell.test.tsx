@@ -142,7 +142,7 @@ describe('UnitBookingWidget - CLU-011 whole-villa cross-sell', () => {
     expect(screen.getByTestId('child-room-card-102')).toHaveTextContent('₹4,500/night');
     expect(screen.getByTestId('select-child-room-102')).toHaveAttribute(
       'href',
-      `/homes/villa/102?checkIn=${checkInIso}&checkOut=${checkOutIso}`,
+      `/homes/villa/102?checkIn=${checkInIso}&checkOut=${checkOutIso}&guests=2`,
     );
   });
 

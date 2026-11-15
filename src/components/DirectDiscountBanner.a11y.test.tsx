@@ -17,7 +17,11 @@ vi.mock('@/hooks/useAdvertisedPromoActive', () => ({
 
 beforeEach(() => {
   sessionStorage.clear();
-  Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    configurable: true,
+    writable: true,
+  });
 });
 
 function visibleText(el: HTMLElement): string {

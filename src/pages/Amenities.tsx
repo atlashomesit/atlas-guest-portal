@@ -66,7 +66,7 @@ function AmenityCard({ icon, name, desc, variant = "standard" }: AmenityCardProp
   const bg = variant === "premium" ? "bg-amber-50 border-amber-200" : "bg-bg-surface border-border-subtle";
   return (
     <div className={`rounded-2xl border ${bg} p-5 flex gap-4 items-start shadow-level1`}>
-      <div className={`text-2xl mt-0.5 flex-shrink-0 ${variant === "premium" ? "text-amber-600" : "text-brand-primary"}`}>
+      <div className={`text-2xl mt-0.5 flex-shrink-0 ${variant === "premium" ? "text-amber-600" : "text-primary-dark"}`}>
         {icon}
       </div>
       <div>
@@ -107,7 +107,7 @@ export default function Amenities() {
       <div className="max-w-5xl mx-auto space-y-14">
         {/* Header */}
         <div className="text-center space-y-3">
-          <p className="uppercase tracking-[0.2em] text-brand-primary font-semibold text-sm">{brandName}</p>
+          <p className="uppercase tracking-[0.2em] text-primary-dark font-semibold text-sm">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">What's included</h1>
           <p className="text-lg text-text-muted max-w-2xl mx-auto">
             Every apartment is set up for comfort and productivity. Here's what you'll find across our properties.

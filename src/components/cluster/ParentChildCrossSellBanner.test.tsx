@@ -84,6 +84,43 @@ describe('ParentChildCrossSellBanner (CLU-004 / CLU-011)', () => {
     fireEvent.click(link);
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 102, href: '/homes/villa/102?checkIn=2026-11-11&checkOut=2026-11-13' }));
     expect(buildChildRoomHref('villa', 5)).toBe('/homes/villa/5');
+    expect(buildChildRoomHref('villa', 5, '2026-11-11', '2026-11-13', 4, 2)).toBe(
+      '/homes/villa/5?checkIn=2026-11-11&checkOut=2026-11-13&guests=2',
+    );
+  });
+
+  it('CLU-035: forwards clamped guests, shows room maxGuests, and renders multi-room combination hint', () => {
+    const withCaps: ClusterChildrenAvailability = {
+      cause: 'ChildrenBooked',
+      totalChildren: 3,
+      unavailableChildren: 1,
+      freeChildren: [
+        { ...child(102, 'Suite 102', 4500), maxGuests: 2 },
+        { ...child(103, 'Suite 103', 5200), maxGuests: 3 },
+      ],
+    };
+    render(
+      <ParentChildCrossSellBanner
+        availability={withCaps}
+        propertySlug="villa"
+        checkIn="2026-11-11"
+        checkOut="2026-11-13"
+        guests={4}
+      />,
+    );
+    expect(screen.getByTestId('select-child-room-102')).toHaveAttribute(
+      'href',
+      '/homes/villa/102?checkIn=2026-11-11&checkOut=2026-11-13&guests=2',
+    );
+    expect(screen.getByTestId('select-child-room-103')).toHaveAttribute(
+      'href',
+      '/homes/villa/103?checkIn=2026-11-11&checkOut=2026-11-13&guests=3',
+    );
+    expect(screen.getByTestId('child-room-card-102')).toHaveTextContent('Up to 2 guests');
+    expect(screen.getByTestId('child-room-card-103')).toHaveTextContent('Up to 3 guests');
+    expect(screen.getByTestId('cluster-cross-sell-combination')).toHaveTextContent(
+      'Need space for 4 guests? Combine 2 open rooms from ₹9,700/night',
+    );
   });
 
   it('does not render when the listing is not a parent or the dates are available', () => {

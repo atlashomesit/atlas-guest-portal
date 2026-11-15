@@ -5,6 +5,7 @@ export interface ChildRoomPreview {
   id: string | number;
   name: string;
   price?: number | null;
+  maxGuests?: number | null;
   /** Child page with the searched dates prefilled. */
   href?: string;
 }
@@ -17,6 +18,7 @@ export interface ParentChildCrossSellBannerProps {
   availability?: ClusterChildrenAvailability | null;
   checkIn?: string | null;
   checkOut?: string | null;
+  guests?: number | null;
   /** Route segment of the Child page: `/homes/{propertySlug}/{listingId}`. */
   propertySlug?: string;
   onSelectChildRoom?: (room: ChildRoomPreview) => void;
@@ -37,17 +39,31 @@ export function isParentListing(listing: {
   return acc === 'clusterparent' || acc === 'whole_villa_parent';
 }
 
-/** `/homes/{propertySlug}/{childId}?checkIn=yyyy-MM-dd&checkOut=yyyy-MM-dd` (dates optional). */
+/** `/homes/{propertySlug}/{childId}?checkIn=yyyy-MM-dd&checkOut=yyyy-MM-dd&guests=N` (params optional). */
 // eslint-disable-next-line react-refresh/only-export-components -- co-located cluster helper
 export function buildChildRoomHref(
   propertySlug: string | undefined,
   childId: number,
   checkIn?: string | null,
   checkOut?: string | null,
+  guests?: number | null,
+  maxGuests?: number | null,
 ): string {
   const base = `/homes/${propertySlug || 'atlas-homes'}/${childId}`;
-  if (!checkIn || !checkOut) return base;
-  return `${base}?checkIn=${encodeURIComponent(checkIn)}&checkOut=${encodeURIComponent(checkOut)}`;
+  const params = new URLSearchParams();
+  if (checkIn && checkOut) {
+    params.set('checkIn', checkIn);
+    params.set('checkOut', checkOut);
+  }
+  if (typeof guests === 'number' && Number.isFinite(guests) && guests > 0) {
+    const clamped =
+      typeof maxGuests === 'number' && Number.isFinite(maxGuests) && maxGuests > 0
+        ? Math.min(Math.floor(guests), Math.floor(maxGuests))
+        : Math.floor(guests);
+    params.set('guests', String(clamped));
+  }
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
 export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProps> = ({
@@ -57,6 +73,7 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
   availability,
   checkIn,
   checkOut,
+  guests,
   propertySlug,
   onSelectChildRoom,
   className = '',
@@ -73,8 +90,38 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
     id: c.listingId,
     name: c.name,
     price: c.nightlyRate,
-    href: buildChildRoomHref(propertySlug, c.listingId, checkIn, checkOut),
+    maxGuests: c.maxGuests ?? null,
+    href: buildChildRoomHref(propertySlug, c.listingId, checkIn, checkOut, guests, c.maxGuests),
   }));
+
+  const requestedGuests = typeof guests === 'number' && Number.isFinite(guests) ? Math.floor(guests) : 0;
+  let combinationHint: string | null = null;
+  if (requestedGuests > 2 && rooms.length >= 2) {
+    const withCapacity = rooms.filter((r) => typeof r.maxGuests === 'number' && r.maxGuests > 0);
+    const totalCap = withCapacity.reduce((acc, r) => acc + (r.maxGuests || 0), 0);
+    if (totalCap >= requestedGuests) {
+      const sorted = [...withCapacity].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+      let cap = 0;
+      let count = 0;
+      let sumPrice = 0;
+      let allPriced = true;
+      for (const r of sorted) {
+        cap += r.maxGuests || 0;
+        count += 1;
+        if (typeof r.price === 'number') {
+          sumPrice += r.price;
+        } else {
+          allPriced = false;
+        }
+        if (cap >= requestedGuests) break;
+      }
+      if (count >= 2) {
+        combinationHint = allPriced
+          ? `Need space for ${requestedGuests} guests? Combine ${count} open rooms from ₹${sumPrice.toLocaleString('en-IN')}/night`
+          : `Need space for ${requestedGuests} guests? Combine ${count} open rooms`;
+      }
+    }
+  }
 
   return (
     <div
@@ -110,6 +157,9 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
               {room.price != null && (
                 <p className="text-indigo-700 font-medium">₹{room.price.toLocaleString('en-IN')}/night</p>
               )}
+              {typeof room.maxGuests === 'number' && room.maxGuests > 0 && (
+                <p className="text-slate-600">Up to {room.maxGuests} {room.maxGuests === 1 ? 'guest' : 'guests'}</p>
+              )}
             </div>
             <a
               href={room.href}
@@ -127,6 +177,12 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
           </div>
         ))}
       </div>
+
+      {combinationHint && (
+        <p className="text-xs font-medium text-indigo-900" data-testid="cluster-cross-sell-combination">
+          {combinationHint}
+        </p>
+      )}
     </div>
   );
 };

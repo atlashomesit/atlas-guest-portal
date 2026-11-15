@@ -76,9 +76,18 @@ interface PropBaseline {
   value: unknown;
 }
 
+interface ProtoPropBaseline {
+  target: object;
+  name: string;
+  descriptor: PropertyDescriptor | undefined;
+}
+
+const RESTORED_DOM_PROTO_PROPS = ["scrollIntoView", "scrollTo", "scroll", "scrollBy"] as const;
+
 interface WorkerBaseline {
   href: string;
   props: Map<string, PropBaseline>;
+  protoProps: ProtoPropBaseline[];
   headKeep: Set<Element>;
   bodyKeep: Set<Element>;
   htmlAttrs: Map<string, string>;
@@ -100,9 +109,22 @@ function baseline(): WorkerBaseline {
   for (const name of [...RESTORED_WINDOW_PROPS, ...SDK_GLOBALS]) {
     props.set(name, { descriptor: Object.getOwnPropertyDescriptor(g, name), value: g[name] });
   }
+  const protoProps: ProtoPropBaseline[] = [];
+  for (const ctor of [g.Element, g.HTMLElement] as Array<{ prototype?: object } | undefined>) {
+    const proto = ctor?.prototype;
+    if (!proto) continue;
+    for (const name of RESTORED_DOM_PROTO_PROPS) {
+      protoProps.push({
+        target: proto,
+        name,
+        descriptor: Object.getOwnPropertyDescriptor(proto, name),
+      });
+    }
+  }
   const created: WorkerBaseline = {
     href: window.location.href,
     props,
+    protoProps,
     headKeep: new Set(Array.from(document.head.children)),
     bodyKeep: new Set(Array.from(document.body.children)),
     htmlAttrs: attributesOf(document.documentElement),
@@ -222,6 +244,19 @@ export function resetSharedWorkerState(): void {
   // Replaced or assigned window properties (a test that swaps `window.location` for a plain object, sets a viewport
   // width, stubs `scrollTo`, or leaves a `Razorpay` mock behind).
   for (const [name, propBase] of base.props) attempt(() => restoreWindowProp(name, propBase));
+
+  // DOM prototype scroll stubs (`HTMLElement.prototype.scrollIntoView = vi.fn()` in checkout/messaging tests, which
+  // would otherwise leave an own property on `HTMLElement.prototype` that shadows `Element.prototype.scrollIntoView`).
+  for (const protoBase of base.protoProps) {
+    attempt(() => {
+      const current = Object.getOwnPropertyDescriptor(protoBase.target, protoBase.name);
+      if (protoBase.descriptor === undefined) {
+        if (current !== undefined) Reflect.deleteProperty(protoBase.target, protoBase.name);
+      } else if (!sameDescriptor(current, protoBase.descriptor)) {
+        Object.defineProperty(protoBase.target, protoBase.name, protoBase.descriptor);
+      }
+    });
+  }
 
   // The URL. App code moves it (`history.replaceState` adds `?tenant=` on the checkout pages; BrowserRouter pushes).
   attempt(() => {

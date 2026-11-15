@@ -22,6 +22,7 @@ html {
      Every theme SHOULD override with its own brand-matched passing values;
      these defaults keep small accent TEXT readable in themes that haven't. */
   --accent-text: #a84832;
+  --brand-primary-dark: #9e351d;
   --lavender-text: #6f5aa8;
   /* TASK-4951 — same "-text" text-role pattern as --accent-text/--lavender-text above.
      The shared Footer "GST Verified" badge was hardcoded to Tailwind's `emerald-400`

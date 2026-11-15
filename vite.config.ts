@@ -42,85 +42,91 @@ function resolveBackendTarget(): string {
 }
 const BACKEND_TARGET = resolveBackendTarget();
 
-/** In dev, serve runtime config with apiBaseUrl = BACKEND_TARGET (API only). */
+/** In dev and local preview, serve runtime config with apiBaseUrl = BACKEND_TARGET (API only). */
+function attachRuntimeConfigMiddleware(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
+  server.middlewares.use((req, res, next) => {
+    if (!req.url?.startsWith("/.well-known/atlas-runtime-config.json")) {
+      return next();
+    }
+    let config: Record<string, unknown>;
+    try {
+      const raw = fs.readFileSync(RUNTIME_CONFIG_PATH, "utf-8");
+      config = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return next();
+    }
+    config = { ...config, apiBaseUrl: BACKEND_TARGET };
+    const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
+    if (mapsKey) config.googleMapsApiKey = mapsKey;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(config));
+  });
+}
+
 function devRuntimeConfigPlugin() {
   return {
     name: "dev-runtime-config",
-    configureServer(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
-      server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith("/.well-known/atlas-runtime-config.json")) {
-          return next();
-        }
-        let config: Record<string, unknown>;
-        try {
-          const raw = fs.readFileSync(RUNTIME_CONFIG_PATH, "utf-8");
-          config = JSON.parse(raw) as Record<string, unknown>;
-        } catch {
-          return next();
-        }
-        config = { ...config, apiBaseUrl: BACKEND_TARGET };
-        const mapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim();
-        if (mapsKey) config.googleMapsApiKey = mapsKey;
-        res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify(config));
-      });
-    },
+    configureServer: attachRuntimeConfigMiddleware,
+    configurePreviewServer: attachRuntimeConfigMiddleware,
   };
 }
 
 /**
- * TASK-7821: Vite dev `/img?u=&w=` actually resizes with sharp (same allowlist as
+ * TASK-7821: Vite dev & preview `/img?u=&w=` actually resizes with sharp (same allowlist as
  * `functions/img.ts`). A 302 to the blob would still ship the multi-MB original.
  */
+function attachGuestImageProxyMiddleware(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
+  server.middlewares.use((req, res, next) => {
+    const rawUrl = req.url?.split("?")[0];
+    if (rawUrl !== "/img") {
+      return next();
+    }
+    void (async () => {
+      try {
+        const parsed = new URL(req.url ?? "", "http://local.invalid");
+        const origin = (parsed.searchParams.get("u") ?? "").trim();
+        if (!isAllowedBlobImageUrl(origin)) {
+          res.statusCode = 400;
+          res.end("Invalid image origin");
+          return;
+        }
+        const width = clampTransformWidth(parsed.searchParams.get("w"));
+        const upstream = await fetch(origin, { redirect: "manual" });
+        if (upstream.status >= 300 && upstream.status < 400) {
+          res.statusCode = 400;
+          res.end("Redirected image origin is not allowed");
+          return;
+        }
+        if (!upstream.ok) {
+          res.statusCode = upstream.status === 404 ? 404 : 502;
+          res.end("Image origin failed");
+          return;
+        }
+        const bytes = Buffer.from(await upstream.arrayBuffer());
+        const sharp = (await import("sharp")).default;
+        const body = await sharp(bytes)
+          .resize({ width, withoutEnlargement: true })
+          .webp({ quality: 75 })
+          .toBuffer();
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "image/webp");
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        res.setHeader("X-Atlas-Image-Proxy", "1");
+        res.setHeader("X-Atlas-Image-Width", String(width));
+        res.end(body);
+      } catch {
+        res.statusCode = 502;
+        res.end("Image origin unreachable");
+      }
+    })();
+  });
+}
+
 function devGuestImageProxyPlugin() {
   return {
     name: "dev-guest-image-proxy",
-    configureServer(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
-      server.middlewares.use((req, res, next) => {
-        const rawUrl = req.url?.split("?")[0];
-        if (rawUrl !== "/img") {
-          return next();
-        }
-        void (async () => {
-          try {
-            const parsed = new URL(req.url ?? "", "http://local.invalid");
-            const origin = (parsed.searchParams.get("u") ?? "").trim();
-            if (!isAllowedBlobImageUrl(origin)) {
-              res.statusCode = 400;
-              res.end("Invalid image origin");
-              return;
-            }
-            const width = clampTransformWidth(parsed.searchParams.get("w"));
-            const upstream = await fetch(origin, { redirect: "manual" });
-            if (upstream.status >= 300 && upstream.status < 400) {
-              res.statusCode = 400;
-              res.end("Redirected image origin is not allowed");
-              return;
-            }
-            if (!upstream.ok) {
-              res.statusCode = upstream.status === 404 ? 404 : 502;
-              res.end("Image origin failed");
-              return;
-            }
-            const bytes = Buffer.from(await upstream.arrayBuffer());
-            const sharp = (await import("sharp")).default;
-            const body = await sharp(bytes)
-              .resize({ width, withoutEnlargement: true })
-              .webp({ quality: 75 })
-              .toBuffer();
-            res.statusCode = 200;
-            res.setHeader("Content-Type", "image/webp");
-            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-            res.setHeader("X-Atlas-Image-Proxy", "1");
-            res.setHeader("X-Atlas-Image-Width", String(width));
-            res.end(body);
-          } catch {
-            res.statusCode = 502;
-            res.end("Image origin unreachable");
-          }
-        })();
-      });
-    },
+    configureServer: attachGuestImageProxyMiddleware,
+    configurePreviewServer: attachGuestImageProxyMiddleware,
   };
 }
 
@@ -130,47 +136,69 @@ function devGuestImageProxyPlugin() {
  * checks expect this canonical path; without the alias, Vite falls back to
  * the SPA's `index.html` and the response masquerades as `text/html`.
  */
+function attachManifestJsonAliasMiddleware(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
+  server.middlewares.use((req, res, next) => {
+    const url = req.url?.split("?")[0];
+    if (url !== "/manifest.json") {
+      return next();
+    }
+    try {
+      const raw = fs.readFileSync(MANIFEST_PATH, "utf-8");
+      // Round-trip parse so we ship strict JSON (no comments / trailing commas).
+      const parsed = JSON.parse(raw);
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache");
+      res.end(JSON.stringify(parsed));
+    } catch {
+      // Fall through to the default 404/SPA handler if the manifest is missing.
+      return next();
+    }
+  });
+}
+
 function devManifestJsonAliasPlugin() {
   return {
     name: "dev-manifest-json-alias",
-    configureServer(server: { middlewares: { use: (fn: (req: any, res: any, next: () => void) => void) => void } }) {
-      server.middlewares.use((req, res, next) => {
-        const url = req.url?.split("?")[0];
-        if (url !== "/manifest.json") {
-          return next();
-        }
-        try {
-          const raw = fs.readFileSync(MANIFEST_PATH, "utf-8");
-          // Round-trip parse so we ship strict JSON (no comments / trailing commas).
-          const parsed = JSON.parse(raw);
-          res.setHeader("Content-Type", "application/json; charset=utf-8");
-          res.setHeader("Cache-Control", "no-cache");
-          res.end(JSON.stringify(parsed));
-        } catch {
-          // Fall through to the default 404/SPA handler if the manifest is missing.
-          return next();
-        }
-      });
-    },
+    configureServer: attachManifestJsonAliasMiddleware,
+    configurePreviewServer: attachManifestJsonAliasMiddleware,
   };
 }
 
 /**
  * TASK-10299465 (b): production builds only. Adds `<script async src="/boot-prefetch.js">` first in <head> so the runtime-config request and the tenant
- * lookup start while the app's scripts download (see public/boot-prefetch.js and src/boot/earlyFetch.ts). `vite dev` never serves it, so the dev
- * server's requests and console are unchanged.
+ * lookup start while the app's scripts download (see public/boot-prefetch.js and src/boot/earlyFetch.ts). `vite dev` and local E2E preview builds skip it
+ * so local E2E requests and console stay identical to `vite dev`.
  */
 function bootPrefetchScriptPlugin() {
   return {
     name: "boot-prefetch-script",
     apply: "build" as const,
     transformIndexHtml() {
+      if (process.env.ATLAS_E2E_PREVIEW_BUILD === "1") return [];
       return [{ tag: "script", attrs: { src: "/boot-prefetch.js", async: true }, injectTo: "head-prepend" as const }];
     },
   };
 }
 
-export default defineConfig({
+const GUEST_PROXY_RULES = {
+  "/tenants": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
+  "/listings": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
+  "/availability": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
+  "/bookings": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
+  "/api": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
+  "/properties": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
+  "/pricing": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
+};
+
+const GUEST_SECURITY_HEADERS_BASE = {
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+};
+
+export default defineConfig(({ command }) => ({
   plugins: [
     tailwindcss(),
     react(),
@@ -186,21 +214,22 @@ export default defineConfig({
     },
     dedupe: ["react", "react-dom", "react-router", "react-router-dom"],
   },
-  html: {
-    // Stamps nonce="..." onto every <script> tag Vite itself injects (HMR client, the
-    // React-refresh preamble) so they clear the strict script-src below without 'unsafe-inline'.
-    cspNonce: devCspNonce,
-  },
+  ...(command === "serve"
+    ? {
+        html: {
+          // Stamps nonce="..." onto every <script> tag Vite itself injects (HMR client, the
+          // React-refresh preamble) so they clear the strict script-src below without 'unsafe-inline'.
+          cspNonce: devCspNonce,
+        },
+      }
+    : {}),
   server: {
     port: 5174,
     /** Must stay 5174 — E2E and docs assume guest portal here; do not silently move to another port. */
     strictPort: true,
+    allowedHosts: true,
     headers: {
-      "Referrer-Policy": "strict-origin-when-cross-origin",
-      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
-      "X-Content-Type-Options": "nosniff",
-      "X-Frame-Options": "DENY",
-      "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+      ...GUEST_SECURITY_HEADERS_BASE,
       // Mirror public/_headers CSP so local Playwright security gates see the same policy as Pages,
       // plus 'nonce-<devCspNonce>' in the two script directives ONLY (never 'unsafe-inline' — that
       // would trip xss-input-sanitization.e2e.spec.ts's "script-src must not include 'unsafe-inline'"
@@ -213,20 +242,25 @@ export default defineConfig({
       // TASK-10164: `frame-ancestors https: http:` is LOCAL DEV ONLY so iframe embed work still
       // functions against Vite. Production/Pages clickjacking is set per-path in
       // functions/_middleware.ts — do not copy this permissive token into public/_headers.
+      // NOTE: keep this CSP header entry FIRST in the file as an inline template literal with `${devCspNonce}`,
+      // because atlas-e2e/scripts/check-guest-csp-parity.cjs regex-parses the first CSP key in vite.config.ts.
+      "Content-Security-Policy": `default-src 'self'; script-src 'self' 'nonce-${devCspNonce}' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://static.cloudflareinsights.com https://maps.googleapis.com; script-src-elem 'self' 'nonce-${devCspNonce}' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://static.cloudflareinsights.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: http://127.0.0.1:* http://localhost:* https://maps.gstatic.com https://*.googleapis.com; connect-src 'self' http://127.0.0.1:* http://localhost:* https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://cloudflareinsights.com https://api.atlaspms.in https://atlas-homes-api-dev-lx.azurewebsites.net https://qaapi.atlaspms.in https://maps.googleapis.com https://*.googleapis.com; frame-src https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://www.google.com https://www.google.com/maps https://maps.googleapis.com; frame-ancestors https: http:`,
+    },
+    proxy: GUEST_PROXY_RULES,
+  },
+  preview: {
+    port: 5174,
+    strictPort: true,
+    allowedHosts: true,
+    headers: {
+      ...GUEST_SECURITY_HEADERS_BASE,
       "Content-Security-Policy":
-        `default-src 'self'; script-src 'self' 'nonce-${devCspNonce}' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://static.cloudflareinsights.com https://maps.googleapis.com; script-src-elem 'self' 'nonce-${devCspNonce}' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://static.cloudflareinsights.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: http://127.0.0.1:* http://localhost:* https://maps.gstatic.com https://*.googleapis.com; connect-src 'self' http://127.0.0.1:* http://localhost:* https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://cloudflareinsights.com https://api.atlaspms.in https://atlas-homes-api-dev-lx.azurewebsites.net https://qaapi.atlaspms.in https://maps.googleapis.com https://*.googleapis.com; frame-src https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://www.google.com https://www.google.com/maps https://maps.googleapis.com; frame-ancestors https: http:`,
+        "default-src 'self'; script-src 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://static.cloudflareinsights.com https://maps.googleapis.com; script-src-elem 'self' https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://static.cloudflareinsights.com https://maps.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: http://127.0.0.1:* http://localhost:* https://maps.gstatic.com https://*.googleapis.com; connect-src 'self' http://127.0.0.1:* http://localhost:* https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://cloudflareinsights.com https://api.atlaspms.in https://atlas-homes-api-dev-lx.azurewebsites.net https://qaapi.atlaspms.in https://maps.googleapis.com https://*.googleapis.com; frame-src https://checkout.razorpay.com https://api.razorpay.com https://*.razorpay.com https://www.google.com https://www.google.com/maps https://maps.googleapis.com; frame-ancestors https: http:",
     },
-    proxy: {
-      "/tenants": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
-      "/listings": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
-      "/availability": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
-      "/bookings": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
-      "/api": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
-      "/properties": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
-      "/pricing": { target: BACKEND_TARGET, changeOrigin: true, secure: false },
-    },
+    proxy: GUEST_PROXY_RULES,
   },
   build: {
+    outDir: process.env.ATLAS_E2E_OUT_DIR?.trim() || "dist",
     modulePreload: {
       polyfill: false,
     },
@@ -253,4 +287,4 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
   },
-});
+}));

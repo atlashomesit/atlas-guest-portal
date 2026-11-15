@@ -19,6 +19,7 @@ import { getTenantContext } from "./tenant/tenantContext"
 import { isTenantNotTakingBookings, NOT_TAKING_BOOKINGS_COPY } from "./tenant/paymentRail"
 import { CITY_LANDING_SLUGS } from "./content/cities/cityLandingSlugs"
 import InternalTenantRobotsMeta from "./components/InternalTenantRobotsMeta"
+import { SupportTriggerSlotProvider } from "./components/support-drawer/SupportTriggerSlot"
 // TASK-4903 (ADR-0081): the theme mount point. Sole allowed import of `./themes/registry`
 // outside `src/themes/` itself (ESLint boundary rule, eslint.config.js) — resolves which
 // registered layout theme's Home/PropertyDetails/Gallery/About/Contact pages to render.
@@ -357,7 +358,7 @@ function AppWrapper() {
         </Suspense>
         </main>
       </ErrorBoundary>
-      {!shouldHideFooter && <div className={inlineHomeConsent ? "home-inline-support" : inlineReviewSupport ? "review-inline-support" : undefined}><Suspense fallback={null}><SupportWidget placement={inlineReviewSupport ? "inline" : "floating"} /></Suspense></div>}
+      {!shouldHideFooter && <div className={inlineHomeConsent ? "home-inline-support" : inlineReviewSupport ? "review-inline-support" : undefined}><Suspense fallback={null}><SupportWidget placement={inlineReviewSupport ? "inline" : location.pathname === '/search' ? "search" : "floating"} /></Suspense></div>}
       {!shouldHideFooter && <Footer />}
       {!shouldHideFooter && !inlineHomeConsent && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
@@ -372,7 +373,7 @@ function App() {
         <BookingProvider>
           <ListingPhotosProvider>
             <Router>
-              <AppWrapper />
+              <SupportTriggerSlotProvider><AppWrapper /></SupportTriggerSlotProvider>
             </Router>
           </ListingPhotosProvider>
         </BookingProvider>

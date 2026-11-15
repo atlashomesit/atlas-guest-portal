@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.vite-e2e-dist/
+.vite-e2e-dist-*/
 
 # agent-worktree.ps1 sandbox markers (atlas-e2e/scripts/agent-worktree.ps1) -- each describes ONE
 # checkout's isolation/identity, never the repo. Gitignored fleet-wide 2026-09-26; previously only

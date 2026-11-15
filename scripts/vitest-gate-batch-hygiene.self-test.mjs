@@ -31,6 +31,7 @@ const DETERMINISTIC_CASES = [
   "html and body attributes carry nothing over",
   "document.visibilityState is visible again",
   "SDK globals and replaced window properties are re-armed",
+  "DOM prototype scroll stubs do not shadow Element.prototype in later files",
   "vi.stubGlobal, vi.stubEnv and fake timers are undone",
   "a vi.doMock queued at the end of the previous file does not apply to this file",
 ];
