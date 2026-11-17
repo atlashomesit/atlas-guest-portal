@@ -219,3 +219,37 @@ describe("BecomeHost — no invented host testimonials", () => {
     }
   });
 });
+
+// 2026-11-17: the page also carried an earnings estimator. It stated what "properties in your area
+// earn" as one fixed rupee range, and turned a room-count slider into "estimated monthly earnings"
+// said to be "based on average occupancy". Both were constants in this file, with no area and no
+// data behind them, so the block was removed. Earnings figures may come back only from real,
+// sourced numbers or from the host's own inputs.
+describe("BecomeHost — no unsourced earnings figures", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("shows no earnings estimator and makes no earnings claim", () => {
+    render(
+      <MemoryRouter>
+        <BecomeHost />
+      </MemoryRouter>,
+    );
+
+    const page = screen.getByTestId("become-host-page");
+    expect(screen.queryByRole("heading", { name: /how much could you earn/i })).toBeNull();
+    expect(screen.queryByRole("slider")).toBeNull();
+
+    const pageText = page.textContent ?? "";
+    for (const claim of [
+      "Properties in your area earn",
+      "₹45,000",
+      "1,20,000",
+      "Estimated monthly earnings",
+      "Based on average occupancy",
+    ]) {
+      expect(pageText).not.toContain(claim);
+    }
+  });
+});
