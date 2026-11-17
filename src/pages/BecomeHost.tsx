@@ -37,10 +37,6 @@ const COMPARISON_FEATURES = [
   { feature: "Listing optimization", self: "Trial & error", atlas: "Data-driven SEO tools" },
 ];
 
-function formatINR(amount: number): string {
-  return amount.toLocaleString("en-IN");
-}
-
 interface ContactInfo {
   displayName: string;
   email: string;
@@ -284,9 +280,7 @@ const BecomeHost = () => {
     loading: false,
   });
 
-  const [estimatorRooms, setEstimatorRooms] = useState(2);
-
-  const updateContact = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const updateContact =(e: React.ChangeEvent<HTMLInputElement>) => {
     setContact((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -552,73 +546,10 @@ const BecomeHost = () => {
         </div>
       </div>
 
-      {/* ── Earnings Estimator ── */}
-      <div className="max-w-2xl mx-auto px-4 mb-12">
-        <div
-          className="rounded-2xl p-6 sm:p-8 text-center"
-          style={{
-            background: "rgba(255,255,255,0.85)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-          }}
-        >
-          <h2
-            className="text-2xl font-bold mb-1"
-            style={{ color: "var(--text-primary, #1e293b)" }}
-          >
-            How much could you earn?
-          </h2>
-          <p className="text-base mb-6" style={{ color: "var(--text-muted, #6b5a55)" }}>
-            Properties in your area earn{" "}
-            <strong style={{ color: "var(--cta-primary, #2563eb)" }}>
-              ₹45,000 – ₹1,20,000/month
-            </strong>
-          </p>
-          <label
-            className="block text-base font-medium mb-2"
-            style={{ color: "var(--text-muted, #6b5a55)" }}
-          >
-            Number of rooms: <strong>{estimatorRooms}</strong>
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={10}
-            value={estimatorRooms}
-            onChange={(e) => setEstimatorRooms(e.target.valueAsNumber)}
-            aria-label="Number of rooms"
-            aria-valuetext={`${estimatorRooms} ${estimatorRooms === 1 ? "room" : "rooms"}`}
-            className="w-full accent-[#c04528]"
-          />
-          <div
-            className="flex justify-between text-base mt-1 mb-4"
-            style={{ color: "var(--text-muted, #6b5a55)" }}
-          >
-            <span>1 room</span>
-            <span>10 rooms</span>
-          </div>
-          <div
-            className="rounded-xl p-4"
-            style={{
-              background: "linear-gradient(135deg, #ffe4d6 0%, #f0eafd 100%)",
-            }}
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <p className="text-base" style={{ color: "var(--text-muted, #6b5a55)" }}>
-              Estimated monthly earnings
-            </p>
-            <p
-              className="text-3xl font-extrabold mt-1"
-              style={{ color: "var(--cta-primary, #2563eb)" }}
-            >
-              ₹{formatINR(estimatorRooms * 15000)} – ₹{formatINR(estimatorRooms * 40000)}
-            </p>
-            <p className="text-base mt-2" style={{ color: "var(--text-muted, #6b5a55)" }}>
-              Based on average occupancy for properties using {pmsLabel}
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* No earnings estimate on this page. The estimator that sat here showed fixed rupee ranges,
+          presented as local earnings and as an occupancy-based estimate, with no area and no data
+          behind them, so it was removed on 2026-11-17. Show earnings figures again only from real,
+          sourced numbers or from the host's own inputs. BecomeHost.test.tsx guards this. */}
 
       {/* ── Comparison Table: Self-managed vs Atlas Managed ── */}
       <div className="max-w-2xl mx-auto px-4 mb-12">
