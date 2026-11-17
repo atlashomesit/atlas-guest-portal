@@ -27,14 +27,33 @@ const PROPERTY_TYPES = [
 
 const TOTAL_STEPS = 3;
 
+// 2026-11-17: every product claim on this public page was checked against the API and the admin
+// portal, and the ones that did not hold were reworded. Keep them true; BecomeHost.test.tsx guards
+// the wording. What the product does today, and so what this page may say:
+//   - New hosts get a 7-day free trial (founder ruling 2026-10-07). Nothing here is "free".
+//   - A trial account's listing is not public: its booking site and the marketplace need a paid plan.
+//   - The channel manager is a paid add-on and is not part of the trial.
+//   - Packages have no setup fee; own-number WhatsApp has a one-time setup fee, so never "zero setup fee".
+//   - Pricing suggestions come from fixed rules (day, occupancy, season, lead time), not an AI model.
+//   - Guests get automated messages; nobody answers guests round the clock, so never "24/7 support".
+//   - No one at Atlas lists a property for the host, so never promise "listed within N hours".
+// Left as it was, for the founder: the hero line "so you earn more while staying in control" (no data
+// behind "earn more") and "Get started in under 5 minutes" (nobody has measured it).
+const HERO_BADGES = [
+  { icon: "🌐", label: "Multi-platform listing (paid add-on)" },
+  { icon: "📈", label: "Dynamic pricing" },
+  { icon: "💬", label: "Automated guest messages" },
+  { icon: "₹0", label: "No setup fee on packages" },
+];
+
 const COMPARISON_FEATURES = [
-  { feature: "Channel distribution", self: "1–2 platforms", atlas: "Airbnb, Booking.com, MMT & more" },
-  { feature: "Pricing optimization", self: "Manual guesswork", atlas: "Dynamic AI pricing tools" },
+  { feature: "Channel distribution", self: "1–2 platforms", atlas: "Airbnb, Booking.com, MakeMyTrip & more (paid add-on)" },
+  { feature: "Pricing optimization", self: "Manual guesswork", atlas: "Auto-pricing & pricing rules" },
   { feature: "Guest communication", self: "You handle 24/7", atlas: "Automated messaging templates" },
-  { feature: "Payment collection", self: "Per-platform payouts", atlas: "Unified dashboard & payouts" },
+  { feature: "Payment collection", self: "Per-platform payouts", atlas: "One dashboard for earnings & payouts" },
   { feature: "Reviews management", self: "Manual follow-ups", atlas: "Automated review requests" },
-  { feature: "Professional photography", self: "DIY", atlas: "Guided photo upload & tips" },
-  { feature: "Listing optimization", self: "Trial & error", atlas: "Data-driven SEO tools" },
+  { feature: "Listing photos", self: "DIY", atlas: "Photo upload step in setup" },
+  { feature: "Listing optimization", self: "Trial & error", atlas: "SEO title & description for each listing" },
 ];
 
 interface ContactInfo {
@@ -520,15 +539,10 @@ const BecomeHost = () => {
           className="inline-block mt-6 px-8 py-3 rounded-xl text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
           style={{ background: "var(--cta-primary, #2563eb)" }}
         >
-          List Your Property — It's Free
+          Start your 7-day free trial
         </a>
         <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { icon: "🌐", label: "Multi-platform listing" },
-            { icon: "📈", label: "Dynamic pricing" },
-            { icon: "💬", label: "24/7 guest support" },
-            { icon: "₹0", label: "Zero setup fee" },
-          ].map((b) => (
+          {HERO_BADGES.map((b) => (
             <div
               key={b.label}
               className="flex flex-col items-center gap-1 p-3 rounded-xl"
@@ -661,8 +675,11 @@ const BecomeHost = () => {
         <div style={styles.header}>
           <Typography variant="h2">Get started in under 5 minutes</Typography>
           <Typography variant="subtitle" className="mt-2">
-            Fill in your details and we'll have your property listed within 24 hours.
+            First 7 days free. No credit card. No setup fee on packages.
           </Typography>
+          <p style={{ ...styles.hint, marginTop: 8 }} data-testid="host-signup-go-live-note">
+            Your listing goes live for guests once you publish it and start a paid plan.
+          </p>
         </div>
 
         <StepIndicator current={step} />

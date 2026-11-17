@@ -253,3 +253,93 @@ describe("BecomeHost — no unsourced earnings figures", () => {
     }
   });
 });
+
+// 2026-11-17: every product claim on this page was checked against the API and the admin portal.
+// Three were false:
+//   - "List Your Property — It's Free": a new host gets a 7-day free trial, then pays for a plan
+//     (atlas-api Options/BillingOptions.cs DefaultTrialDurationDays, founder ruling 2026-10-07).
+//   - "we'll have your property listed within 24 hours": the host publishes the listing themself,
+//     and a trial account's booking site and marketplace listing stay private until a paid plan
+//     (atlas-api Services/Billing/SubscriberLifecycle.cs, Services/Marketplace/MarketplaceEligibility.cs).
+//   - "24/7 guest support": nobody answers guests round the clock; the AI receptionist is not on sale.
+// Seven held only in part:
+//   - "Multi-platform listing" and "Airbnb, Booking.com, MMT & more": the channel manager is real,
+//     but it is a paid add-on and is not part of the trial.
+//   - "Zero setup fee": true for packages only; own-number WhatsApp has a one-time setup fee.
+//   - "Dynamic AI pricing tools": suggestions come from fixed rules, not an AI model
+//     (atlas-api Services/Pricing/SmartPriceCalculator.cs).
+//   - "Unified dashboard & payouts": one screen shows earnings and payouts; payouts are not pooled.
+//   - "Guided photo upload & tips" under "Professional photography": a photo step in setup, no tips.
+//   - "Data-driven SEO tools": an SEO title and description per listing; nothing reads search data.
+// These tests keep the reworded claims in place and the retired ones out.
+describe("BecomeHost — product claims match what the product does", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  function renderPageText(): string {
+    render(
+      <MemoryRouter>
+        <BecomeHost />
+      </MemoryRouter>,
+    );
+    return screen.getByTestId("become-host-page").textContent ?? "";
+  }
+
+  it("offers the 7-day free trial in the ruled words, and never calls listing free", () => {
+    const pageText = renderPageText();
+
+    const cta = screen.getByRole("link", { name: "Start your 7-day free trial" });
+    expect(cta).toHaveAttribute("href", "#host-signup-form");
+    expect(pageText).toContain("First 7 days free. No credit card. No setup fee on packages.");
+
+    expect(pageText).not.toMatch(/it['’]s free/i);
+  });
+
+  it("says a setup fee is waived on packages only, not everywhere", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).toContain("No setup fee on packages");
+    expect(pageText).not.toMatch(/zero setup fee/i);
+  });
+
+  it("does not promise a listing within a set time, and says what makes a listing go live", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).not.toMatch(/within \d+ hours|listed within/i);
+    expect(screen.getByTestId("host-signup-go-live-note")).toHaveTextContent(
+      "Your listing goes live for guests once you publish it and start a paid plan.",
+    );
+  });
+
+  it("does not promise round-the-clock guest support or AI pricing", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).not.toMatch(/24\/7 (guest )?support/i);
+    expect(pageText).toContain("Automated guest messages");
+
+    // Case-sensitive on purpose: "AI" as a word, not the "Ai" in Airbnb.
+    expect(pageText).not.toMatch(/\bAI\b/);
+    expect(pageText).not.toMatch(/data-driven/i);
+    expect(pageText).toContain("Auto-pricing & pricing rules");
+  });
+
+  it("marks channel distribution as a paid add-on wherever it is named", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).toContain("Multi-platform listing (paid add-on)");
+    expect(pageText).toContain("Airbnb, Booking.com, MakeMyTrip & more (paid add-on)");
+    // Neither claim may appear without its "(paid add-on)" qualifier.
+    expect(pageText).not.toMatch(/Multi-platform listing(?! \(paid add-on\))/);
+    expect(pageText).not.toMatch(/& more(?! \(paid add-on\))/);
+  });
+
+  it("describes payouts, photos and SEO as the screens that exist, not as services", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).toContain("One dashboard for earnings & payouts");
+    expect(pageText).toContain("Photo upload step in setup");
+    expect(pageText).toContain("SEO title & description for each listing");
+    expect(pageText).not.toMatch(/professional photography|unified dashboard & payouts|photo upload & tips/i);
+  });
+});
