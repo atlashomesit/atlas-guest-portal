@@ -187,3 +187,35 @@ describe("BecomeHost — Airbnb prefill (TASK-7490)", () => {
     );
   });
 });
+
+// 2026-11-17: this public signup page used to show three named host testimonials with growth
+// figures (occupancy "from 40% to 85%", "revenue increased 60%"). Nothing on record showed they
+// were real hosts who had agreed to be quoted, so they were removed. A quote may come back only
+// from a real, consenting host with figures that can be sourced; these names and claims must not.
+describe("BecomeHost — no invented host testimonials", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("shows no testimonial section, invented host names or invented growth figures", () => {
+    render(
+      <MemoryRouter>
+        <BecomeHost />
+      </MemoryRouter>,
+    );
+
+    const page = screen.getByTestId("become-host-page");
+    expect(screen.queryByRole("heading", { name: /hear from our hosts/i })).toBeNull();
+
+    const pageText = page.textContent ?? "";
+    for (const invented of [
+      "Priya Sharma",
+      "Rajesh Kumar",
+      "Ananya Patel",
+      "40% to 85%",
+      "revenue increased 60%",
+    ]) {
+      expect(pageText).not.toContain(invented);
+    }
+  });
+});
