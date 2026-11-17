@@ -343,3 +343,26 @@ describe("BecomeHost — product claims match what the product does", () => {
     expect(pageText).not.toMatch(/professional photography|unified dashboard & payouts|photo upload & tips/i);
   });
 });
+
+// 2026-11-17: the Display name field used to carry `autoFocus`. It sits in the signup form far
+// below the headline, the free-trial offer and the comparison table, so on load the browser
+// scrolled it into view (about 1,700 px down at 393 px wide) and, on a phone, the keyboard opened.
+// A first-time visitor landed on the form without ever seeing what they were signing up for.
+// Nothing may take focus on load; focus belongs to what the visitor taps.
+describe("BecomeHost — nothing takes focus on load", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("leaves focus on the page, not on the Display name field", () => {
+    render(
+      <MemoryRouter>
+        <BecomeHost />
+      </MemoryRouter>,
+    );
+
+    const nameField = screen.getByTestId("host-onboard-name");
+    expect(nameField).not.toHaveFocus();
+    expect(document.activeElement).toBe(document.body);
+  });
+});

@@ -704,7 +704,6 @@ const BecomeHost = () => {
                   value={contact.displayName}
                   onChange={updateContact}
                   required
-                  autoFocus
                   data-testid="host-onboard-name"
                 />
               </div>
