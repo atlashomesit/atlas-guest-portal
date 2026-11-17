@@ -1,5 +1,5 @@
  
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { Typography } from "../components/ui/Typography";
@@ -26,27 +26,6 @@ const PROPERTY_TYPES = [
 ] as const;
 
 const TOTAL_STEPS = 3;
-
-const buildHostTestimonials = (pmsLabel: string) => [
-  {
-    quote:
-      `${pmsLabel} handles all my bookings and guest communication. My occupancy went from 40% to 85% in three months.`,
-    name: "Priya Sharma",
-    detail: "Villa owner, Lonavala",
-  },
-  {
-    quote:
-      "I used to spend hours every day managing listings across platforms. Now I just check the dashboard once a week.",
-    name: "Rajesh Kumar",
-    detail: "Homestay owner, Coorg",
-  },
-  {
-    quote:
-      "The pricing optimization alone paid for itself. My revenue increased 60% in the first quarter.",
-    name: "Ananya Patel",
-    detail: "Apartment host, Goa",
-  },
-];
 
 const COMPARISON_FEATURES = [
   { feature: "Channel distribution", self: "1–2 platforms", atlas: "Airbnb, Booking.com, MMT & more" },
@@ -232,7 +211,6 @@ const DRAFT_KEY = "becomehost_draft";
 const BecomeHost = () => {
   const pmsLabel = `${getTenantBrandNameLong()} PMS`;
   const partnerBrand = getTenantBrandNameLong();
-  const hostTestimonials = useMemo(() => buildHostTestimonials(pmsLabel), [pmsLabel]);
 
   const [step, setStep] = useState(0);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
@@ -723,48 +701,10 @@ const BecomeHost = () => {
         </div>
       </div>
 
-      {/* ── Host Testimonials ── */}
-      <div className="max-w-3xl mx-auto px-4 mb-16">
-        <h2
-          className="text-2xl font-bold text-center mb-6"
-          style={{ color: "var(--text-primary, #1e293b)" }}
-        >
-          Hear from our hosts
-        </h2>
-        <div className="grid sm:grid-cols-3 gap-4">
-          {hostTestimonials.map((t) => (
-            <div
-              key={t.name}
-              className="rounded-2xl p-5 flex flex-col"
-              style={{
-                background: "rgba(255,255,255,0.9)",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-              }}
-            >
-              <p
-                className="text-sm leading-relaxed flex-1"
-                style={{ color: "var(--text-muted, #6b5a55)" }}
-              >
-                &ldquo;{t.quote}&rdquo;
-              </p>
-              <div
-                className="mt-4 pt-3"
-                style={{ borderTop: "1px solid var(--border-subtle, #f0ddd0)" }}
-              >
-                <p
-                  className="font-semibold text-sm"
-                  style={{ color: "var(--text-primary, #1e293b)" }}
-                >
-                  {t.name}
-                </p>
-                <p className="text-xs" style={{ color: "var(--text-muted, #475569)" }}>
-                  {t.detail}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* No host testimonials on this page. The three named host quotes that sat here, with
+          occupancy and revenue growth figures, were placeholder copy with no record of a real host
+          who agreed to be quoted, so they were removed on 2026-11-17. Add a quote back only from a
+          real host who has agreed to it, with figures we can source. BecomeHost.test.tsx guards this. */}
 
       {/* ── Registration Form ── */}
       <div style={styles.container} id="host-signup-form">
