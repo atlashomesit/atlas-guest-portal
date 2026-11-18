@@ -33,6 +33,13 @@ const resolveCoverImage = (property: TenantPropertyRecord): string => {
 };
 
 const resolvePrice = (property: TenantPropertyRecord): number | null => {
+  if (
+    typeof property.property_price === "number" &&
+    Number.isFinite(property.property_price) &&
+    property.property_price > 0
+  ) {
+    return property.property_price;
+  }
   try {
     const breakdown = calculateNightlyPrice({
       unitType: inferUnitType(property),

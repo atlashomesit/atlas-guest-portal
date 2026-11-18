@@ -3,7 +3,7 @@
  * "Three bright bedrooms" and "a sunlit duplex", so they are gone and those cards use the listing's own text.
  */
 import { describe, it, expect } from 'vitest';
-import HOME_DESCRIPTORS, { getHomeDescriptor } from './homeDescriptors';
+import HOME_DESCRIPTORS, { getHomeDescriptor, resolveHomeCardDescriptor } from './homeDescriptors';
 
 describe('homeDescriptors (GUEST-065)', () => {
   it('has no line for the two studios whose lines contradicted them', () => {
@@ -20,5 +20,34 @@ describe('homeDescriptors (GUEST-065)', () => {
   it('keeps the lines that were not flagged', () => {
     expect(getHomeDescriptor('501')).toMatch(/rooftop/i);
     expect(getHomeDescriptor('102')).toBeDefined();
+  });
+
+  it('prefers host-authored description or subtitle over static editorial descriptor', () => {
+    expect(
+      resolveHomeCardDescriptor({
+        id: '501',
+        propertyDescription: 'Quiet 1BHK apartment near metro with balcony.',
+        hideAtlasBranding: false,
+        unitSingular: 'home',
+      }),
+    ).toBe('Quiet 1BHK apartment near metro with balcony.');
+
+    expect(
+      resolveHomeCardDescriptor({
+        id: '501',
+        propertyDescription: 'A luxurious penthouse with stunning views and premium amenities.',
+        hideAtlasBranding: false,
+        unitSingular: 'home',
+      }),
+    ).toMatch(/rooftop/i);
+
+    expect(
+      resolveHomeCardDescriptor({
+        id: '501',
+        propertyDescription: undefined,
+        hideAtlasBranding: true,
+        unitSingular: 'villa',
+      }),
+    ).toBe('A calm, owner-run villa.');
   });
 });

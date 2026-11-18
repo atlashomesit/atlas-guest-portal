@@ -19,10 +19,68 @@ const HOME_DESCRIPTORS: Record<string, string> = {
   "102": "A cosy corner suite for work trips, fast wifi, and a desk by the window.",
 };
 
+const BUNDLED_PLACEHOLDER_DESCRIPTIONS = new Set([
+  "A cozy and comfortable room with modern amenities.",
+  "A spacious room with modern amenities and a beautiful view.",
+  "A comfortable room with all necessary amenities for a pleasant stay.",
+  "A modern and well-equipped room for a comfortable stay.",
+  "A comfortable and well-appointed room for your stay.",
+  "A cozy room with all the necessary amenities for a comfortable stay.",
+  "A luxurious penthouse with stunning views and premium amenities.",
+]);
+
+function isHostAuthoredCopy(value: string | undefined | null): value is string {
+  if (!value) return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  const withoutEllipsis = trimmed.replace(/\.\.\.$/, "");
+  for (const placeholder of BUNDLED_PLACEHOLDER_DESCRIPTIONS) {
+    if (trimmed === placeholder || placeholder.startsWith(withoutEllipsis)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /** Returns the editorial descriptor for a home, or undefined if none is authored. */
 export function getHomeDescriptor(id: string | number | undefined | null): string | undefined {
   if (id === undefined || id === null) return undefined;
   return HOME_DESCRIPTORS[String(id)];
+}
+
+/**
+ * GUEST-065: Resolves the home card's one-line descriptor without overriding host-authored facts
+ * or leaking Atlas descriptors onto white-label sites.
+ */
+export function resolveHomeCardDescriptor(input: {
+  id: string | number | undefined | null;
+  subtitle?: string | null;
+  propertyDescription?: string | null;
+  hideAtlasBranding: boolean;
+  unitSingular: string;
+}): string {
+  const hostLine = isHostAuthoredCopy(input.propertyDescription)
+    ? input.propertyDescription.trim()
+    : isHostAuthoredCopy(input.subtitle)
+      ? input.subtitle.trim()
+      : undefined;
+
+  if (input.hideAtlasBranding) {
+    return (
+      hostLine ??
+      input.subtitle?.trim() ??
+      input.propertyDescription?.trim() ??
+      `A calm, owner-run ${input.unitSingular}.`
+    );
+  }
+
+  return (
+    hostLine ??
+    getHomeDescriptor(input.id) ??
+    input.subtitle?.trim() ??
+    input.propertyDescription?.trim() ??
+    "A calm, owner-run home in this neighbourhood."
+  );
 }
 
 export default HOME_DESCRIPTORS;

@@ -22,7 +22,7 @@ import { getTenantBrandName } from "../../../tenant/displayBrand";
 import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOverrides } from "../../../tenant/tenantOverrides";
 import { useCurrency } from "../../../contexts/CurrencyContext";
 import { getListingDisplayName } from "../../../lib/listingDisplayName";
-import { getHomeDescriptor } from "../../../content/homeDescriptors";
+import { resolveHomeCardDescriptor } from "../../../content/homeDescriptors";
 import { fetchAvailabilitySummary, type ListingAvailabilitySummary } from "../../../api/availabilitySummaryClient";
 import { allInTotalLabel, directPriceDisplay, directSavingsLabel } from "../../../utils/directBookingPrice";
 import {
@@ -454,11 +454,22 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
       );
     }
 
+    const dynamicPropertyPrice =
+      typeof model.property?.property_price === "number" &&
+      Number.isFinite(model.property.property_price) &&
+      model.property.property_price > 0
+        ? model.property.property_price
+        : null;
+
     return (
       <div className="ahv2-price">
         <div className="ahv2-price-row">
           {todayBreakdown ? (
             <span className="ahv2-price-amt">{formatCurrency(todayBreakdown.actualPrice)}</span>
+          ) : dynamicPropertyPrice != null ? (
+            <span className="ahv2-price-amt" data-testid="home-card-dynamic-property-price">
+              {formatCurrency(dynamicPropertyPrice)}
+            </span>
           ) : (
             <>
               <span className="ahv2-price-amt">{formattedFinal}</span>
@@ -556,15 +567,14 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             const activeIndex = (activeImageIndex[model.listing.id] ?? 0) % Math.max(photos.length, 1);
             const imageSrc = photos[activeIndex] ?? model.images[0] ?? "";
             const cardTitle = getListingDisplayName(model.listing.id, model.listing.title);
-            // TASK-7194: Atlas unit descriptors + KPHB fallback must not leak on white-label.
-            const descriptor = hideAtlasBranding
-              ? (model.listing.subtitle ??
-                model.property?.property_description ??
-                `A calm, owner-run ${unitNoun.singular}.`)
-              : (getHomeDescriptor(model.listing.id) ??
-                model.listing.subtitle ??
-                model.property?.property_description ??
-                "A calm, owner-run home in this neighbourhood.");
+            // TASK-7194 / GUEST-065: host-authored facts win over fallback descriptors; Atlas descriptors never leak on white-label.
+            const descriptor = resolveHomeCardDescriptor({
+              id: model.listing.id,
+              subtitle: model.listing.subtitle,
+              propertyDescription: model.property?.property_description,
+              hideAtlasBranding,
+              unitSingular: unitNoun.singular,
+            });
 
             return (
               <Link
