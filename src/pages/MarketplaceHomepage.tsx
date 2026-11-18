@@ -10,7 +10,7 @@ import { getFavoriteIds, toggleFavorite } from '@/utils/guestHistory'; // TASK-1
 import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
-import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
+import MultiPinMap, { type MapBounds, type MapPin } from '@/components/map/MultiPinMap'; // TL-PROP
 import { useMarketplaceCardPrices, type MarketplaceCardPrice } from '@/hooks/useMarketplaceCardPrices'; // TASK-10298999
 import { sizedForPartyFirst } from '@/utils/smallParty'; // GUEST-033
 import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
@@ -23,6 +23,7 @@ import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
+import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
 import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
 import { resolveAmenityLabel } from '@/utils/amenityCodes';
 import { isHostelDormType } from '@/utils/dormListing';
@@ -90,6 +91,18 @@ type MarketplaceItem = {
   propertyType?: string | null;
   accommodationType?: string | null;
   category?: string | null;
+  // MKT-049: cancellation policy summary
+  cancellationPolicyTier?: string | null;
+  freeCancellationWindowHours?: number | null;
+  freeCancellationDeadlineUtc?: string | null;
+  hasFreeCancellation?: boolean;
+  // MKT-050: meal plan summary
+  hasBreakfastIncluded?: boolean;
+  hasBreakfastOptional?: boolean;
+  mealPlanCodes?: string[];
+  // MKT-047: Top host badge + criteria stats
+  topHost?: boolean;
+  topHostStats?: TopHostStatsDto | null;
 };
 
 /**
@@ -216,13 +229,71 @@ export function formatExternalReviewsLabel(
   return count === 1 ? `1 review on ${normalizedSource}` : `${count} reviews on ${normalizedSource}`;
 }
 
-type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number };
+type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number; topHostEnabled?: boolean };
 
 // TASK-101491: the grid requests one page at a time and appends. This constant is the request
 // size, NOT a ceiling on what the page can show - everything past it is reachable via the
 // "Show more homes" control below. Do not "fix" a truncated grid by raising this: that just
 // moves the cliff and pulls every listing + cover image on first paint.
 const PAGE_SIZE = 20;
+
+export type MarketplaceCategoryOption =
+  | 'all'
+  | 'homestays'
+  | 'villas'
+  | 'bnb'
+  | 'hotels'
+  | 'hostels'
+  | 'homes'
+  | 'rooms';
+
+const MARKETPLACE_CATEGORIES: { id: MarketplaceCategoryOption; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'homestays', label: 'Homestays' },
+  { id: 'villas', label: 'Villas' },
+  { id: 'bnb', label: 'B&Bs' },
+  { id: 'hotels', label: 'Hotels' },
+  { id: 'hostels', label: 'Hostels' },
+  { id: 'homes', label: 'Homes' },
+  { id: 'rooms', label: 'Rooms' },
+];
+
+function parseCategoryParam(raw: string | null): MarketplaceCategoryOption {
+  const cat = raw?.toLowerCase() ?? '';
+  if (
+    cat === 'homes' ||
+    cat === 'rooms' ||
+    cat === 'villas' ||
+    cat === 'homestays' ||
+    cat === 'bnb' ||
+    cat === 'hotels' ||
+    cat === 'hostels'
+  ) {
+    return cat;
+  }
+  return 'all';
+}
+
+function parseBoundsFromSearchParams(sp: URLSearchParams): MapBounds | null {
+  const swLat = Number(sp.get('swLat'));
+  const swLng = Number(sp.get('swLng'));
+  const neLat = Number(sp.get('neLat'));
+  const neLng = Number(sp.get('neLng'));
+  if (
+    sp.has('swLat') &&
+    sp.has('swLng') &&
+    sp.has('neLat') &&
+    sp.has('neLng') &&
+    Number.isFinite(swLat) &&
+    Number.isFinite(swLng) &&
+    Number.isFinite(neLat) &&
+    Number.isFinite(neLng) &&
+    swLat <= neLat
+  ) {
+    return { swLat, swLng, neLat, neLng };
+  }
+  return null;
+}
 
 export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc';
 
@@ -262,16 +333,33 @@ export default function MarketplaceHomepage() {
   // TASK-10299142: an in-app click on "Stays" (/?...#our-homes) does not make the browser scroll; do it once the grid is in the DOM.
   useScrollToHash();
 
-  // TASK-1039950: sync category and amenity filter pills with URL query parameters
-  const categoryParam = searchParams.get('category')?.toLowerCase();
-  const [category, setCategory] = useState<'all' | 'homes' | 'rooms' | 'villas'>(
-    categoryParam === 'homes' || categoryParam === 'rooms' || categoryParam === 'villas' ? categoryParam : 'all',
+  // TASK-1039950 / MKT-051: sync category and amenity filter pills with URL query parameters
+  const [category, setCategory] = useState<MarketplaceCategoryOption>(() =>
+    parseCategoryParam(searchParams.get('category')),
   );
 
   // MKT-023 / TASK-1039950: Quick amenity filter selection synced with ?amenity= and ?amenities=
   const [selectedAmenity, setSelectedAmenity] = useState<string | null>(
     searchParams.get('amenity')?.trim() || searchParams.get('amenities')?.trim() || null,
   );
+
+  // MKT-049 & MKT-050: Free cancellation & Breakfast included filter toggles synced with URL
+  const [freeCancellation, setFreeCancellation] = useState<boolean>(
+    () => searchParams.get('freeCancellation') === 'true',
+  );
+  const [breakfastIncluded, setBreakfastIncluded] = useState<boolean>(
+    () => searchParams.get('mealPlan') === 'breakfast',
+  );
+  const [topHostFilter, setTopHostFilter] = useState<boolean>(
+    () => searchParams.get('topHost') === 'true',
+  );
+  const [topHostFeatureEnabled, setTopHostFeatureEnabled] = useState<boolean>(false);
+
+  // MKT-048: Map bounding box synced with URL (?swLat=&swLng=&neLat=&neLng=)
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(() =>
+    parseBoundsFromSearchParams(searchParams),
+  );
+  const [pendingMapBounds, setPendingMapBounds] = useState<MapBounds | null>(null);
 
   // TASK-1039952: sort dropdown options ("Recommended" | "Price: Low to High" | "Price: High to Low" | "Rating: High to Low")
   const sortParam = searchParams.get('sort') || searchParams.get('sortBy');
@@ -282,14 +370,13 @@ export default function MarketplaceHomepage() {
   );
 
   useEffect(() => {
-    const cat = searchParams.get('category')?.toLowerCase();
-    if (cat === 'homes' || cat === 'rooms' || cat === 'villas') {
-      setCategory(cat);
-    } else {
-      setCategory('all');
-    }
+    setCategory(parseCategoryParam(searchParams.get('category')));
     const amen = searchParams.get('amenity')?.trim() || searchParams.get('amenities')?.trim() || null;
     setSelectedAmenity(amen);
+    setFreeCancellation(searchParams.get('freeCancellation') === 'true');
+    setBreakfastIncluded(searchParams.get('mealPlan') === 'breakfast');
+    setTopHostFilter(searchParams.get('topHost') === 'true');
+    setMapBounds(parseBoundsFromSearchParams(searchParams));
 
     const s = searchParams.get('sort') || searchParams.get('sortBy');
     if (s === 'price_asc' || s === 'price_desc' || s === 'rating_desc') {
@@ -299,7 +386,7 @@ export default function MarketplaceHomepage() {
     }
   }, [searchParams]);
 
-  const handleCategoryChange = useCallback((c: 'all' | 'homes' | 'rooms' | 'villas') => {
+  const handleCategoryChange = useCallback((c: MarketplaceCategoryOption) => {
     setCategory(c);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -308,6 +395,67 @@ export default function MarketplaceHomepage() {
       } else {
         next.delete('category');
       }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleToggleFreeCancellation = useCallback(() => {
+    const nextVal = !freeCancellation;
+    setFreeCancellation(nextVal);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (nextVal) next.set('freeCancellation', 'true');
+      else next.delete('freeCancellation');
+      return next;
+    }, { replace: true });
+  }, [freeCancellation, setSearchParams]);
+
+  const handleToggleBreakfastIncluded = useCallback(() => {
+    const nextVal = !breakfastIncluded;
+    setBreakfastIncluded(nextVal);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (nextVal) next.set('mealPlan', 'breakfast');
+      else next.delete('mealPlan');
+      return next;
+    }, { replace: true });
+  }, [breakfastIncluded, setSearchParams]);
+
+  const handleToggleTopHost = useCallback(() => {
+    const nextVal = !topHostFilter;
+    setTopHostFilter(nextVal);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (nextVal) next.set('topHost', 'true');
+      else next.delete('topHost');
+      return next;
+    }, { replace: true });
+  }, [topHostFilter, setSearchParams]);
+
+  const handleSearchThisArea = useCallback(() => {
+    if (!pendingMapBounds) return;
+    const b = pendingMapBounds;
+    setMapBounds(b);
+    setPendingMapBounds(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('swLat', String(b.swLat));
+      next.set('swLng', String(b.swLng));
+      next.set('neLat', String(b.neLat));
+      next.set('neLng', String(b.neLng));
+      return next;
+    }, { replace: true });
+  }, [pendingMapBounds, setSearchParams]);
+
+  const handleClearMapBounds = useCallback(() => {
+    setMapBounds(null);
+    setPendingMapBounds(null);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('swLat');
+      next.delete('swLng');
+      next.delete('neLat');
+      next.delete('neLng');
       return next;
     }, { replace: true });
   }, [setSearchParams]);
@@ -366,6 +514,13 @@ export default function MarketplaceHomepage() {
       'amenities',
       'sort',
       'sortBy',
+      'freeCancellation',
+      'mealPlan',
+      'topHost',
+      'swLat',
+      'swLng',
+      'neLat',
+      'neLng',
       // MKT-031: marketplace brand switch (QA/preview) + campaign attribution survive the click-through
       'brand',
       'utm_source',
@@ -415,9 +570,18 @@ export default function MarketplaceHomepage() {
     if (maxPrice != null) p.set('maxPrice', String(maxPrice));
     // MKT-026: the server filters on real amenity codes before pagination, so page 2+ is filtered too.
     if (serverAmenityCodes.length > 0) p.set('amenities', serverAmenityCodes.join(','));
+    if (freeCancellation) p.set('freeCancellation', 'true');
+    if (breakfastIncluded) p.set('mealPlan', 'breakfast');
+    if (topHostFilter) p.set('topHost', 'true');
+    if (mapBounds) {
+      p.set('swLat', String(mapBounds.swLat));
+      p.set('swLng', String(mapBounds.swLng));
+      p.set('neLat', String(mapBounds.neLat));
+      p.set('neLng', String(mapBounds.neLng));
+    }
     if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, sortBy]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, mapBounds, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -450,6 +614,7 @@ export default function MarketplaceHomepage() {
       .then(async (data) => {
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
         if (cancelled) return;
+        setTopHostFeatureEnabled(Boolean(data.topHostEnabled || enriched.some((x) => x.topHost)));
         setItems(enriched);
         // TASK-101491: trust the server's count. Note the API returns the CURRENT PAGE's match
         // count (not a global one) when a `city` filter is applied - city filtering happens after
@@ -536,9 +701,30 @@ export default function MarketplaceHomepage() {
         const cat = resolvePropertyTypeBadge(item).toLowerCase();
         if (category === 'homes') return cat === 'homestay' || cat === 'home' || cat === 'villa';
         if (category === 'rooms') return cat === 'room' || cat === 'hotel' || cat === 'b&b' || cat === 'hostel';
+        if (category === 'homestays') return cat === 'homestay' || cat === 'home';
         if (category === 'villas') return cat === 'villa' || (item.title && item.title.toLowerCase().includes('villa'));
+        if (category === 'bnb') return cat === 'b&b';
+        if (category === 'hotels') return cat === 'hotel';
+        if (category === 'hostels') return cat === 'hostel';
         return true;
       });
+    }
+
+    if (topHostFilter) {
+      result = result.filter((item) => item.topHost === true);
+    }
+
+    if (freeCancellation) {
+      result = result.filter((item) => item.hasFreeCancellation !== false);
+    }
+
+    if (breakfastIncluded) {
+      result = result.filter(
+        (item) =>
+          item.hasBreakfastIncluded === true ||
+          item.hasBreakfastOptional === true ||
+          Boolean(item.mealPlanCodes?.some((c) => ['CP', 'MAP', 'AP'].includes(c.toUpperCase()))),
+      );
     }
 
     if (minPrice != null || maxPrice != null) {
@@ -581,7 +767,7 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -607,8 +793,18 @@ export default function MarketplaceHomepage() {
     if (checkOut) p.set('checkOut', checkOut);
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
+    if (category !== 'all') p.set('category', category);
+    if (freeCancellation) p.set('freeCancellation', 'true');
+    if (breakfastIncluded) p.set('mealPlan', 'breakfast');
+    if (topHostFilter) p.set('topHost', 'true');
+    if (mapBounds) {
+      p.set('swLat', String(mapBounds.swLat));
+      p.set('swLng', String(mapBounds.swLng));
+      p.set('neLat', String(mapBounds.neLat));
+      p.set('neLng', String(mapBounds.neLng));
+    }
     return p.toString();
-  }, [query, searchParams]);
+  }, [query, searchParams, category, freeCancellation, breakfastIncluded, topHostFilter, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -756,7 +952,7 @@ export default function MarketplaceHomepage() {
         <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
           open={wideFilters || filtersOpen}
           onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
-          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
           <div className="marketplace-secondary-content">
             <ExploreDestinationsStrip listings={items} />
             <div className="marketplace-refinements">
@@ -771,6 +967,13 @@ export default function MarketplaceHomepage() {
       <AmenityFilterPills
         selectedAmenity={selectedAmenity}
         onSelectAmenity={handleAmenityChange}
+        freeCancellation={freeCancellation}
+        onToggleFreeCancellation={handleToggleFreeCancellation}
+        breakfastIncluded={breakfastIncluded}
+        onToggleBreakfastIncluded={handleToggleBreakfastIncluded}
+        showTopHost={topHostFeatureEnabled || topHostFilter}
+        topHost={topHostFilter}
+        onToggleTopHost={handleToggleTopHost}
       />
 
         <div className="flex flex-wrap items-center gap-2">
@@ -817,16 +1020,19 @@ export default function MarketplaceHomepage() {
           </div>
         </details>
         <div className="marketplace-primary-controls">
-        {(['all', 'homes', 'rooms', 'villas'] as const).map((c) => (
-          <button
-            key={c}
-            data-testid={`marketplace-filter-${c}`}
-            className={`min-h-[44px] rounded-xl px-4 py-2 ${category === c ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
-            onClick={() => handleCategoryChange(c)}
-          >
-            {c === 'all' ? 'All' : c[0].toUpperCase() + c.slice(1)}
-          </button>
-        ))}
+        <div className="marketplace-category-pills" data-testid="marketplace-category-pills">
+          {MARKETPLACE_CATEGORIES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              data-testid={`marketplace-filter-${c.id}`}
+              className={`min-h-[44px] rounded-xl px-4 py-2 ${category === c.id ? 'bg-black text-white' : 'bg-gray-100 text-black'}`}
+              onClick={() => handleCategoryChange(c.id)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
         {/* TL-PROP: map view toggle. Hidden if no properties have lat/lng configured. */}
         {mapPins.length > 0 && (
           <button
@@ -861,8 +1067,35 @@ export default function MarketplaceHomepage() {
       </div>
 
       {showMap && mapPins.length > 0 && (
-        <div className="mt-6">
-          <MultiPinMap pins={mapPins} height={400} />
+        <div className="mt-6 relative">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            {pendingMapBounds && (
+              <button
+                type="button"
+                data-testid="marketplace-search-this-area"
+                onClick={handleSearchThisArea}
+                className="min-h-[44px] rounded-full bg-black px-4 py-2 text-xs font-semibold text-white shadow hover:opacity-90"
+              >
+                Search this area
+              </button>
+            )}
+            {mapBounds && (
+              <button
+                type="button"
+                data-testid="marketplace-clear-map-area"
+                onClick={handleClearMapBounds}
+                className="min-h-[44px] rounded-full border border-border bg-white px-4 py-2 text-xs font-medium text-text-primary hover:bg-bg-muted"
+              >
+                Clear map area
+              </button>
+            )}
+          </div>
+          <MultiPinMap
+            pins={mapPins}
+            height={400}
+            onBoundsChanged={setPendingMapBounds}
+            initialBounds={mapBounds}
+          />
         </div>
       )}
 
@@ -929,6 +1162,11 @@ export default function MarketplaceHomepage() {
                     </Link>
                   </h2>
                   <HostIdentityLabel marketplace verified={item.hostIdentityVerified} />
+
+                  {/* MKT-047: Top host badge on atlastays.com cards only */}
+                  {item.topHost === true && (
+                    <TopHostBadge stats={item.topHostStats} compact />
+                  )}
 
                   {/* MKT-029: only an explicit `true` from the API earns the chip; a missing field is unknown. */}
                   {item.isInstantBookable === true && (
@@ -1011,6 +1249,28 @@ export default function MarketplaceHomepage() {
                           >
                             Starting from per bed
                           </span>
+                        )}
+                        {(item.hasFreeCancellation || item.hasBreakfastIncluded || item.hasBreakfastOptional || item.mealPlanCodes?.some((c) => ['CP', 'MAP', 'AP'].includes(c.toUpperCase()))) && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {item.hasFreeCancellation && (
+                              <span
+                                data-testid="marketplace-free-cancellation-badge"
+                                className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                              >
+                                {item.freeCancellationDeadlineUtc
+                                  ? `Free cancellation until ${new Date(item.freeCancellationDeadlineUtc).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
+                                  : 'Free cancellation available'}
+                              </span>
+                            )}
+                            {(item.hasBreakfastIncluded || item.hasBreakfastOptional || item.mealPlanCodes?.some((c) => ['CP', 'MAP', 'AP'].includes(c.toUpperCase()))) && (
+                              <span
+                                data-testid="marketplace-breakfast-badge"
+                                className="inline-flex items-center rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900"
+                              >
+                                {item.hasBreakfastIncluded ? '☕ Breakfast included' : '☕ Breakfast option available'}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     );

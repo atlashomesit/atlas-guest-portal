@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { UpiPaymentPanel } from '../components/checkout/UpiPaymentPanel';
 import {
@@ -52,6 +52,10 @@ function toUpiOrder(o: PayLinkOrder): UpiOrder | null {
 
 export default function PayLinkPage() {
   const { token = '' } = useParams<{ token: string }>();
+  const [searchParams] = useSearchParams();
+  const rawInstalmentId = searchParams.get('instalmentId');
+  const parsedInstalmentId = rawInstalmentId ? Number(rawInstalmentId) : null;
+  const instalmentId = parsedInstalmentId && Number.isFinite(parsedInstalmentId) && parsedInstalmentId > 0 ? parsedInstalmentId : null;
   const navigate = useNavigate();
 
   const [summary, setSummary] = useState<PayLinkSummary | null>(null);
@@ -66,19 +70,19 @@ export default function PayLinkPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getPayLink(token)
+    getPayLink(token, instalmentId)
       .then((s) => { if (!cancelled) setSummary(s); })
       .catch((e: unknown) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : 'We could not load this payment page.');
       });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, instalmentId]);
 
   /** Asks the API to verify what Checkout returned; on success opens the booking confirmation. Never throws. */
   const confirmPayment = useCallback(
     async (result: RazorpayCheckoutResult, bookingId: number): Promise<void> => {
       try {
-        const verified = await verifyPayLinkPayment(token, result);
+        const verified = await verifyPayLinkPayment(token, result, instalmentId);
         setUnconfirmed(null);
         const id = verified.bookingId || bookingId;
         const t = verified.bookingToken;
@@ -88,14 +92,14 @@ export default function PayLinkPage() {
         setActionError(e instanceof Error ? e.message : 'We could not confirm your payment, so it is not marked paid. If money was taken, do not pay again - contact your host.');
       }
     },
-    [token, navigate],
+    [token, instalmentId, navigate],
   );
 
   const startPayment = useCallback(async () => {
     setBusy(true);
     setActionError(null);
     try {
-      const order = await createPayLinkOrder(token);
+      const order = await createPayLinkOrder(token, instalmentId);
       const upiOrder = toUpiOrder(order);
       if (upiOrder) {
         setUpi({ order: upiOrder, raw: order });
@@ -128,7 +132,7 @@ export default function PayLinkPage() {
     } finally {
       setBusy(false);
     }
-  }, [token, summary, confirmPayment]);
+  }, [token, summary, confirmPayment, instalmentId]);
 
   const checkAgain = useCallback(async () => {
     if (!unconfirmed) return;

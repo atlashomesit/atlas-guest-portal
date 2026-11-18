@@ -134,6 +134,9 @@ export interface TenantInfo {
     privacyUrl: string;
     privacyLinkLabel?: string;
   };
+  /** CLU-038: Multi-room direct website booking toggle and max rooms per booking (2-6). */
+  allowMultiRoomBooking?: boolean;
+  maxRoomsPerBooking?: number;
 }
 
 /** RA-006 §3.5: legal/contact identity returned by /tenants/from-domain.LegalContactPack. */
@@ -417,6 +420,8 @@ export async function resolveFromDomain(apiBaseUrl: string, domain: string): Pro
             ? data.guestCommsBrandingMode
             : undefined,
         searchByImageEnabled: Boolean(data.searchByImageEnabled),
+        allowMultiRoomBooking: Boolean(data.allowMultiRoomBooking),
+        maxRoomsPerBooking: typeof data.maxRoomsPerBooking === 'number' && data.maxRoomsPerBooking >= 2 ? data.maxRoomsPerBooking : 4,
         faq: Array.isArray(data.faq) ? data.faq : undefined,
         cookieBanner: data.cookieBanner && typeof data.cookieBanner.text === 'string'
           ? {
@@ -524,6 +529,8 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
             ? data.effectiveColorPresetId
             : undefined,
         searchByImageEnabled: Boolean(data.searchByImageEnabled),
+        allowMultiRoomBooking: Boolean(data.allowMultiRoomBooking),
+        maxRoomsPerBooking: typeof data.maxRoomsPerBooking === 'number' && data.maxRoomsPerBooking >= 2 ? data.maxRoomsPerBooking : 4,
       };
       const entry = tenantValidateCache.get(cacheKey);
       if (entry) entry.value = tenantInfo;

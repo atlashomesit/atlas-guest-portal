@@ -3,6 +3,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { getIstCalendarDate } from '../utils/date';
 import type { CancellationTier } from '@/utils/cancellationPolicy';
 import type { DormGenderPolicy } from '@/utils/dormListing';
+import type { PaymentPlanOptions } from '@/api/pricingClient';
 
 /** Price breakdown forwarded from the widget to GuestDetailsPage (session-only, not persisted). */
 export type BookingPriceBreakdown = {
@@ -36,6 +37,8 @@ export type BookingPriceBreakdown = {
   includeBreakfast?: boolean;
   /** CFB-009 / BNB-009 / BNB-010: Total breakfast extra amount included in finalAmount. */
   breakfastExtraAmount?: number;
+  /** GUEST-076 / GUEST-077: server-computed RNPL & monthly instalment options. */
+  paymentPlans?: PaymentPlanOptions | null;
 };
 
 type BookingState = {
@@ -95,6 +98,17 @@ type BookingState = {
   ratePlanCancellationPolicy?: string | null;
   /** TASK-1040087: Marketplace booking origin channel ('marketplace') forwarded from UnitBookingWidget. */
   holdBookingChannel?: 'marketplace' | 'ai_receptionist' | null;
+  /** CLU-038: Multi-room group checkout state (session-only). */
+  holdGroupReference?: string | null;
+  holdMultiRoomSelections?: Array<{
+    listingId: number;
+    listingName: string;
+    guests: number;
+    finalAmount: number;
+    includeBreakfast?: boolean;
+    hasPets?: boolean;
+    listingRatePlanId?: number | null;
+  }> | null;
 };
 
 type BookingContextValue = {
@@ -210,6 +224,8 @@ const loadState = (): BookingState => {
       ratePlanMealPlan: null,
       ratePlanCancellationPolicy: null,
       holdBookingChannel: null,
+      holdGroupReference: null,
+      holdMultiRoomSelections: null,
     };
   } catch (error) {
     console.warn('[BookingContext] Failed to load persisted booking state', error);

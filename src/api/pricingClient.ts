@@ -147,6 +147,29 @@ export type GuestPriceBreakdown = {
   includeBreakfast?: boolean;
   /** CFB-009 / BNB-009 / BNB-010: Breakfast extra amount included in finalAmount (BreakfastPricePerPerson * guests * nights). */
   breakfastExtraAmount?: number;
+  /** GUEST-076 / GUEST-077: server-computed RNPL & monthly instalment options. */
+  paymentPlans?: PaymentPlanOptions | null;
+};
+
+export type MonthlyInstalmentPreview = {
+  monthNumber: number;
+  periodStart: string;
+  periodEnd: string;
+  payableFromDate: string;
+  dueDate: string;
+  amount: number;
+};
+
+export type PaymentPlanOptions = {
+  rnplEligible: boolean;
+  reserveDepositPercent: number;
+  depositAmountNow: number;
+  remainingBalanceAmount: number;
+  balanceDueAtUtc?: string | null;
+  allowZeroDepositReserve: boolean;
+  freeCancellationDeadlineUtc?: string | null;
+  monthlyEligible: boolean;
+  monthlyInstalments: MonthlyInstalmentPreview[];
 };
 
 /**
@@ -416,6 +439,37 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
     ...(appliedPromotionLabel ? { appliedPromotionLabel } : {}),
     ...(promotionDiscountAmount > 0 ? { promotionDiscountAmount } : {}),
     ...(promotionDiscountPercent > 0 ? { promotionDiscountPercent } : {}),
+    paymentPlans: mapPaymentPlans(raw.paymentPlans ?? raw.PaymentPlans),
+  };
+}
+
+function mapPaymentPlans(v: unknown): PaymentPlanOptions | null {
+  if (!v || typeof v !== 'object') return null;
+  const r = v as Record<string, unknown>;
+  const rawInst = Array.isArray(r.monthlyInstalments ?? r.MonthlyInstalments)
+    ? ((r.monthlyInstalments ?? r.MonthlyInstalments) as Array<Record<string, unknown>>)
+    : [];
+  return {
+    rnplEligible: Boolean(r.rnplEligible ?? r.RnplEligible),
+    reserveDepositPercent: Number(r.reserveDepositPercent ?? r.ReserveDepositPercent ?? 25),
+    depositAmountNow: Number(r.depositAmountNow ?? r.DepositAmountNow ?? 0),
+    remainingBalanceAmount: Number(r.remainingBalanceAmount ?? r.RemainingBalanceAmount ?? 0),
+    balanceDueAtUtc: typeof (r.balanceDueAtUtc ?? r.BalanceDueAtUtc) === 'string'
+      ? String(r.balanceDueAtUtc ?? r.BalanceDueAtUtc)
+      : null,
+    allowZeroDepositReserve: Boolean(r.allowZeroDepositReserve ?? r.AllowZeroDepositReserve),
+    freeCancellationDeadlineUtc: typeof (r.freeCancellationDeadlineUtc ?? r.FreeCancellationDeadlineUtc) === 'string'
+      ? String(r.freeCancellationDeadlineUtc ?? r.FreeCancellationDeadlineUtc)
+      : null,
+    monthlyEligible: Boolean(r.monthlyEligible ?? r.MonthlyEligible),
+    monthlyInstalments: rawInst.map((i) => ({
+      monthNumber: Number(i.monthNumber ?? i.MonthNumber ?? 1),
+      periodStart: String(i.periodStart ?? i.PeriodStart ?? ''),
+      periodEnd: String(i.periodEnd ?? i.PeriodEnd ?? ''),
+      payableFromDate: String(i.payableFromDate ?? i.PayableFromDate ?? ''),
+      dueDate: String(i.dueDate ?? i.DueDate ?? ''),
+      amount: Number(i.amount ?? i.Amount ?? 0),
+    })),
   };
 }
 
