@@ -33,6 +33,7 @@ export type TenantPropertyRecord = {
   /** Unit/listing name (`dto.name`). Historically misnamed — NOT the property name. */
   property_name?: string;
   property_description?: string;
+  property_price?: number;
   property_location?: string;
   propertyAddress?: string | null;
   property_neighborhoods?: string[];

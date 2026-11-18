@@ -2137,8 +2137,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           nights: nightsCount,
           currency: 'INR',
         },
-        checkIn: istInstantFromCalendarDate(checkinIst).toISOString(),
-        checkOut: istInstantFromCalendarDate(checkoutIst).toISOString(),
+        checkIn: istInstantFromCalendarDate(startOfCalendarDay(dateRange.startDate)).toISOString(),
+        checkOut: istInstantFromCalendarDate(startOfCalendarDay(dateRange.endDate)).toISOString(),
         guests: orderResp.rooms.reduce((s, r) => s + r.guests, 0),
       });
       setMultiRoomOpen(false);
@@ -2382,8 +2382,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         // is an ISO instant, and the hydration effect above reads it back as an IST civil date —
         // so emit the IST-midnight instant (unchanged format, correct day) rather than
         // `.toISOString()` on a local-midnight Date, which would not round-trip east of +05:30.
-        checkIn: istInstantFromCalendarDate(checkinIst).toISOString(),
-        checkOut: istInstantFromCalendarDate(checkoutIst).toISOString(),
+        checkIn: istInstantFromCalendarDate(startOfCalendarDay(dateRange.startDate)).toISOString(),
+        checkOut: istInstantFromCalendarDate(startOfCalendarDay(dateRange.endDate)).toISOString(),
         guests,
         listingRatePlanId: selectedRatePlanId,
         // TASK-10299208: never forward internal/OTA rate plan names; only pass plain meal + cancellation terms when the guest chose between options.
