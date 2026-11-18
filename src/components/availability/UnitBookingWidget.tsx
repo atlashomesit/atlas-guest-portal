@@ -49,6 +49,7 @@ import {
   netChargeableRoomFare,
   type GuestPriceBreakdown,
   type PublicListingRatePlanDto,
+  type RatePlanPackageDto,
 } from '@/api/pricingClient';
 import { fetchAvailabilityRatesForMonths } from '@/api/availabilityRatesClient';
 import { fetchPublicListings } from '@/api/listingClient';
@@ -129,6 +130,11 @@ export interface UnitBookingWidgetProps {
   dormGenderPolicy?: DormGenderPolicy | null;
   /** HSL-011: total beds in the dorm (`Listing.Quantity`) - the "Y" of "X of Y beds left". */
   dormBedCount?: number | null;
+  /** HSL-029: Linked whole-room private listing info for mixed dorms. */
+  wholeRoomListingId?: number | null;
+  wholeRoomName?: string | null;
+  wholeRoomNightlyRate?: number | null;
+  isHostelWholeRoomParent?: boolean;
   /** TASK-1039977 / PAY-006: listing security deposit (INR); forwarded to checkout */
   securityDepositAmount?: number | null;
   /** TASK-10299183: small-party pricing configured on listing. */
@@ -276,6 +282,10 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   accommodationType,
   dormGenderPolicy = null,
   dormBedCount = null,
+  wholeRoomListingId = null,
+  wholeRoomName = null,
+  wholeRoomNightlyRate = null,
+  isHostelWholeRoomParent = false,
   securityDepositAmount = null,
   hasSmallPartyPricing = false,
   includedGuests = null,
@@ -385,6 +395,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // MRP-002: Public rate plans for this listing & selected rate plan ID.
   const [publicRatePlans, setPublicRatePlans] = useState<PublicListingRatePlanDto[]>([]);
   const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
+  const [openPackageModal, setOpenPackageModal] = useState<RatePlanPackageDto | null>(null);
   // CFB-009 / BNB-009 / BNB-010: Optional "Add breakfast" toggle on Room-Only (EP) direct bookings.
   const [includeBreakfast, setIncludeBreakfast] = useState(false);
   const [guests, setGuests] = useState(2);
@@ -1529,17 +1540,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setOpenCalendar(false);
       return;
     }
-    setDateConflictError('These dates overlap an existing booking or hold.');
-    return;
-  }
+      setDateConflictError('These dates overlap an existing booking or hold.');
+      if (listingId != null) {
+        track('dates_unavailable', Number(listingId), {
+          checkIn: toCalendarISO(startDate),
+          checkOut: toCalendarISO(endDate),
+          tenantSlug: verifiedTenantSlug,
+        });
+      }
+      return;
+    }
 
-  setDateRange(next);
-  // Auto-close calendar when both dates are selected
-  setOpenCalendar(false);
-  // TASK-1480: funnel event when both dates are selected
-  if (next.startDate && next.endDate && listingId != null) {
-    track('select_dates', Number(listingId));
-  }
+    setDateRange(next);
+    // Auto-close calendar when both dates are selected
+    setOpenCalendar(false);
+    // TASK-1480 / DYN-039: funnel event when both dates are selected (carries dates + owning host tenant on marketplace)
+    if (next.startDate && next.endDate && listingId != null) {
+      track('select_dates', Number(listingId), {
+        checkIn: toCalendarISO(next.startDate),
+        checkOut: toCalendarISO(next.endDate),
+        tenantSlug: verifiedTenantSlug,
+      });
+    }
 };
 
 
@@ -2251,14 +2273,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     // A host that cannot take an online payment is handed off HERE, before anything else (TASK-8048 fail-closed, extended to
     // Reserve): the same WhatsApp hand-off the order API's 422 used to trigger only after the guest had already reached it.
     const hostCtx = tenantContext !== undefined ? tenantContext : getTenantContext();
+    const checkoutISO = toCalendarISO(checkoutIst);
     if (hostCtx?.bookingMode === 'WHATSAPP') {
+      track('start_checkout', numericListingId, {
+        checkIn: checkinISO,
+        checkOut: checkoutISO,
+        tenantSlug: verifiedTenantSlug,
+      });
       setProviderHandoff(true);
       return;
     }
 
     setIsSubmitting(true);
     // Funnel: a guest started checkout. Fired once per Reserve; the Pay taps on the details page do not re-fire it.
-    track('start_checkout', numericListingId);
+    track('start_checkout', numericListingId, {
+      checkIn: checkinISO,
+      checkOut: checkoutISO,
+      tenantSlug: verifiedTenantSlug,
+    });
 
     try {
       const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
@@ -2364,6 +2396,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           publicRatePlans.length > 1
             ? (cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy || null)
             : null,
+        holdPackage: selectedRatePlan?.package
+          ? {
+              title: selectedRatePlan.package.title,
+              description: selectedRatePlan.package.description ?? null,
+              items: selectedRatePlan.package.items ?? [],
+            }
+          : null,
       });
 
       // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
@@ -2829,6 +2868,52 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                         {plan.agentName ? `Special rate from ${plan.agentName}` : 'Travel agent rate'}
                       </div>
                     )}
+                    {plan.package && (
+                      <div
+                        data-testid={`rate-plan-package-${plan.id}`}
+                        style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}
+                      >
+                        {plan.package.photoUrl && (
+                          <img
+                            src={plan.package.photoUrl}
+                            alt={plan.package.title}
+                            style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+                          />
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
+                            {plan.package.title}
+                          </div>
+                          {plan.package.items.length > 0 && (
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary, #475569)' }}>
+                              {plan.package.items.slice(0, 3).map((item) =>
+                                `${item.quantity > 1 ? `${item.quantity}× ` : ''}${item.label}`
+                              ).join(' · ')}
+                              {plan.package.items.length > 3 ? ` +${plan.package.items.length - 3} more` : ''}
+                            </div>
+                          )}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            data-testid={`rate-plan-package-details-${plan.id}`}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setOpenPackageModal(plan.package ?? null);
+                            }}
+                            onKeyDown={(ev) => {
+                              if (ev.key === 'Enter' || ev.key === ' ') {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                setOpenPackageModal(plan.package ?? null);
+                              }
+                            }}
+                            style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-primary, #0f172a)', textDecoration: 'underline', cursor: 'pointer', alignSelf: 'flex-start' }}
+                          >
+                            See what&apos;s included
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     <div style={{ fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
                       {plan.cancellationSummary}
                     </div>
@@ -2847,6 +2932,47 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 </button>
               );
             })}
+            {openPackageModal && (
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={openPackageModal.title}
+                data-testid="rate-plan-package-modal"
+                style={{
+                  border: '1px solid var(--border-subtle, #e2e8f0)',
+                  borderRadius: 10,
+                  padding: 12,
+                  background: '#ffffff',
+                  marginTop: 6,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
+                    {openPackageModal.title}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenPackageModal(null)}
+                    style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary, #64748b)', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  >
+                    Close
+                  </button>
+                </div>
+                {openPackageModal.description && (
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary, #475569)', marginTop: 4 }}>
+                    {openPackageModal.description}
+                  </p>
+                )}
+                <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: 12, color: 'var(--text-primary, #0f172a)' }}>
+                  {openPackageModal.items.map((item, idx) => (
+                    <li key={idx}>
+                      {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.label}
+                      {item.basis === 'per_night' ? ' (per night)' : ' (per stay)'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
         {/* The hint and legend sit BELOW the joined dates + guests card: the guests cell has no
@@ -3271,6 +3397,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           <ParentChildCrossSellBanner
             isParentCluster={isParentOfCluster}
             isUnavailable={Boolean(datesUnavailable)}
+            isHostelWholeRoom={isHostelWholeRoomParent}
             parentName={listingName}
             availability={clusterAvailability}
             checkIn={crossSellCheckIn}
@@ -3313,6 +3440,62 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           />
         </div>
       )}
+
+      {/* HSL-029: Mixed dorm sold both bed-by-bed and as one private room for a group */}
+      {isDorm && wholeRoomListingId != null && wholeRoomListingId > 0 && (() => {
+        const bedsTaken = dormBedsLeft != null && dormBedCount != null && dormBedsLeft < dormBedCount;
+        const cap = dormBedCount ?? maxGuests;
+        const wholeHref = `/homes/${propertySlug || 'atlas-homes'}/${wholeRoomListingId}${
+          dateRange.startDate && dateRange.endDate
+            ? `?checkIn=${encodeURIComponent(toCalendarISO(dateRange.startDate))}&checkOut=${encodeURIComponent(toCalendarISO(dateRange.endDate))}&guests=${encodeURIComponent(String(cap))}`
+            : ''
+        }`;
+        const showStayCompare = guests >= 4 && priceDetails.nights > 0 && wholeRoomNightlyRate != null;
+        return (
+          <div
+            className="mt-3 rounded-xl border border-border-subtle bg-bg-subtle p-3.5 text-left"
+            data-testid="hsl029-whole-room-card"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                  {wholeRoomName || `Private room for ${cap}`}
+                </div>
+                <div className="text-sm font-bold text-text-primary mt-0.5">
+                  The whole dorm, just your group
+                </div>
+              </div>
+              {wholeRoomNightlyRate != null && (
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-bold text-text-primary">
+                    {showStayCompare
+                      ? displayPrice(wholeRoomNightlyRate * priceDetails.nights)
+                      : displayPrice(wholeRoomNightlyRate)}
+                  </div>
+                  <div className="text-[11px] text-text-secondary">
+                    {showStayCompare ? `for ${priceDetails.nights} nights` : 'per night'}
+                  </div>
+                </div>
+              )}
+            </div>
+            {bedsTaken ? (
+              <p className="mt-2 text-xs text-text-secondary" data-testid="hsl029-whole-room-unavailable">
+                Not free on these dates because some beds are booked. Beds are still free in the shared dorm.
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="mt-2.5 w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-xs font-semibold text-text-primary hover:bg-bg-subtle transition-colors"
+                style={{ minHeight: 44 }}
+                data-testid="hsl029-whole-room-cta"
+                onClick={() => navigate(wholeHref)}
+              >
+                Book the whole room
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
       {!datesUnavailable && (

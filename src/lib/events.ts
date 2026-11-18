@@ -1,5 +1,5 @@
 /**
- * TASK-1480: Conversion funnel event tracking.
+ * TASK-1480 / DYN-039: Conversion funnel event tracking.
  * Posts events to /api/funnel-events (anonymous, fire-and-forget).
  *
  * TASK-10087: fixed anonymous vocabulary for terminal checkout outcomes. Payloads
@@ -36,16 +36,27 @@ export const TerminalCheckoutOutcomeEvents = {
 export type TerminalCheckoutOutcome =
   (typeof TerminalCheckoutOutcomeEvents)[keyof typeof TerminalCheckoutOutcomeEvents];
 
-export function track(eventName: string, listingId?: number): void {
+export interface TrackFunnelEventOptions {
+  checkIn?: string | null;
+  checkOut?: string | null;
+  tenantSlug?: string | null;
+}
+
+export function track(eventName: string, listingId?: number, options?: TrackFunnelEventOptions): void {
   try {
+    const payload: Record<string, unknown> = {
+      eventName,
+      sessionId: getSessionId(),
+      listingId: listingId ?? null,
+    };
+    if (options?.checkIn && options?.checkOut) {
+      payload.checkIn = options.checkIn;
+      payload.checkOut = options.checkOut;
+    }
     fetch(buildApiUrl('/api/funnel-events'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getApiHeaders() },
-      body: JSON.stringify({
-        eventName,
-        sessionId: getSessionId(),
-        listingId: listingId ?? null,
-      }),
+      headers: { 'Content-Type': 'application/json', ...getApiHeaders(options?.tenantSlug ?? undefined) },
+      body: JSON.stringify(payload),
     }).catch(() => { /* fire and forget */ });
   } catch { /* ignore */ }
 }

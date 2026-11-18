@@ -242,6 +242,25 @@ export type PublicListingRatePlanDto = {
   isAgentRate?: boolean;
   /** PRICE-016: the agent / company the unlocked rate belongs to. */
   agentName?: string | null;
+  /** MRP-041: Stay package details when this rate plan is sold as a package on the website. */
+  package?: RatePlanPackageDto | null;
+};
+
+export type RatePlanPackageInclusionDto = {
+  addOnServiceId?: number | null;
+  label: string;
+  basis: string;
+  quantity: number;
+};
+
+export type RatePlanPackageDto = {
+  title: string;
+  description?: string | null;
+  photoId?: number | null;
+  photoUrl?: string | null;
+  stayFrom?: string | null;
+  stayTo?: string | null;
+  items: RatePlanPackageInclusionDto[];
 };
 
 /**

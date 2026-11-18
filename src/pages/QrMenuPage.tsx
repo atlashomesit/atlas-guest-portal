@@ -96,6 +96,23 @@ export interface MenuResponse {
   /** POS-011: the settlement methods to offer while room charge is locked or the link is unusable (empty = room charge available). */
   roomChargeFallbackMethods?: string[];
   categories: MenuCategory[];
+  /** POS-132: active guest-menu upsell suggestions from the server. */
+  suggestions?: MenuSuggestionOffer[];
+}
+
+export interface MenuSuggestionOffer {
+  id: number;
+  kind: "Pairing" | "OrderStart" | "Upgrade" | string;
+  posOutletId?: number | null;
+  offeredAddOnServiceId: number;
+  offeredItemName: string;
+  offeredItemPrice: number;
+  offeredDietary?: string;
+  offeredImageUrl?: string | null;
+  guestText?: string | null;
+  sortOrder?: number;
+  triggerAddOnServiceIds?: number[];
+  triggerCategories?: string[];
 }
 
 export interface OrderStatus {
@@ -145,6 +162,8 @@ interface CartLine {
   modifiers: SelectedModifier[];
   /** Menu price + the chosen deltas, as the API will price it (display only; the server recomputes). */
   unitPrice: number;
+  /** POS-132: Optional suggestion id when this line was added or upgraded via an upsell offer. */
+  suggestionId?: number | null;
 }
 
 /** POS-011: the same wording the API uses when a room link is not usable. */
@@ -325,6 +344,12 @@ export default function QrMenuPage() {
   const [cart, setCart] = useState<{ [lineKey: string]: CartLine }>({});
   // POS-017: the item whose modifier picker is open
   const [pickerItemId, setPickerItemId] = useState<number | null>(null);
+  // POS-132: upsell suggestions state (dismissed for this order, shown log, last triggered item, pending suggestion if modifier picker opens)
+  const [dismissedSuggestionIds, setDismissedSuggestionIds] = useState<number[]>([]);
+  const [shownSuggestionIds, setShownSuggestionIds] = useState<number[]>([]);
+  const [lastTriggeredItemId, setLastTriggeredItemId] = useState<number | null>(null);
+  const [pendingSuggestionByItem, setPendingSuggestionByItem] = useState<Record<number, number>>({});
+  const [pendingUpgradeFromItemId, setPendingUpgradeFromItemId] = useState<number | null>(null);
 
   // Checkout Form State
   // POS-047 L3: an optional host promo code typed on the order. The server checks it and takes the amount off the food bill before GST.
@@ -489,7 +514,12 @@ export default function QrMenuPage() {
   }, [activeOrder, tenantSlug]);
 
   /** POS-017: add one unit of the item with the given choices; the same choices land on the same line, other choices make a new line. */
-  const addLine = (item: MenuItem, picks: ModifierPick[] = [], modifiers: SelectedModifier[] = []) => {
+  const addLine = (
+    item: MenuItem,
+    picks: ModifierPick[] = [],
+    modifiers: SelectedModifier[] = [],
+    suggestionId?: number | null
+  ) => {
     if (item.isSoldOut86) return;
     const key = buildLineKey(item.id, picks);
     setCart((prev) => {
@@ -497,14 +527,24 @@ export default function QrMenuPage() {
       return {
         ...prev,
         [key]: existing
-          ? { ...existing, qty: existing.qty + 1 }
-          : { key, item, qty: 1, notes: "", picks, modifiers, unitPrice: unitPriceWithModifiers(item.price, modifiers) },
+          ? { ...existing, qty: existing.qty + 1, suggestionId: existing.suggestionId ?? suggestionId ?? null }
+          : {
+              key,
+              item,
+              qty: 1,
+              notes: "",
+              picks,
+              modifiers,
+              unitPrice: unitPriceWithModifiers(item.price, modifiers),
+              suggestionId: suggestionId ?? null,
+            },
       };
     });
   };
 
   const handleAddToCart = (item: MenuItem) => {
     if (item.isSoldOut86) return;
+    setLastTriggeredItemId(item.id);
     const groups = parseModifierGroups(item.modifierGroups);
     if (groups.length === 0) {
       addLine(item);
@@ -516,7 +556,26 @@ export default function QrMenuPage() {
   };
 
   const handlePickerAdd = (item: MenuItem, groups: ModifierGroup[], selection: ModifierSelection) => {
-    addLine(item, selectionToPayload(groups, selection), selectedModifiers(groups, selection));
+    const sugId = pendingSuggestionByItem[item.id] ?? null;
+    if (sugId != null) {
+      setPendingSuggestionByItem((prev) => {
+        const copy = { ...prev };
+        delete copy[item.id];
+        return copy;
+      });
+    }
+    if (pendingUpgradeFromItemId != null && pendingUpgradeFromItemId !== item.id) {
+      const fromId = pendingUpgradeFromItemId;
+      setPendingUpgradeFromItemId(null);
+      setCart((prev) => {
+        const copy = { ...prev };
+        for (const k of Object.keys(copy)) {
+          if (copy[k].item.id === fromId) delete copy[k];
+        }
+        return copy;
+      });
+    }
+    addLine(item, selectionToPayload(groups, selection), selectedModifiers(groups, selection), sugId);
     setPickerItemId(null);
   };
 
@@ -550,6 +609,133 @@ export default function QrMenuPage() {
     () => cartLines.reduce((acc, line) => acc + line.qty, 0),
     [cartLines]
   );
+
+  // POS-132: Lookup all active, non-sold-out items visible under current dietary filter
+  const visibleMenuItemsById = useMemo(() => {
+    const map = new Map<number, MenuItem>();
+    for (const cat of menu?.categories ?? []) {
+      for (const item of cat.items) {
+        if (!item.isSoldOut86 && matchesDietaryFilter(item.dietary, dietaryFilter)) {
+          map.set(item.id, item);
+        }
+      }
+    }
+    return map;
+  }, [menu, dietaryFilter]);
+
+  const inCartItemIds = useMemo(() => new Set(cartLines.map((l) => l.item.id)), [cartLines]);
+
+  const activeSuggestions = useMemo(() => {
+    const raw = menu?.suggestions ?? [];
+    return raw.filter((s) => {
+      if (dismissedSuggestionIds.includes(s.id)) return false;
+      if (!visibleMenuItemsById.has(s.offeredAddOnServiceId)) return false;
+      if (inCartItemIds.has(s.offeredAddOnServiceId)) return false;
+      return true;
+    });
+  }, [menu?.suggestions, dismissedSuggestionIds, visibleMenuItemsById, inCartItemIds]);
+
+  const orderStartSuggestion = useMemo(
+    () => (cartCount === 0 ? activeSuggestions.find((s) => s.kind === "OrderStart") ?? null : null),
+    [cartCount, activeSuggestions]
+  );
+
+  const findSuggestionForItem = (item: MenuItem): MenuSuggestionOffer | null => {
+    const itemCat = (item.outletCategory ?? item.category ?? "").trim().toLowerCase();
+    return (
+      activeSuggestions.find(
+        (s) =>
+          s.kind !== "OrderStart" &&
+          ((s.triggerAddOnServiceIds ?? []).includes(item.id) ||
+            (s.triggerCategories ?? []).some((tc) => tc.trim().toLowerCase() === itemCat))
+      ) ?? null
+    );
+  };
+
+  const inlineSuggestionForLastItem = useMemo(() => {
+    if (lastTriggeredItemId == null || !inCartItemIds.has(lastTriggeredItemId)) return null;
+    const item = visibleMenuItemsById.get(lastTriggeredItemId);
+    if (!item) return null;
+    return findSuggestionForItem(item);
+  }, [lastTriggeredItemId, inCartItemIds, visibleMenuItemsById, activeSuggestions]);
+
+  const cartSuggestionRows = useMemo(() => {
+    if (cartCount === 0) return [];
+    const seenOffered = new Set<number>();
+    const rows: MenuSuggestionOffer[] = [];
+    for (const s of activeSuggestions) {
+      if (seenOffered.has(s.offeredAddOnServiceId)) continue;
+      if (s.kind === "OrderStart") {
+        rows.push(s);
+        seenOffered.add(s.offeredAddOnServiceId);
+      } else {
+        const matchesCart = cartLines.some((l) => {
+          const cat = (l.item.outletCategory ?? l.item.category ?? "").trim().toLowerCase();
+          return (
+            (s.triggerAddOnServiceIds ?? []).includes(l.item.id) ||
+            (s.triggerCategories ?? []).some((tc) => tc.trim().toLowerCase() === cat)
+          );
+        });
+        if (matchesCart) {
+          rows.push(s);
+          seenOffered.add(s.offeredAddOnServiceId);
+        }
+      }
+      if (rows.length >= 2) break;
+    }
+    return rows;
+  }, [cartCount, cartLines, activeSuggestions]);
+
+  useEffect(() => {
+    const visibleIds: number[] = [];
+    if (orderStartSuggestion) visibleIds.push(orderStartSuggestion.id);
+    if (inlineSuggestionForLastItem) visibleIds.push(inlineSuggestionForLastItem.id);
+    for (const r of cartSuggestionRows) visibleIds.push(r.id);
+    if (visibleIds.length === 0) return;
+
+    setShownSuggestionIds((prev) => {
+      const next = [...prev];
+      let changed = false;
+      for (const id of visibleIds) {
+        if (!next.includes(id) && next.length < 20) {
+          next.push(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [orderStartSuggestion, inlineSuggestionForLastItem, cartSuggestionRows]);
+
+  const handleAcceptSuggestion = (offer: MenuSuggestionOffer, triggerItem?: MenuItem | null) => {
+    const offered = visibleMenuItemsById.get(offer.offeredAddOnServiceId);
+    if (!offered || offered.isSoldOut86) return;
+
+    const groups = parseModifierGroups(offered.modifierGroups);
+    if (groups.length > 0) {
+      if (!isOrderable(groups)) return;
+      setPendingSuggestionByItem((prev) => ({ ...prev, [offered.id]: offer.id }));
+      if (offer.kind === "Upgrade" && triggerItem) {
+        setPendingUpgradeFromItemId(triggerItem.id);
+      }
+      setPickerItemId(offered.id);
+      return;
+    }
+
+    if (offer.kind === "Upgrade" && triggerItem) {
+      setCart((prev) => {
+        const copy = { ...prev };
+        for (const k of Object.keys(copy)) {
+          if (copy[k].item.id === triggerItem.id) delete copy[k];
+        }
+        return copy;
+      });
+    }
+    addLine(offered, [], [], offer.id);
+  };
+
+  const handleDismissSuggestion = (offerId: number) => {
+    setDismissedSuggestionIds((prev) => (prev.includes(offerId) ? prev : [...prev, offerId]));
+  };
 
   // The order sheet is fixed to the bottom of the screen and can take most of it. The page reserves exactly its height below the menu, so a
   // guest can always scroll the next dish (or the last one) up into the strip above the sheet and add another line.
@@ -611,6 +797,7 @@ export default function QrMenuPage() {
         whatsAppUpdates,
         notes: orderNotes.trim() || undefined,
         scheduledFor: scheduledForIso ?? undefined,
+        suggestionsShown: shownSuggestionIds.length > 0 ? shownSuggestionIds.slice(0, 20) : undefined,
         lines: cartLines.map((l) => ({
           addOnServiceId: l.item.id,
           itemName: l.item.name,
@@ -621,6 +808,8 @@ export default function QrMenuPage() {
           notes: l.notes.trim() || undefined,
           // POS-017: ids only; the API checks them against the item's groups and prices them from the catalogue.
           modifiers: l.picks.length > 0 ? l.picks : undefined,
+          // POS-132: attribution link if added via suggestion card.
+          suggestionId: l.suggestionId ?? undefined,
         })),
       };
 
@@ -679,6 +868,9 @@ export default function QrMenuPage() {
       rememberOrderInUrl(orderData.orderNumber);
       setPromoCode("");
       setCart({});
+      setDismissedSuggestionIds([]);
+      setShownSuggestionIds([]);
+      setLastTriggeredItemId(null);
       setFulfillAt("NOW");
       setCustomFulfillTime("");
     } catch (err: any) {
@@ -1219,6 +1411,51 @@ export default function QrMenuPage() {
           </div>
         )}
 
+        {/* POS-132: Start of the order banner while cart is empty */}
+        {orderStartSuggestion && (
+          <div
+            data-testid="qr-suggestion-order-start"
+            style={{
+              backgroundColor: "#fdf7f2",
+              border: "1px solid #e7c5ad",
+              borderRadius: "12px",
+              padding: "12px 14px",
+              marginBottom: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e1b18" }}>
+                {orderStartSuggestion.guestText || orderStartSuggestion.offeredItemName}
+              </div>
+              <div style={{ fontSize: "12px", color: "#786a63" }}>
+                {orderStartSuggestion.offeredItemName} · ₹{orderStartSuggestion.offeredItemPrice.toLocaleString("en-IN")}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+              <button
+                type="button"
+                data-testid={`qr-suggestion-add-${orderStartSuggestion.id}`}
+                onClick={() => handleAcceptSuggestion(orderStartSuggestion)}
+                style={{ minHeight: "44px", padding: "0 14px", borderRadius: "8px", border: "none", backgroundColor: "#9e402a", color: "#fff", fontWeight: 700, fontSize: "13px", cursor: "pointer" }}
+              >
+                + Add
+              </button>
+              <button
+                type="button"
+                data-testid={`qr-suggestion-dismiss-${orderStartSuggestion.id}`}
+                onClick={() => handleDismissSuggestion(orderStartSuggestion.id)}
+                style={{ minHeight: "44px", padding: "0 10px", borderRadius: "8px", border: "1px solid #d8c7b8", backgroundColor: "#fff", color: "#4a3e39", fontWeight: 600, fontSize: "12px", cursor: "pointer" }}
+              >
+                No thanks
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Items List */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           {dietaryFilter !== "ALL" &&
@@ -1432,6 +1669,47 @@ export default function QrMenuPage() {
                           onAdd={(selection) => handlePickerAdd(item, modifierGroups, selection)}
                           onCancel={() => setPickerItemId(null)}
                         />
+                      )}
+                      {inlineSuggestionForLastItem && lastTriggeredItemId === item.id && (
+                        <div
+                          data-testid="qr-suggestion-inline"
+                          style={{
+                            marginTop: "6px",
+                            backgroundColor: "#fdf7f2",
+                            border: "1px solid #e7c5ad",
+                            borderRadius: "10px",
+                            padding: "10px 12px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: "10px",
+                          }}
+                        >
+                          <div style={{ fontSize: "13px", fontWeight: 600, color: "#1e1b18" }}>
+                            {inlineSuggestionForLastItem.kind === "Upgrade" &&
+                            inlineSuggestionForLastItem.offeredItemPrice > item.price
+                              ? `Make it ${inlineSuggestionForLastItem.offeredItemName} for ₹${(inlineSuggestionForLastItem.offeredItemPrice - item.price).toLocaleString("en-IN")} more`
+                              : `${inlineSuggestionForLastItem.guestText || `Goes well with your ${item.name}`}: ${inlineSuggestionForLastItem.offeredItemName}, ₹${inlineSuggestionForLastItem.offeredItemPrice.toLocaleString("en-IN")}`}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              data-testid={`qr-suggestion-add-${inlineSuggestionForLastItem.id}`}
+                              onClick={() => handleAcceptSuggestion(inlineSuggestionForLastItem, item)}
+                              style={{ minHeight: "44px", padding: "0 14px", borderRadius: "8px", border: "none", backgroundColor: "#9e402a", color: "#fff", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}
+                            >
+                              {inlineSuggestionForLastItem.kind === "Upgrade" ? "Switch" : "+ Add"}
+                            </button>
+                            <button
+                              type="button"
+                              data-testid={`qr-suggestion-dismiss-${inlineSuggestionForLastItem.id}`}
+                              onClick={() => handleDismissSuggestion(inlineSuggestionForLastItem.id)}
+                              style={{ minHeight: "44px", padding: "0 10px", borderRadius: "8px", border: "1px solid #d8c7b8", backgroundColor: "#fff", color: "#4a3e39", fontWeight: 600, fontSize: "12px", cursor: "pointer" }}
+                            >
+                              No thanks
+                            </button>
+                          </div>
+                        </div>
                       )}
                       </div>
                     );
@@ -1856,6 +2134,49 @@ export default function QrMenuPage() {
               </div>
 
               {/* Verification / Server Error Banner */}
+              {cartSuggestionRows.length > 0 && (
+                <div
+                  data-testid="qr-cart-suggestions"
+                  style={{
+                    marginBottom: "12px",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    backgroundColor: "#fdf7f2",
+                    border: "1px solid #e7c5ad",
+                  }}
+                >
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#786a63", marginBottom: "6px" }}>
+                    Add to your order
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {cartSuggestionRows.map((s) => (
+                      <div key={s.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: "#1e1b18" }}>
+                          {s.offeredItemName} · ₹{s.offeredItemPrice.toLocaleString("en-IN")}
+                        </span>
+                        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                          <button
+                            type="button"
+                            data-testid={`qr-cart-suggestion-add-${s.id}`}
+                            onClick={() => handleAcceptSuggestion(s)}
+                            style={{ minHeight: "44px", padding: "0 12px", borderRadius: "8px", border: "none", backgroundColor: "#9e402a", color: "#fff", fontWeight: 700, fontSize: "12px", cursor: "pointer" }}
+                          >
+                            + Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDismissSuggestion(s.id)}
+                            style={{ minHeight: "44px", padding: "0 10px", borderRadius: "8px", border: "1px solid #d8c7b8", backgroundColor: "#fff", color: "#4a3e39", fontWeight: 600, fontSize: "12px", cursor: "pointer" }}
+                          >
+                            No thanks
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {verificationError && (
                 <div
                   style={{

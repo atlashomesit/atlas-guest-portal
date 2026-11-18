@@ -27,6 +27,8 @@ export interface ParentChildCrossSellBannerProps {
   selectedRoomIds?: number[];
   onToggleRoom?: (room: ChildRoomPreview) => void;
   onBookSelectedTogether?: () => void;
+  /** HSL-029: When true, render hostel dorm wording instead of whole-villa wording. */
+  isHostelWholeRoom?: boolean;
   className?: string;
 }
 
@@ -85,6 +87,7 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
   selectedRoomIds = [],
   onToggleRoom,
   onBookSelectedTogether,
+  isHostelWholeRoom = false,
   className = '',
 }) => {
   // Only claim something about the rooms when the API says some Children are booked AND some are free.
@@ -140,16 +143,18 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
     >
       <div className="flex items-start gap-3">
         <div className="text-2xl flex-shrink-0" aria-hidden="true">
-          🏡
+          {isHostelWholeRoom ? '🛏️' : '🏡'}
         </div>
         <div className="space-y-1 flex-1">
           <h4 className="text-sm font-bold text-indigo-900 leading-snug" data-testid="cluster-cross-sell-headline">
-            The whole villa is taken because {booked} room{booked === 1 ? ' is' : 's are'} booked, but {free}{' '}
-            {free === 1 ? 'is' : 'are'} free.
+            {isHostelWholeRoom
+              ? 'Not free on these dates because some beds are booked.'
+              : `The whole villa is taken because ${booked} room${booked === 1 ? ' is' : 's are'} booked, but ${free} ${free === 1 ? 'is' : 'are'} free.`}
           </h4>
           <p className="text-xs text-indigo-800 leading-relaxed" data-testid="cluster-cross-sell-count">
-            {free} of {total} rooms {free === 1 ? 'is' : 'are'} free on these dates
-            {parentName ? ` at ${parentName}` : ''}.
+            {isHostelWholeRoom
+              ? `Beds are still free in the shared dorm${parentName ? ` at ${parentName}` : ''}.`
+              : `${free} of ${total} rooms ${free === 1 ? 'is' : 'are'} free on these dates${parentName ? ` at ${parentName}` : ''}.`}
           </p>
         </div>
       </div>
