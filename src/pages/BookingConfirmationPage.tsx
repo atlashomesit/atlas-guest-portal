@@ -28,6 +28,7 @@ import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector, { type GuestMealPreferences } from "../components/bnb/GuestDietarySelector"; // BNB-002 / BNB-009
 import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
+import BookingPaymentPlanCard, { type GuestBookingInstalment } from "../components/booking/BookingPaymentPlanCard";
 import {
   buildReceiptHtml,
   buildStayGuideHtml,
@@ -275,6 +276,23 @@ interface BookingSummary {
   /** HSL-011: when the guest confirmed the dorm gender rule (ISO) and which rule. */
   dormGenderAckAtUtc?: string | null;
   dormGenderAckPolicy?: "FemaleOnly" | "MaleOnly" | null;
+  /** GUEST-076 / GUEST-077: payment plan + monthly instalments. */
+  paymentPlan?: string | null;
+  balanceDueAtUtc?: string | null;
+  depositPercent?: number | null;
+  amountReceived?: number;
+  balanceDue?: number;
+  payLinkToken?: string | null;
+  instalments?: GuestBookingInstalment[] | null;
+  /** CLU-038: multi-room group booking reference & rooms list. */
+  groupBookingId?: string | null;
+  groupRooms?: Array<{
+    bookingId: number;
+    listingName: string;
+    guests: number;
+    totalAmount: number;
+    status: string;
+  }> | null;
 }
 
 const statusLabel: Record<string, { label: string; color: string }> = {
@@ -1235,6 +1253,46 @@ export default function BookingConfirmationPage() {
 
         {/* PAY-009: live refund status with the bank reference Razorpay sent (never an invented one). */}
         <RefundStatusTracker refunds={booking.refunds} currency={booking.currency} />
+
+        <BookingPaymentPlanCard
+          currency={booking.currency}
+          paymentPlan={booking.paymentPlan}
+          balanceDueAtUtc={booking.balanceDueAtUtc}
+          depositPercent={booking.depositPercent}
+          amountReceived={booking.amountReceived}
+          balanceDue={booking.balanceDue}
+          payLinkToken={booking.payLinkToken}
+          instalments={booking.instalments}
+          isCancelled={isCancelled}
+        />
+
+        {booking.groupRooms && booking.groupRooms.length > 1 && (
+          <section
+            className="rounded-2xl border border-border-subtle bg-bg-surface shadow-level1 p-5 space-y-2.5"
+            data-testid="confirmation-group-rooms"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-text-primary">
+                Rooms in this booking ({booking.groupRooms.length})
+              </h2>
+              {booking.groupBookingId && (
+                <span className="text-xs font-mono text-text-secondary">{booking.groupBookingId}</span>
+              )}
+            </div>
+            <ul className="divide-y divide-border-subtle text-sm">
+              {booking.groupRooms.map((r) => (
+                <li key={r.bookingId} className="py-2 flex items-center justify-between gap-2">
+                  <span>
+                    {r.listingName} · {r.guests} guest{r.guests === 1 ? "" : "s"}
+                  </span>
+                  <span className="font-medium text-text-primary">
+                    ₹{Math.round(r.totalAmount).toLocaleString("en-IN")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* PAY-010: direct-UPI payment the guest says they made — only the host can confirm it arrived. */}
         {booking.awaitingHostPaymentConfirmation && !isCancelled && (

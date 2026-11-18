@@ -57,6 +57,8 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import ParentChildCrossSellBanner, { isParentListing, type ChildRoomPreview } from '../cluster/ParentChildCrossSellBanner';
+import MultiRoomDrawer from './MultiRoomDrawer';
+import { createMultiRoomOrder, fetchMultiRoomOptions, type MultiRoomOption, type MultiRoomOptionsResponse } from '@/api/multiRoomClient';
 import { fetchClusterChildrenAvailability, type ClusterChildrenAvailability } from '@/api/clusterChildrenClient';
 import { fetchSisterAvailability, type SisterSpillover } from '@/api/sisterAvailabilityClient';
 import SisterPropertySpillover from './SisterPropertySpillover';
@@ -1357,6 +1359,39 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => controller.abort();
   }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests, verifiedTenantSlug, quoteKey]);
 
+  // CLU-038: Multi-room direct website checkout options & selection state.
+  const multiRoomTenantAllow = (tenantContext !== undefined ? tenantContext : getTenantContext())?.allowMultiRoomBooking === true;
+  const [multiRoomOpen, setMultiRoomOpen] = useState(false);
+  const [multiRoomOptions, setMultiRoomOptions] = useState<MultiRoomOptionsResponse | null>(null);
+  const [multiRoomLoading, setMultiRoomLoading] = useState(false);
+  const [selectedExtraRooms, setSelectedExtraRooms] = useState<MultiRoomOption[]>([]);
+  const [selectedParentChildRooms, setSelectedParentChildRooms] = useState<ChildRoomPreview[]>([]);
+  const [multiRoomSubmitting, setMultiRoomSubmitting] = useState(false);
+
+  useEffect(() => {
+    setSelectedExtraRooms([]);
+    setSelectedParentChildRooms([]);
+    if (!multiRoomTenantAllow || !gstRangeStartIso || !gstRangeEndIso) {
+      setMultiRoomOptions(null);
+      return;
+    }
+    const idNum = Number(listingId);
+    if (!Number.isFinite(idNum) || idNum <= 0) return;
+    const ac = new AbortController();
+    setMultiRoomLoading(true);
+    fetchMultiRoomOptions(idNum, gstRangeStartIso, gstRangeEndIso, verifiedTenantSlug, ac.signal)
+      .then((res) => {
+        if (!ac.signal.aborted) setMultiRoomOptions(res);
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setMultiRoomOptions(null);
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setMultiRoomLoading(false);
+      });
+    return () => ac.abort();
+  }, [multiRoomTenantAllow, listingId, gstRangeStartIso, gstRangeEndIso, verifiedTenantSlug]);
+
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
   // helper the grid uses (utils/date.ts). Routing it through an instant→IST conversion
@@ -2027,6 +2062,72 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
+  const handleBookMultiRoomTogether = useCallback(async (extraRooms: MultiRoomOption[]) => {
+    if (!dateRange.startDate || !dateRange.endDate || extraRooms.length === 0 || multiRoomSubmitting) return;
+    const idNum = Number(listingId);
+    if (!Number.isFinite(idNum) || idNum <= 0) return;
+    setMultiRoomSubmitting(true);
+    setFormError(null);
+    try {
+      const checkinIst = toCalendarISO(startOfCalendarDay(dateRange.startDate));
+      const checkoutIst = toCalendarISO(startOfCalendarDay(dateRange.endDate));
+      const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+      const tenantFromUrl = typeof window !== 'undefined' ? new URLSearchParams(currentSearch).get('tenant') : null;
+      const holdTenantSlug = verifiedTenantSlug || tenantFromUrl || getApiHeaders(verifiedTenantSlug)['X-Tenant-Slug'] || null;
+
+      const roomsPayload = [
+        ...(isParentOfCluster ? [] : [{ listingId: idNum, guests, includeBreakfast: Boolean(includeBreakfast), hasPets: false, listingRatePlanId: selectedRatePlanId }]),
+        ...extraRooms.map((r) => ({ listingId: r.listingId, guests: Math.min(r.maxGuests || 2, guests || 2) })),
+      ];
+      const orderResp = await createMultiRoomOrder(
+        {
+          rooms: roomsPayload,
+          checkinDate: checkinIst,
+          checkoutDate: checkoutIst,
+          currency: 'INR',
+          guestConsentAccepted: false,
+        },
+        holdTenantSlug,
+      );
+
+      const nightsCount = Math.max(1, Math.round((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / 86400000));
+      updateBooking({
+        holdId: orderResp.leadBookingId,
+        holdToken: orderResp.holdToken ?? orderResp.bookingToken ?? null,
+        holdExpiresAt: orderResp.holdExpiresAtUtc,
+        holdPropertySlug: propertySlug || 'atlas-homes',
+        holdUnitSlug: unitSlug || String(idNum),
+        holdTenantSlug,
+        holdListingId: orderResp.rooms[0]?.listingId ?? idNum,
+        holdListingName: orderResp.rooms.map((r) => r.listingName).join(' + '),
+        holdGroupReference: orderResp.groupReference,
+        holdMultiRoomSelections: orderResp.rooms.map((r) => ({
+          listingId: r.listingId,
+          listingName: r.listingName,
+          guests: r.guests,
+          finalAmount: r.finalAmount,
+        })),
+        holdPriceBreakdown: {
+          baseAmount: orderResp.rooms.reduce((s, r) => s + r.baseAmount, 0),
+          discountAmount: 0,
+          convenienceFeeAmount: orderResp.rooms.reduce((s, r) => s + r.convenienceFeeAmount, 0),
+          finalAmount: orderResp.amount,
+          nights: nightsCount,
+          currency: 'INR',
+        },
+        checkIn: istInstantFromCalendarDate(checkinIst).toISOString(),
+        checkOut: istInstantFromCalendarDate(checkoutIst).toISOString(),
+        guests: orderResp.rooms.reduce((s, r) => s + r.guests, 0),
+      });
+      setMultiRoomOpen(false);
+      navigate(`/book/${propertySlug || 'atlas-homes'}/${unitSlug || String(idNum)}/details${currentSearch}`);
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Could not reserve selected rooms together.');
+    } finally {
+      setMultiRoomSubmitting(false);
+    }
+  }, [dateRange, multiRoomSubmitting, listingId, verifiedTenantSlug, isParentOfCluster, guests, includeBreakfast, selectedRatePlanId, updateBooking, propertySlug, unitSlug, navigate]);
+
   // TASK-2612: handleReserve replaces the old handleSubmit.
   // FOUNDER RULED 2026-10-19: Reserve no longer calls the API or starts a hold. It stores the stay draft in context and
   // navigates to the details page; the 10-minute hold starts when the guest taps Pay there.
@@ -2229,6 +2330,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             : {}),
           ...(serverGstMatchesSelection && serverPriceBreakdown?.appliedPromotionLabel
             ? { appliedPromotionLabel: serverPriceBreakdown.appliedPromotionLabel }
+            : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.paymentPlans !== undefined
+            ? { paymentPlans: serverPriceBreakdown.paymentPlans }
             : {}),
         },
         holdCancellationTier: effectiveRatePlanCancellationTier,
@@ -3127,6 +3231,40 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             : 'Reserve'}
       </Button>
 
+      {multiRoomOptions?.enabled && multiRoomOptions.rooms.length > 0 && !datesUnavailable && !isParentOfCluster && (
+        <div className="mt-2.5">
+          <button
+            type="button"
+            onClick={() => setMultiRoomOpen(true)}
+            data-testid="multi-room-open-btn"
+            className="w-full min-h-[44px] rounded-xl border border-border-default bg-bg-surface px-3 py-2 text-xs font-semibold text-text-primary hover:bg-bg-muted transition"
+          >
+            {selectedExtraRooms.length > 0
+              ? `Need more space? ${1 + selectedExtraRooms.length} rooms selected`
+              : 'Need more space? Add another room'}
+          </button>
+          <MultiRoomDrawer
+            open={multiRoomOpen}
+            onClose={() => setMultiRoomOpen(false)}
+            anchorListingName={listingName || 'Primary room'}
+            anchorGuests={guests}
+            anchorTotal={finalTotal}
+            options={multiRoomOptions}
+            loading={multiRoomLoading}
+            selectedExtraRooms={selectedExtraRooms}
+            onToggleRoom={(room) => {
+              setSelectedExtraRooms((prev) =>
+                prev.some((r) => r.listingId === room.listingId)
+                  ? prev.filter((r) => r.listingId !== room.listingId)
+                  : [...prev, room],
+              );
+            }}
+            onBookTogether={() => void handleBookMultiRoomTogether(selectedExtraRooms)}
+            submitting={multiRoomSubmitting}
+          />
+        </div>
+      )}
+
       {/* CLU-004: Parent whole-villa blocked -> available child private rooms cross-sell alert */}
       {datesUnavailable && (
         <div className="mt-3">
@@ -3140,6 +3278,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             guests={guests}
             propertySlug={propertySlug}
             onSelectChildRoom={(room: ChildRoomPreview) => room.href && navigate(room.href)}
+            multiRoomEnabled={multiRoomTenantAllow}
+            selectedRoomIds={selectedParentChildRooms.map((r) => Number(r.id))}
+            onToggleRoom={(room) => {
+              setSelectedParentChildRooms((prev) =>
+                prev.some((r) => Number(r.id) === Number(room.id))
+                  ? prev.filter((r) => Number(r.id) !== Number(room.id))
+                  : [...prev, room],
+              );
+            }}
+            onBookSelectedTogether={() => {
+              const mapped: MultiRoomOption[] = selectedParentChildRooms.map((r) => ({
+                listingId: Number(r.id),
+                name: r.name,
+                maxGuests: r.maxGuests ?? 2,
+                nightlyRate: r.price ?? 0,
+                totalStayAmount: r.price ?? 0,
+              }));
+              void handleBookMultiRoomTogether(mapped);
+            }}
           />
         </div>
       )}
