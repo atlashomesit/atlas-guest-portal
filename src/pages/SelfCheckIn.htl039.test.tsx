@@ -70,7 +70,7 @@ describe("HTL-039 pre-arrival upgrade offers on SelfCheckIn", () => {
   test("renders upgrade offer card, hides on decline, and calls accept endpoint", async () => {
     let accepted = false;
     let declined = false;
-    vi.mocked(global.fetch).mockImplementation(async (input, init) => {
+    vi.mocked(global.fetch).mockImplementation(async (input) => {
       const url = String(input);
       if (url.includes("/upgrade-offers/701/accept")) {
         accepted = true;

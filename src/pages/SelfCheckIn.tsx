@@ -375,6 +375,7 @@ export default function SelfCheckIn() {
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const [upgradeDeclinedAll, setUpgradeDeclinedAll] = useState(false);
   const [upgradeAcceptingId, setUpgradeAcceptingId] = useState<number | null>(null);
+  const upgradeLoadedForRef = useRef<string>("");
 
   const loadUpgradeOffers = async (ref: string, signedToken: string) => {
     setUpgradeLoading(true);
@@ -401,6 +402,9 @@ export default function SelfCheckIn() {
     if (step !== "summary" || !details || !token) return;
     const ref = (details.bookingRef || bookingRef || urlRef || "").trim();
     if (!ref) return;
+    const key = `${ref}|${token}`;
+    if (upgradeLoadedForRef.current === key) return;
+    upgradeLoadedForRef.current = key;
     void loadUpgradeOffers(ref, token);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, details?.bookingRef, token]);

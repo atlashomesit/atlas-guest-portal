@@ -1,6 +1,7 @@
 /** TASK-1040186: white-label tenants must never see the bundled Atlas Homes catalog. */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
+import { settle } from "../test/settle";
 
 const ctx = vi.hoisted(() => ({ slug: "qa-fixture-lockoff" as string | undefined }));
 vi.mock("@/tenant/tenantContext", () => ({ getTenantContext: () => (ctx.slug ? { slug: ctx.slug } : null) }));
@@ -27,7 +28,8 @@ describe("useTenantListings fallback catalog (TASK-1040186)", () => {
     ctx.slug = "qa-fixture-lockoff";
     const { result } = renderHook(() => mod.useTenantListings());
     expect(result.current.listings).toHaveLength(0);
-    await waitFor(() => expect(result.current.state).toBe("error"));
+    await settle();
+    expect(result.current.state).toBe("error");
     expect(result.current.listings).toHaveLength(0);
     expect(JSON.stringify(result.current.properties)).not.toMatch(/Penthouse 501|7032493290/);
   });

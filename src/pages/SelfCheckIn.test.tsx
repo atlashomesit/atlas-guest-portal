@@ -56,13 +56,17 @@ afterEach(() => {
 
 describe("SelfCheckIn token auto-verify (GUEST-030)", () => {
   test("a valid token link skips the last-name form and lands on the summary", async () => {
-    fetchMock().mockResolvedValueOnce(json(details));
+    fetchMock().mockImplementation(async (input) => {
+      if (String(input).includes("/upgrade-offers")) return json([]);
+      return json(details);
+    });
 
     renderAt("/check-in/ATL-4242?t=tok-123");
     await settle();
 
-    expect(fetchMock()).toHaveBeenCalledTimes(1);
-    const url = calledUrl(0);
+    const checkinCalls = fetchMock().mock.calls.filter(([u]) => !String(u).includes("/upgrade-offers"));
+    expect(checkinCalls).toHaveLength(1);
+    const url = String(checkinCalls[0][0]);
     expect(url).toContain("/api/public/checkin/ATL-4242?t=tok-123");
     expect(url).not.toContain("lastName=");
     expect(screen.getByRole("heading", { name: "Lake View Loft" })).toBeInTheDocument();
@@ -71,9 +75,12 @@ describe("SelfCheckIn token auto-verify (GUEST-030)", () => {
   });
 
   test("later steps still send the last name, taken from the verified guest name", async () => {
-    fetchMock()
-      .mockResolvedValueOnce(json(details))
-      .mockResolvedValueOnce(json({ required: true, signed: false, waiverPdfUrl: null }));
+    fetchMock().mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/upgrade-offers")) return json([]);
+      if (url.includes("/damage-waiver")) return json({ required: true, signed: false, waiverPdfUrl: null });
+      return json(details);
+    });
 
     renderAt("/check-in/ATL-4242?t=tok-123");
     await settle();
@@ -85,8 +92,9 @@ describe("SelfCheckIn token auto-verify (GUEST-030)", () => {
     fireEvent.click(screen.getByTestId("checkin-house-rules-continue"));
     await settle();
 
-    const waiverUrl = calledUrl(1);
-    expect(waiverUrl).toContain("/api/public/checkin/ATL-4242/damage-waiver?lastName=Sharma&t=tok-123");
+    const waiverCall = fetchMock().mock.calls.find(([u]) => String(u).includes("/damage-waiver"));
+    expect(waiverCall).toBeDefined();
+    expect(String(waiverCall![0])).toContain("/api/public/checkin/ATL-4242/damage-waiver?lastName=Sharma&t=tok-123");
   });
 
   test("an invalid or expired token falls back to the last-name form with a notice", async () => {
