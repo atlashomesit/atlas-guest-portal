@@ -34,8 +34,10 @@ describe('GuestAssistant marketplace FAQ scoping (TASK-10298986)', () => {
     expect(calledOptions.headers['X-Tenant-Slug']).toBe('host-grove');
     expect(calledOptions.headers['X-Tenant-Id']).toBe('99');
 
-    // Trigger button should be rendered because FAQs are present
-    expect(screen.getByRole('button', { name: /View frequently asked questions/i })).toBeDefined();
+    // Trigger button should be rendered because FAQs are present, and accessible name includes visible "FAQs" text (WCAG 2.5.3)
+    const trigger = screen.getByRole('button', { name: /View frequently asked questions/i });
+    expect(trigger).toBeDefined();
+    expect(trigger.getAttribute('aria-label')?.toLowerCase()).toContain('faqs');
   });
 
   it('handles 404 response on marketplace gracefully without showing fatal error banner', async () => {
