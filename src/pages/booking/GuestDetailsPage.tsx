@@ -434,6 +434,7 @@ const GuestDetailsPage: React.FC = () => {
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
         holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : urlParams.isAiReceptionistSrc ? 'ai_receptionist' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
+        holdPackage: booking.holdPackage ?? null,
       });
 
       if (!effectiveListingId && unitSlug) {
@@ -866,6 +867,17 @@ const GuestDetailsPage: React.FC = () => {
   // ── Add-ons ───────────────────────────────────────────────────────────────
   const [availableAddOns, setAvailableAddOns] = useState<AddOnService[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
+  const includedAddOnIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const item of booking.holdPackage?.items ?? []) {
+      if (item.addOnServiceId != null) ids.add(item.addOnServiceId);
+    }
+    return ids;
+  }, [booking.holdPackage]);
+  const visibleAddOns = useMemo(
+    () => availableAddOns.filter((ao) => !includedAddOnIds.has(ao.addOnServiceId)),
+    [availableAddOns, includedAddOnIds],
+  );
 
   // TASK-1040062: Hydrate holdPriceBreakdown via GET /api/pricing/guest-breakdown when
   // GuestDetailsPage mounts on a deep-link or restored draft without holdPriceBreakdown,
@@ -3098,8 +3110,30 @@ const GuestDetailsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* MRP-041: Included package extras */}
+                {booking.holdPackage && booking.holdPackage.items?.length > 0 && (
+                  <div
+                    className="gd-card"
+                    data-testid="gd-included-package"
+                    style={{ marginBottom: 14, padding: '12px 16px' }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--gd-faint, #64748b)' }}>
+                      Included in your stay
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{booking.holdPackage.title}</div>
+                    <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: 13 }}>
+                      {booking.holdPackage.items.map((item, idx) => (
+                        <li key={idx}>
+                          {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.label}
+                          {item.basis === 'per_night' ? ' (per night)' : ' (per stay)'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {/* Add-ons (only if available) */}
-                {availableAddOns.length > 0 && (
+                {visibleAddOns.length > 0 && (
                   <div className={`gd-disclosure${addOnsOpen ? ' open' : ''}`}>
                     <button
                       type="button"
@@ -3116,12 +3150,12 @@ const GuestDetailsPage: React.FC = () => {
                         )}
                       </span>
                       <span className="gd-disc-side">
-                        <span>{availableAddOns.length} available</span>
+                        <span>{visibleAddOns.length} available</span>
                         <IconChevronDown size={16}/>
                       </span>
                     </button>
                     <div id="gd-addons-panel" className="gd-disclosure-panel gd-disclosure-panel-pad-top">
-                      {availableAddOns.map((ao) => {
+                      {visibleAddOns.map((ao) => {
                         const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
                         const lineTotal = addOnLineTotal(ao, qty || 1, nights, stayGuestCount);
                         return (

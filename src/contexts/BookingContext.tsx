@@ -96,6 +96,17 @@ type BookingState = {
   /** TASK-1039948: Selected rate plan meal plan and cancellation policy for direct booking pricing tier display. */
   ratePlanMealPlan?: string | null;
   ratePlanCancellationPolicy?: string | null;
+  /** MRP-041: Selected rate plan stay package snapshot (session-only). */
+  holdPackage?: {
+    title: string;
+    description?: string | null;
+    items: Array<{
+      addOnServiceId?: number | null;
+      label: string;
+      basis: string;
+      quantity: number;
+    }>;
+  } | null;
   /** TASK-1040087: Marketplace booking origin channel ('marketplace') forwarded from UnitBookingWidget. */
   holdBookingChannel?: 'marketplace' | 'ai_receptionist' | null;
   /** CLU-038: Multi-room group checkout state (session-only). */
@@ -151,6 +162,7 @@ const defaultState: BookingState = {
   ratePlanName: null,
   ratePlanMealPlan: null,
   ratePlanCancellationPolicy: null,
+  holdPackage: null,
   holdBookingChannel: null,
 };
 

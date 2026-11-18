@@ -175,9 +175,26 @@ export default function PayLinkPage() {
         <>
           <header className="mb-4">
             <h1 className="text-xl font-semibold text-stone-900" data-testid="pay-link-title">
-              {summary.guestFirstName ? `Hi ${summary.guestFirstName}, ` : ''}pay for your stay at {summary.hostName || summary.propertyName}
+              {summary.upgradeTitle
+                ? summary.upgradeTitle
+                : `${summary.guestFirstName ? `Hi ${summary.guestFirstName}, ` : ''}pay for your stay at ${summary.hostName || summary.propertyName}`}
             </h1>
           </header>
+
+          {summary.upgradeHoldLapsed ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert" data-testid="pay-link-upgrade-lapsed">
+              <p className="font-medium">This upgrade is no longer held for you.</p>
+              {summary.checkInReturnUrl && (
+                <a
+                  href={summary.checkInReturnUrl}
+                  className="mt-2 inline-block font-semibold underline"
+                  data-testid="pay-link-upgrade-back"
+                >
+                  Back to your check-in page
+                </a>
+              )}
+            </div>
+          ) : null}
 
           <section className="mb-4 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-800" data-testid="pay-link-summary">
             <p className="font-medium">{[summary.propertyName, summary.listingName].filter(Boolean).join(' - ')}</p>
@@ -185,17 +202,21 @@ export default function PayLinkPage() {
               {summary.checkIn} to {summary.checkOut} ({summary.nights} {summary.nights === 1 ? 'night' : 'nights'})
             </p>
             <p className="mt-2 text-base font-semibold" data-testid="pay-link-amount">
-              {summary.alreadyPaid ? 'Nothing left to pay' : `Amount to pay: ${formatInr(summary.amountDueInr, summary.currency)}`}
+              {summary.upgradeHoldLapsed
+                ? 'Nothing charged'
+                : summary.alreadyPaid
+                  ? 'Nothing left to pay'
+                  : `Amount to pay: ${formatInr(summary.amountDueInr, summary.currency)}`}
             </p>
           </section>
 
-          {summary.alreadyPaid && (
+          {summary.alreadyPaid && !summary.upgradeHoldLapsed && (
             <p className="rounded-xl bg-emerald-50 p-4 text-emerald-900" data-testid="pay-link-paid">
               This stay is paid up. Thank you!
             </p>
           )}
 
-          {!summary.alreadyPaid && summary.mode === 'UNAVAILABLE' && (
+          {!summary.alreadyPaid && !summary.upgradeHoldLapsed && summary.mode === 'UNAVAILABLE' && (
             <p className="rounded-xl bg-amber-50 p-4 text-amber-900" data-testid="pay-link-unavailable">
               Online payment is not available for this property right now. Please contact your host to pay.
             </p>

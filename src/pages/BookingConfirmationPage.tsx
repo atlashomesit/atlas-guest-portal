@@ -263,6 +263,17 @@ interface BookingSummary {
   bookingRef?: string;
   /** GUEST-053: Assigned smart-lock door code & key access on Stay Hub upon check-in completion. */
   doorCodeVisible?: boolean;
+  /** MRP-041: Frozen package snapshot captured when booked on a website package rate plan. */
+  includedPackage?: {
+    title: string;
+    description?: string | null;
+    items: Array<{
+      addOnServiceId?: number | null;
+      label: string;
+      basis: string;
+      quantity: number;
+    }>;
+  } | null;
   doorCode?: string | null;
   doorCodeLabel?: string | null;
   /** TASK-2071: ISO 639-1 language code from guest profile. Null defaults to "en". */
@@ -586,6 +597,7 @@ export default function BookingConfirmationPage() {
             cancellationPolicy: b.cancellationPolicy,
             cancellationHeadline: b.cancellationHeadline,
             cancellationDetail: b.cancellationDetail,
+            includedPackage: b.includedPackage ?? null,
             savedAtUtc: new Date().toISOString(),
           };
           const serialized = JSON.stringify(snapshot);
@@ -1448,6 +1460,20 @@ export default function BookingConfirmationPage() {
               )}
             </div>
           )}
+          {booking.includedPackage && booking.includedPackage.items?.length > 0 && (
+            <div className="py-4 border-t border-border-subtle space-y-1.5" data-testid="confirmation-included-package">
+              <p className="text-xs text-text-muted uppercase tracking-wider font-medium">Included in your stay</p>
+              <p className="text-sm font-semibold text-text-primary">{booking.includedPackage.title}</p>
+              <ul className="list-disc pl-5 text-sm text-text-secondary space-y-0.5">
+                {booking.includedPackage.items.map((item, idx) => (
+                  <li key={idx}>
+                    {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.label}
+                    {item.basis === 'per_night' ? ' (per night)' : ' (per stay)'}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="pt-4 flex justify-between items-center">
             <span className="text-sm text-text-secondary">
               {booking.nights} {booking.nights === 1 ? "night" : "nights"}
@@ -2085,12 +2111,19 @@ export default function BookingConfirmationPage() {
         )}
 
         {/* TASK-1376 / TASK-5178: Add-on upsell needs WhatsApp — never re-parse whatsappUrl (crashes when empty) */}
-        {!isCancelled && addOns.length > 0 && hasWhatsAppContact && (
+        {!isCancelled && (() => {
+          const includedIds = new Set(
+            (booking.includedPackage?.items ?? [])
+              .map((it) => it.addOnServiceId)
+              .filter((id): id is number => id != null),
+          );
+          const unincludedAddOns = addOns.filter((ao) => !includedIds.has(ao.addOnServiceId));
+          return unincludedAddOns.length > 0 && hasWhatsAppContact ? (
           <div className="rounded-2xl border border-brand-primary/30 bg-brand-primary/5 p-5">
             <h2 className="text-sm font-semibold text-text-primary mb-1">Make your stay even better</h2>
             <p className="text-xs text-text-secondary mb-3">Our team will confirm via WhatsApp after you send a request.</p>
             <div className="space-y-3">
-              {addOns.slice(0, 3).map((addOn) => {
+              {unincludedAddOns.slice(0, 3).map((addOn) => {
                 const priceLabel = addOn.priceType === 'per_night' ? '/night'
                   : addOn.priceType === 'per_guest' ? '/guest'
                   : '';
@@ -2118,7 +2151,8 @@ export default function BookingConfirmationPage() {
               })}
             </div>
           </div>
-        )}
+          ) : null;
+        })()}
 
         {/* Need help — only render contact rows when at least one channel is available */}
         {(hasWhatsAppContact || !!supportEmail) && (

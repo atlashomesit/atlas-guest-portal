@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
 import SEO from "../components/SEO";
 import ArrivalDetailsEditor, { type ArrivalDetailsDraft } from "../components/ArrivalDetailsEditor";
@@ -254,7 +254,23 @@ const ISO_NATIONALITIES = [
   "Other",
 ] as const;
 
+export interface RoomUpgradeOffer {
+  offerId: number;
+  targetListingId: number;
+  targetListingName: string;
+  leadPhotoUrl?: string | null;
+  sleeps: number;
+  highlights: string[];
+  nights: number;
+  pricePerNight: number;
+  totalPrice: number;
+  roomsLeft?: number | null;
+  expiresAtUtc: string;
+  status: string;
+}
+
 export default function SelfCheckIn() {
+  const navigate = useNavigate();
   const brandName = getTenantBrandName();
   const poweredBySlug = getPoweredBySlug();
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
@@ -353,6 +369,84 @@ export default function SelfCheckIn() {
   const [_aadhaarMasked, setAadhaarMasked] = useState("");
   // TASK-5346: auditable skip when ID was collected through another channel
   const [idCollectedElsewhere, setIdCollectedElsewhere] = useState(false);
+  // HTL-039: Pre-arrival room upgrade offers (signed link only)
+  const [upgradeOffers, setUpgradeOffers] = useState<RoomUpgradeOffer[]>([]);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [upgradeDeclinedAll, setUpgradeDeclinedAll] = useState(false);
+  const [upgradeAcceptingId, setUpgradeAcceptingId] = useState<number | null>(null);
+
+  const loadUpgradeOffers = async (ref: string, signedToken: string) => {
+    setUpgradeLoading(true);
+    setUpgradeError(null);
+    try {
+      const res = await fetch(
+        buildApiUrl(`/api/public/checkin/${encodeURIComponent(ref)}/upgrade-offers?t=${encodeURIComponent(signedToken)}`),
+        { headers: getApiHeaders() },
+      );
+      if (res.ok) {
+        const list = (await res.json()) as RoomUpgradeOffer[];
+        setUpgradeOffers(Array.isArray(list) ? list : []);
+      } else {
+        setUpgradeOffers([]);
+      }
+    } catch {
+      setUpgradeOffers([]);
+    } finally {
+      setUpgradeLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (step !== "summary" || !details || !token) return;
+    const ref = (details.bookingRef || bookingRef || urlRef || "").trim();
+    if (!ref) return;
+    void loadUpgradeOffers(ref, token);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, details?.bookingRef, token]);
+
+  const handleAcceptUpgrade = async (offer: RoomUpgradeOffer) => {
+    const ref = (details?.bookingRef || bookingRef || urlRef || "").trim();
+    if (!ref || !token) return;
+    setUpgradeAcceptingId(offer.offerId);
+    setUpgradeError(null);
+    try {
+      const res = await fetch(
+        buildApiUrl(`/api/public/checkin/${encodeURIComponent(ref)}/upgrade-offers/${offer.offerId}/accept?t=${encodeURIComponent(token)}`),
+        { method: "POST", headers: getApiHeaders() },
+      );
+      if (res.status === 409) {
+        setUpgradeError("That room was just taken. Your booking has not changed.");
+        return;
+      }
+      if (!res.ok) {
+        setUpgradeError("Could not start your upgrade right now. Your booking has not changed.");
+        return;
+      }
+      const data = (await res.json()) as { payUrl?: string };
+      if (data.payUrl) {
+        navigate(data.payUrl);
+      }
+    } catch {
+      setUpgradeError("Could not start your upgrade right now. Your booking has not changed.");
+    } finally {
+      setUpgradeAcceptingId(null);
+    }
+  };
+
+  const handleDeclineUpgrades = async () => {
+    setUpgradeDeclinedAll(true);
+    const ref = (details?.bookingRef || bookingRef || urlRef || "").trim();
+    if (!ref || !token) return;
+    await Promise.all(
+      upgradeOffers.map((o) =>
+        fetch(
+          buildApiUrl(`/api/public/checkin/${encodeURIComponent(ref)}/upgrade-offers/${o.offerId}/decline?t=${encodeURIComponent(token)}`),
+          { method: "POST", headers: getApiHeaders() },
+        ).catch(() => undefined),
+      ),
+    );
+  };
   const [guests, setGuests] = useState<GuestInfo[]>([
     {
       name: "",
@@ -1094,6 +1188,104 @@ export default function SelfCheckIn() {
               {details.emergencyContactPhone && <InfoRow label="Emergency" value={details.emergencyContactPhone} />}
             </div>
             <StayAccessBlock wifiName={details.wifiName} wifiPass={details.wifiPassword} doorCode={details.doorCode} />
+
+            {/* HTL-039: Room upgrade offers on signed check-in link */}
+            {token && !upgradeDeclinedAll && (upgradeLoading || upgradeOffers.length > 0 || upgradeError) && (
+              <section
+                className="mb-5 rounded-xl border border-border-subtle bg-bg-page p-4"
+                data-testid="checkin-upgrade-card"
+              >
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <h2 className="text-base font-semibold text-text-primary">Upgrade your room</h2>
+                  {upgradeOffers.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDeclineUpgrades()}
+                      className="text-xs font-medium text-text-secondary underline"
+                      data-testid="checkin-upgrade-decline"
+                    >
+                      No thanks, keep my room
+                    </button>
+                  )}
+                </div>
+
+                {upgradeLoading && upgradeOffers.length === 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3" data-testid="checkin-upgrade-loading">
+                    <div className="h-36 rounded-lg bg-bg-subtle animate-pulse" />
+                    <div className="h-36 rounded-lg bg-bg-subtle animate-pulse" />
+                  </div>
+                )}
+
+                {upgradeError && (
+                  <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" role="alert" data-testid="checkin-upgrade-error">
+                    <p>{upgradeError}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ref = (details.bookingRef || bookingRef || urlRef || "").trim();
+                        if (ref && token) void loadUpgradeOffers(ref, token);
+                      }}
+                      className="mt-1.5 font-semibold underline"
+                      data-testid="checkin-upgrade-refresh"
+                    >
+                      See what is free now
+                    </button>
+                  </div>
+                )}
+
+                {upgradeOffers.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {upgradeOffers.map((offer) => (
+                      <div
+                        key={offer.offerId}
+                        className="rounded-xl border border-border-subtle bg-bg-surface p-3 flex flex-col justify-between gap-3"
+                        data-testid={`checkin-upgrade-option-${offer.offerId}`}
+                      >
+                        <div>
+                          {offer.leadPhotoUrl && (
+                            <img
+                              src={offer.leadPhotoUrl}
+                              alt={offer.targetListingName}
+                              className="w-full h-32 object-cover rounded-lg mb-2.5"
+                              loading="lazy"
+                            />
+                          )}
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-sm font-semibold text-text-primary">{offer.targetListingName}</h3>
+                            {offer.roomsLeft != null && offer.roomsLeft <= 2 && (
+                              <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                                Only {offer.roomsLeft} left
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-text-secondary mt-1">
+                            {[
+                              `Sleeps ${offer.sleeps}`,
+                              ...offer.highlights.slice(0, 3),
+                            ].join(" · ")}
+                          </p>
+                          <p className="text-xs font-medium text-text-primary mt-2">
+                            ₹{offer.totalPrice.toLocaleString("en-IN")} more for {offer.nights} {offer.nights === 1 ? "night" : "nights"} (₹{offer.pricePerNight.toLocaleString("en-IN")} a night)
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={upgradeAcceptingId === offer.offerId}
+                          onClick={() => void handleAcceptUpgrade(offer)}
+                          style={{ minHeight: 48 }}
+                          className="w-full rounded-xl bg-brand-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                          data-testid={`checkin-upgrade-accept-${offer.offerId}`}
+                        >
+                          {upgradeAcceptingId === offer.offerId
+                            ? "Holding your upgrade…"
+                            : `Upgrade for ₹${offer.totalPrice.toLocaleString("en-IN")}`}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* TASK-102915: split-stay legs in date order. Rendered only when the
                 API returns more than one leg; single-room bookings (no `stays`)

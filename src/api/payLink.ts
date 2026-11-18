@@ -24,6 +24,9 @@ export interface PayLinkSummary {
   alreadyPaid: boolean;
   upiVpa?: string | null;
   payeeName?: string | null;
+  upgradeTitle?: string | null;
+  upgradeHoldLapsed?: boolean;
+  checkInReturnUrl?: string | null;
 }
 
 export interface PayLinkOrder {
