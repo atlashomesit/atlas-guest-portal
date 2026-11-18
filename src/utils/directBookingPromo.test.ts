@@ -64,4 +64,21 @@ describe("resolveDirectBookingPromo (TASK-101158)", () => {
     );
     expect(resolved.sub).toBe("Custom host-authored subline");
   });
+
+  it("GUEST-063: default headline uses neutral 'Book direct with the host' when add-on fee applies or is unknown, and 'best rates' only when fee is known to be 0", () => {
+    const hostTenant = tenant({ isMarketplaceRoot: false, paymentProvider: "RAZORPAY", bookingMode: "ONLINE" });
+    const withFee = resolveDirectBookingPromo(hostTenant, noOverrides, 3);
+    const withZeroFee = resolveDirectBookingPromo(hostTenant, noOverrides, 0);
+    const marketplaceZero = resolveDirectBookingPromo(
+      tenant({ isMarketplaceRoot: true, paymentProvider: "RAZORPAY", bookingMode: "ONLINE" }),
+      noOverrides,
+      0,
+    );
+
+    if (withFee.effectiveDiscountPercent === 0) {
+      expect(withFee.headline).toBe("Book direct with the host");
+      expect(withZeroFee.headline).toBe("Book direct — best rates on our official site");
+      expect(marketplaceZero.headline).toBe("Book direct with the host");
+    }
+  });
 });

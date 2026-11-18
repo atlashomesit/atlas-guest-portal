@@ -6,7 +6,9 @@ import { normalizePromoCodeInput, normalizePromoCodeSubmit } from "@/utils/promo
 import { useTenantListings, type TenantPropertyRecord } from "@/hooks/useTenantListings";
 import { useAdvertisedPromoActive } from "@/hooks/useAdvertisedPromoActive";
 import { useAbSuggest } from "@/hooks/useAbSuggest";
+import { useTenantProcessingFee } from "@/hooks/useTenantProcessingFee";
 import { getTenantBrandName } from "@/tenant/displayBrand";
+import { getTenantContext } from "@/tenant/tenantContext";
 
 const DIRECT5_CODE = "DIRECT5";
 
@@ -125,6 +127,9 @@ function DirectBookingCodeCopy() {
 export default function OffersPage() {
   const { properties, state, fetchErrorMessage, refetch } = useTenantListings();
   const brandName = getTenantBrandName();
+  const feePercent = useTenantProcessingFee();
+  const isMarketplaceRoot = getTenantContext()?.isMarketplaceRoot === true;
+  const showBestRates = feePercent === 0 && !isMarketplaceRoot;
 
   const [promoCode, setPromoCode] = useState("");
   const [promoResult, setPromoResult] = useState<PromoResult | null>(null);
@@ -194,7 +199,11 @@ export default function OffersPage() {
         <div className="space-y-2">
           <p className="uppercase tracking-[0.2em] text-primary-dark font-semibold text-sm">{brandName}</p>
           <h1 className="text-3xl md:text-4xl font-bold text-text-primary">Exclusive Offers</h1>
-          <p className="text-lg text-text-muted">Book direct and unlock the best rates — no OTA fees, no middlemen.</p>
+          <p className="text-lg text-text-muted" data-testid="offers-hero-subtitle">
+            {showBestRates
+              ? "Book direct and unlock the best rates — no OTA fees, no middlemen."
+              : "Book direct with the host"}
+          </p>
         </div>
 
         {/* Direct booking deal — TASK-8016: gated on validate; inactive → render nothing */}
