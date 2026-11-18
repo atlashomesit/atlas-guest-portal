@@ -49,6 +49,24 @@ function renderAt(path: string) {
 
 const fetchMock = () => global.fetch as Mock;
 
+function mockCheckinFlow({
+  details = baseDetails,
+  waiver = { required: false, signed: true, waiverPdfUrl: null },
+  complete = () => json({}),
+}: {
+  details?: typeof baseDetails;
+  waiver?: { required: boolean; signed: boolean; waiverPdfUrl: string | null };
+  complete?: () => Response;
+}) {
+  fetchMock().mockImplementation(async (input) => {
+    const url = String(input);
+    if (url.includes("/upgrade-offers")) return json([]);
+    if (url.includes("/damage-waiver")) return json(waiver);
+    if (url.includes("/complete")) return complete();
+    return json(details);
+  });
+}
+
 /** Summary -> Continue -> ID step Skip -> house rules Continue -> (waiver already signed) -> complete. */
 async function runFromSummaryToComplete() {
   fireEvent.click(screen.getByRole("button", { name: /continue/i }));
@@ -86,10 +104,9 @@ describe("SelfCheckIn contact capture (NOTIF-048)", () => {
   });
 
   test("the phone is optional when we already have a deliverable one, and nothing is sent when nothing is typed", async () => {
-    fetchMock()
-      .mockResolvedValueOnce(json({ ...baseDetails, guestHasDeliverablePhone: true, guestHasUsableEmail: true }))
-      .mockResolvedValueOnce(json({ required: false, signed: true, waiverPdfUrl: null }))
-      .mockResolvedValueOnce(json({}));
+    mockCheckinFlow({
+      details: { ...baseDetails, guestHasDeliverablePhone: true, guestHasUsableEmail: true },
+    });
     renderAt("/check-in/ATL-4242?t=tok-123");
     await settle();
 
@@ -104,23 +121,22 @@ describe("SelfCheckIn contact capture (NOTIF-048)", () => {
   });
 
   test("a mistyped number is caught on the details step without calling the server", async () => {
-    fetchMock().mockResolvedValueOnce(json(baseDetails));
+    mockCheckinFlow({});
     renderAt("/check-in/ATL-4242?t=tok-123");
     await settle();
+    const callsOnSummary = fetchMock().mock.calls.length;
 
     fireEvent.change(screen.getByLabelText(/whatsapp mobile number/i), { target: { value: "12345" } });
     fireEvent.click(screen.getByRole("button", { name: /continue/i }));
     await settle();
 
     expect(screen.getByRole("alert")).toHaveTextContent(/valid whatsapp mobile number/i);
-    expect(fetchMock()).toHaveBeenCalledTimes(1);
+    expect(fetchMock()).toHaveBeenCalledTimes(callsOnSummary);
+    expect(completeCall()).toBeUndefined();
   });
 
   test("typed phone and email are sent in the complete request body", async () => {
-    fetchMock()
-      .mockResolvedValueOnce(json(baseDetails))
-      .mockResolvedValueOnce(json({ required: false, signed: true, waiverPdfUrl: null }))
-      .mockResolvedValueOnce(json({}));
+    mockCheckinFlow({});
     renderAt("/check-in/ATL-4242?t=tok-123");
     await settle();
 
@@ -137,10 +153,9 @@ describe("SelfCheckIn contact capture (NOTIF-048)", () => {
   });
 
   test("a 400 INVALID_GUEST_PHONE from the server is shown in words next to the field", async () => {
-    fetchMock()
-      .mockResolvedValueOnce(json(baseDetails))
-      .mockResolvedValueOnce(json({ required: false, signed: true, waiverPdfUrl: null }))
-      .mockResolvedValueOnce(json({ error: "INVALID_GUEST_PHONE", message: "bad" }, 400));
+    mockCheckinFlow({
+      complete: () => json({ error: "INVALID_GUEST_PHONE", message: "bad" }, 400),
+    });
     renderAt("/check-in/ATL-4242?t=tok-123");
     await settle();
 
@@ -155,10 +170,10 @@ describe("SelfCheckIn contact capture (NOTIF-048)", () => {
   });
 
   test("a 400 INVALID_GUEST_EMAIL from the server is shown in words next to the email field", async () => {
-    fetchMock()
-      .mockResolvedValueOnce(json({ ...baseDetails, guestHasDeliverablePhone: true }))
-      .mockResolvedValueOnce(json({ required: false, signed: true, waiverPdfUrl: null }))
-      .mockResolvedValueOnce(json({ error: "INVALID_GUEST_EMAIL", message: "bad" }, 400));
+    mockCheckinFlow({
+      details: { ...baseDetails, guestHasDeliverablePhone: true },
+      complete: () => json({ error: "INVALID_GUEST_EMAIL", message: "bad" }, 400),
+    });
     renderAt("/check-in/ATL-4242?t=tok-123");
     await settle();
 
