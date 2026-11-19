@@ -39,15 +39,24 @@ export const buildResponsiveSrcSet = (src: string, widths: number[] = RESPONSIVE
     const base = typeof window !== "undefined" ? window.location.origin : "https://example.invalid";
     const url = new URL(src, base);
 
-    // Airbnb's image CDN (muscache.com) ignores ?w= and always returns its full-size photo
-    // (~1180px), so every srcset candidate downloaded the same bytes. It resizes on ?im_w=.
+    // Airbnb's image CDN (muscache.com) ignores ?w= and only supports specific discrete im_w values
+    // (e.g. 240, 320, 480, 720, 960, 1200, 1440). Standard 768 / 1024 / 1080 return HTTP 404!
     const isAirbnbCdn = url.hostname === "muscache.com" || url.hostname.endsWith(".muscache.com");
+
+    const clampAirbnbWidth = (w: number): number => {
+      if (w <= 240) return 240;
+      if (w <= 320) return 320;
+      if (w <= 480) return 480;
+      if (w <= 720 || w === 768) return 720;
+      if (w <= 960) return 960;
+      return 1200;
+    };
 
     return widths
       .map((width) => {
         const next = new URL(url);
         if (isAirbnbCdn) {
-          next.searchParams.set("im_w", String(width));
+          next.searchParams.set("im_w", String(clampAirbnbWidth(width)));
         } else {
           next.searchParams.set("w", String(width));
           next.searchParams.set("auto", "format");

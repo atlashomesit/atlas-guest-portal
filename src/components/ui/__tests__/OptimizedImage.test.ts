@@ -52,13 +52,13 @@ describe('OptimizedImage — srcset builder (TASK-7433)', () => {
       expect(srcset).toContain('480w');
     });
 
-    it('asks Airbnb photos (muscache.com) for each width with im_w, which that CDN honours', () => {
+    it('asks Airbnb photos (muscache.com) for each width with im_w, mapping 768 to 720 (Airbnb 404s on 768)', () => {
       const airbnb = 'https://a0.muscache.com/im/pictures/hosting/Hosting-1/original/abc.jpeg';
       const srcset = buildResponsiveSrcSet(airbnb);
 
       expect(srcset).toBeDefined();
       expect(srcset).toContain('im_w=480 480w');
-      expect(srcset).toContain('im_w=768 768w');
+      expect(srcset).toContain('im_w=720 768w');
       expect(srcset).toContain('im_w=1200 1200w');
       expect(srcset).not.toContain('auto=format');
       expect(srcset).not.toMatch(/[?&]w=/);

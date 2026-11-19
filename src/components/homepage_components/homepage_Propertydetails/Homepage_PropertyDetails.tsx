@@ -1793,8 +1793,15 @@ useEffect(() => {
       return `https://atlashomestorage.blob.core.windows.net/atlas-media/atlas/${resolvedListingId}/${filename}`;
     };
 
-    const galleryUrls = filterGuestImageUrls(data?.property_img ?? []).map(buildAtlasMediaUrl);
-    const primaryImage = galleryUrls[0];
+    const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
+    const handlePhotoError = useCallback((failedUrl: string) => {
+      setFailedPhotos((prev) => ({ ...prev, [failedUrl]: true }));
+    }, []);
+
+    const rawGalleryUrls = filterGuestImageUrls(data?.property_img ?? []).map(buildAtlasMediaUrl);
+    const galleryUrls = rawGalleryUrls.filter((url) => !failedPhotos[url]);
+    const effectiveGalleryUrls = galleryUrls.length > 0 ? galleryUrls : rawGalleryUrls;
+    const primaryImage = effectiveGalleryUrls[0];
     // TASK-8216: route gallery URLs through /img transform (keeps mosaic visually identical via object-fit: cover)
     const getGalleryTransformedUrl = (url: string, width: number) =>
       toTransformedGuestImageUrl(url, width) ?? url;
@@ -2119,6 +2126,7 @@ useEffect(() => {
                       decoding="async"
                       className="pp-gallery-img"
                       style={{ width: '100%', height: '100%', objectFit: galleryUrls.length === 1 ? 'contain' : 'cover', display: 'block' }}
+                      onError={() => handlePhotoError(ppHeroUrl)}
                     />
                   </button>
                 ) : ppPhotosPending ? (
@@ -2152,6 +2160,7 @@ useEffect(() => {
                         decoding="async"
                         className="pp-gallery-img"
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        onError={() => handlePhotoError(photo)}
                       />
                     </button>
                   </div>
