@@ -21,7 +21,6 @@ export const termsSections: TermsSection[] = [
     title: "Booking & Payment",
     paragraphs: [
       "Booking is confirmed only after successful payment. Please provide correct guest details and dates.",
-      "Payments are non-refundable unless stated otherwise.",
     ],
   },
   {

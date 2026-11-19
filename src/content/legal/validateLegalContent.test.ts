@@ -36,4 +36,17 @@ describe("validateLegalContent", () => {
     expect(result.valid).toBe(false);
     expect(result.errors.some((err) => err.includes("unknown terms id"))).toBe(true);
   });
+
+  it("GUEST-080: reschedule policy and FAQ state date changes depend on the host and listing policy, with no day counts or percentage fees", () => {
+    const reschedPolicy = policySections.find((p) => p.id === "reschedules")!;
+    expect(reschedPolicy).toBeDefined();
+    const reschedFaq = faqItems.find((f) => f.id === "reschedule-options")!;
+    expect(reschedFaq).toBeDefined();
+
+    const combined = [reschedPolicy.summary, ...reschedPolicy.details, reschedFaq.answer].join("\n");
+    expect(combined).toMatch(/depend on the host and the listing's policy shown at booking/i);
+    expect(combined).not.toMatch(/\b(15|7|90)\s*days?\b/i);
+    expect(combined).not.toMatch(/7[–-]15/);
+    expect(combined).not.toMatch(/\d+\s*%/);
+  });
 });
