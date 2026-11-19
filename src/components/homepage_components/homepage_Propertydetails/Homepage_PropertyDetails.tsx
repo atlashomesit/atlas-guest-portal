@@ -84,6 +84,7 @@ import {
     resolveStaticMaxGuests,
 } from '../../../api/listingClient';
 import SEO from '../../SEO';
+import GuestGroupAndQuoteForms from '@/components/inquiries/GuestGroupAndQuoteForms';
 import StateMessage from '../../StateMessage';
 import { useMarketplaceListingUnavailable } from '@/hooks/useMarketplaceListingUnavailable';
 import MultiPinMap, { type MapPin } from '../../map/MultiPinMap';
@@ -3183,6 +3184,16 @@ useEffect(() => {
                     )}
                   </div>
                 )}
+
+                {/* GUEST-079: "Booking for a group?" and "Send me a quote" triggers */}
+                <GuestGroupAndQuoteForms
+                  listingId={resolvedListingId ?? data.listingId ?? data.id ?? null}
+                  listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name)}
+                  defaultCity={data.property_location || data.property_name}
+                  tenantSlug={effectiveTenantCtx?.slug ?? tenantSlugFromUrl ?? null}
+                  showGroupTrigger
+                  showQuoteTrigger
+                />
 
                 {/* Availability Calendar */}
                 {resolvedListingId && (
