@@ -83,24 +83,31 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
 }) => {
   const [isLoaded, setIsLoaded] = React.useState(false);
   const [loadFailed, setLoadFailed] = React.useState(false);
+  const [useFallbackToRaw, setUseFallbackToRaw] = React.useState(false);
   const safeSrc = React.useMemo(() => sanitizeGuestImageUrl(src), [src]);
   const displaySrc = React.useMemo(
-    () => (safeSrc ? toTransformedGuestImageUrl(safeSrc, 768) ?? safeSrc : undefined),
-    [safeSrc],
+    () => {
+      if (!safeSrc) return undefined;
+      if (useFallbackToRaw) return safeSrc;
+      return toTransformedGuestImageUrl(safeSrc, 768) ?? safeSrc;
+    },
+    [safeSrc, useFallbackToRaw],
   );
 
   React.useEffect(() => {
     setIsLoaded(false);
     setLoadFailed(false);
-  }, [displaySrc]);
+    setUseFallbackToRaw(false);
+  }, [src]);
 
   const computedSrcSet = React.useMemo(() => {
+    if (useFallbackToRaw) return undefined;
     if (srcSet != null) return srcSet;
     if (!safeSrc) return undefined;
     const blobSrcSet = buildGuestImageSrcSet(safeSrc);
     if (blobSrcSet) return blobSrcSet;
     return buildResponsiveSrcSet(safeSrc);
-  }, [srcSet, safeSrc]);
+  }, [srcSet, safeSrc, useFallbackToRaw]);
 
   const showPlaceholder = !safeSrc || loadFailed;
 
@@ -147,6 +154,10 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         fetchPriority={fetchPriority}
         loading={loading}
         onError={(event) => {
+          if (!useFallbackToRaw && safeSrc && displaySrc !== safeSrc) {
+            setUseFallbackToRaw(true);
+            return;
+          }
           setLoadFailed(true);
           props.onError?.(event);
         }}
