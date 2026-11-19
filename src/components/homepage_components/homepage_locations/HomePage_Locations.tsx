@@ -458,6 +458,17 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
                     loading={index < 3 ? "eager" : undefined}
                     fetchPriority={index === 0 ? "high" : undefined}
                     showSkeleton={false}
+                    onError={() => {
+                      if (photos.length > 1) {
+                        setActiveImageIndex((prev) => {
+                          const current = prev[model.listing.id] ?? 0;
+                          return {
+                            ...prev,
+                            [model.listing.id]: (current + 1) % photos.length,
+                          };
+                        });
+                      }
+                    }}
                   />
                   {photos.length > 1 && (
                     <div className="ahv2-card-dots" aria-hidden="true">
