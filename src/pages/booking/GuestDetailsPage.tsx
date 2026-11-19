@@ -1422,9 +1422,19 @@ const GuestDetailsPage: React.FC = () => {
         });
         if (!qres.ok) { rejectLinkCode(); return; }
         const q = (await qres.json()) as { valid?: boolean; message?: string; discountAmount?: number; totalReduction?: number };
-        if (!q.valid || !(Number(q.discountAmount) > 0)) { rejectLinkCode(); return; }
-        const discount = Number(q.discountAmount);
+        if (!q.valid) { rejectLinkCode(); return; }
+        const discount = Number(q.discountAmount) || 0;
         const reduction = Math.max(discount, Number(q.totalReduction) || 0);
+        // MKTG-027: a creator tracking-only code (0% discount) is still applied for attribution; price stays the same.
+        if (discount <= 0 && reduction <= 0) {
+          setPromoMessage(q.message || 'Promo code applied');
+          setAppliedPromoCode(code);
+          setServerPromoLocked(false);
+          setPromoDiscountAmount(0);
+          setLinkQuote({ discount: 0, reduction: 0 });
+          return;
+        }
+        if (!(discount > 0)) { rejectLinkCode(); return; }
         setPromoMessage(q.message || null);
         setAppliedPromoCode(code);
         setServerPromoLocked(false);
@@ -1912,13 +1922,20 @@ const GuestDetailsPage: React.FC = () => {
             setReferralDiscountAmount(Number(serverReferralDiscount) > 0 ? Number(serverReferralDiscount) : 0);
           }
           if (typeof serverPromoCode === 'string' && serverPromoCode.trim()) {
-            setAppliedPromoCode(serverPromoCode.trim());
+            const echoedPromo = serverPromoCode.trim();
+            setAppliedPromoCode(echoedPromo);
             setPromoDiscountAmount(Number(serverPromoDiscount) > 0 ? Number(serverPromoDiscount) : 0);
             setServerPromoLocked(true);
+            const expectedLinkReduction = linkQuote?.reduction ?? promoDiscountAmount;
             if (!(Number(serverPromoDiscount) > 0)) {
-              setLinkQuote(null);
-              setPromoMessage(`Promo ${serverPromoCode.trim()} could not be applied`);
-              setPromoOpen(true);
+              // MKTG-027: zero-discount tracking codes are recorded on the booking with no price change.
+              if (expectedLinkReduction > 0) {
+                setLinkQuote(null);
+                setPromoMessage(`Promo ${echoedPromo} could not be applied`);
+                setPromoOpen(true);
+              } else if (linkPromoActive) {
+                setLinkQuote({ discount: 0, reduction: 0 });
+              }
             }
           } else if (Number(serverPromoDiscount) > 0) {
             setServerPromoLocked(true);
