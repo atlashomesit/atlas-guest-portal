@@ -84,6 +84,8 @@ const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 const QrMenuPage = React.lazy(() => import("./pages/QrMenuPage"))
 // REV-046: the page a guest reaches by scanning the host's review QR code (`/rate/:tenantSlug/:code`).
 const ReviewQrPage = React.lazy(() => import("./pages/ReviewQrPage"))
+// ADMIN-166: Guest-facing held-rooms claim & checkout page (`/group/:token`)
+const GroupHoldBookingPage = React.lazy(() => import("./pages/GroupHoldBookingPage"))
 
 function LazyFallback() {
   // TASK-7822: 50vh left the site footer in the first desktop viewport. Home then
@@ -315,6 +317,8 @@ function AppWrapper() {
           <Route path="/property/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-singular-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Suspense fallback={<LazyFallback />}><Reserve /></Suspense>, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><BookingConfirmationPage /></Suspense>, "booking-confirmation-route")} />
+          {/* ADMIN-166: Shared group-hold room selection & claim page */}
+          <Route path="/group/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><GroupHoldBookingPage /></Suspense>, "group-hold-booking-route")} />
           {/* TASK-10299239: security-deposit hold page, reached from the pre-arrival message; authorised by the same booking-link token (?t=). */}
           <Route path="/booking/:bookingId/deposit" element={withBoundary(<Suspense fallback={<LazyFallback />}><SecurityDepositPage /></Suspense>, "security-deposit-route")} />
           <Route path="/check-in/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-route")} />
