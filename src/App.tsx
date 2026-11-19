@@ -54,6 +54,7 @@ const SearchPage = React.lazy(() => import("./pages/SearchPage"))
 const MarketplaceHomepage = React.lazy(() => import("./pages/MarketplaceHomepage"))
 const ShortLinkRedirect = React.lazy(() => import("./components/ShortLinkRedirect"))
 const LegacyHomeRoomRedirect = React.lazy(() => import("./pages/home/LegacyHomeRoomRedirect"))
+const TalkToUsVoiceWidget = React.lazy(() => import("./components/support/TalkToUsVoiceWidget"))
 const SupportWidget = React.lazy(() => import("./components/support/SupportWidget"))
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
@@ -363,6 +364,7 @@ function AppWrapper() {
         </main>
       </ErrorBoundary>
       {!shouldHideFooter && <div className={inlineHomeConsent ? "home-inline-support" : inlineReviewSupport ? "review-inline-support" : undefined}><Suspense fallback={null}><SupportWidget placement={inlineReviewSupport ? "inline" : location.pathname === '/search' ? "search" : "floating"} /></Suspense></div>}
+      {!shouldHideFooter && <Suspense fallback={null}><TalkToUsVoiceWidget /></Suspense>}
       {!shouldHideFooter && <Footer />}
       {!shouldHideFooter && !inlineHomeConsent && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />
