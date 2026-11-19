@@ -48,7 +48,7 @@ import { LiaNewspaper } from "react-icons/lia";
 import { MdOutlineEmojiFoodBeverage, MdOutlineLocalLaundryService, MdOutlineDone } from "react-icons/md";
 import { FaCcMastercard } from "react-icons/fa6";
 import { X, ShieldCheck, CalendarClock, CreditCard } from 'lucide-react';
-import { useEffect, useMemo, useState, Suspense, lazy } from 'react';
+import { useEffect, useMemo, useState, useCallback, Suspense, lazy } from 'react';
 import { useTenantListings } from '@/hooks/useTenantListings';
 import { usePropertyListings } from '@/hooks/usePropertyListings';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
@@ -613,6 +613,10 @@ const PropertyDetails = () => {
     }, [showAmenitiesModal]);
     const [showAboutMore, setShowAboutMore] = useState(false);
     const [showAllReviews, setShowAllReviews] = useState(false);
+    const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
+    const handlePhotoError = useCallback((failedUrl: string) => {
+      setFailedPhotos((prev) => ({ ...prev, [failedUrl]: true }));
+    }, []);
     /** TASK-102112: guest review star filter (null = All) + sort. Pure client-side —
         filtering/sorting re-renders the already-fetched cards instantly, no reload. */
     const [reviewStarFilter, setReviewStarFilter] = useState<number | null>(null);
@@ -1751,11 +1755,6 @@ useEffect(() => {
       const filename = cleanPath.split('/').pop() || cleanPath;
       return `https://atlashomestorage.blob.core.windows.net/atlas-media/atlas/${resolvedListingId}/${filename}`;
     };
-
-    const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
-    const handlePhotoError = useCallback((failedUrl: string) => {
-      setFailedPhotos((prev) => ({ ...prev, [failedUrl]: true }));
-    }, []);
 
     const rawGalleryUrls = filterGuestImageUrls(data?.property_img ?? []).map(buildAtlasMediaUrl);
     // Filter out photos that failed to load (e.g. 404 on Airbnb CDN)
