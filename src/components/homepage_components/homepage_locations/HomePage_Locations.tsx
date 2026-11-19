@@ -563,7 +563,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
           {allListingModels.map((model, index) => {
             const navigation = getListingNavigation(model);
-            const photos = model.images.slice(0, Math.min(model.images.length, 5));
+            const photos = model.images;
             const activeIndex = (activeImageIndex[model.listing.id] ?? 0) % Math.max(photos.length, 1);
             const imageSrc = photos[activeIndex] ?? model.images[0] ?? "";
             const cardTitle = getListingDisplayName(model.listing.id, model.listing.title);
