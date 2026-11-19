@@ -68,8 +68,8 @@ describe('GroupHoldBookingPage (ADMIN-166)', () => {
     );
 
     expect(await screen.findByText('Mehta Family Wedding')).toBeInTheDocument();
-    expect(screen.getByText('Lakeview Suite 101')).toBeInTheDocument();
-    expect(screen.getByText('Courtyard Room 102')).toBeInTheDocument();
+    expect(screen.getByTestId('group-room-card-11')).toHaveTextContent('Lakeview Suite 101');
+    expect(screen.getByTestId('group-room-card-12')).toHaveTextContent('Courtyard Room 102');
 
     // Pick Courtyard Room 102
     fireEvent.click(screen.getByTestId('group-room-card-12'));
