@@ -61,6 +61,7 @@ const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
 const SecurityDepositPage = React.lazy(() => import("./pages/SecurityDepositPage")) // TASK-10299239
 const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
+const LobbyCheckinLinkPage = React.lazy(() => import("./pages/LobbyCheckinLinkPage")) // HSL-031
 const HouseRulesAcceptPage = React.lazy(() => import("./pages/HouseRulesAcceptPage")) // TASK-guest-automation-phase3
 const YourBookingPage = React.lazy(() => import("./pages/YourBookingPage")) // TASK-10299444
 const PayLinkPage = React.lazy(() => import("./pages/PayLinkPage")) // PAY-016
@@ -324,6 +325,8 @@ function AppWrapper() {
           <Route path="/booking/:bookingId/deposit" element={withBoundary(<Suspense fallback={<LazyFallback />}><SecurityDepositPage /></Suspense>, "security-deposit-route")} />
           <Route path="/check-in/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-route")} />
           <Route path="/check-in" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-noparam-route")} />
+          {/* HSL-031: lobby poster page, opened from the QR on the printed poster; holds nothing private. */}
+          <Route path="/lobby/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><LobbyCheckinLinkPage /></Suspense>, "lobby-checkin-link-route")} />
           {/* GUEST-052: Unhyphenated /checkin aliases preserving query params (?t=...) */}
           <Route path="/checkin/:bookingRef" element={withBoundary(<CheckinBookingRefAliasRedirect />, "self-checkin-alias-ref-route")} />
           <Route path="/checkin" element={withBoundary(<CheckinAliasRedirect />, "self-checkin-alias-route")} />
