@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import GroupHoldBookingPage from '../GroupHoldBookingPage';
+import { settle } from '../../test/settle';
 
 describe('GroupHoldBookingPage (ADMIN-166)', () => {
   const originalFetch = globalThis.fetch;
@@ -67,7 +68,8 @@ describe('GroupHoldBookingPage (ADMIN-166)', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('Mehta Family Wedding')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText('Mehta Family Wedding')).toBeInTheDocument();
     expect(screen.getByTestId('group-room-card-11')).toHaveTextContent('Lakeview Suite 101');
     expect(screen.getByTestId('group-room-card-12')).toHaveTextContent('Courtyard Room 102');
 
@@ -77,9 +79,8 @@ describe('GroupHoldBookingPage (ADMIN-166)', () => {
     fireEvent.change(screen.getByTestId('group-claim-phone'), { target: { value: '9876543210' } });
     fireEvent.click(screen.getByTestId('group-claim-submit'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('booking-dest')).toHaveTextContent('Reached booking 555');
-    });
+    await settle();
+    expect(screen.getByTestId('booking-dest')).toHaveTextContent('Reached booking 555');
   });
 
   it('shows "Someone just booked this room. Pick another" on 409 room conflict', async () => {
@@ -123,12 +124,14 @@ describe('GroupHoldBookingPage (ADMIN-166)', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('Coorg Reunion')).toBeInTheDocument();
+    await settle();
+    expect(screen.getByText('Coorg Reunion')).toBeInTheDocument();
     fireEvent.change(screen.getByTestId('group-claim-name'), { target: { value: 'Priya Nair' } });
     fireEvent.change(screen.getByTestId('group-claim-phone'), { target: { value: '9123456789' } });
     fireEvent.click(screen.getByTestId('group-claim-submit'));
 
-    expect(await screen.findByTestId('group-hold-error')).toHaveTextContent(
+    await settle();
+    expect(screen.getByTestId('group-hold-error')).toHaveTextContent(
       'Someone just booked this room. Pick another',
     );
   });
@@ -176,7 +179,8 @@ describe('GroupHoldBookingPage (ADMIN-166)', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByTestId('group-hold-all-booked')).toHaveTextContent(
+    await settle();
+    expect(screen.getByTestId('group-hold-all-booked')).toHaveTextContent(
       'All rooms in this group are booked',
     );
     unmount();
@@ -189,7 +193,8 @@ describe('GroupHoldBookingPage (ADMIN-166)', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByTestId('group-hold-ended')).toHaveTextContent(
+    await settle();
+    expect(screen.getByTestId('group-hold-ended')).toHaveTextContent(
       'This group link has ended',
     );
   });

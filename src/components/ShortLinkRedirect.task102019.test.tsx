@@ -84,7 +84,7 @@ describe("TASK-102019: ShortLinkRedirect tenant slug resolution", () => {
           json: () => Promise.resolve([]),
         });
       }
-      if (urlStr.includes("/tenants/public/fresh-host")) {
+      if (urlStr.includes("/tenants/fresh-host/public")) {
         return Promise.resolve({
           ok: true,
           status: 200,

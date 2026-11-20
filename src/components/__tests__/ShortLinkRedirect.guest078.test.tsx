@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ShortLinkRedirect from '../ShortLinkRedirect';
+import { settle } from '../../test/settle';
 
 describe('ShortLinkRedirect (GUEST-078)', () => {
   const originalFetch = globalThis.fetch;
@@ -47,9 +48,8 @@ describe('ShortLinkRedirect (GUEST-078)', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('/?tenant=new-host')).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByText('/?tenant=new-host')).toBeInTheDocument();
 
     const calledUrls = fetchMock.mock.calls.map((c) => String(c[0]));
     expect(calledUrls.some((u) => u.endsWith('/tenants/new-host/public'))).toBe(true);
