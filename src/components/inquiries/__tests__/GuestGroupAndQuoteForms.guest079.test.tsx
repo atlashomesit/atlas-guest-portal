@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import GuestGroupAndQuoteForms from '../GuestGroupAndQuoteForms';
+import { settle } from '../../../test/settle';
 
 describe('GuestGroupAndQuoteForms (GUEST-079)', () => {
   const originalFetch = globalThis.fetch;
@@ -35,7 +36,8 @@ describe('GuestGroupAndQuoteForms (GUEST-079)', () => {
 
     // Submit empty to trigger client validation
     fireEvent.click(screen.getByTestId('group-inquiry-submit'));
-    expect(await screen.findByTestId('guest-inquiry-error')).toHaveTextContent(
+    await settle();
+    expect(screen.getByTestId('guest-inquiry-error')).toHaveTextContent(
       'Please select a check-in date.',
     );
     expect(fetchMock).not.toHaveBeenCalled();
@@ -62,11 +64,10 @@ describe('GuestGroupAndQuoteForms (GUEST-079)', () => {
 
     fireEvent.click(screen.getByTestId('group-inquiry-submit'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('guest-inquiry-success')).toHaveTextContent(
-        'Your enquiry has been sent to the host.',
-      );
-    });
+    await settle();
+    expect(screen.getByTestId('guest-inquiry-success')).toHaveTextContent(
+      'Your enquiry has been sent to the host.',
+    );
     expect(screen.getByTestId('guest-inquiry-success').textContent).not.toContain('within 2 hours');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -106,7 +107,8 @@ describe('GuestGroupAndQuoteForms (GUEST-079)', () => {
 
     // Missing name validation
     fireEvent.click(screen.getByTestId('quote-lead-submit'));
-    expect(await screen.findByTestId('guest-inquiry-error')).toHaveTextContent(
+    await settle();
+    expect(screen.getByTestId('guest-inquiry-error')).toHaveTextContent(
       'Please enter your name.',
     );
 
@@ -122,11 +124,10 @@ describe('GuestGroupAndQuoteForms (GUEST-079)', () => {
 
     fireEvent.click(screen.getByTestId('quote-lead-submit'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('guest-inquiry-success')).toHaveTextContent(
-        'Your enquiry has been sent to the host.',
-      );
-    });
+    await settle();
+    expect(screen.getByTestId('guest-inquiry-success')).toHaveTextContent(
+      'Your enquiry has been sent to the host.',
+    );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [calledUrl, calledInit] = fetchMock.mock.calls[0];
@@ -175,13 +176,15 @@ describe('GuestGroupAndQuoteForms (GUEST-079)', () => {
 
     // 429 response
     fireEvent.click(screen.getByTestId('quote-lead-submit'));
-    expect(await screen.findByTestId('guest-inquiry-error')).toHaveTextContent(
+    await settle();
+    expect(screen.getByTestId('guest-inquiry-error')).toHaveTextContent(
       'Too many requests. Please wait a moment and try again.',
     );
 
     // 400 response
     fireEvent.click(screen.getByTestId('quote-lead-submit'));
-    expect(await screen.findByTestId('guest-inquiry-error')).toHaveTextContent(
+    await settle();
+    expect(screen.getByTestId('guest-inquiry-error')).toHaveTextContent(
       'Listing does not belong to this host.',
     );
   });
