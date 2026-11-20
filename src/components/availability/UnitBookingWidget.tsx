@@ -65,6 +65,7 @@ import { fetchSisterAvailability, type SisterSpillover } from '@/api/sisterAvail
 import SisterPropertySpillover from './SisterPropertySpillover';
 import HostelDormBadge from '../hostel/HostelDormBadge';
 import { bedsLeftForNights, isHostelDormType, type DormGenderPolicy } from '@/utils/dormListing';
+import { guestCapacityHint, guestCapacityMismatchMessage } from '@/utils/guestCapacityHint';
 import { track } from '@/lib/events'; // TASK-1480
 import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
@@ -145,6 +146,8 @@ export interface UnitBookingWidgetProps {
   priceChangesWithGuests?: boolean | null;
   /** Custom small-party hint text. Defaults to "Special rate available for 1-2 guests". */
   smallPartyHint?: string | null;
+  /** GUEST-066: listing type label from the API (e.g. "4 BHK") for capacity mismatch hint. */
+  listingType?: string | null;
 }
 
 export type BookingStickySummary = {
@@ -292,6 +295,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   extraGuestRate = null,
   priceChangesWithGuests = null,
   smallPartyHint,
+  listingType = null,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -577,6 +581,18 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const effectiveMaxGuests = maxGuests;
   // HSL-011: a HostelDorm sells BEDS. The type comes from the listing API only (never the listing name).
   const isDorm = isHostelDormType(accommodationType);
+  const capacityMismatch = useMemo(
+    () =>
+      !isDorm
+        ? guestCapacityHint({
+            maxGuests: effectiveMaxGuests,
+            listingType,
+            listingName,
+            accommodationType,
+          })
+        : null,
+    [isDorm, effectiveMaxGuests, listingType, listingName, accommodationType],
+  );
   const dormBedsLeft = useMemo(() => {
     if (!isDorm || !dateRange.startDate || !dateRange.endDate) return null;
     const nights: string[] = [];
@@ -2764,6 +2780,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
+        {!isDorm && capacityMismatch != null && (
+          <p
+            role="status"
+            data-testid="bw-capacity-mismatch-hint"
+            style={{ marginTop: 8, fontSize: 12, lineHeight: 1.45, color: 'var(--text-muted, #6b5a55)' }}
+          >
+            {guestCapacityMismatchMessage(capacityMismatch)}
+          </p>
+        )}
         {/* TASK-10299183: small-party discount hint when small-party pricing is configured and guest count qualifies (1-2 guests) */}
         {showSmallPartyHint && (
           <div
