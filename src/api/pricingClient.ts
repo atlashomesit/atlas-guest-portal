@@ -263,6 +263,51 @@ export type RatePlanPackageDto = {
   items: RatePlanPackageInclusionDto[];
 };
 
+function mapRatePlanPackageInclusion(raw: Record<string, unknown>): RatePlanPackageInclusionDto {
+  const addOnRaw = raw.addOnServiceId ?? raw.AddOnServiceId;
+  return {
+    addOnServiceId:
+      addOnRaw !== undefined && addOnRaw !== null && Number.isFinite(Number(addOnRaw))
+        ? Number(addOnRaw)
+        : null,
+    label: String(raw.label ?? raw.Label ?? '').trim(),
+    basis: String(raw.basis ?? raw.Basis ?? 'per_stay').trim() || 'per_stay',
+    quantity: Math.max(0, Number(raw.quantity ?? raw.Quantity ?? 1) || 0),
+  };
+}
+
+/** MRP-041: map stay-package details from a public rate-plan row (camelCase or PascalCase). */
+export function mapRatePlanPackageDto(raw: unknown): RatePlanPackageDto | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const title = String(o.title ?? o.Title ?? '').trim();
+  if (!title) return null;
+  const itemsRaw = o.items ?? o.Items;
+  const items = Array.isArray(itemsRaw)
+    ? itemsRaw
+        .filter((row): row is Record<string, unknown> => row != null && typeof row === 'object')
+        .map((row) => mapRatePlanPackageInclusion(row))
+        .filter((item) => item.label.length > 0)
+    : [];
+  const descriptionRaw = o.description ?? o.Description;
+  const photoIdRaw = o.photoId ?? o.PhotoId;
+  const photoUrlRaw = o.photoUrl ?? o.PhotoUrl;
+  const stayFromRaw = o.stayFrom ?? o.StayFrom;
+  const stayToRaw = o.stayTo ?? o.StayTo;
+  return {
+    title,
+    description: typeof descriptionRaw === 'string' && descriptionRaw.trim() ? descriptionRaw.trim() : null,
+    photoId:
+      photoIdRaw !== undefined && photoIdRaw !== null && Number.isFinite(Number(photoIdRaw))
+        ? Number(photoIdRaw)
+        : null,
+    photoUrl: typeof photoUrlRaw === 'string' && photoUrlRaw.trim() ? photoUrlRaw.trim() : null,
+    stayFrom: typeof stayFromRaw === 'string' && stayFromRaw.trim() ? stayFromRaw.trim() : null,
+    stayTo: typeof stayToRaw === 'string' && stayToRaw.trim() ? stayToRaw.trim() : null,
+    items,
+  };
+}
+
 /**
  * MRP-002: Fetch active public rate plans for a listing (and optional date range + guest count).
  */
@@ -326,6 +371,7 @@ export async function fetchPublicListingRatePlans(
         const q = r.guestQuote ?? r.GuestQuote;
         return q && typeof q === 'object' ? mapGuestPriceBreakdown(q as Record<string, unknown>) : null;
       })(),
+      package: mapRatePlanPackageDto(r.package ?? r.Package),
     };
   });
 }
