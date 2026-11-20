@@ -63,6 +63,17 @@ describe('GUEST-059: one cancellation answer per rate plan', () => {
   });
 });
 
+describe('GUEST-080: reschedule copy has no invented fee schedule', () => {
+  it('policies and FAQ defer date changes to the host and listing policy (no day counts or percent fees)', () => {
+    const reschedPolicy = policySections.find((s) => s.id === 'reschedules')!;
+    const text = [reschedPolicy.summary, ...reschedPolicy.details].join('\n');
+    expect(text).toMatch(/depend on the host and the listing's policy shown at booking/i);
+    expect(text).not.toMatch(/\b(15|7|90)\s*days?\b/i);
+    expect(text).not.toMatch(/7[–-]15/);
+    expect(text).not.toMatch(/\d+\s*%/);
+  });
+});
+
 describe('GUEST-060: included guests line', () => {
   const inr = (n: number) => `₹${n}`;
   it('names the included count and the extra-guest rate for the host that set them', () => {
