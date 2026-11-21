@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { buildApiUrl, getApiHeaders } from "../api/client";
-import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy";
 import { Camera, CheckCircle2, KeyRound, Wifi, ShieldCheck, ArrowRight, RotateCcw, AlertTriangle } from "lucide-react";
 
 interface KioskBookingDetails {
@@ -23,7 +22,6 @@ type KioskStep = "welcome" | "lookup" | "id-scan" | "house-rules" | "pass";
 
 export default function KioskCheckIn() {
   const { bookingRef: routeRef } = useParams<{ bookingRef?: string }>();
-  const navigate = useNavigate();
 
   const [step, setStep] = useState<KioskStep>(routeRef ? "lookup" : "welcome");
   const [refInput, setRefInput] = useState(routeRef || "");
@@ -35,7 +33,6 @@ export default function KioskCheckIn() {
   // ID capture state
   const [capturedBlob, setCapturedBlob] = useState<Blob | null>(null);
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
-  const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -117,7 +114,6 @@ export default function KioskCheckIn() {
   // Camera handling
   const startCamera = async () => {
     try {
-      setCameraActive(true);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
       });
@@ -127,7 +123,7 @@ export default function KioskCheckIn() {
         await videoRef.current.play();
       }
     } catch {
-      setCameraActive(false);
+      // Camera unavailable or denied; user can still see the ID scan screen
     }
   };
 
@@ -136,7 +132,6 @@ export default function KioskCheckIn() {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
-    setCameraActive(false);
   };
 
   const capturePhoto = () => {
