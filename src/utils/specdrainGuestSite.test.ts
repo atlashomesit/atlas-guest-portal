@@ -7,6 +7,7 @@ import {
 import { describeIncludedGuests, readIncludedGuestFields } from './includedGuests';
 import { collectListingCities, formatCityList, resolveHomesPlace } from './listingCities';
 import { keepSimilarStaysInSameCity } from './marketplaceBackHref';
+import { resolveDirectBookingPromo } from './directBookingPromo';
 import { policySections } from '../content/legal/policies';
 import { termsSections } from '../content/legal/terms';
 
@@ -60,6 +61,36 @@ describe('GUEST-059: one cancellation answer per rate plan', () => {
     expect(text).not.toMatch(/15 days|7–15|100% refund|50% refund|full refund/i);
     expect(text).toMatch(/listing/i);
     expect(text).toMatch(/contact the host/i);
+  });
+});
+
+describe('GUEST-063: best rates only when the add-on fee is known to be 0', () => {
+  it('defaults to neutral copy when the fee applies, is unknown, or the tenant is marketplace root', () => {
+    const withFee = resolveDirectBookingPromo(null, {}, 3);
+    expect(withFee.headline).toBe('Book direct with the host');
+    expect(withFee.headline).not.toMatch(/best rates/i);
+
+    const unknown = resolveDirectBookingPromo(null, {}, null);
+    expect(unknown.headline).toBe('Book direct with the host');
+
+    const marketplace = resolveDirectBookingPromo({ isMarketplaceRoot: true } as never, {}, 0);
+    expect(marketplace.headline).toBe('Book direct with the host');
+  });
+
+  it('allows best rates only when the fee is known to be 0 on a host site', () => {
+    const zero = resolveDirectBookingPromo(null, {}, 0);
+    expect(zero.headline).toBe('Book direct — best rates on our official site');
+  });
+});
+
+describe('GUEST-080: reschedule copy has no invented fee schedule', () => {
+  it('policies and FAQ defer date changes to the host and listing policy (no day counts or percent fees)', () => {
+    const reschedPolicy = policySections.find((s) => s.id === 'reschedules')!;
+    const text = [reschedPolicy.summary, ...reschedPolicy.details].join('\n');
+    expect(text).toMatch(/depend on the host and the listing's policy shown at booking/i);
+    expect(text).not.toMatch(/\b(15|7|90)\s*days?\b/i);
+    expect(text).not.toMatch(/7[–-]15/);
+    expect(text).not.toMatch(/\d+\s*%/);
   });
 });
 

@@ -143,7 +143,11 @@ describe('BookingCoverPreview - GUEST-048 (b): no empty pink block above the dat
   it('renders nothing at all when the picture fails (no placeholder box)', async () => {
     const { BookingCoverPreview } = await import('./UnitBookingWidget');
     render(<BookingCoverPreview src="https://atlashomestorage.blob.core.windows.net/media/a.jpg" alt="Cover" />);
-    await act(async () => { fireEvent.error(screen.getByTestId('bw-cover-preview').querySelector('img') as HTMLImageElement); });
+    const img = () => screen.getByTestId('bw-cover-preview').querySelector('img') as HTMLImageElement;
+    await act(async () => { fireEvent.error(img()); });
+    await settle();
+    await act(async () => { fireEvent.error(img()); });
+    await settle();
     expect(screen.queryByTestId('bw-cover-preview')).toBeNull();
   });
 });
