@@ -276,6 +276,7 @@ export default function SelfCheckIn() {
   const { bookingRef: urlRef } = useParams<{ bookingRef: string }>();
   const [searchParams] = useSearchParams();
   const token = (searchParams.get("t") ?? searchParams.get("token") ?? "").trim();
+  const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
 
   const [bookingRef, setBookingRef] = useState(urlRef ?? "");
   const [lastName, setLastName] = useState("");
@@ -820,7 +821,6 @@ export default function SelfCheckIn() {
     setBusy(true);
     setError("");
     try {
-      const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
       const url = buildApiUrl(
         `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/damage-waiver?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`
       );
@@ -859,7 +859,6 @@ export default function SelfCheckIn() {
       if (effectiveTypedName) form.append("typedName", effectiveTypedName);
       if (payload.signatureBlob) form.append("signatureBlob", payload.signatureBlob, "signature.png");
 
-      const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
       const res = await fetch(
         buildApiUrl(
           `/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/damage-waiver/sign?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`
@@ -913,7 +912,6 @@ export default function SelfCheckIn() {
     setBusy(true);
     setError("");
     try {
-      const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
       const url = buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`);
       const res = await fetch(url, { headers: getApiHeaders() });
       if (res.status === 404) {
@@ -985,7 +983,6 @@ export default function SelfCheckIn() {
     try {
       // TASK-4346: Upload ID document if provided
       let idDocumentUrl: string | null = null;
-      const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
       const primaryFile = guests[0]?.idFile || idFile;
       if (primaryFile) {
         const formData = new FormData();
