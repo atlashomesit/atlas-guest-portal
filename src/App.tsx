@@ -61,6 +61,7 @@ const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
 const SecurityDepositPage = React.lazy(() => import("./pages/SecurityDepositPage")) // TASK-10299239
 const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
+const KioskCheckIn = React.lazy(() => import("./pages/KioskCheckIn"))
 const HouseRulesAcceptPage = React.lazy(() => import("./pages/HouseRulesAcceptPage")) // TASK-guest-automation-phase3
 const YourBookingPage = React.lazy(() => import("./pages/YourBookingPage")) // TASK-10299444
 const PayLinkPage = React.lazy(() => import("./pages/PayLinkPage")) // PAY-016
@@ -199,11 +200,13 @@ function AppWrapper() {
   const isQrMenuRoute = Boolean(matchPath('/qr-menu/:tenantSlug', location.pathname));
   // REV-046: the review QR page is a standalone, one-screen page (no navbar, footer, support widget or cookie banner).
   const isReviewQrRoute = Boolean(matchPath('/rate/:tenantSlug/:code', location.pathname));
+  // KIOSK: Standalone touchscreen lobby terminal — hide navbar, footer, support widget and cookie banner.
+  const isKioskRoute = Boolean(matchPath('/kiosk/:bookingRef', location.pathname)) || Boolean(matchPath('/kiosk', location.pathname));
 
-  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || hideNavbarRoutes.some((pattern) =>
+  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || isKioskRoute || hideNavbarRoutes.some((pattern) =>
     Boolean(matchPath(pattern, location.pathname))
   );
-  const shouldHideFooter = isEmbedRoute || isQrMenuRoute || isReviewQrRoute;
+  const shouldHideFooter = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || isKioskRoute;
   // Classic tenant home owns the inline consent region immediately after its search.
   // Other themes/routes keep the global consent banner; no tenant resolution changes.
   const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
@@ -324,6 +327,9 @@ function AppWrapper() {
           <Route path="/booking/:bookingId/deposit" element={withBoundary(<Suspense fallback={<LazyFallback />}><SecurityDepositPage /></Suspense>, "security-deposit-route")} />
           <Route path="/check-in/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-route")} />
           <Route path="/check-in" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-noparam-route")} />
+          {/* KIOSK: Freestanding lobby terminal check-in routes */}
+          <Route path="/kiosk/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><KioskCheckIn /></Suspense>, "kiosk-ref-route")} />
+          <Route path="/kiosk" element={withBoundary(<Suspense fallback={<LazyFallback />}><KioskCheckIn /></Suspense>, "kiosk-route")} />
           {/* GUEST-052: Unhyphenated /checkin aliases preserving query params (?t=...) */}
           <Route path="/checkin/:bookingRef" element={withBoundary(<CheckinBookingRefAliasRedirect />, "self-checkin-alias-ref-route")} />
           <Route path="/checkin" element={withBoundary(<CheckinAliasRedirect />, "self-checkin-alias-route")} />

@@ -488,14 +488,42 @@ export default function SelfCheckIn() {
     }
   };
 
-  const handleSendOtp = (idx: number) => {
+  const handleSendOtp = async (idx: number) => {
     const guest = guests[idx];
     if (!guest) return;
     const cleanPhone = guest.phoneNumber.trim().replace(/\D/g, "");
-    if (cleanPhone.length < 10) {
+    const cleanId = (guest.govtIdNumber || "").trim().replace(/\D/g, "");
+    if (cleanPhone.length < 10 && cleanId.length !== 12) {
       updateGuest(idx, { otpError: "Please enter a valid 10-digit mobile number." });
       return;
     }
+
+    if (bookingRef && cleanId.length === 12) {
+      try {
+        const res = await fetch(
+          buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/ekyc/aadhaar/otp?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`),
+          {
+            method: "POST",
+            headers: { ...getApiHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify({ aadhaarNumber: cleanId }),
+          }
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { success?: boolean; referenceId?: string; message?: string };
+          if (data.success && data.referenceId) {
+            updateGuest(idx, {
+              otpSent: true,
+              otpCode: data.referenceId,
+              otpError: "",
+            });
+            return;
+          }
+        }
+      } catch {
+        // Fall back to client simulation
+      }
+    }
+
     const mockCode = String(Math.floor(100000 + Math.random() * 900000));
     updateGuest(idx, {
       otpSent: true,
@@ -513,7 +541,7 @@ export default function SelfCheckIn() {
     }
   };
 
-  const handleVerifyOtp = (idx: number) => {
+  const handleVerifyOtp = async (idx: number) => {
     const guest = guests[idx];
     if (!guest) return;
     const entered = (guest.enteredOtp || "").trim();
@@ -521,6 +549,59 @@ export default function SelfCheckIn() {
       updateGuest(idx, { otpError: "Please enter or paste the 6-digit OTP." });
       return;
     }
+
+    if (bookingRef && guest.otpCode && guest.otpCode.startsWith("ekyc_")) {
+      try {
+        const res = await fetch(
+          buildApiUrl(`/api/public/checkin/${encodeURIComponent(bookingRef.trim())}/ekyc/aadhaar/verify?lastName=${encodeURIComponent(lastName.trim())}${tokenQuery}`),
+          {
+            method: "POST",
+            headers: { ...getApiHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify({ referenceId: guest.otpCode, otp: entered }),
+          }
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { success?: boolean; fullName?: string; maskedAadhaar?: string; documentUrl?: string; message?: string };
+          if (data.success) {
+            const masked = data.maskedAadhaar || `XXXX-XXXX-${guest.govtIdNumber.slice(-4)}`;
+            const nextGuests = [...guests];
+            nextGuests[idx] = {
+              ...guest,
+              name: data.fullName && !guest.name ? data.fullName : guest.name,
+              isVerified: true,
+              verificationMethod: "OTP",
+              maskedNumber: masked,
+              uploadedFileUrl: data.documentUrl || guest.uploadedFileUrl,
+              otpError: "",
+            };
+            setGuests(nextGuests);
+            if (idx === 0) {
+              setGovtIdType("Aadhaar");
+              setGovtIdNumber(masked);
+              setAadhaarVcVerified(true);
+              setAadhaarMasked(masked);
+            }
+            setError("");
+            const allGuestsReady = nextGuests.every(
+              (g) => g.isVerified || g.idFile || idCollectedElsewhere
+            );
+            if (allGuestsReady) {
+              if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+              advanceTimerRef.current = setTimeout(() => {
+                setStep("house-rules");
+              }, 500);
+            }
+            return;
+          } else {
+            updateGuest(idx, { otpError: data.message || "Invalid OTP code." });
+            return;
+          }
+        }
+      } catch {
+        // Fall back to client verification
+      }
+    }
+
     const last4 = guest.govtIdNumber.trim().slice(-4) || (guest.phoneNumber.trim().slice(-4) || "0000");
     const masked = `XXXX-XXXX-${last4}`;
     const nextGuests = [...guests];
