@@ -33,6 +33,7 @@ export type TenantPropertyRecord = {
   /** Unit/listing name (`dto.name`). Historically misnamed — NOT the property name. */
   property_name?: string;
   property_description?: string;
+  property_price?: number;
   property_location?: string;
   propertyAddress?: string | null;
   property_neighborhoods?: string[];
@@ -277,7 +278,10 @@ export function _clearTenantListingsCacheForTests(): void {
 export function useTenantListings(): UseTenantListings {
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
-  const onlyApi = overrides.onlyApiListings === true;
+  // TASK-1040186: only the Atlas Homes storefront (no tenant, or slug atlas/marketplace) may show the bundled catalog.
+  const slug = tenant?.slug;
+  const isAtlasStorefront = !slug || slug === "atlas" || slug === "marketplace";
+  const onlyApi = overrides.onlyApiListings === true || !isAtlasStorefront;
   const filteredFallback = onlyApi ? [] : FALLBACK_PROPERTIES;
   const filteredListings = onlyApi ? [] : FALLBACK_LISTINGS;
   const tenantKey = tenant?.slug ?? "";

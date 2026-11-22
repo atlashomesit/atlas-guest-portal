@@ -22,6 +22,7 @@ import { resolveEffectiveListingAddress } from "../utils/listingAddress";
 import { LoadingState } from "../components/LoadingState";
 import ErrorBanner from "../components/ErrorBanner"; // TASK-7195
 import SEO from "../components/SEO"; // TASK-4290
+import GuestGroupAndQuoteForms from "../components/inquiries/GuestGroupAndQuoteForms";
 import { SupportTriggerSlot } from "../components/support-drawer/SupportTriggerSlot";
 import OptimizedImage from "../components/ui/OptimizedImage";
 import OwnerShareBadge from "../components/OwnerShareBadge"; // TASK-1705
@@ -2230,6 +2231,17 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
         onClose={() => setImageSearchOpen(false)}
         onResults={handleImageSearchResults}
       />
+      <div className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+        <GuestGroupAndQuoteForms
+          defaultCity={searchParams.get("city") || searchParams.get("q") || ""}
+          defaultCheckIn={checkInParam || ""}
+          defaultCheckOut={checkOutParam || ""}
+          defaultGuests={guests}
+          tenantSlug={getTenantContext()?.slug ?? null}
+          showGroupTrigger
+          showQuoteTrigger={false}
+        />
+      </div>
     </div>
   );
 };

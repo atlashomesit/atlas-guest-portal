@@ -36,12 +36,11 @@ export const policySections: PolicySection[] = [
     id: "reschedules",
     title: "Reschedules & Date Changes",
     summary:
-      "Date changes depend on availability and may incur fees or rate differences; new tariffs apply to the revised dates.",
+      "Date changes depend on the host and the listing's policy shown at booking, subject to availability for the revised dates.",
     details: [
-      "One complimentary date change may be available when requested more than 15 days before arrival, subject to availability within 90 days of the original date.",
-      "Date changes 7–15 days before arrival may incur a reschedule fee up to 25% of the booking value, plus any higher tariff differences.",
-      "Within 7 days of arrival, date changes are treated as cancellations and follow the cancellation policy.",
-      "Higher tariff dates (weekends/holidays) are charged at prevailing rates; lower tariff differences are not refunded unless mandated by law.",
+      "Date changes depend on the host and the listing's policy shown at booking (as agreed with your host and the listing's policy).",
+      "You can request a date change from your booking page or by contacting your host; changes are subject to availability for the requested dates.",
+      "Where the revised dates carry a higher nightly tariff, any rate difference applies as agreed with your host and the listing's policy.",
     ],
     termsRefs: ["cancellations-refunds", "booking-payments"],
   },

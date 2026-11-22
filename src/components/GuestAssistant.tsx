@@ -197,7 +197,8 @@ export default function GuestAssistant({ listingId, tenantSlug, tenantId }: Gues
           ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(true)}
-          aria-label="View frequently asked questions"
+          data-testid="guest-faq-trigger"
+          aria-label="FAQs — View frequently asked questions"
           className={[
             'fixed left-4 z-[var(--z-floating)]',
             // On mobile clear the reserve bar (~56 px); on md+ use standard 20 px gap

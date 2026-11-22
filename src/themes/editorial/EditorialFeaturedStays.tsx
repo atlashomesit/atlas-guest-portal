@@ -14,8 +14,8 @@
  * (AGENTS.md "Theme ≠ integration" HARD RULE), same reuse set `coastal/ListingsGallery.tsx`
  * (TASK-4907) already established:
  *   - `useTenantListings()` — the same shared listing-data hook every other layout uses.
- *   - `calculateNightlyPrice`/`inferUnitType` — the same shared pricing utility functions
- *     `HomePage_Locations` itself calls (not reimplemented).
+ *   - `useHomeCardPriceLines()` — the same quote hook the default grid reads (GUEST-065 item 1: the live
+ *     price for the dates the guest picked, else "See the price for your dates"; never a static rate).
  *   - `getPropertySlug`/`buildHomeUnitPath` — the same shared navigation utilities.
  *   - `OptimizedImage` — the shared responsive-image component.
  * No new data-fetching path, no new pricing formula, no new booking/payment code. The
@@ -33,14 +33,13 @@
  */
 import { Link } from "react-router-dom";
 import { useTenantListings, type TenantPropertyRecord } from "../../hooks/useTenantListings";
-import { calculateNightlyPrice, inferUnitType } from "../../utils/pricing";
 import { getPropertySlug, buildHomeUnitPath } from "../../utils/navigation";
 import { getListingDisplayName } from "../../lib/listingDisplayName";
 import { getPropertyDesignImage } from "../../config/branding";
 import { sanitizeGuestImageUrl, filterGuestImageUrls } from "../../utils/guestImageUrl";
 import { getUnitNoun, getTenantOverrides } from "../../tenant/tenantOverrides";
 import { getTenantContext } from "../../tenant/tenantContext";
-import { useCurrency } from "../../contexts/CurrencyContext";
+import { useHomeCardPriceLines } from "../../hooks/useHomeCardPriceLines";
 import OptimizedImage from "../../components/ui/OptimizedImage";
 import { repairMojibake } from "../../utils/textUtils";
 
@@ -50,18 +49,6 @@ const resolveCoverImage = (property: TenantPropertyRecord): string => {
   return sanitizeGuestImageUrl(getPropertyDesignImage(property.id)) ?? getPropertyDesignImage(property.id);
 };
 
-const resolvePrice = (property: TenantPropertyRecord): number | null => {
-  try {
-    const breakdown = calculateNightlyPrice({
-      unitType: inferUnitType(property),
-      checkInDate: new Date(),
-    });
-    return breakdown.finalNightlyPrice;
-  } catch {
-    return null;
-  }
-};
-
 // Short, story-flavoured standing copy per feature "chapter" — content, not logic (same
 // static-copy convention `classic`/`coastal`'s WHY_DIRECT_ITEMS already establish).
 const CHAPTER_DEK =
@@ -69,7 +56,7 @@ const CHAPTER_DEK =
 
 const EditorialFeaturedStays = () => {
   const { properties } = useTenantListings();
-  const { format: formatCurrency } = useCurrency();
+  const priceLineFor = useHomeCardPriceLines(properties);
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
   const unitNoun = getUnitNoun(overrides);
@@ -100,7 +87,7 @@ const EditorialFeaturedStays = () => {
             });
             const path = Number.isFinite(listingId) ? buildHomeUnitPath(slug, listingId) : "#";
             const title = getListingDisplayName(property.id, property.property_name);
-            const price = resolvePrice(property);
+            const priceLine = priceLineFor(property);
             const isReversed = index % 2 === 1;
 
             return (
@@ -130,9 +117,9 @@ const EditorialFeaturedStays = () => {
                     <p className="editorial-chapter-description">{repairMojibake(property.property_description)}</p>
                   )}
                   <div className="editorial-chapter-footer">
-                    {price != null && (
-                      <span className="editorial-chapter-price">{formatCurrency(price)} / night</span>
-                    )}
+                    <span className="editorial-chapter-price" data-testid={priceLine.testId}>
+                      {priceLine.text}
+                    </span>
                     <Link to={path} className="editorial-chapter-cta" aria-label={`Read the stay: ${title}`}>
                       Read the stay &rarr;
                     </Link>

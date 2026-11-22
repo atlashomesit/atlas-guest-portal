@@ -1,7 +1,9 @@
 /**
- * GUEST-065 — a home card with no dates picked shows tonight's price. A home that is SOLD tonight must not say
- * "/ night tonight": it says it is booked, when it is next open, and where to see a price. No number is shown
- * for a night the guest cannot book. A home open tonight, or a failed availability ask, keeps the old card.
+ * GUEST-065 — a home card with no dates picked shows NO price (founder ruling 2026-11-19, item 1: it supersedes the
+ * 2026-10-21 "show tonight's real price" rule for this card). The card says "See the price for your dates" and carries no
+ * rupee amount, no "/ night tonight" and no cached or hard-coded number. A home that is SOLD tonight says it is booked,
+ * when it is next open, and where to see a price. Once dates are picked the card shows the quote for those dates
+ * (HomePage_Locations.test.tsx).
  */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
@@ -99,23 +101,36 @@ describe('HomePage_Locations — sold tonight (GUEST-065)', () => {
     spy.mockRestore();
   });
 
-  it('a home open tonight keeps tonight\'s price and the tonight label', async () => {
+  it('a home open tonight, with no dates picked, shows no price: it says "See the price for your dates"', async () => {
     const spy = stubFetch([{ listingId: 101, isAvailableTonight: true, nextAvailableDate: null }]);
     renderCards();
     await settle();
     expect(screen.queryByTestId('home-card-sold-tonight')).toBeNull();
-    expect(screen.getByTestId('home-card-night-label')).toHaveTextContent('/ night tonight');
-    expect(screen.getByTestId('home-card-real-price')).toHaveTextContent(/2,496/);
+    expect(screen.getByTestId('home-card-price-hint')).toHaveTextContent(/^See the price for your dates$/);
+    expect(screen.queryByTestId('home-card-night-label')).toBeNull();
+    expect(screen.queryByTestId('home-card-real-price')).toBeNull();
+    expect(document.body.textContent ?? '').not.toMatch(/₹|night tonight|from\s*₹/i);
     spy.mockRestore();
   });
 
-  it('when tonight\'s availability cannot be read, the card stays exactly as it was', async () => {
+  it('with no dates the page never asks for tonight\'s price, so no cached or hard-coded number can reach the card', async () => {
+    const spy = stubFetch([{ listingId: 101, isAvailableTonight: true, nextAvailableDate: null }]);
+    renderCards();
+    await settle();
+    const urls = spy.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes('/api/pricing/daily-summary'))).toBe(false);
+    expect(urls.some((u) => u.includes('/api/pricing/guest-breakdown'))).toBe(false);
+    spy.mockRestore();
+  });
+
+  it('when tonight\'s availability cannot be read, the card still says "See the price for your dates" and shows no number', async () => {
     const spy = stubFetch('fail');
     renderCards();
     await settle();
     expect(screen.queryByTestId('home-card-sold-tonight')).toBeNull();
-    expect(screen.getByTestId('home-card-night-label')).toHaveTextContent('/ night tonight');
-    expect(screen.getByTestId('home-card-real-price')).toHaveTextContent(/2,496/);
+    expect(screen.getByTestId('home-card-price-hint')).toHaveTextContent(/^See the price for your dates$/);
+    expect(screen.queryByTestId('home-card-night-label')).toBeNull();
+    expect(document.body.textContent ?? '').not.toMatch(/₹|night tonight|from\s*₹/i);
     spy.mockRestore();
   });
 });

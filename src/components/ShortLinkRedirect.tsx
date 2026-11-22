@@ -77,12 +77,12 @@ const ShortLinkRedirect = ({ code }: ShortLinkRedirectProps = {}) => {
                     }
                 }
 
-                // Fallback: check /tenants/public/{slug} in case tenant has no published listings yet
+                // Fallback: check /tenants/{slug}/public in case tenant has no published listings yet
                 let tenantUrl: string;
                 try {
-                    tenantUrl = buildApiUrl(`/tenants/public/${encodeURIComponent(validSlug)}`);
+                    tenantUrl = buildApiUrl(`/tenants/${encodeURIComponent(validSlug)}/public`);
                 } catch {
-                    tenantUrl = `/tenants/public/${encodeURIComponent(validSlug)}`;
+                    tenantUrl = `/tenants/${encodeURIComponent(validSlug)}/public`;
                 }
 
                 const tenantRes = await fetch(tenantUrl);

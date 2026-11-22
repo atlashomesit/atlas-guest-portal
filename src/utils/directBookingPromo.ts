@@ -25,9 +25,20 @@ export type DirectBookingPromoResolved = {
 export function resolveDirectBookingPromo(
   tenant: TenantInfo | null | undefined,
   overrides: TenantOverrides,
+  processingFeePercent?: number | null,
 ): DirectBookingPromoResolved {
   const hideAtlasBranding = shouldHideAtlasBranding(tenant, overrides);
   const effectiveDiscountPercent = getEffectiveDiscountPercent();
+  const isMarketplaceRoot = tenant?.isMarketplaceRoot === true;
+  const offline =
+    tenant?.bookingMode === "MANUAL" ||
+    tenant?.bookingMode === "WHATSAPP" ||
+    tenant?.paymentProvider === "MANUAL";
+  const resolvedFee =
+    processingFeePercent !== undefined ? processingFeePercent : offline ? 0 : null;
+  // GUEST-063 (ruled 2026-11-18 CPO): say 'best rates' only where the add-on fee is known to be 0;
+  // where the 3% add-on applies (or fee is unknown / marketplace root), use 'Book direct with the host'.
+  const showBestRates = resolvedFee === 0 && !isMarketplaceRoot;
   const show =
     overrides.directBookingPromo?.enabled === true ||
     (!hideAtlasBranding && overrides.directBookingPromo?.enabled !== false);
@@ -35,7 +46,9 @@ export function resolveDirectBookingPromo(
     overrides.directBookingPromo?.headline?.trim() ||
     (effectiveDiscountPercent > 0
       ? `Book direct — save up to ${Math.round(effectiveDiscountPercent)}% vs typical booking sites`
-      : "Book direct — best rates on our official site");
+      : showBestRates
+        ? "Book direct — best rates on our official site"
+        : "Book direct with the host");
   // TASK-101158: never claim an online payment rail (Razorpay/UPI) that this tenant does not
   // have — mirrors the hasOnlinePaymentRail() gate used by Footer/OwnerShareBadge/etc.
   const sub =
@@ -50,7 +63,10 @@ export function resolveDirectBookingPromo(
 }
 
 /** Convenience: tenant slug → overrides → resolved promo. */
-export function resolveDirectBookingPromoForTenant(tenant: TenantInfo | null | undefined): DirectBookingPromoResolved {
+export function resolveDirectBookingPromoForTenant(
+  tenant: TenantInfo | null | undefined,
+  processingFeePercent?: number | null,
+): DirectBookingPromoResolved {
   const overrides = getTenantOverrides(tenant?.slug);
-  return resolveDirectBookingPromo(tenant, overrides);
+  return resolveDirectBookingPromo(tenant, overrides, processingFeePercent);
 }

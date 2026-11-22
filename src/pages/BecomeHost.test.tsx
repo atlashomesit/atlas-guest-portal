@@ -187,3 +187,182 @@ describe("BecomeHost — Airbnb prefill (TASK-7490)", () => {
     );
   });
 });
+
+// 2026-11-17: this public signup page used to show three named host testimonials with growth
+// figures (occupancy "from 40% to 85%", "revenue increased 60%"). Nothing on record showed they
+// were real hosts who had agreed to be quoted, so they were removed. A quote may come back only
+// from a real, consenting host with figures that can be sourced; these names and claims must not.
+describe("BecomeHost — no invented host testimonials", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("shows no testimonial section, invented host names or invented growth figures", () => {
+    render(
+      <MemoryRouter>
+        <BecomeHost />
+      </MemoryRouter>,
+    );
+
+    const page = screen.getByTestId("become-host-page");
+    expect(screen.queryByRole("heading", { name: /hear from our hosts/i })).toBeNull();
+
+    const pageText = page.textContent ?? "";
+    for (const invented of [
+      "Priya Sharma",
+      "Rajesh Kumar",
+      "Ananya Patel",
+      "40% to 85%",
+      "revenue increased 60%",
+    ]) {
+      expect(pageText).not.toContain(invented);
+    }
+  });
+});
+
+// 2026-11-17: the page also carried an earnings estimator. It stated what "properties in your area
+// earn" as one fixed rupee range, and turned a room-count slider into "estimated monthly earnings"
+// said to be "based on average occupancy". Both were constants in this file, with no area and no
+// data behind them, so the block was removed. Earnings figures may come back only from real,
+// sourced numbers or from the host's own inputs.
+describe("BecomeHost — no unsourced earnings figures", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("shows no earnings estimator and makes no earnings claim", () => {
+    render(
+      <MemoryRouter>
+        <BecomeHost />
+      </MemoryRouter>,
+    );
+
+    const page = screen.getByTestId("become-host-page");
+    expect(screen.queryByRole("heading", { name: /how much could you earn/i })).toBeNull();
+    expect(screen.queryByRole("slider")).toBeNull();
+
+    const pageText = page.textContent ?? "";
+    for (const claim of [
+      "Properties in your area earn",
+      "₹45,000",
+      "1,20,000",
+      "Estimated monthly earnings",
+      "Based on average occupancy",
+    ]) {
+      expect(pageText).not.toContain(claim);
+    }
+  });
+});
+
+// 2026-11-17: every product claim on this page was checked against the API and the admin portal.
+// Three were false:
+//   - "List Your Property — It's Free": a new host gets a 7-day free trial, then pays for a plan
+//     (atlas-api Options/BillingOptions.cs DefaultTrialDurationDays, founder ruling 2026-10-07).
+//   - "we'll have your property listed within 24 hours": the host publishes the listing themself,
+//     and a trial account's booking site and marketplace listing stay private until a paid plan
+//     (atlas-api Services/Billing/SubscriberLifecycle.cs, Services/Marketplace/MarketplaceEligibility.cs).
+//   - "24/7 guest support": nobody answers guests round the clock; the AI receptionist is not on sale.
+// Seven held only in part:
+//   - "Multi-platform listing" and "Airbnb, Booking.com, MMT & more": the channel manager is real,
+//     but it is a paid add-on and is not part of the trial.
+//   - "Zero setup fee": true for packages only; own-number WhatsApp has a one-time setup fee.
+//   - "Dynamic AI pricing tools": suggestions come from fixed rules, not an AI model
+//     (atlas-api Services/Pricing/SmartPriceCalculator.cs).
+//   - "Unified dashboard & payouts": one screen shows earnings and payouts; payouts are not pooled.
+//   - "Guided photo upload & tips" under "Professional photography": a photo step in setup, no tips.
+//   - "Data-driven SEO tools": an SEO title and description per listing; nothing reads search data.
+// These tests keep the reworded claims in place and the retired ones out.
+describe("BecomeHost — product claims match what the product does", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  function renderPageText(): string {
+    render(
+      <MemoryRouter>
+        <BecomeHost />
+      </MemoryRouter>,
+    );
+    return screen.getByTestId("become-host-page").textContent ?? "";
+  }
+
+  it("offers the 7-day free trial in the ruled words, and never calls listing free", () => {
+    const pageText = renderPageText();
+
+    const cta = screen.getByRole("link", { name: "Start your 7-day free trial" });
+    expect(cta).toHaveAttribute("href", "#host-signup-form");
+    expect(pageText).toContain("First 7 days free. No credit card. No setup fee on packages.");
+
+    expect(pageText).not.toMatch(/it['’]s free/i);
+  });
+
+  it("says a setup fee is waived on packages only, not everywhere", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).toContain("No setup fee on packages");
+    expect(pageText).not.toMatch(/zero setup fee/i);
+  });
+
+  it("does not promise a listing within a set time, and says what makes a listing go live", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).not.toMatch(/within \d+ hours|listed within/i);
+    expect(screen.getByTestId("host-signup-go-live-note")).toHaveTextContent(
+      "Your listing goes live for guests once you publish it and start a paid plan.",
+    );
+  });
+
+  it("does not promise round-the-clock guest support or AI pricing", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).not.toMatch(/24\/7 (guest )?support/i);
+    expect(pageText).toContain("Automated guest messages");
+
+    // Case-sensitive on purpose: "AI" as a word, not the "Ai" in Airbnb.
+    expect(pageText).not.toMatch(/\bAI\b/);
+    expect(pageText).not.toMatch(/data-driven/i);
+    expect(pageText).toContain("Auto-pricing & pricing rules");
+  });
+
+  it("marks channel distribution as a paid add-on wherever it is named", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).toContain("Multi-platform listing (paid add-on)");
+    expect(pageText).toContain("Airbnb, Booking.com, MakeMyTrip & more (paid add-on)");
+    // Neither claim may appear without its "(paid add-on)" qualifier.
+    expect(pageText).not.toMatch(/Multi-platform listing(?! \(paid add-on\))/);
+    expect(pageText).not.toMatch(/& more(?! \(paid add-on\))/);
+  });
+
+  it("describes payouts, photos and SEO as the screens that exist, not as services", () => {
+    const pageText = renderPageText();
+
+    expect(pageText).toContain("One dashboard for earnings & payouts");
+    expect(pageText).toContain("Photo upload step in setup");
+    expect(pageText).toContain("SEO title & description for each listing");
+    expect(pageText).not.toMatch(/professional photography|unified dashboard & payouts|photo upload & tips/i);
+  });
+});
+
+// 2026-11-17: the Display name field used to carry `autoFocus`. It sits in the signup form far
+// below the headline, the free-trial offer and the comparison table, so on load the browser
+// scrolled it into view (about 1,700 px down at 393 px wide) and, on a phone, the keyboard opened.
+// A first-time visitor landed on the form without ever seeing what they were signing up for.
+// Nothing may take focus on load; focus belongs to what the visitor taps.
+describe("BecomeHost — nothing takes focus on load", () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("leaves focus on the page, not on the Display name field", () => {
+    render(
+      <MemoryRouter>
+        <BecomeHost />
+      </MemoryRouter>,
+    );
+
+    const nameField = screen.getByTestId("host-onboard-name");
+    expect(nameField).not.toHaveFocus();
+    expect(document.activeElement).toBe(document.body);
+  });
+});

@@ -304,6 +304,49 @@ describe('GuestDetailsPage - AGT-003 promo from a checkout link', () => {
     expect(window.localStorage.getItem(LINK_KEY)).toBeNull();
   });
 
+  describe('MKTG-027 tracking-only creator code (0% discount)', () => {
+    const TRACKING_QUOTE: Quote = {
+      valid: true,
+      message: 'Creator code applied',
+      percent: 0,
+      discountAmount: 0,
+      totalReduction: 0,
+      finalAmount: 4479,
+    };
+
+    function seedCreatorLinkCode() {
+      window.localStorage.setItem(KEY, 'AARAV10');
+      window.localStorage.setItem(LINK_KEY, 'AARAV10');
+    }
+
+    it('applies a 0% link code: normal total, code on the order, no discount rows', async () => {
+      seedCreatorLinkCode();
+      const f = mockFetch(TRACKING_QUOTE);
+      const post = vi.spyOn(axios, 'post');
+      mockOrderApi(post, 4479, { code: 'AARAV10', discount: 0 });
+      await renderPage();
+      expect(quoteCalls(f)).toHaveLength(1);
+      expect(screen.queryByTestId('promo-confirmed-row')).toBeNull();
+      expect(screen.getByTestId('checkout-total-amount')).toHaveTextContent('₹4,479');
+      fillDetails();
+      fireEvent.click(screen.getByTestId('guest-booking-consent'));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('guest-booking-submit'));
+      });
+      await settle();
+      await settle();
+      expect((post.mock.calls[1][1] as { promoCode?: string }).promoCode).toBe('AARAV10');
+    });
+
+    it('does not reject a valid quote when discountAmount is zero', async () => {
+      seedCreatorLinkCode();
+      mockFetch(TRACKING_QUOTE);
+      await renderPage();
+      expect(screen.queryByText(PLAIN_FALLBACK)).toBeNull();
+      expect(screen.getByText('Creator code applied')).toBeInTheDocument();
+    });
+  });
+
   describe('AGT-005 attribution: src=ai_receptionist', () => {
     async function payAndGetBodies(search: string, preloadChannel?: 'ai_receptionist') {
       if (preloadChannel) {

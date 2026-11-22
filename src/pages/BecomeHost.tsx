@@ -1,5 +1,5 @@
  
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "../components/ui/Card";
 import { Typography } from "../components/ui/Typography";
@@ -27,40 +27,34 @@ const PROPERTY_TYPES = [
 
 const TOTAL_STEPS = 3;
 
-const buildHostTestimonials = (pmsLabel: string) => [
-  {
-    quote:
-      `${pmsLabel} handles all my bookings and guest communication. My occupancy went from 40% to 85% in three months.`,
-    name: "Priya Sharma",
-    detail: "Villa owner, Lonavala",
-  },
-  {
-    quote:
-      "I used to spend hours every day managing listings across platforms. Now I just check the dashboard once a week.",
-    name: "Rajesh Kumar",
-    detail: "Homestay owner, Coorg",
-  },
-  {
-    quote:
-      "The pricing optimization alone paid for itself. My revenue increased 60% in the first quarter.",
-    name: "Ananya Patel",
-    detail: "Apartment host, Goa",
-  },
+// 2026-11-17: every product claim on this public page was checked against the API and the admin
+// portal, and the ones that did not hold were reworded. Keep them true; BecomeHost.test.tsx guards
+// the wording. What the product does today, and so what this page may say:
+//   - New hosts get a 7-day free trial (founder ruling 2026-10-07). Nothing here is "free".
+//   - A trial account's listing is not public: its booking site and the marketplace need a paid plan.
+//   - The channel manager is a paid add-on and is not part of the trial.
+//   - Packages have no setup fee; own-number WhatsApp has a one-time setup fee, so never "zero setup fee".
+//   - Pricing suggestions come from fixed rules (day, occupancy, season, lead time), not an AI model.
+//   - Guests get automated messages; nobody answers guests round the clock, so never "24/7 support".
+//   - No one at Atlas lists a property for the host, so never promise "listed within N hours".
+// Left as it was, for the founder: the hero line "so you earn more while staying in control" (no data
+// behind "earn more") and "Get started in under 5 minutes" (nobody has measured it).
+const HERO_BADGES = [
+  { icon: "🌐", label: "Multi-platform listing (paid add-on)" },
+  { icon: "📈", label: "Dynamic pricing" },
+  { icon: "💬", label: "Automated guest messages" },
+  { icon: "₹0", label: "No setup fee on packages" },
 ];
 
 const COMPARISON_FEATURES = [
-  { feature: "Channel distribution", self: "1–2 platforms", atlas: "Airbnb, Booking.com, MMT & more" },
-  { feature: "Pricing optimization", self: "Manual guesswork", atlas: "Dynamic AI pricing tools" },
+  { feature: "Channel distribution", self: "1–2 platforms", atlas: "Airbnb, Booking.com, MakeMyTrip & more (paid add-on)" },
+  { feature: "Pricing optimization", self: "Manual guesswork", atlas: "Auto-pricing & pricing rules" },
   { feature: "Guest communication", self: "You handle 24/7", atlas: "Automated messaging templates" },
-  { feature: "Payment collection", self: "Per-platform payouts", atlas: "Unified dashboard & payouts" },
+  { feature: "Payment collection", self: "Per-platform payouts", atlas: "One dashboard for earnings & payouts" },
   { feature: "Reviews management", self: "Manual follow-ups", atlas: "Automated review requests" },
-  { feature: "Professional photography", self: "DIY", atlas: "Guided photo upload & tips" },
-  { feature: "Listing optimization", self: "Trial & error", atlas: "Data-driven SEO tools" },
+  { feature: "Listing photos", self: "DIY", atlas: "Photo upload step in setup" },
+  { feature: "Listing optimization", self: "Trial & error", atlas: "SEO title & description for each listing" },
 ];
-
-function formatINR(amount: number): string {
-  return amount.toLocaleString("en-IN");
-}
 
 interface ContactInfo {
   displayName: string;
@@ -232,7 +226,6 @@ const DRAFT_KEY = "becomehost_draft";
 const BecomeHost = () => {
   const pmsLabel = `${getTenantBrandNameLong()} PMS`;
   const partnerBrand = getTenantBrandNameLong();
-  const hostTestimonials = useMemo(() => buildHostTestimonials(pmsLabel), [pmsLabel]);
 
   const [step, setStep] = useState(0);
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
@@ -306,9 +299,7 @@ const BecomeHost = () => {
     loading: false,
   });
 
-  const [estimatorRooms, setEstimatorRooms] = useState(2);
-
-  const updateContact = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const updateContact =(e: React.ChangeEvent<HTMLInputElement>) => {
     setContact((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
@@ -548,15 +539,10 @@ const BecomeHost = () => {
           className="inline-block mt-6 px-8 py-3 rounded-xl text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all"
           style={{ background: "var(--cta-primary, #2563eb)" }}
         >
-          List Your Property — It's Free
+          Start your 7-day free trial
         </a>
         <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { icon: "🌐", label: "Multi-platform listing" },
-            { icon: "📈", label: "Dynamic pricing" },
-            { icon: "💬", label: "24/7 guest support" },
-            { icon: "₹0", label: "Zero setup fee" },
-          ].map((b) => (
+          {HERO_BADGES.map((b) => (
             <div
               key={b.label}
               className="flex flex-col items-center gap-1 p-3 rounded-xl"
@@ -574,73 +560,10 @@ const BecomeHost = () => {
         </div>
       </div>
 
-      {/* ── Earnings Estimator ── */}
-      <div className="max-w-2xl mx-auto px-4 mb-12">
-        <div
-          className="rounded-2xl p-6 sm:p-8 text-center"
-          style={{
-            background: "rgba(255,255,255,0.85)",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-          }}
-        >
-          <h2
-            className="text-2xl font-bold mb-1"
-            style={{ color: "var(--text-primary, #1e293b)" }}
-          >
-            How much could you earn?
-          </h2>
-          <p className="text-base mb-6" style={{ color: "var(--text-muted, #6b5a55)" }}>
-            Properties in your area earn{" "}
-            <strong style={{ color: "var(--cta-primary, #2563eb)" }}>
-              ₹45,000 – ₹1,20,000/month
-            </strong>
-          </p>
-          <label
-            className="block text-base font-medium mb-2"
-            style={{ color: "var(--text-muted, #6b5a55)" }}
-          >
-            Number of rooms: <strong>{estimatorRooms}</strong>
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={10}
-            value={estimatorRooms}
-            onChange={(e) => setEstimatorRooms(e.target.valueAsNumber)}
-            aria-label="Number of rooms"
-            aria-valuetext={`${estimatorRooms} ${estimatorRooms === 1 ? "room" : "rooms"}`}
-            className="w-full accent-[#c04528]"
-          />
-          <div
-            className="flex justify-between text-base mt-1 mb-4"
-            style={{ color: "var(--text-muted, #6b5a55)" }}
-          >
-            <span>1 room</span>
-            <span>10 rooms</span>
-          </div>
-          <div
-            className="rounded-xl p-4"
-            style={{
-              background: "linear-gradient(135deg, #ffe4d6 0%, #f0eafd 100%)",
-            }}
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <p className="text-base" style={{ color: "var(--text-muted, #6b5a55)" }}>
-              Estimated monthly earnings
-            </p>
-            <p
-              className="text-3xl font-extrabold mt-1"
-              style={{ color: "var(--cta-primary, #2563eb)" }}
-            >
-              ₹{formatINR(estimatorRooms * 15000)} – ₹{formatINR(estimatorRooms * 40000)}
-            </p>
-            <p className="text-base mt-2" style={{ color: "var(--text-muted, #6b5a55)" }}>
-              Based on average occupancy for properties using {pmsLabel}
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* No earnings estimate on this page. The estimator that sat here showed fixed rupee ranges,
+          presented as local earnings and as an occupancy-based estimate, with no area and no data
+          behind them, so it was removed on 2026-11-17. Show earnings figures again only from real,
+          sourced numbers or from the host's own inputs. BecomeHost.test.tsx guards this. */}
 
       {/* ── Comparison Table: Self-managed vs Atlas Managed ── */}
       <div className="max-w-2xl mx-auto px-4 mb-12">
@@ -723,48 +646,10 @@ const BecomeHost = () => {
         </div>
       </div>
 
-      {/* ── Host Testimonials ── */}
-      <div className="max-w-3xl mx-auto px-4 mb-16">
-        <h2
-          className="text-2xl font-bold text-center mb-6"
-          style={{ color: "var(--text-primary, #1e293b)" }}
-        >
-          Hear from our hosts
-        </h2>
-        <div className="grid sm:grid-cols-3 gap-4">
-          {hostTestimonials.map((t) => (
-            <div
-              key={t.name}
-              className="rounded-2xl p-5 flex flex-col"
-              style={{
-                background: "rgba(255,255,255,0.9)",
-                boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-              }}
-            >
-              <p
-                className="text-sm leading-relaxed flex-1"
-                style={{ color: "var(--text-muted, #6b5a55)" }}
-              >
-                &ldquo;{t.quote}&rdquo;
-              </p>
-              <div
-                className="mt-4 pt-3"
-                style={{ borderTop: "1px solid var(--border-subtle, #f0ddd0)" }}
-              >
-                <p
-                  className="font-semibold text-sm"
-                  style={{ color: "var(--text-primary, #1e293b)" }}
-                >
-                  {t.name}
-                </p>
-                <p className="text-xs" style={{ color: "var(--text-muted, #475569)" }}>
-                  {t.detail}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* No host testimonials on this page. The three named host quotes that sat here, with
+          occupancy and revenue growth figures, were placeholder copy with no record of a real host
+          who agreed to be quoted, so they were removed on 2026-11-17. Add a quote back only from a
+          real host who has agreed to it, with figures we can source. BecomeHost.test.tsx guards this. */}
 
       {/* ── Registration Form ── */}
       <div style={styles.container} id="host-signup-form">
@@ -790,8 +675,11 @@ const BecomeHost = () => {
         <div style={styles.header}>
           <Typography variant="h2">Get started in under 5 minutes</Typography>
           <Typography variant="subtitle" className="mt-2">
-            Fill in your details and we'll have your property listed within 24 hours.
+            First 7 days free. No credit card. No setup fee on packages.
           </Typography>
+          <p style={{ ...styles.hint, marginTop: 8 }} data-testid="host-signup-go-live-note">
+            Your listing goes live for guests once you publish it and start a paid plan.
+          </p>
         </div>
 
         <StepIndicator current={step} />
@@ -816,7 +704,6 @@ const BecomeHost = () => {
                   value={contact.displayName}
                   onChange={updateContact}
                   required
-                  autoFocus
                   data-testid="host-onboard-name"
                 />
               </div>

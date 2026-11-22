@@ -10,7 +10,8 @@
  * (AGENTS.md "Theme ≠ integration" HARD RULE), same precedent `coastal/ListingsGallery.tsx`
  * (TASK-4907) already established:
  *   - `useTenantListings()` — the same shared listing-data hook every other layout uses.
- *   - `calculateNightlyPrice`/`inferUnitType` — the same shared pricing utility functions.
+ *   - `useHomeCardPriceLines()` — the same quote hook the default grid reads (GUEST-065 item 1: the live
+ *     price for the dates the guest picked, else "See the price for your dates"; never a static rate).
  *   - `getPropertySlug`/`buildHomeUnitPath` — the same shared navigation utilities.
  *   - `getListingDisplayName` — the same shared SKU/floor-id display-name mapping.
  *   - `OptimizedImage` — the shared responsive-image component.
@@ -23,8 +24,7 @@
  */
 import { Link } from "react-router-dom";
 import { useTenantListings, type TenantPropertyRecord } from "../../hooks/useTenantListings";
-import { useCurrency } from "../../contexts/CurrencyContext";
-import { calculateNightlyPrice, inferUnitType } from "../../utils/pricing";
+import { useHomeCardPriceLines } from "../../hooks/useHomeCardPriceLines";
 import { getPropertySlug, buildHomeUnitPath } from "../../utils/navigation";
 import { getListingDisplayName } from "../../lib/listingDisplayName";
 import { getPropertyDesignImage } from "../../config/branding";
@@ -39,21 +39,9 @@ const resolveCoverImage = (property: TenantPropertyRecord): string => {
   return sanitizeGuestImageUrl(getPropertyDesignImage(property.id)) ?? getPropertyDesignImage(property.id);
 };
 
-const resolvePrice = (property: TenantPropertyRecord): number | null => {
-  try {
-    const breakdown = calculateNightlyPrice({
-      unitType: inferUnitType(property),
-      checkInDate: new Date(),
-    });
-    return breakdown.finalNightlyPrice;
-  } catch {
-    return null;
-  }
-};
-
 const PhotoFirstListingsStack = () => {
   const { properties } = useTenantListings();
-  const { format: formatCurrency } = useCurrency();
+  const priceLineFor = useHomeCardPriceLines(properties);
   const tenant = getTenantContext();
   const overrides = getTenantOverrides(tenant?.slug);
   const unitNoun = getUnitNoun(overrides);
@@ -78,7 +66,7 @@ const PhotoFirstListingsStack = () => {
           });
           const path = Number.isFinite(listingId) ? buildHomeUnitPath(slug, listingId) : "#";
           const title = getListingDisplayName(property.id, property.property_name);
-          const price = resolvePrice(property);
+          const priceLine = priceLineFor(property);
 
           return (
             <Link
@@ -104,11 +92,9 @@ const PhotoFirstListingsStack = () => {
                 {property.property_location && (
                   <span className="photofirst-stack-location">{property.property_location}</span>
                 )}
-                {price != null && (
-                  <span className="photofirst-stack-price">
-                    {formatCurrency(price)} / night
-                  </span>
-                )}
+                <span className="photofirst-stack-price" data-testid={priceLine.testId}>
+                  {priceLine.text}
+                </span>
               </div>
             </Link>
           );

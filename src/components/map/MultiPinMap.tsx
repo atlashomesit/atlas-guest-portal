@@ -24,12 +24,23 @@ export interface MapPin {
   subtitle?: string;
 }
 
+export interface MapBounds {
+  swLat: number;
+  swLng: number;
+  neLat: number;
+  neLng: number;
+}
+
 export interface MultiPinMapProps {
   pins: MapPin[];
   height?: number;
   className?: string;
   /** Fallback center when no pins (e.g. Hyderabad). */
   fallbackCenter?: { lat: number; lng: number; zoom?: number };
+  /** MKT-048: fired when user pans or zooms the map to new visible bounds. */
+  onBoundsChanged?: (bounds: MapBounds) => void;
+  /** MKT-048: initial bounding box restored from URL on Back navigation. */
+  initialBounds?: MapBounds | null;
 }
 
 async function loadGoogleMaps(apiKey: string): Promise<void> {
@@ -60,10 +71,15 @@ export default function MultiPinMap({
   height = 420,
   className,
   fallbackCenter = { lat: 17.4948, lng: 78.3996, zoom: 11 },
+  onBoundsChanged,
+  initialBounds = null,
 }: MultiPinMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const programmaticMoveRef = useRef(false);
+  const onBoundsChangedRef = useRef(onBoundsChanged);
+  onBoundsChangedRef.current = onBoundsChanged;
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
 
   const apiKey = GOOGLE_MAPS_API_KEY;
@@ -90,6 +106,30 @@ export default function MultiPinMap({
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: true,
+        });
+        if (initialBounds) {
+          programmaticMoveRef.current = true;
+          const b = new window.google.maps.LatLngBounds(
+            { lat: initialBounds.swLat, lng: initialBounds.swLng },
+            { lat: initialBounds.neLat, lng: initialBounds.neLng },
+          );
+          map.fitBounds(b, 0);
+        }
+        map.addListener("idle", () => {
+          if (programmaticMoveRef.current) {
+            programmaticMoveRef.current = false;
+            return;
+          }
+          const b = map.getBounds?.();
+          if (!b || !onBoundsChangedRef.current) return;
+          const sw = b.getSouthWest();
+          const ne = b.getNorthEast();
+          onBoundsChangedRef.current({
+            swLat: Number(sw.lat().toFixed(6)),
+            swLng: Number(sw.lng().toFixed(6)),
+            neLat: Number(ne.lat().toFixed(6)),
+            neLng: Number(ne.lng().toFixed(6)),
+          });
         });
         mapRef.current = map;
         setStatus("ready");
@@ -140,13 +180,17 @@ export default function MultiPinMap({
       bounds.extend(pos);
     }
 
-    if (validPins.length >= 2) {
-      map.fitBounds(bounds, 64);
-    } else if (validPins.length === 1) {
-      map.setCenter({ lat: validPins[0].lat, lng: validPins[0].lng });
-      map.setZoom(15);
+    if (!initialBounds) {
+      if (validPins.length >= 2) {
+        programmaticMoveRef.current = true;
+        map.fitBounds(bounds, 64);
+      } else if (validPins.length === 1) {
+        programmaticMoveRef.current = true;
+        map.setCenter({ lat: validPins[0].lat, lng: validPins[0].lng });
+        map.setZoom(15);
+      }
     }
-  }, [validPins, status]);
+  }, [validPins, status, initialBounds]);
 
   if (!apiKey || status === "failed") {
     return (

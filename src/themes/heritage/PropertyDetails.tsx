@@ -94,6 +94,7 @@ import {
     resolveStaticMaxGuests,
 } from '@/api/listingClient';
 import SEO from '@/components/SEO';
+import GuestGroupAndQuoteForms from '@/components/inquiries/GuestGroupAndQuoteForms';
 import StateMessage from '@/components/StateMessage';
 import MultiPinMap, { type MapPin } from '@/components/map/MultiPinMap';
 import SinglePinGoogleMap from '@/components/map/SinglePinGoogleMap';
@@ -932,6 +933,14 @@ const PropertyDetails = () => {
                     const cluster = readClusterListingFields(d);
                     if (cluster.clusterRole !== (prev.clusterRole ?? null)) updates.clusterRole = cluster.clusterRole;
                     if (cluster.clusterId !== (prev.clusterId ?? null)) updates.clusterId = cluster.clusterId;
+                    const wholeId = typeof d.wholeRoomListingId === 'number' ? d.wholeRoomListingId : null;
+                    const wholeName = typeof d.wholeRoomName === 'string' ? d.wholeRoomName : null;
+                    const wholeRate = typeof d.wholeRoomNightlyRate === 'number' ? d.wholeRoomNightlyRate : null;
+                    const wholeParent = Boolean(d.isHostelWholeRoomParent);
+                    if (wholeId !== ((prev as { wholeRoomListingId?: number | null }).wholeRoomListingId ?? null)) (updates as { wholeRoomListingId?: number | null }).wholeRoomListingId = wholeId;
+                    if (wholeName !== ((prev as { wholeRoomName?: string | null }).wholeRoomName ?? null)) (updates as { wholeRoomName?: string | null }).wholeRoomName = wholeName;
+                    if (wholeRate !== ((prev as { wholeRoomNightlyRate?: number | null }).wholeRoomNightlyRate ?? null)) (updates as { wholeRoomNightlyRate?: number | null }).wholeRoomNightlyRate = wholeRate;
+                    if (wholeParent !== Boolean((prev as { isHostelWholeRoomParent?: boolean | null }).isHostelWholeRoomParent)) (updates as { isHostelWholeRoomParent?: boolean | null }).isHostelWholeRoomParent = wholeParent;
                     const prevGallery = filterGuestImageUrls(prev.property_img ?? []);
                     if (hydratedImages.length > prevGallery.length) {
                         updates.property_img = hydratedImages;
@@ -3026,6 +3035,10 @@ useEffect(() => {
                         accommodationType={data.accommodationType ?? null}
                         dormGenderPolicy={data.dormGenderPolicy ?? null}
                         dormBedCount={data.dormBedCount ?? null}
+                        wholeRoomListingId={(data as { wholeRoomListingId?: number | null }).wholeRoomListingId ?? null}
+                        wholeRoomName={(data as { wholeRoomName?: string | null }).wholeRoomName ?? null}
+                        wholeRoomNightlyRate={(data as { wholeRoomNightlyRate?: number | null }).wholeRoomNightlyRate ?? null}
+                        isHostelWholeRoomParent={Boolean((data as { isHostelWholeRoomParent?: boolean | null }).isHostelWholeRoomParent)}
                         isParentCluster={data.isParentCluster ?? (data.clusterRole ? data.clusterRole.toUpperCase() === 'PARENT' : undefined)}
                         clusterRole={data.clusterRole ?? null}
                         clusterId={data.clusterId ?? null}
@@ -3112,6 +3125,16 @@ useEffect(() => {
                     )}
                   </div>
                 )}
+
+                {/* GUEST-079: "Booking for a group?" and "Send me a quote" triggers */}
+                <GuestGroupAndQuoteForms
+                  listingId={resolvedListingId ?? data.listingId ?? data.id ?? null}
+                  listingName={getListingDisplayName(data.id ?? data.listingId, data.property_name)}
+                  defaultCity={data.property_location || data.property_name}
+                  tenantSlug={effectiveTenantCtx?.slug ?? tenantSlugFromUrl ?? null}
+                  showGroupTrigger
+                  showQuoteTrigger
+                />
 
                 {/* Availability Calendar */}
                 {resolvedListingId && (

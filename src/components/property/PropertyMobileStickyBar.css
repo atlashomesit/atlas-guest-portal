@@ -16,7 +16,8 @@
   .pp-m-sticky-chat:focus-visible { outline: 2px solid #3b1f1e; outline-offset: 2px; }
   body[data-pp-sticky-chat] [data-testid="listing-whatsapp-float"],
   body[data-pp-sticky-chat] [data-testid="support-widget-trigger"],
-  body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { display: none !important; }
+  body[data-pp-sticky-chat] [data-testid="guest-faq-trigger"],
+  body[data-pp-sticky-chat] button[aria-label*="frequently asked questions"] { display: none !important; }
 
   /* Chat chooser: the host stays one tap away on phone (the support drawer is the platform's
      own contact). Opens upward from the bar, inside the viewport at 320px and up. */
@@ -68,10 +69,12 @@
    links; the attribute is set from the page's scroll position by PropertyMobileStickyBar. */
 @media (min-width: 1024px) {
   body[data-pp-sticky-chat] [data-testid="support-widget-trigger"] { bottom: 84px !important; }
-  body[data-pp-sticky-chat] button[aria-label="View frequently asked questions"] { bottom: 156px !important; }
+  body[data-pp-sticky-chat] [data-testid="guest-faq-trigger"],
+  body[data-pp-sticky-chat] button[aria-label*="frequently asked questions"] { bottom: 156px !important; }
   body[data-pp-sticky-chat] [data-testid="listing-whatsapp-float"] { bottom: 212px !important; }
   body[data-pp-sticky-chat][data-pp-near-footer] [data-testid="support-widget-trigger"],
-  body[data-pp-sticky-chat][data-pp-near-footer] button[aria-label="View frequently asked questions"],
+  body[data-pp-sticky-chat][data-pp-near-footer] [data-testid="guest-faq-trigger"],
+  body[data-pp-sticky-chat][data-pp-near-footer] button[aria-label*="frequently asked questions"],
   body[data-pp-sticky-chat][data-pp-near-footer] [data-testid="listing-whatsapp-float"] {
     visibility: hidden; pointer-events: none;
   }

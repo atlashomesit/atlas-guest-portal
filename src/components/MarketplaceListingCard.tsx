@@ -28,6 +28,11 @@ export interface MarketplaceListingCardProps {
   category?: string | null;
   amenities?: (string | { code?: string; name?: string; title?: string })[];
   amenityCodes?: string[];
+  hasFreeCancellation?: boolean;
+  freeCancellationDeadlineUtc?: string | null;
+  hasBreakfastIncluded?: boolean;
+  hasBreakfastOptional?: boolean;
+  mealPlanCodes?: string[];
   onClick?: () => void;
   className?: string;
 }
@@ -53,6 +58,11 @@ export const MarketplaceListingCard: React.FC<MarketplaceListingCardProps> = ({
   category,
   amenities,
   amenityCodes,
+  hasFreeCancellation,
+  freeCancellationDeadlineUtc,
+  hasBreakfastIncluded,
+  hasBreakfastOptional,
+  mealPlanCodes,
   onClick,
   className,
 }) => {
@@ -145,6 +155,28 @@ export const MarketplaceListingCard: React.FC<MarketplaceListingCardProps> = ({
             >
               Starting from per bed
             </span>
+          )}
+          {(hasFreeCancellation || hasBreakfastIncluded || hasBreakfastOptional) && (
+            <div className="flex flex-wrap gap-1.5">
+              {hasFreeCancellation && (
+                <span
+                  data-testid="marketplace-free-cancellation-badge"
+                  className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                >
+                  {freeCancellationDeadlineUtc
+                    ? `Free cancellation until ${new Date(freeCancellationDeadlineUtc).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
+                    : 'Free cancellation available'}
+                </span>
+              )}
+              {(hasBreakfastIncluded || hasBreakfastOptional || mealPlanCodes?.some((c) => ['CP', 'MAP', 'AP'].includes(c.toUpperCase()))) && (
+                <span
+                  data-testid="marketplace-breakfast-badge"
+                  className="inline-flex items-center rounded-md bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900"
+                >
+                  {hasBreakfastIncluded ? '☕ Breakfast included' : '☕ Breakfast option available'}
+                </span>
+              )}
+            </div>
           )}
         </div>
 

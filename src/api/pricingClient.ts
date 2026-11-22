@@ -147,6 +147,29 @@ export type GuestPriceBreakdown = {
   includeBreakfast?: boolean;
   /** CFB-009 / BNB-009 / BNB-010: Breakfast extra amount included in finalAmount (BreakfastPricePerPerson * guests * nights). */
   breakfastExtraAmount?: number;
+  /** GUEST-076 / GUEST-077: server-computed RNPL & monthly instalment options. */
+  paymentPlans?: PaymentPlanOptions | null;
+};
+
+export type MonthlyInstalmentPreview = {
+  monthNumber: number;
+  periodStart: string;
+  periodEnd: string;
+  payableFromDate: string;
+  dueDate: string;
+  amount: number;
+};
+
+export type PaymentPlanOptions = {
+  rnplEligible: boolean;
+  reserveDepositPercent: number;
+  depositAmountNow: number;
+  remainingBalanceAmount: number;
+  balanceDueAtUtc?: string | null;
+  allowZeroDepositReserve: boolean;
+  freeCancellationDeadlineUtc?: string | null;
+  monthlyEligible: boolean;
+  monthlyInstalments: MonthlyInstalmentPreview[];
 };
 
 /**
@@ -219,7 +242,71 @@ export type PublicListingRatePlanDto = {
   isAgentRate?: boolean;
   /** PRICE-016: the agent / company the unlocked rate belongs to. */
   agentName?: string | null;
+  /** MRP-041: Stay package details when this rate plan is sold as a package on the website. */
+  package?: RatePlanPackageDto | null;
 };
+
+export type RatePlanPackageInclusionDto = {
+  addOnServiceId?: number | null;
+  label: string;
+  basis: string;
+  quantity: number;
+};
+
+export type RatePlanPackageDto = {
+  title: string;
+  description?: string | null;
+  photoId?: number | null;
+  photoUrl?: string | null;
+  stayFrom?: string | null;
+  stayTo?: string | null;
+  items: RatePlanPackageInclusionDto[];
+};
+
+function mapRatePlanPackageInclusion(raw: Record<string, unknown>): RatePlanPackageInclusionDto {
+  const addOnRaw = raw.addOnServiceId ?? raw.AddOnServiceId;
+  return {
+    addOnServiceId:
+      addOnRaw !== undefined && addOnRaw !== null && Number.isFinite(Number(addOnRaw))
+        ? Number(addOnRaw)
+        : null,
+    label: String(raw.label ?? raw.Label ?? '').trim(),
+    basis: String(raw.basis ?? raw.Basis ?? 'per_stay').trim() || 'per_stay',
+    quantity: Math.max(0, Number(raw.quantity ?? raw.Quantity ?? 1) || 0),
+  };
+}
+
+/** MRP-041: map stay-package details from a public rate-plan row (camelCase or PascalCase). */
+export function mapRatePlanPackageDto(raw: unknown): RatePlanPackageDto | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const title = String(o.title ?? o.Title ?? '').trim();
+  if (!title) return null;
+  const itemsRaw = o.items ?? o.Items;
+  const items = Array.isArray(itemsRaw)
+    ? itemsRaw
+        .filter((row): row is Record<string, unknown> => row != null && typeof row === 'object')
+        .map((row) => mapRatePlanPackageInclusion(row))
+        .filter((item) => item.label.length > 0)
+    : [];
+  const descriptionRaw = o.description ?? o.Description;
+  const photoIdRaw = o.photoId ?? o.PhotoId;
+  const photoUrlRaw = o.photoUrl ?? o.PhotoUrl;
+  const stayFromRaw = o.stayFrom ?? o.StayFrom;
+  const stayToRaw = o.stayTo ?? o.StayTo;
+  return {
+    title,
+    description: typeof descriptionRaw === 'string' && descriptionRaw.trim() ? descriptionRaw.trim() : null,
+    photoId:
+      photoIdRaw !== undefined && photoIdRaw !== null && Number.isFinite(Number(photoIdRaw))
+        ? Number(photoIdRaw)
+        : null,
+    photoUrl: typeof photoUrlRaw === 'string' && photoUrlRaw.trim() ? photoUrlRaw.trim() : null,
+    stayFrom: typeof stayFromRaw === 'string' && stayFromRaw.trim() ? stayFromRaw.trim() : null,
+    stayTo: typeof stayToRaw === 'string' && stayToRaw.trim() ? stayToRaw.trim() : null,
+    items,
+  };
+}
 
 /**
  * MRP-002: Fetch active public rate plans for a listing (and optional date range + guest count).
@@ -284,6 +371,7 @@ export async function fetchPublicListingRatePlans(
         const q = r.guestQuote ?? r.GuestQuote;
         return q && typeof q === 'object' ? mapGuestPriceBreakdown(q as Record<string, unknown>) : null;
       })(),
+      package: mapRatePlanPackageDto(r.package ?? r.Package),
     };
   });
 }
@@ -416,6 +504,37 @@ export function mapGuestPriceBreakdown(raw: Record<string, unknown>): GuestPrice
     ...(appliedPromotionLabel ? { appliedPromotionLabel } : {}),
     ...(promotionDiscountAmount > 0 ? { promotionDiscountAmount } : {}),
     ...(promotionDiscountPercent > 0 ? { promotionDiscountPercent } : {}),
+    paymentPlans: mapPaymentPlans(raw.paymentPlans ?? raw.PaymentPlans),
+  };
+}
+
+function mapPaymentPlans(v: unknown): PaymentPlanOptions | null {
+  if (!v || typeof v !== 'object') return null;
+  const r = v as Record<string, unknown>;
+  const rawInst = Array.isArray(r.monthlyInstalments ?? r.MonthlyInstalments)
+    ? ((r.monthlyInstalments ?? r.MonthlyInstalments) as Array<Record<string, unknown>>)
+    : [];
+  return {
+    rnplEligible: Boolean(r.rnplEligible ?? r.RnplEligible),
+    reserveDepositPercent: Number(r.reserveDepositPercent ?? r.ReserveDepositPercent ?? 25),
+    depositAmountNow: Number(r.depositAmountNow ?? r.DepositAmountNow ?? 0),
+    remainingBalanceAmount: Number(r.remainingBalanceAmount ?? r.RemainingBalanceAmount ?? 0),
+    balanceDueAtUtc: typeof (r.balanceDueAtUtc ?? r.BalanceDueAtUtc) === 'string'
+      ? String(r.balanceDueAtUtc ?? r.BalanceDueAtUtc)
+      : null,
+    allowZeroDepositReserve: Boolean(r.allowZeroDepositReserve ?? r.AllowZeroDepositReserve),
+    freeCancellationDeadlineUtc: typeof (r.freeCancellationDeadlineUtc ?? r.FreeCancellationDeadlineUtc) === 'string'
+      ? String(r.freeCancellationDeadlineUtc ?? r.FreeCancellationDeadlineUtc)
+      : null,
+    monthlyEligible: Boolean(r.monthlyEligible ?? r.MonthlyEligible),
+    monthlyInstalments: rawInst.map((i) => ({
+      monthNumber: Number(i.monthNumber ?? i.MonthNumber ?? 1),
+      periodStart: String(i.periodStart ?? i.PeriodStart ?? ''),
+      periodEnd: String(i.periodEnd ?? i.PeriodEnd ?? ''),
+      payableFromDate: String(i.payableFromDate ?? i.PayableFromDate ?? ''),
+      dueDate: String(i.dueDate ?? i.DueDate ?? ''),
+      amount: Number(i.amount ?? i.Amount ?? 0),
+    })),
   };
 }
 

@@ -85,6 +85,8 @@ import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
+import { PaymentPlanSelector, type PaymentPlanChoice } from '@/components/checkout/PaymentPlanSelector';
+import { createMultiRoomOrder } from '@/api/multiRoomClient';
 import { dormNeedsGenderAcknowledgement, readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
 import { hostCallDigits } from '@/utils/hostCallDigits';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
@@ -432,6 +434,7 @@ const GuestDetailsPage: React.FC = () => {
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
         holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : urlParams.isAiReceptionistSrc ? 'ai_receptionist' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
+        holdPackage: booking.holdPackage ?? null,
       });
 
       if (!effectiveListingId && unitSlug) {
@@ -864,6 +867,17 @@ const GuestDetailsPage: React.FC = () => {
   // ── Add-ons ───────────────────────────────────────────────────────────────
   const [availableAddOns, setAvailableAddOns] = useState<AddOnService[]>([]);
   const [selectedAddOns, setSelectedAddOns] = useState<Record<number, number>>({});
+  const includedAddOnIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const item of booking.holdPackage?.items ?? []) {
+      if (item.addOnServiceId != null) ids.add(item.addOnServiceId);
+    }
+    return ids;
+  }, [booking.holdPackage]);
+  const visibleAddOns = useMemo(
+    () => availableAddOns.filter((ao) => !includedAddOnIds.has(ao.addOnServiceId)),
+    [availableAddOns, includedAddOnIds],
+  );
 
   // TASK-1040062: Hydrate holdPriceBreakdown via GET /api/pricing/guest-breakdown when
   // GuestDetailsPage mounts on a deep-link or restored draft without holdPriceBreakdown,
@@ -933,6 +947,7 @@ const GuestDetailsPage: React.FC = () => {
             ...(quote.breakfastPricePerPerson ? { breakfastPricePerPerson: quote.breakfastPricePerPerson } : {}),
             ...(quote.includeBreakfast ? { includeBreakfast: quote.includeBreakfast } : {}),
             ...(quote.breakfastExtraAmount ? { breakfastExtraAmount: quote.breakfastExtraAmount } : {}),
+            ...(quote.paymentPlans !== undefined ? { paymentPlans: quote.paymentPlans } : {}),
           },
         });
       })
@@ -1244,11 +1259,42 @@ const GuestDetailsPage: React.FC = () => {
   const checkoutPriceKnown =
     quoteRefusedMessage == null && (serverFinalAmount != null || baseAmount > 0);
 
+  const isMultiRoomCheckout = Boolean(
+    booking.holdGroupReference &&
+    booking.holdMultiRoomSelections &&
+    booking.holdMultiRoomSelections.length >= 2,
+  );
+
+  const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<PaymentPlanChoice>('Full');
+  const paymentPlans = priceBreakdown?.paymentPlans ?? null;
+  useEffect(() => {
+    if (selectedPaymentPlan === 'DepositNow' && !paymentPlans?.rnplEligible) {
+      setSelectedPaymentPlan('Full');
+    } else if (selectedPaymentPlan === 'ZeroDeposit' && !(paymentPlans?.rnplEligible && paymentPlans?.allowZeroDepositReserve)) {
+      setSelectedPaymentPlan('Full');
+    } else if (selectedPaymentPlan === 'Monthly' && !(paymentPlans?.monthlyEligible && paymentPlans.monthlyInstalments?.length > 0)) {
+      setSelectedPaymentPlan('Full');
+    }
+  }, [selectedPaymentPlan, paymentPlans]);
+
+  const planChargeNow = useMemo(() => {
+    if (selectedPaymentPlan === 'ZeroDeposit' && paymentPlans?.rnplEligible && paymentPlans.allowZeroDepositReserve) {
+      return 0;
+    }
+    if (selectedPaymentPlan === 'DepositNow' && paymentPlans?.rnplEligible) {
+      return paymentPlans.depositAmountNow;
+    }
+    if (selectedPaymentPlan === 'Monthly' && paymentPlans?.monthlyEligible && paymentPlans.monthlyInstalments?.length > 0) {
+      return paymentPlans.monthlyInstalments[0].amount;
+    }
+    return displayTotal;
+  }, [selectedPaymentPlan, paymentPlans, displayTotal]);
+
   /** TASK-2875: when the server total differs, the Pay CTA shows the authoritative charge (INR). */
   const chargeInr =
     serverTotalConfirmRequired && razorpayAmountPaise != null && razorpayAmountPaise > 0
       ? razorpayAmountPaise / 100
-      : displayTotal;
+      : planChargeNow;
 
   // ── Form validation ───────────────────────────────────────────────────────
   const validateForm = useCallback(() => {
@@ -1376,9 +1422,19 @@ const GuestDetailsPage: React.FC = () => {
         });
         if (!qres.ok) { rejectLinkCode(); return; }
         const q = (await qres.json()) as { valid?: boolean; message?: string; discountAmount?: number; totalReduction?: number };
-        if (!q.valid || !(Number(q.discountAmount) > 0)) { rejectLinkCode(); return; }
-        const discount = Number(q.discountAmount);
+        if (!q.valid) { rejectLinkCode(); return; }
+        const discount = Number(q.discountAmount) || 0;
         const reduction = Math.max(discount, Number(q.totalReduction) || 0);
+        // MKTG-027: a creator tracking-only code (0% discount) is still applied for attribution; price stays the same.
+        if (discount <= 0 && reduction <= 0) {
+          setPromoMessage(q.message || 'Promo code applied');
+          setAppliedPromoCode(code);
+          setServerPromoLocked(false);
+          setPromoDiscountAmount(0);
+          setLinkQuote({ discount: 0, reduction: 0 });
+          return;
+        }
+        if (!(discount > 0)) { rejectLinkCode(); return; }
         setPromoMessage(q.message || null);
         setAppliedPromoCode(code);
         setServerPromoLocked(false);
@@ -1699,6 +1755,7 @@ const GuestDetailsPage: React.FC = () => {
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
           ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
         },
+        ...(selectedPaymentPlan !== 'Full' ? { paymentPlan: selectedPaymentPlan } : {}),
       });
 
       try {
@@ -1713,7 +1770,7 @@ const GuestDetailsPage: React.FC = () => {
           activeHoldId != null &&
           activeHoldExpiresAt != null &&
           new Date(activeHoldExpiresAt).getTime() > Date.now() + 5_000;
-        if (!holdIsLive) {
+        if (!holdIsLive && !isMultiRoomCheckout) {
           // A lapsed hold takes its order with it: never reuse an order or a launch stashed for a released hold.
           pendingRazorpayLaunchRef.current = null;
           currentAttemptIdempotencyKeyRef.current = null;
@@ -1724,7 +1781,7 @@ const GuestDetailsPage: React.FC = () => {
           activeHoldToken = started.holdToken;
           activeHoldExpiresAt = started.holdExpiresAt;
         }
-        const numericHoldId = activeHoldId as number;
+        const numericHoldId = (activeHoldId ?? 0) as number;
         const payload = buildPayload(numericHoldId, activeHoldToken);
 
         let keyId: string;
@@ -1755,11 +1812,60 @@ const GuestDetailsPage: React.FC = () => {
           }
           // (start_checkout is tracked ONCE per stay, at Reserve — re-firing it on every Pay tap inflated "checkouts started".)
 
-          const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
-            headers: getOrderRequestHeaders(idempotencyKey, effectiveTenantSlug),
-            timeout: 20000,
-          });
-          const responseData = response.data;
+          let responseData: Record<string, unknown> | undefined;
+          if (isMultiRoomCheckout && booking.holdMultiRoomSelections) {
+            const mrCheckIn = toCalendarISO(getIstCalendarDate(new Date(booking.checkIn!)));
+            const mrCheckOut = toCalendarISO(getIstCalendarDate(new Date(booking.checkOut!)));
+            const mrResp = await createMultiRoomOrder(
+              {
+                rooms: booking.holdMultiRoomSelections.map((r) => ({
+                  listingId: r.listingId,
+                  guests: r.guests,
+                  includeBreakfast: r.includeBreakfast,
+                  hasPets: r.hasPets,
+                  listingRatePlanId: r.listingRatePlanId,
+                })),
+                checkinDate: mrCheckIn,
+                checkoutDate: mrCheckOut,
+                currency: 'INR',
+                ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
+                holdGroupReference: holdIsLive ? booking.holdGroupReference! : undefined,
+                holdToken: holdIsLive ? (activeHoldToken ?? undefined) : undefined,
+                guestInfo: {
+                  name: formData.name.trim(),
+                  email: formData.email.trim(),
+                  phone: e164Phone,
+                  marketingWhatsAppOptIn: whatsappOptIn,
+                },
+                guestConsentAccepted: consentAccepted,
+                guestPurposeConsents: {
+                  booking_contact: consentAccepted,
+                  transactional_whatsapp: whatsappOptIn,
+                  marketing: marketingOptIn,
+                  ...(adsMeasurementOptIn ? { ads_measurement: true } : {}),
+                },
+                houseRulesAccepted,
+                dormGenderAcknowledged: dormAckRequired ? dormAckAccepted : false,
+                securityDepositAccepted: depositRequired ? depositAccepted : false,
+                notes: formData.notes.trim().slice(0, 500) || undefined,
+                guestNationality: formData.nationality || 'India',
+              },
+              effectiveTenantSlug,
+            );
+            responseData = {
+              keyId: mrResp.keyId,
+              orderId: mrResp.orderId,
+              bookingId: mrResp.leadBookingId,
+              bookingToken: mrResp.bookingToken,
+              amount: mrResp.amount,
+            };
+          } else {
+            const response = await axios.post(buildApiUrl('/api/Razorpay/order'), payload, {
+              headers: getOrderRequestHeaders(idempotencyKey, effectiveTenantSlug),
+              timeout: 20000,
+            });
+            responseData = response.data;
+          }
 
           const {
             keyId: respKeyId,
@@ -1772,7 +1878,30 @@ const GuestDetailsPage: React.FC = () => {
             referralDiscountAmount: serverReferralDiscount,
             appliedPromoCode: serverPromoCode,
             promoDiscountAmount: serverPromoDiscount,
+            confirmedWithoutGateway: respConfirmedWithoutGateway,
           } = responseData ?? {};
+
+          if (respConfirmedWithoutGateway === true && respBookingId) {
+            checkoutSettledRef.current = true;
+            currentAttemptIdempotencyKeyRef.current = null;
+            try {
+              sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
+              sessionStorage.removeItem(CHECKOUT_HOLD_KEY);
+            } catch { /* ignore */ }
+            updateBooking({
+              holdId: null, holdExpiresAt: null, holdPropertySlug: null,
+              holdUnitSlug: null, holdTenantSlug: null, holdPriceBreakdown: null, holdListingId: null,
+              holdListingName: null, holdCancellationTier: null,
+              holdCancellationWindowHours: null, holdGraceHours: null,
+              holdSecurityDepositAmount: null, holdBookingChannel: null,
+              paymentHoldBookingId: null, paymentHoldToken: null,
+            });
+            const tokenStr = typeof respBookingToken === 'string' ? respBookingToken.trim() : '';
+            const confirmedId = Number(respBookingId);
+            navigate(tokenStr ? `/booking/${confirmedId}?t=${encodeURIComponent(tokenStr)}` : `/booking/${confirmedId}`, { replace: true });
+            setIsSubmitting(false);
+            return;
+          }
 
           if (!respKeyId || typeof respKeyId !== 'string') {
             throw new Error('Checkout error: missing payment key. Please try again.');
@@ -1793,13 +1922,20 @@ const GuestDetailsPage: React.FC = () => {
             setReferralDiscountAmount(Number(serverReferralDiscount) > 0 ? Number(serverReferralDiscount) : 0);
           }
           if (typeof serverPromoCode === 'string' && serverPromoCode.trim()) {
-            setAppliedPromoCode(serverPromoCode.trim());
+            const echoedPromo = serverPromoCode.trim();
+            setAppliedPromoCode(echoedPromo);
             setPromoDiscountAmount(Number(serverPromoDiscount) > 0 ? Number(serverPromoDiscount) : 0);
             setServerPromoLocked(true);
+            const expectedLinkReduction = linkQuote?.reduction ?? promoDiscountAmount;
             if (!(Number(serverPromoDiscount) > 0)) {
-              setLinkQuote(null);
-              setPromoMessage(`Promo ${serverPromoCode.trim()} could not be applied`);
-              setPromoOpen(true);
+              // MKTG-027: zero-discount tracking codes are recorded on the booking with no price change.
+              if (expectedLinkReduction > 0) {
+                setLinkQuote(null);
+                setPromoMessage(`Promo ${echoedPromo} could not be applied`);
+                setPromoOpen(true);
+              } else if (linkPromoActive) {
+                setLinkQuote({ discount: 0, reduction: 0 });
+              }
             }
           } else if (Number(serverPromoDiscount) > 0) {
             setServerPromoLocked(true);
@@ -2305,7 +2441,8 @@ const GuestDetailsPage: React.FC = () => {
       holdListingId, updateBooking, navigate, booking.checkIn, booking.checkOut, booking.listingRatePlanId,
       isMarketplaceCheckout, isAiReceptionistCheckout, displayTotal,
       checkInDisplay, checkOutDisplay, brandName, effectiveTenantSlug,
-      appliedPromoCode, appliedReferralCode, bringingPet, includeBreakfast,
+      appliedPromoCode, appliedReferralCode, bringingPet, includeBreakfast, selectedPaymentPlan,
+      isMultiRoomCheckout, booking.holdGroupReference, booking.holdMultiRoomSelections,
       promoDiscountAmount, referralDiscountAmount,
     ],
   );
@@ -2990,8 +3127,30 @@ const GuestDetailsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* MRP-041: Included package extras */}
+                {booking.holdPackage && booking.holdPackage.items?.length > 0 && (
+                  <div
+                    className="gd-card"
+                    data-testid="gd-included-package"
+                    style={{ marginBottom: 14, padding: '12px 16px' }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--gd-faint, #64748b)' }}>
+                      Included in your stay
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{booking.holdPackage.title}</div>
+                    <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: 13 }}>
+                      {booking.holdPackage.items.map((item, idx) => (
+                        <li key={idx}>
+                          {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.label}
+                          {item.basis === 'per_night' ? ' (per night)' : ' (per stay)'}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {/* Add-ons (only if available) */}
-                {availableAddOns.length > 0 && (
+                {visibleAddOns.length > 0 && (
                   <div className={`gd-disclosure${addOnsOpen ? ' open' : ''}`}>
                     <button
                       type="button"
@@ -3008,12 +3167,12 @@ const GuestDetailsPage: React.FC = () => {
                         )}
                       </span>
                       <span className="gd-disc-side">
-                        <span>{availableAddOns.length} available</span>
+                        <span>{visibleAddOns.length} available</span>
                         <IconChevronDown size={16}/>
                       </span>
                     </button>
                     <div id="gd-addons-panel" className="gd-disclosure-panel gd-disclosure-panel-pad-top">
-                      {availableAddOns.map((ao) => {
+                      {visibleAddOns.map((ao) => {
                         const qty = selectedAddOns[ao.addOnServiceId] ?? 0;
                         const lineTotal = addOnLineTotal(ao, qty || 1, nights, stayGuestCount);
                         return (
@@ -3262,6 +3421,14 @@ const GuestDetailsPage: React.FC = () => {
               </div>
             )}
 
+            <PaymentPlanSelector
+              paymentPlans={paymentPlans}
+              selectedPlan={selectedPaymentPlan}
+              onChange={setSelectedPaymentPlan}
+              displayTotal={displayTotal}
+              formatPrice={displayPrice}
+            />
+
             {/* Native consent controls keep one focus stop per choice and independent policy links. */}
             <div className="gd-consent">
               <div ref={consentRowRef} className={`gd-consent-row required${consentAccepted ? ' checked' : ''}${consentFlash ? ' gd-consent-flash' : ''}`} data-testid="guest-booking-consent-row">
@@ -3487,6 +3654,16 @@ const GuestDetailsPage: React.FC = () => {
               <div className="gd-aside-stay-dates">
                 {checkInDisplay} → {checkOutDisplay} · {nights > 0 ? `${nights} ${nights === 1 ? 'night' : 'nights'}` : ''} · {booking.guests ?? 1} guest{(booking.guests ?? 1) !== 1 ? 's' : ''}
               </div>
+              {isMultiRoomCheckout && booking.holdMultiRoomSelections && (
+                <ul className="mt-2 space-y-1 text-xs text-text-secondary" data-testid="gd-multi-room-list">
+                  {booking.holdMultiRoomSelections.map((r) => (
+                    <li key={r.listingId} className="flex items-center justify-between gap-2">
+                      <span>{r.listingName} ({r.guests}g)</span>
+                      <span>{displayPrice(r.finalAmount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
@@ -3718,9 +3895,11 @@ const GuestDetailsPage: React.FC = () => {
               >
                 {isSubmitting
                   ? <><IconSpinner size={16}/> Securing your booking…</>
-                  : checkoutPriceKnown
-                    ? <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
-                    : <><IconLock size={14}/> Pay to confirm</>
+                  : checkoutPriceKnown && selectedPaymentPlan === 'ZeroDeposit'
+                    ? <><IconLock size={14}/> Reserve for ₹0</>
+                    : checkoutPriceKnown
+                      ? <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span> to confirm</>
+                      : <><IconLock size={14}/> Pay to confirm</>
                 }
               </button>
               {quoteRefusedMessage != null && (
@@ -3903,9 +4082,11 @@ const GuestDetailsPage: React.FC = () => {
               ? <><IconSpinner size={14}/> Securing…</>
               : !checkoutPriceKnown
                 ? <><IconLock size={14}/> Pay</>
-                : serverTotalConfirmRequired
-                  ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
-                  : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
+                : selectedPaymentPlan === 'ZeroDeposit'
+                  ? <><IconLock size={14}/> Reserve for ₹0</>
+                  : serverTotalConfirmRequired
+                    ? <><IconLock size={14}/> Confirm <span className="num">{displayPrice(chargeInr)}</span></>
+                    : <><IconLock size={14}/> Pay <span className="num">{displayPrice(chargeInr)}</span></>
             }
           </button>
         ) : notTakingBookings ? (

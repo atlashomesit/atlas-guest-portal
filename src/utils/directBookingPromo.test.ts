@@ -4,10 +4,14 @@
  * tenant-authored overrides.directBookingPromo.subline must still win over both variants.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { resolveDirectBookingPromo } from "./directBookingPromo";
 import type { TenantInfo } from "../tenant/tenantContext";
 import type { TenantOverrides } from "../tenant/tenantOverrides";
+
+vi.mock("@/runtime-config", () => ({
+  getGlobalDiscountPercent: () => 0,
+}));
 
 const tenant = (over: Partial<TenantInfo>): TenantInfo => ({
   name: "Atlas Homestays",
@@ -63,5 +67,22 @@ describe("resolveDirectBookingPromo (TASK-101158)", () => {
       { directBookingPromo: { subline: "Custom host-authored subline" } } as TenantOverrides,
     );
     expect(resolved.sub).toBe("Custom host-authored subline");
+  });
+
+  it("GUEST-063: default headline uses neutral 'Book direct with the host' when add-on fee applies or is unknown, and 'best rates' only when fee is known to be 0", () => {
+    const hostTenant = tenant({ isMarketplaceRoot: false, paymentProvider: "RAZORPAY", bookingMode: "ONLINE" });
+    const withFee = resolveDirectBookingPromo(hostTenant, noOverrides, 3);
+    const withZeroFee = resolveDirectBookingPromo(hostTenant, noOverrides, 0);
+    const withUnknownFee = resolveDirectBookingPromo(hostTenant, noOverrides, null);
+    const marketplaceZero = resolveDirectBookingPromo(
+      tenant({ isMarketplaceRoot: true, paymentProvider: "RAZORPAY", bookingMode: "ONLINE" }),
+      noOverrides,
+      0,
+    );
+
+    expect(withFee.headline).toBe("Book direct with the host");
+    expect(withUnknownFee.headline).toBe("Book direct with the host");
+    expect(withZeroFee.headline).toBe("Book direct — best rates on our official site");
+    expect(marketplaceZero.headline).toBe("Book direct with the host");
   });
 });

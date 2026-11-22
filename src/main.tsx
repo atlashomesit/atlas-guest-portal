@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import ApiConfigGuard from './components/ApiConfigGuard'
 import { initMonitoring } from './lib/monitoring'
 import { rememberAgentCodeFromLink } from './lib/agentCode'
+import { rememberPromoFromLink } from './utils/linkPromo'
 import { initAnalytics, initTenantAnalytics } from './utils/analytics'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { loadRuntimeConfig, setRuntimeConfig, getApiBaseUrl } from './runtime-config'
@@ -86,6 +87,8 @@ const bootstrapApp = async () => {
   // PRICE-016: remember the travel agent's code from the agent's link (?agent=CODE), then take it out of the
   // address bar before monitoring / analytics read the URL, so the code is never sent to a third party.
   rememberAgentCodeFromLink()
+  // MKTG-027: creator tracked links open the host site with `?promo=CODE` (often on `/`, not a listing page).
+  rememberPromoFromLink()
   initMonitoring()
   initAnalytics()
   window.addEventListener('atlas:cookie-consent-changed', () => {

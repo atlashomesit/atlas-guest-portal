@@ -22,6 +22,13 @@ export interface ParentChildCrossSellBannerProps {
   /** Route segment of the Child page: `/homes/{propertySlug}/{listingId}`. */
   propertySlug?: string;
   onSelectChildRoom?: (room: ChildRoomPreview) => void;
+  /** CLU-038: optional multi-room selection controls when parent cluster has 2+ free rooms */
+  multiRoomEnabled?: boolean;
+  selectedRoomIds?: number[];
+  onToggleRoom?: (room: ChildRoomPreview) => void;
+  onBookSelectedTogether?: () => void;
+  /** HSL-029: When true, render hostel dorm wording instead of whole-villa wording. */
+  isHostelWholeRoom?: boolean;
   className?: string;
 }
 
@@ -76,6 +83,11 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
   guests,
   propertySlug,
   onSelectChildRoom,
+  multiRoomEnabled = false,
+  selectedRoomIds = [],
+  onToggleRoom,
+  onBookSelectedTogether,
+  isHostelWholeRoom = false,
   className = '',
 }) => {
   // Only claim something about the rooms when the API says some Children are booked AND some are free.
@@ -131,16 +143,18 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
     >
       <div className="flex items-start gap-3">
         <div className="text-2xl flex-shrink-0" aria-hidden="true">
-          🏡
+          {isHostelWholeRoom ? '🛏️' : '🏡'}
         </div>
         <div className="space-y-1 flex-1">
           <h4 className="text-sm font-bold text-indigo-900 leading-snug" data-testid="cluster-cross-sell-headline">
-            The whole villa is taken because {booked} room{booked === 1 ? ' is' : 's are'} booked, but {free}{' '}
-            {free === 1 ? 'is' : 'are'} free.
+            {isHostelWholeRoom
+              ? 'Not free on these dates because some beds are booked.'
+              : `The whole villa is taken because ${booked} room${booked === 1 ? ' is' : 's are'} booked, but ${free} ${free === 1 ? 'is' : 'are'} free.`}
           </h4>
           <p className="text-xs text-indigo-800 leading-relaxed" data-testid="cluster-cross-sell-count">
-            {free} of {total} rooms {free === 1 ? 'is' : 'are'} free on these dates
-            {parentName ? ` at ${parentName}` : ''}.
+            {isHostelWholeRoom
+              ? `Beds are still free in the shared dorm${parentName ? ` at ${parentName}` : ''}.`
+              : `${free} of ${total} rooms ${free === 1 ? 'is' : 'are'} free on these dates${parentName ? ` at ${parentName}` : ''}.`}
           </p>
         </div>
       </div>
@@ -161,19 +175,35 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
                 <p className="text-slate-600">Up to {room.maxGuests} {room.maxGuests === 1 ? 'guest' : 'guests'}</p>
               )}
             </div>
-            <a
-              href={room.href}
-              onClick={(e) => {
-                if (onSelectChildRoom) {
-                  e.preventDefault();
-                  onSelectChildRoom(room);
-                }
-              }}
-              data-testid={`select-child-room-${room.id}`}
-              className="flex-shrink-0 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700 transition"
-            >
-              View {room.name}
-            </a>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {multiRoomEnabled && rooms.length >= 2 && onToggleRoom && (
+                <button
+                  type="button"
+                  onClick={() => onToggleRoom(room)}
+                  data-testid={`add-child-room-${room.id}`}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition ${
+                    selectedRoomIds.includes(Number(room.id))
+                      ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                      : 'border border-indigo-600 text-indigo-700 hover:bg-indigo-50'
+                  }`}
+                >
+                  {selectedRoomIds.includes(Number(room.id)) ? 'Added' : 'Add'}
+                </button>
+              )}
+              <a
+                href={room.href}
+                onClick={(e) => {
+                  if (onSelectChildRoom) {
+                    e.preventDefault();
+                    onSelectChildRoom(room);
+                  }
+                }}
+                data-testid={`select-child-room-${room.id}`}
+                className="flex-shrink-0 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+              >
+                View {room.name}
+              </a>
+            </div>
           </div>
         ))}
       </div>
@@ -182,6 +212,18 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
         <p className="text-xs font-medium text-indigo-900" data-testid="cluster-cross-sell-combination">
           {combinationHint}
         </p>
+      )}
+      {multiRoomEnabled && selectedRoomIds.length >= 2 && onBookSelectedTogether && (
+        <div className="pt-1 flex justify-end">
+          <button
+            type="button"
+            onClick={onBookSelectedTogether}
+            data-testid="cluster-book-rooms-together"
+            className="min-h-[44px] rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+          >
+            Book these rooms together ({selectedRoomIds.length})
+          </button>
+        </div>
       )}
     </div>
   );

@@ -24,6 +24,9 @@ export interface PayLinkSummary {
   alreadyPaid: boolean;
   upiVpa?: string | null;
   payeeName?: string | null;
+  upgradeTitle?: string | null;
+  upgradeHoldLapsed?: boolean;
+  checkInReturnUrl?: string | null;
 }
 
 export interface PayLinkOrder {
@@ -60,15 +63,22 @@ async function readError(res: Response, fallback: string): Promise<PayLinkError>
 
 const base = (token: string) => `/api/guest/payments/link/${encodeURIComponent(token)}`;
 
-export async function getPayLink(token: string): Promise<PayLinkSummary> {
-  const res = await fetch(buildApiUrl(base(token)), { headers: getApiHeaders() });
+function withInstalment(urlPath: string, instalmentId?: number | null): string {
+  if (instalmentId != null && Number.isFinite(instalmentId) && instalmentId > 0) {
+    return `${urlPath}?instalmentId=${encodeURIComponent(String(instalmentId))}`;
+  }
+  return urlPath;
+}
+
+export async function getPayLink(token: string, instalmentId?: number | null): Promise<PayLinkSummary> {
+  const res = await fetch(buildApiUrl(withInstalment(base(token), instalmentId)), { headers: getApiHeaders() });
   if (res.status === 404) throw new PayLinkError('This payment link is not valid any more. Please ask your host for a new one.', 404);
   if (!res.ok) throw await readError(res, 'We could not load this payment page. Please try again.');
   return res.json() as Promise<PayLinkSummary>;
 }
 
-export async function createPayLinkOrder(token: string): Promise<PayLinkOrder> {
-  const res = await fetch(buildApiUrl(`${base(token)}/order`), {
+export async function createPayLinkOrder(token: string, instalmentId?: number | null): Promise<PayLinkOrder> {
+  const res = await fetch(buildApiUrl(withInstalment(`${base(token)}/order`, instalmentId)), {
     method: 'POST',
     headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
   });
@@ -95,10 +105,10 @@ export interface PayLinkVerifyResult {
  * POST verify. Resolves only when the API verified the signature, read the payment back from Razorpay and recorded it. Any refusal throws a PayLinkError with a
  * plain sentence from the API (the booking stays unpaid); a network failure says so and tells the guest not to pay twice.
  */
-export async function verifyPayLinkPayment(token: string, result: RazorpayCheckoutResult): Promise<PayLinkVerifyResult> {
+export async function verifyPayLinkPayment(token: string, result: RazorpayCheckoutResult, instalmentId?: number | null): Promise<PayLinkVerifyResult> {
   let res: Response;
   try {
-    res = await fetch(buildApiUrl(`${base(token)}/verify`), {
+    res = await fetch(buildApiUrl(withInstalment(`${base(token)}/verify`, instalmentId)), {
       method: 'POST',
       headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({

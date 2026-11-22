@@ -45,7 +45,7 @@ export const faqItems: FaqItem[] = [
     category: "Cancellations & Refunds",
     question: "Can I reschedule instead of cancelling?",
     answer:
-      "Reschedules are possible subject to availability. Notice windows may include a fee or tariff difference, and changes close to arrival follow the cancellation policy.",
+      "Date changes depend on the host and the listing's policy shown at booking (as agreed with your host and the listing's policy), subject to availability for the revised dates.",
     linksTo: [
       { type: "policy", id: "reschedules" },
       { type: "terms", id: "cancellations-refunds" },

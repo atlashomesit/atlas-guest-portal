@@ -54,12 +54,15 @@ const SearchPage = React.lazy(() => import("./pages/SearchPage"))
 const MarketplaceHomepage = React.lazy(() => import("./pages/MarketplaceHomepage"))
 const ShortLinkRedirect = React.lazy(() => import("./components/ShortLinkRedirect"))
 const LegacyHomeRoomRedirect = React.lazy(() => import("./pages/home/LegacyHomeRoomRedirect"))
+const TalkToUsVoiceWidget = React.lazy(() => import("./components/support/TalkToUsVoiceWidget"))
 const SupportWidget = React.lazy(() => import("./components/support/SupportWidget"))
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
 const SecurityDepositPage = React.lazy(() => import("./pages/SecurityDepositPage")) // TASK-10299239
 const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
+const KioskCheckIn = React.lazy(() => import("./pages/KioskCheckIn"))
+const LobbyCheckinLinkPage = React.lazy(() => import("./pages/LobbyCheckinLinkPage")) // HSL-031
 const HouseRulesAcceptPage = React.lazy(() => import("./pages/HouseRulesAcceptPage")) // TASK-guest-automation-phase3
 const YourBookingPage = React.lazy(() => import("./pages/YourBookingPage")) // TASK-10299444
 const PayLinkPage = React.lazy(() => import("./pages/PayLinkPage")) // PAY-016
@@ -84,6 +87,8 @@ const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 const QrMenuPage = React.lazy(() => import("./pages/QrMenuPage"))
 // REV-046: the page a guest reaches by scanning the host's review QR code (`/rate/:tenantSlug/:code`).
 const ReviewQrPage = React.lazy(() => import("./pages/ReviewQrPage"))
+// ADMIN-166: Guest-facing held-rooms claim & checkout page (`/group/:token`)
+const GroupHoldBookingPage = React.lazy(() => import("./pages/GroupHoldBookingPage"))
 
 function LazyFallback() {
   // TASK-7822: 50vh left the site footer in the first desktop viewport. Home then
@@ -196,11 +201,13 @@ function AppWrapper() {
   const isQrMenuRoute = Boolean(matchPath('/qr-menu/:tenantSlug', location.pathname));
   // REV-046: the review QR page is a standalone, one-screen page (no navbar, footer, support widget or cookie banner).
   const isReviewQrRoute = Boolean(matchPath('/rate/:tenantSlug/:code', location.pathname));
+  // KIOSK: Standalone touchscreen lobby terminal — hide navbar, footer, support widget and cookie banner.
+  const isKioskRoute = Boolean(matchPath('/kiosk/:bookingRef', location.pathname)) || Boolean(matchPath('/kiosk', location.pathname));
 
-  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || hideNavbarRoutes.some((pattern) =>
+  const shouldHideNavbar = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || isKioskRoute || hideNavbarRoutes.some((pattern) =>
     Boolean(matchPath(pattern, location.pathname))
   );
-  const shouldHideFooter = isEmbedRoute || isQrMenuRoute || isReviewQrRoute;
+  const shouldHideFooter = isEmbedRoute || isQrMenuRoute || isReviewQrRoute || isKioskRoute;
   // Classic tenant home owns the inline consent region immediately after its search.
   // Other themes/routes keep the global consent banner; no tenant resolution changes.
   const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
@@ -315,10 +322,17 @@ function AppWrapper() {
           <Route path="/property/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-singular-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Suspense fallback={<LazyFallback />}><Reserve /></Suspense>, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><BookingConfirmationPage /></Suspense>, "booking-confirmation-route")} />
+          {/* ADMIN-166: Shared group-hold room selection & claim page */}
+          <Route path="/group/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><GroupHoldBookingPage /></Suspense>, "group-hold-booking-route")} />
           {/* TASK-10299239: security-deposit hold page, reached from the pre-arrival message; authorised by the same booking-link token (?t=). */}
           <Route path="/booking/:bookingId/deposit" element={withBoundary(<Suspense fallback={<LazyFallback />}><SecurityDepositPage /></Suspense>, "security-deposit-route")} />
           <Route path="/check-in/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-route")} />
           <Route path="/check-in" element={withBoundary(<Suspense fallback={<LazyFallback />}><SelfCheckIn /></Suspense>, "self-checkin-noparam-route")} />
+          {/* KIOSK: Freestanding lobby terminal check-in routes */}
+          <Route path="/kiosk/:bookingRef" element={withBoundary(<Suspense fallback={<LazyFallback />}><KioskCheckIn /></Suspense>, "kiosk-ref-route")} />
+          <Route path="/kiosk" element={withBoundary(<Suspense fallback={<LazyFallback />}><KioskCheckIn /></Suspense>, "kiosk-route")} />
+          {/* HSL-031: lobby poster page, opened from the QR on the printed poster; holds nothing private. */}
+          <Route path="/lobby/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><LobbyCheckinLinkPage /></Suspense>, "lobby-checkin-link-route")} />
           {/* GUEST-052: Unhyphenated /checkin aliases preserving query params (?t=...) */}
           <Route path="/checkin/:bookingRef" element={withBoundary(<CheckinBookingRefAliasRedirect />, "self-checkin-alias-ref-route")} />
           <Route path="/checkin" element={withBoundary(<CheckinAliasRedirect />, "self-checkin-alias-route")} />
@@ -359,6 +373,7 @@ function AppWrapper() {
         </main>
       </ErrorBoundary>
       {!shouldHideFooter && <div className={inlineHomeConsent ? "home-inline-support" : inlineReviewSupport ? "review-inline-support" : undefined}><Suspense fallback={null}><SupportWidget placement={inlineReviewSupport ? "inline" : location.pathname === '/search' ? "search" : "floating"} /></Suspense></div>}
+      {!shouldHideFooter && <Suspense fallback={null}><TalkToUsVoiceWidget /></Suspense>}
       {!shouldHideFooter && <Footer />}
       {!shouldHideFooter && !inlineHomeConsent && <Suspense fallback={null}><CookieConsentBanner /></Suspense>}
       <ToastContainer position="top-right" newestOnTop pauseOnFocusLoss={false} />

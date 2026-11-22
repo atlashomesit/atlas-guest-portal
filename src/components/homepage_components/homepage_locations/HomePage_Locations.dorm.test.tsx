@@ -6,6 +6,7 @@ import HomePage_Locations from './HomePage_Locations';
 import { settle } from '../../../test/settle';
 import { CurrencyProvider } from '../../../contexts/CurrencyContext';
 import * as useTenantListingsModule from '../../../hooks/useTenantListings';
+import { clearMarketplaceCardPriceCache } from '../../../hooks/useMarketplaceCardPrices';
 
 // TASK-1040089: the guest storefront "Our Homes" tiles carry the same dorm / gender chips and per-bed wording as the listing card.
 afterEach(() => {
@@ -26,14 +27,29 @@ const spyProperties = (properties: Array<Record<string, unknown>>) =>
     refetch: vi.fn(),
   });
 
-const renderTiles = () =>
+const renderTiles = (search = '') =>
   render(
     <CurrencyProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[{ pathname: '/', search }]}>
         <HomePage_Locations listings={listings} />
       </MemoryRouter>
     </CurrencyProvider>,
   );
+
+// GUEST-065 (founder ruling 2026-11-19): with no dates a tile shows no price, so per-bed pricing is read where a price is
+// shown: the tile for the dates the guest picked, priced from the quote for those dates.
+const stubQuote = () =>
+  vi.spyOn(globalThis, 'fetch').mockImplementation((input: unknown) => {
+    const url = String(input);
+    if (url.includes('/api/pricing/guest-breakdown')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ baseAmount: 3000, discountAmount: 0, convenienceFeeAmount: 0, finalAmount: 3000 }),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, status: 200, json: async () => ({}) } as Response);
+  });
 
 describe('HomePage_Locations dorm tiles (TASK-1040089)', () => {
   it('shows the dorm badge and the Female-Only chip on a FemaleOnly dorm tile, and nothing on a private room', async () => {
@@ -63,12 +79,14 @@ describe('HomePage_Locations dorm tiles (TASK-1040089)', () => {
     expect(screen.queryByTestId('hostel-gender-badge-female')).toBeNull();
   });
 
-  it('prices a dorm tile per bed', async () => {
+  it('prices a dorm tile per bed once dates are picked, and a room per night', async () => {
+    clearMarketplaceCardPriceCache();
+    stubQuote();
     spyProperties([
       { id: '1516', listingId: 1516, property_name: 'Female Dorm', accommodationType: 'HostelDorm', dormGenderPolicy: 'Mixed' },
       { id: '1517', listingId: 1517, property_name: 'Private Room', accommodationType: 'PrivateRoom', dormGenderPolicy: null },
     ]);
-    renderTiles();
+    renderTiles('?checkIn=2026-10-30&checkOut=2026-11-01&guests=2');
     await settle();
 
     // G2 journey 19: a card's accessible name is its own text now (it started with an aria-label that hid the words on screen).
@@ -77,9 +95,21 @@ describe('HomePage_Locations dorm tiles (TASK-1040089)', () => {
     const room = tiles.find((t) => /private room/i.test(t.textContent ?? ''));
     expect(dorm).toBeTruthy();
     expect(room).toBeTruthy();
-    expect(dorm).toHaveTextContent(/per bed/i);
-    expect(dorm).not.toHaveTextContent(/per night/i);
-    expect(room).toHaveTextContent(/per night/i);
-    expect(room).not.toHaveTextContent(/per bed/i);
+    expect(dorm).toHaveTextContent(/bed \/ night/i);
+    expect(room).toHaveTextContent(/\/ night/i);
+    expect(room).not.toHaveTextContent(/bed \/ night/i);
+  });
+
+  it('with no dates picked a dorm tile and a room tile both show the same hint and no price', async () => {
+    spyProperties([
+      { id: '1516', listingId: 1516, property_name: 'Female Dorm', accommodationType: 'HostelDorm', dormGenderPolicy: 'Mixed' },
+      { id: '1517', listingId: 1517, property_name: 'Private Room', accommodationType: 'PrivateRoom', dormGenderPolicy: null },
+    ]);
+    renderTiles();
+    await settle();
+    const hints = screen.getAllByTestId('home-card-price-hint');
+    expect(hints).toHaveLength(2);
+    hints.forEach((h) => expect(h).toHaveTextContent(/^See the price for your dates$/));
+    expect(document.body.textContent ?? '').not.toMatch(/₹/);
   });
 });

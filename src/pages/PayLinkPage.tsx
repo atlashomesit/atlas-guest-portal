@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { UpiPaymentPanel } from '../components/checkout/UpiPaymentPanel';
 import {
@@ -52,6 +52,10 @@ function toUpiOrder(o: PayLinkOrder): UpiOrder | null {
 
 export default function PayLinkPage() {
   const { token = '' } = useParams<{ token: string }>();
+  const [searchParams] = useSearchParams();
+  const rawInstalmentId = searchParams.get('instalmentId');
+  const parsedInstalmentId = rawInstalmentId ? Number(rawInstalmentId) : null;
+  const instalmentId = parsedInstalmentId && Number.isFinite(parsedInstalmentId) && parsedInstalmentId > 0 ? parsedInstalmentId : null;
   const navigate = useNavigate();
 
   const [summary, setSummary] = useState<PayLinkSummary | null>(null);
@@ -66,19 +70,19 @@ export default function PayLinkPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getPayLink(token)
+    getPayLink(token, instalmentId)
       .then((s) => { if (!cancelled) setSummary(s); })
       .catch((e: unknown) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : 'We could not load this payment page.');
       });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, instalmentId]);
 
   /** Asks the API to verify what Checkout returned; on success opens the booking confirmation. Never throws. */
   const confirmPayment = useCallback(
     async (result: RazorpayCheckoutResult, bookingId: number): Promise<void> => {
       try {
-        const verified = await verifyPayLinkPayment(token, result);
+        const verified = await verifyPayLinkPayment(token, result, instalmentId);
         setUnconfirmed(null);
         const id = verified.bookingId || bookingId;
         const t = verified.bookingToken;
@@ -88,14 +92,14 @@ export default function PayLinkPage() {
         setActionError(e instanceof Error ? e.message : 'We could not confirm your payment, so it is not marked paid. If money was taken, do not pay again - contact your host.');
       }
     },
-    [token, navigate],
+    [token, instalmentId, navigate],
   );
 
   const startPayment = useCallback(async () => {
     setBusy(true);
     setActionError(null);
     try {
-      const order = await createPayLinkOrder(token);
+      const order = await createPayLinkOrder(token, instalmentId);
       const upiOrder = toUpiOrder(order);
       if (upiOrder) {
         setUpi({ order: upiOrder, raw: order });
@@ -128,7 +132,7 @@ export default function PayLinkPage() {
     } finally {
       setBusy(false);
     }
-  }, [token, summary, confirmPayment]);
+  }, [token, summary, confirmPayment, instalmentId]);
 
   const checkAgain = useCallback(async () => {
     if (!unconfirmed) return;
@@ -171,9 +175,26 @@ export default function PayLinkPage() {
         <>
           <header className="mb-4">
             <h1 className="text-xl font-semibold text-stone-900" data-testid="pay-link-title">
-              {summary.guestFirstName ? `Hi ${summary.guestFirstName}, ` : ''}pay for your stay at {summary.hostName || summary.propertyName}
+              {summary.upgradeTitle
+                ? summary.upgradeTitle
+                : `${summary.guestFirstName ? `Hi ${summary.guestFirstName}, ` : ''}pay for your stay at ${summary.hostName || summary.propertyName}`}
             </h1>
           </header>
+
+          {summary.upgradeHoldLapsed ? (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert" data-testid="pay-link-upgrade-lapsed">
+              <p className="font-medium">This upgrade is no longer held for you.</p>
+              {summary.checkInReturnUrl && (
+                <a
+                  href={summary.checkInReturnUrl}
+                  className="mt-2 inline-block font-semibold underline"
+                  data-testid="pay-link-upgrade-back"
+                >
+                  Back to your check-in page
+                </a>
+              )}
+            </div>
+          ) : null}
 
           <section className="mb-4 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-800" data-testid="pay-link-summary">
             <p className="font-medium">{[summary.propertyName, summary.listingName].filter(Boolean).join(' - ')}</p>
@@ -181,17 +202,21 @@ export default function PayLinkPage() {
               {summary.checkIn} to {summary.checkOut} ({summary.nights} {summary.nights === 1 ? 'night' : 'nights'})
             </p>
             <p className="mt-2 text-base font-semibold" data-testid="pay-link-amount">
-              {summary.alreadyPaid ? 'Nothing left to pay' : `Amount to pay: ${formatInr(summary.amountDueInr, summary.currency)}`}
+              {summary.upgradeHoldLapsed
+                ? 'Nothing charged'
+                : summary.alreadyPaid
+                  ? 'Nothing left to pay'
+                  : `Amount to pay: ${formatInr(summary.amountDueInr, summary.currency)}`}
             </p>
           </section>
 
-          {summary.alreadyPaid && (
+          {summary.alreadyPaid && !summary.upgradeHoldLapsed && (
             <p className="rounded-xl bg-emerald-50 p-4 text-emerald-900" data-testid="pay-link-paid">
               This stay is paid up. Thank you!
             </p>
           )}
 
-          {!summary.alreadyPaid && summary.mode === 'UNAVAILABLE' && (
+          {!summary.alreadyPaid && !summary.upgradeHoldLapsed && summary.mode === 'UNAVAILABLE' && (
             <p className="rounded-xl bg-amber-50 p-4 text-amber-900" data-testid="pay-link-unavailable">
               Online payment is not available for this property right now. Please contact your host to pay.
             </p>

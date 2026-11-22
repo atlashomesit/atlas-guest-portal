@@ -49,6 +49,7 @@ import {
   netChargeableRoomFare,
   type GuestPriceBreakdown,
   type PublicListingRatePlanDto,
+  type RatePlanPackageDto,
 } from '@/api/pricingClient';
 import { fetchAvailabilityRatesForMonths } from '@/api/availabilityRatesClient';
 import { fetchPublicListings } from '@/api/listingClient';
@@ -57,11 +58,14 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import FomoBar from '@/components/FomoBar';
 import BookDirectPerks from '@/components/trust/BookDirectPerks';
 import ParentChildCrossSellBanner, { isParentListing, type ChildRoomPreview } from '../cluster/ParentChildCrossSellBanner';
+import MultiRoomDrawer from './MultiRoomDrawer';
+import { createMultiRoomOrder, fetchMultiRoomOptions, type MultiRoomOption, type MultiRoomOptionsResponse } from '@/api/multiRoomClient';
 import { fetchClusterChildrenAvailability, type ClusterChildrenAvailability } from '@/api/clusterChildrenClient';
 import { fetchSisterAvailability, type SisterSpillover } from '@/api/sisterAvailabilityClient';
 import SisterPropertySpillover from './SisterPropertySpillover';
 import HostelDormBadge from '../hostel/HostelDormBadge';
 import { bedsLeftForNights, isHostelDormType, type DormGenderPolicy } from '@/utils/dormListing';
+import { guestCapacityHint, guestCapacityMismatchMessage } from '@/utils/guestCapacityHint';
 import { track } from '@/lib/events'; // TASK-1480
 import { trackEvent } from '@/utils/analytics';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
@@ -127,6 +131,11 @@ export interface UnitBookingWidgetProps {
   dormGenderPolicy?: DormGenderPolicy | null;
   /** HSL-011: total beds in the dorm (`Listing.Quantity`) - the "Y" of "X of Y beds left". */
   dormBedCount?: number | null;
+  /** HSL-029: Linked whole-room private listing info for mixed dorms. */
+  wholeRoomListingId?: number | null;
+  wholeRoomName?: string | null;
+  wholeRoomNightlyRate?: number | null;
+  isHostelWholeRoomParent?: boolean;
   /** TASK-1039977 / PAY-006: listing security deposit (INR); forwarded to checkout */
   securityDepositAmount?: number | null;
   /** TASK-10299183: small-party pricing configured on listing. */
@@ -137,6 +146,8 @@ export interface UnitBookingWidgetProps {
   priceChangesWithGuests?: boolean | null;
   /** Custom small-party hint text. Defaults to "Special rate available for 1-2 guests". */
   smallPartyHint?: string | null;
+  /** GUEST-066: listing type label from the API (e.g. "4 BHK") for capacity mismatch hint. */
+  listingType?: string | null;
 }
 
 export type BookingStickySummary = {
@@ -274,12 +285,17 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   accommodationType,
   dormGenderPolicy = null,
   dormBedCount = null,
+  wholeRoomListingId = null,
+  wholeRoomName = null,
+  wholeRoomNightlyRate = null,
+  isHostelWholeRoomParent = false,
   securityDepositAmount = null,
   hasSmallPartyPricing = false,
   includedGuests = null,
   extraGuestRate = null,
   priceChangesWithGuests = null,
   smallPartyHint,
+  listingType = null,
 }) => {
   if (import.meta.env.DEV) {
     console.assert(Boolean(propertyId), '[UnitBookingWidget] propertyId is required for unit mode');
@@ -383,6 +399,7 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   // MRP-002: Public rate plans for this listing & selected rate plan ID.
   const [publicRatePlans, setPublicRatePlans] = useState<PublicListingRatePlanDto[]>([]);
   const [selectedRatePlanId, setSelectedRatePlanId] = useState<number | null>(null);
+  const [openPackageModal, setOpenPackageModal] = useState<RatePlanPackageDto | null>(null);
   // CFB-009 / BNB-009 / BNB-010: Optional "Add breakfast" toggle on Room-Only (EP) direct bookings.
   const [includeBreakfast, setIncludeBreakfast] = useState(false);
   const [guests, setGuests] = useState(2);
@@ -564,6 +581,18 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   const effectiveMaxGuests = maxGuests;
   // HSL-011: a HostelDorm sells BEDS. The type comes from the listing API only (never the listing name).
   const isDorm = isHostelDormType(accommodationType);
+  const capacityMismatch = useMemo(
+    () =>
+      !isDorm
+        ? guestCapacityHint({
+            maxGuests: effectiveMaxGuests,
+            listingType,
+            listingName,
+            accommodationType,
+          })
+        : null,
+    [isDorm, effectiveMaxGuests, listingType, listingName, accommodationType],
+  );
   const dormBedsLeft = useMemo(() => {
     if (!isDorm || !dateRange.startDate || !dateRange.endDate) return null;
     const nights: string[] = [];
@@ -1357,6 +1386,39 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
     return () => controller.abort();
   }, [listingId, gstRangeStartIso, gstRangeEndIso, selectedRatePlanId, guests, verifiedTenantSlug, quoteKey]);
 
+  // CLU-038: Multi-room direct website checkout options & selection state.
+  const multiRoomTenantAllow = (tenantContext !== undefined ? tenantContext : getTenantContext())?.allowMultiRoomBooking === true;
+  const [multiRoomOpen, setMultiRoomOpen] = useState(false);
+  const [multiRoomOptions, setMultiRoomOptions] = useState<MultiRoomOptionsResponse | null>(null);
+  const [multiRoomLoading, setMultiRoomLoading] = useState(false);
+  const [selectedExtraRooms, setSelectedExtraRooms] = useState<MultiRoomOption[]>([]);
+  const [selectedParentChildRooms, setSelectedParentChildRooms] = useState<ChildRoomPreview[]>([]);
+  const [multiRoomSubmitting, setMultiRoomSubmitting] = useState(false);
+
+  useEffect(() => {
+    setSelectedExtraRooms([]);
+    setSelectedParentChildRooms([]);
+    if (!multiRoomTenantAllow || !gstRangeStartIso || !gstRangeEndIso) {
+      setMultiRoomOptions(null);
+      return;
+    }
+    const idNum = Number(listingId);
+    if (!Number.isFinite(idNum) || idNum <= 0) return;
+    const ac = new AbortController();
+    setMultiRoomLoading(true);
+    fetchMultiRoomOptions(idNum, gstRangeStartIso, gstRangeEndIso, verifiedTenantSlug, ac.signal)
+      .then((res) => {
+        if (!ac.signal.aborted) setMultiRoomOptions(res);
+      })
+      .catch(() => {
+        if (!ac.signal.aborted) setMultiRoomOptions(null);
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setMultiRoomLoading(false);
+      });
+    return () => ac.abort();
+  }, [multiRoomTenantAllow, listingId, gstRangeStartIso, gstRangeEndIso, verifiedTenantSlug]);
+
   const isCheckInAllowed = (date: Date) => {
   // `date` is a CALENDAR-basis cell from AtlasBookingCalendar — key it through the same
   // helper the grid uses (utils/date.ts). Routing it through an instant→IST conversion
@@ -1494,17 +1556,28 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
       setOpenCalendar(false);
       return;
     }
-    setDateConflictError('These dates overlap an existing booking or hold.');
-    return;
-  }
+      setDateConflictError('These dates overlap an existing booking or hold.');
+      if (listingId != null) {
+        track('dates_unavailable', Number(listingId), {
+          checkIn: toCalendarISO(startDate),
+          checkOut: toCalendarISO(endDate),
+          tenantSlug: verifiedTenantSlug,
+        });
+      }
+      return;
+    }
 
-  setDateRange(next);
-  // Auto-close calendar when both dates are selected
-  setOpenCalendar(false);
-  // TASK-1480: funnel event when both dates are selected
-  if (next.startDate && next.endDate && listingId != null) {
-    track('select_dates', Number(listingId));
-  }
+    setDateRange(next);
+    // Auto-close calendar when both dates are selected
+    setOpenCalendar(false);
+    // TASK-1480 / DYN-039: funnel event when both dates are selected (carries dates + owning host tenant on marketplace)
+    if (next.startDate && next.endDate && listingId != null) {
+      track('select_dates', Number(listingId), {
+        checkIn: toCalendarISO(next.startDate),
+        checkOut: toCalendarISO(next.endDate),
+        tenantSlug: verifiedTenantSlug,
+      });
+    }
 };
 
 
@@ -2027,6 +2100,72 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
   // v2 date display uses split check-in/check-out cells (see lv-date-cell blocks below).
 
+  const handleBookMultiRoomTogether = useCallback(async (extraRooms: MultiRoomOption[]) => {
+    if (!dateRange.startDate || !dateRange.endDate || extraRooms.length === 0 || multiRoomSubmitting) return;
+    const idNum = Number(listingId);
+    if (!Number.isFinite(idNum) || idNum <= 0) return;
+    setMultiRoomSubmitting(true);
+    setFormError(null);
+    try {
+      const checkinIst = toCalendarISO(startOfCalendarDay(dateRange.startDate));
+      const checkoutIst = toCalendarISO(startOfCalendarDay(dateRange.endDate));
+      const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+      const tenantFromUrl = typeof window !== 'undefined' ? new URLSearchParams(currentSearch).get('tenant') : null;
+      const holdTenantSlug = verifiedTenantSlug || tenantFromUrl || getApiHeaders(verifiedTenantSlug)['X-Tenant-Slug'] || null;
+
+      const roomsPayload = [
+        ...(isParentOfCluster ? [] : [{ listingId: idNum, guests, includeBreakfast: Boolean(includeBreakfast), hasPets: false, listingRatePlanId: selectedRatePlanId }]),
+        ...extraRooms.map((r) => ({ listingId: r.listingId, guests: Math.min(r.maxGuests || 2, guests || 2) })),
+      ];
+      const orderResp = await createMultiRoomOrder(
+        {
+          rooms: roomsPayload,
+          checkinDate: checkinIst,
+          checkoutDate: checkoutIst,
+          currency: 'INR',
+          guestConsentAccepted: false,
+        },
+        holdTenantSlug,
+      );
+
+      const nightsCount = Math.max(1, Math.round((dateRange.endDate.getTime() - dateRange.startDate.getTime()) / 86400000));
+      updateBooking({
+        holdId: orderResp.leadBookingId,
+        holdToken: orderResp.holdToken ?? orderResp.bookingToken ?? null,
+        holdExpiresAt: orderResp.holdExpiresAtUtc,
+        holdPropertySlug: propertySlug || 'atlas-homes',
+        holdUnitSlug: unitSlug || String(idNum),
+        holdTenantSlug,
+        holdListingId: orderResp.rooms[0]?.listingId ?? idNum,
+        holdListingName: orderResp.rooms.map((r) => r.listingName).join(' + '),
+        holdGroupReference: orderResp.groupReference,
+        holdMultiRoomSelections: orderResp.rooms.map((r) => ({
+          listingId: r.listingId,
+          listingName: r.listingName,
+          guests: r.guests,
+          finalAmount: r.finalAmount,
+        })),
+        holdPriceBreakdown: {
+          baseAmount: orderResp.rooms.reduce((s, r) => s + r.baseAmount, 0),
+          discountAmount: 0,
+          convenienceFeeAmount: orderResp.rooms.reduce((s, r) => s + r.convenienceFeeAmount, 0),
+          finalAmount: orderResp.amount,
+          nights: nightsCount,
+          currency: 'INR',
+        },
+        checkIn: istInstantFromCalendarDate(startOfCalendarDay(dateRange.startDate)).toISOString(),
+        checkOut: istInstantFromCalendarDate(startOfCalendarDay(dateRange.endDate)).toISOString(),
+        guests: orderResp.rooms.reduce((s, r) => s + r.guests, 0),
+      });
+      setMultiRoomOpen(false);
+      navigate(`/book/${propertySlug || 'atlas-homes'}/${unitSlug || String(idNum)}/details${currentSearch}`);
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : 'Could not reserve selected rooms together.');
+    } finally {
+      setMultiRoomSubmitting(false);
+    }
+  }, [dateRange, multiRoomSubmitting, listingId, verifiedTenantSlug, isParentOfCluster, guests, includeBreakfast, selectedRatePlanId, updateBooking, propertySlug, unitSlug, navigate]);
+
   // TASK-2612: handleReserve replaces the old handleSubmit.
   // FOUNDER RULED 2026-10-19: Reserve no longer calls the API or starts a hold. It stores the stay draft in context and
   // navigates to the details page; the 10-minute hold starts when the guest taps Pay there.
@@ -2150,14 +2289,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     // A host that cannot take an online payment is handed off HERE, before anything else (TASK-8048 fail-closed, extended to
     // Reserve): the same WhatsApp hand-off the order API's 422 used to trigger only after the guest had already reached it.
     const hostCtx = tenantContext !== undefined ? tenantContext : getTenantContext();
+    const checkoutISO = toCalendarISO(checkoutIst);
     if (hostCtx?.bookingMode === 'WHATSAPP') {
+      track('start_checkout', numericListingId, {
+        checkIn: checkinISO,
+        checkOut: checkoutISO,
+        tenantSlug: verifiedTenantSlug,
+      });
       setProviderHandoff(true);
       return;
     }
 
     setIsSubmitting(true);
     // Funnel: a guest started checkout. Fired once per Reserve; the Pay taps on the details page do not re-fire it.
-    track('start_checkout', numericListingId);
+    track('start_checkout', numericListingId, {
+      checkIn: checkinISO,
+      checkOut: checkoutISO,
+      tenantSlug: verifiedTenantSlug,
+    });
 
     try {
       const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
@@ -2230,6 +2379,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           ...(serverGstMatchesSelection && serverPriceBreakdown?.appliedPromotionLabel
             ? { appliedPromotionLabel: serverPriceBreakdown.appliedPromotionLabel }
             : {}),
+          ...(serverGstMatchesSelection && serverPriceBreakdown?.paymentPlans !== undefined
+            ? { paymentPlans: serverPriceBreakdown.paymentPlans }
+            : {}),
         },
         holdCancellationTier: effectiveRatePlanCancellationTier,
         holdCancellationWindowHours: selectedRatePlan?.cancellationPolicy ? null : resolvedCancellationWindowHours,
@@ -2246,8 +2398,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         // is an ISO instant, and the hydration effect above reads it back as an IST civil date —
         // so emit the IST-midnight instant (unchanged format, correct day) rather than
         // `.toISOString()` on a local-midnight Date, which would not round-trip east of +05:30.
-        checkIn: istInstantFromCalendarDate(checkinIst).toISOString(),
-        checkOut: istInstantFromCalendarDate(checkoutIst).toISOString(),
+        checkIn: istInstantFromCalendarDate(startOfCalendarDay(dateRange.startDate)).toISOString(),
+        checkOut: istInstantFromCalendarDate(startOfCalendarDay(dateRange.endDate)).toISOString(),
         guests,
         listingRatePlanId: selectedRatePlanId,
         // TASK-10299208: never forward internal/OTA rate plan names; only pass plain meal + cancellation terms when the guest chose between options.
@@ -2260,6 +2412,13 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           publicRatePlans.length > 1
             ? (cancellationTrustText || selectedRatePlan?.cancellationSummary || selectedRatePlan?.cancellationPolicy || null)
             : null,
+        holdPackage: selectedRatePlan?.package
+          ? {
+              title: selectedRatePlan.package.title,
+              description: selectedRatePlan.package.description ?? null,
+              items: selectedRatePlan.package.items ?? [],
+            }
+          : null,
       });
 
       // TASK-102017: carry ?tenant=<slug> (and any search params) to the details route so
@@ -2621,6 +2780,15 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             </div>
           )}
         </div>
+        {!isDorm && capacityMismatch != null && (
+          <p
+            role="status"
+            data-testid="bw-capacity-mismatch-hint"
+            style={{ marginTop: 8, fontSize: 12, lineHeight: 1.45, color: 'var(--text-muted, #6b5a55)' }}
+          >
+            {guestCapacityMismatchMessage(capacityMismatch)}
+          </p>
+        )}
         {/* TASK-10299183: small-party discount hint when small-party pricing is configured and guest count qualifies (1-2 guests) */}
         {showSmallPartyHint && (
           <div
@@ -2725,6 +2893,52 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                         {plan.agentName ? `Special rate from ${plan.agentName}` : 'Travel agent rate'}
                       </div>
                     )}
+                    {plan.package && (
+                      <div
+                        data-testid={`rate-plan-package-${plan.id}`}
+                        style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 4 }}
+                      >
+                        {plan.package.photoUrl && (
+                          <img
+                            src={plan.package.photoUrl}
+                            alt={plan.package.title}
+                            style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+                          />
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary, #0f172a)' }}>
+                            {plan.package.title}
+                          </div>
+                          {plan.package.items.length > 0 && (
+                            <div style={{ fontSize: 11, color: 'var(--text-secondary, #475569)' }}>
+                              {plan.package.items.slice(0, 3).map((item) =>
+                                `${item.quantity > 1 ? `${item.quantity}× ` : ''}${item.label}`
+                              ).join(' · ')}
+                              {plan.package.items.length > 3 ? ` +${plan.package.items.length - 3} more` : ''}
+                            </div>
+                          )}
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            data-testid={`rate-plan-package-details-${plan.id}`}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              setOpenPackageModal(plan.package ?? null);
+                            }}
+                            onKeyDown={(ev) => {
+                              if (ev.key === 'Enter' || ev.key === ' ') {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                setOpenPackageModal(plan.package ?? null);
+                              }
+                            }}
+                            style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-primary, #0f172a)', textDecoration: 'underline', cursor: 'pointer', alignSelf: 'flex-start' }}
+                          >
+                            See what&apos;s included
+                          </span>
+                        </div>
+                      </div>
+                    )}
                     <div style={{ fontSize: 11, color: 'var(--text-secondary, #64748b)' }}>
                       {plan.cancellationSummary}
                     </div>
@@ -2743,6 +2957,47 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                 </button>
               );
             })}
+            {openPackageModal && (
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={openPackageModal.title}
+                data-testid="rate-plan-package-modal"
+                style={{
+                  border: '1px solid var(--border-subtle, #e2e8f0)',
+                  borderRadius: 10,
+                  padding: 12,
+                  background: '#ffffff',
+                  marginTop: 6,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
+                    {openPackageModal.title}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOpenPackageModal(null)}
+                    style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary, #64748b)', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  >
+                    Close
+                  </button>
+                </div>
+                {openPackageModal.description && (
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary, #475569)', marginTop: 4 }}>
+                    {openPackageModal.description}
+                  </p>
+                )}
+                <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: 12, color: 'var(--text-primary, #0f172a)' }}>
+                  {openPackageModal.items.map((item, idx) => (
+                    <li key={idx}>
+                      {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.label}
+                      {item.basis === 'per_night' ? ' (per night)' : ' (per stay)'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
         {/* The hint and legend sit BELOW the joined dates + guests card: the guests cell has no
@@ -3127,12 +3382,47 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             : 'Reserve'}
       </Button>
 
+      {multiRoomOptions?.enabled && multiRoomOptions.rooms.length > 0 && !datesUnavailable && !isParentOfCluster && (
+        <div className="mt-2.5">
+          <button
+            type="button"
+            onClick={() => setMultiRoomOpen(true)}
+            data-testid="multi-room-open-btn"
+            className="w-full min-h-[44px] rounded-xl border border-border-default bg-bg-surface px-3 py-2 text-xs font-semibold text-text-primary hover:bg-bg-muted transition"
+          >
+            {selectedExtraRooms.length > 0
+              ? `Need more space? ${1 + selectedExtraRooms.length} rooms selected`
+              : 'Need more space? Add another room'}
+          </button>
+          <MultiRoomDrawer
+            open={multiRoomOpen}
+            onClose={() => setMultiRoomOpen(false)}
+            anchorListingName={listingName || 'Primary room'}
+            anchorGuests={guests}
+            anchorTotal={finalTotal}
+            options={multiRoomOptions}
+            loading={multiRoomLoading}
+            selectedExtraRooms={selectedExtraRooms}
+            onToggleRoom={(room) => {
+              setSelectedExtraRooms((prev) =>
+                prev.some((r) => r.listingId === room.listingId)
+                  ? prev.filter((r) => r.listingId !== room.listingId)
+                  : [...prev, room],
+              );
+            }}
+            onBookTogether={() => void handleBookMultiRoomTogether(selectedExtraRooms)}
+            submitting={multiRoomSubmitting}
+          />
+        </div>
+      )}
+
       {/* CLU-004: Parent whole-villa blocked -> available child private rooms cross-sell alert */}
       {datesUnavailable && (
         <div className="mt-3">
           <ParentChildCrossSellBanner
             isParentCluster={isParentOfCluster}
             isUnavailable={Boolean(datesUnavailable)}
+            isHostelWholeRoom={isHostelWholeRoomParent}
             parentName={listingName}
             availability={clusterAvailability}
             checkIn={crossSellCheckIn}
@@ -3140,6 +3430,25 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             guests={guests}
             propertySlug={propertySlug}
             onSelectChildRoom={(room: ChildRoomPreview) => room.href && navigate(room.href)}
+            multiRoomEnabled={multiRoomTenantAllow}
+            selectedRoomIds={selectedParentChildRooms.map((r) => Number(r.id))}
+            onToggleRoom={(room) => {
+              setSelectedParentChildRooms((prev) =>
+                prev.some((r) => Number(r.id) === Number(room.id))
+                  ? prev.filter((r) => Number(r.id) !== Number(room.id))
+                  : [...prev, room],
+              );
+            }}
+            onBookSelectedTogether={() => {
+              const mapped: MultiRoomOption[] = selectedParentChildRooms.map((r) => ({
+                listingId: Number(r.id),
+                name: r.name,
+                maxGuests: r.maxGuests ?? 2,
+                nightlyRate: r.price ?? 0,
+                totalStayAmount: r.price ?? 0,
+              }));
+              void handleBookMultiRoomTogether(mapped);
+            }}
           />
         </div>
       )}
@@ -3156,6 +3465,62 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
           />
         </div>
       )}
+
+      {/* HSL-029: Mixed dorm sold both bed-by-bed and as one private room for a group */}
+      {isDorm && wholeRoomListingId != null && wholeRoomListingId > 0 && (() => {
+        const bedsTaken = dormBedsLeft != null && dormBedCount != null && dormBedsLeft < dormBedCount;
+        const cap = dormBedCount ?? maxGuests;
+        const wholeHref = `/homes/${propertySlug || 'atlas-homes'}/${wholeRoomListingId}${
+          dateRange.startDate && dateRange.endDate
+            ? `?checkIn=${encodeURIComponent(toCalendarISO(dateRange.startDate))}&checkOut=${encodeURIComponent(toCalendarISO(dateRange.endDate))}&guests=${encodeURIComponent(String(cap))}`
+            : ''
+        }`;
+        const showStayCompare = guests >= 4 && priceDetails.nights > 0 && wholeRoomNightlyRate != null;
+        return (
+          <div
+            className="mt-3 rounded-xl border border-border-subtle bg-bg-subtle p-3.5 text-left"
+            data-testid="hsl029-whole-room-card"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                  {wholeRoomName || `Private room for ${cap}`}
+                </div>
+                <div className="text-sm font-bold text-text-primary mt-0.5">
+                  The whole dorm, just your group
+                </div>
+              </div>
+              {wholeRoomNightlyRate != null && (
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-bold text-text-primary">
+                    {showStayCompare
+                      ? displayPrice(wholeRoomNightlyRate * priceDetails.nights)
+                      : displayPrice(wholeRoomNightlyRate)}
+                  </div>
+                  <div className="text-[11px] text-text-secondary">
+                    {showStayCompare ? `for ${priceDetails.nights} nights` : 'per night'}
+                  </div>
+                </div>
+              )}
+            </div>
+            {bedsTaken ? (
+              <p className="mt-2 text-xs text-text-secondary" data-testid="hsl029-whole-room-unavailable">
+                Not free on these dates because some beds are booked. Beds are still free in the shared dorm.
+              </p>
+            ) : (
+              <button
+                type="button"
+                className="mt-2.5 w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-xs font-semibold text-text-primary hover:bg-bg-subtle transition-colors"
+                style={{ minHeight: 44 }}
+                data-testid="hsl029-whole-room-cta"
+                onClick={() => navigate(wholeHref)}
+              >
+                Book the whole room
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* DESIGN-030: hide purchase-confidence chrome when the selected dates cannot be booked. */}
       {!datesUnavailable && (

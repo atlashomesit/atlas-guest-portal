@@ -4,14 +4,11 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import Heading from "../../commonComponents/heading/Heading";
 import { type Listing } from "../../../data/listings";
 import { getPropertyDesignImage } from "../../../config/branding";
-import priceDisplayConfig from "../../../config/priceDisplay.config";
-import { calculateNightlyPrice, inferUnitType } from "../../../utils/pricing";
 import { sanitizeItems, getItemKey } from "../../../utils/sanitizeItems";
 import { trackEvent } from "../../../utils/analytics";
 import { buildHomeUnitPath, getPropertySlug } from "../../../utils/navigation";
 import OptimizedImage from "../../ui/OptimizedImage";
 import HostelDormBadge, { isHostelDorm } from "../../hostel/HostelDormBadge";
-import { useDailyPricingSummary } from "../../../hooks/useDailyPricingSummary";
 import { useListingPhotosFromApi } from "../../../contexts/ListingPhotosContext";
 import { useTenantListings, type TenantPropertyRecord } from "../../../hooks/useTenantListings";
 import { filterGuestImageUrls, sanitizeGuestImageUrl } from "../../../utils/guestImageUrl";
@@ -22,9 +19,9 @@ import { getTenantBrandName } from "../../../tenant/displayBrand";
 import { getTenantOverrides, getUnitNoun, shouldHideAtlasBranding, type TenantOverrides } from "../../../tenant/tenantOverrides";
 import { useCurrency } from "../../../contexts/CurrencyContext";
 import { getListingDisplayName } from "../../../lib/listingDisplayName";
-import { getHomeDescriptor } from "../../../content/homeDescriptors";
+import { resolveHomeCardDescriptor } from "../../../content/homeDescriptors";
 import { fetchAvailabilitySummary, type ListingAvailabilitySummary } from "../../../api/availabilitySummaryClient";
-import { allInTotalLabel, directPriceDisplay, directSavingsLabel } from "../../../utils/directBookingPrice";
+import { allInTotalLabel, directSavingsLabel } from "../../../utils/directBookingPrice";
 import {
   useMarketplaceCardPrices,
   type MarketplaceCardPriceItem,
@@ -32,6 +29,8 @@ import {
   toMarketplaceDateOnly,
   marketplaceStayNights,
 } from "../../../hooks/useMarketplaceCardPrices";
+import { HOME_CARD_PRICE_HINT } from "../../../hooks/useHomeCardPriceLines";
+import { useHomeSearchSelections } from "../../../hooks/useHomeSearchSelections";
 
 import { resolveHomesPlace } from "../../../utils/listingCities";
 import "./homepage_location.css";
@@ -48,7 +47,6 @@ type ListingModel = {
   listing: Listing;
   property?: PropertyRecord;
   images: string[];
-  price?: ReturnType<typeof calculateNightlyPrice>;
 };
 
 const formatAmenityName = (value?: string) =>
@@ -57,52 +55,9 @@ const formatAmenityName = (value?: string) =>
     .replace(/\b\w/g, (char) => char.toUpperCase())
     .trim();
 
-const useSearchSelections = (search: string) => {
-  return React.useMemo(() => {
-    const params = new URLSearchParams(search);
-
-    const parseDate = (value: string | null) => {
-      if (!value) return null;
-      const parsed = new Date(value);
-      return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-    };
-
-    const parseGuests = (value: string | null) => {
-      if (!value) return null;
-      const parsed = Number(value);
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-    };
-
-    const checkIn = parseDate(params.get("checkIn") ?? params.get("checkin"));
-    const checkOut = parseDate(params.get("checkOut") ?? params.get("checkout"));
-    const adults = parseGuests(params.get("adults"));
-    const children = parseGuests(params.get("children"));
-    const guestsParam = parseGuests(params.get("guests"));
-    const guestTotal = Math.max((adults ?? 0) + (children ?? 0), guestsParam ?? 0);
-    const guests = guestTotal > 0 ? guestTotal : null;
-
-    const normalizedCheckOut =
-      checkOut && checkIn && new Date(checkOut) <= new Date(checkIn) ? null : checkOut;
-
-    const nextSearch = new URLSearchParams();
-    if (checkIn) nextSearch.set("checkIn", checkIn);
-    if (normalizedCheckOut) nextSearch.set("checkOut", normalizedCheckOut);
-    if (guests) nextSearch.set("guests", String(guests));
-
-    return {
-      checkIn,
-      checkOut: normalizedCheckOut,
-      guests,
-      searchString: nextSearch.toString(),
-    };
-  }, [search]);
-};
-
 const createListingModel = (
   listing: Listing,
   propertyLookup: Record<string, PropertyRecord>,
-  checkInDate: string | null,
-  guests: number | null,
   getUrlsForListingId: (listingId: number | undefined) => string[] | undefined,
   tenantOverrides: TenantOverrides,
 ): ListingModel => {
@@ -123,22 +78,7 @@ const createListingModel = (
         ? [designFallback]
         : [sanitizeGuestImageUrl(designFallback) ?? designFallback].filter(Boolean);
 
-  let price: ListingModel["price"];
-
-  try {
-    price = calculateNightlyPrice({
-      unitType: inferUnitType(
-        property ?? { id: listing.id, name: listing.title, unitType: listing.unitType }
-      ),
-      checkInDate: checkInDate ?? new Date(),
-      guests: guests ?? undefined,
-    });
-  } catch (error) {
-    console.warn("Failed to compute nightly price", error);
-    price = undefined;
-  }
-
-  return { listing, property, images, price };
+  return { listing, property, images };
 };
 
 /** GUEST-065: the one line under "Booked tonight": when it is next open, and where to see a price. */
@@ -163,9 +103,8 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const paymentFeeCharged = hasOnlinePaymentRail(tenant);
   const unitNoun = getUnitNoun(tenantOverrides);
   const { format: formatCurrency } = useCurrency();
-  const { checkIn, checkOut, guests, searchString } = useSearchSelections(location.search);
+  const { checkIn, checkOut, guests, searchString } = useHomeSearchSelections(location.search);
   const [activeImageIndex, setActiveImageIndex] = React.useState<Record<string, number>>({});
-  const { loading: dailyPricingLoading, getListingPricing } = useDailyPricingSummary();
   const { getUrlsForListingId } = useListingPhotosFromApi();
   const { listings: tenantListings, properties: tenantProperties } = useTenantListings();
 
@@ -210,7 +149,7 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
   // GUEST-034 / TASK-10299186: with dates in the search box, query the authoritative quote for those
   // dates and guests (GET /api/pricing/guest-breakdown), matching the checkout quote and SearchPage.
-  // When no dates are searched, keep showing tonight's daily-summary price.
+  // GUEST-065 (founder ruling 2026-11-19): with no dates the card shows no price at all ("See the price for your dates").
   const cardStay = React.useMemo<MarketplaceStay>(() => {
     return {
       checkIn: toMarketplaceDateOnly(checkIn),
@@ -225,8 +164,8 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
       marketplaceStayNights(cardStay.checkIn, cardStay.checkOut) != null,
   );
 
-  // GUEST-065: is each home open tonight? A card with no dates picked shows tonight's price, so a home that is
-  // sold tonight must not say "/ night tonight". null = still asking; a failed ask becomes {} (cards stay as before).
+  // GUEST-065: is each home open tonight? A card with no dates picked names no price, and a home that is sold tonight says
+  // so ("Booked tonight"). null = still asking; a failed ask becomes {} (the card keeps the hint).
   const [tonightById, setTonightById] = React.useState<Record<number, ListingAvailabilitySummary> | null>(null);
   const tonightIdsKey = React.useMemo(
     () =>
@@ -331,7 +270,8 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
 
     if (hasStayDates) {
       const stayPrice = stayPrices.get(numericListingId);
-      if (stayPrice?.status === "loading") {
+      // No entry yet (the first render, before the quote hook has started) is the same as loading: never a stale number.
+      if (!stayPrice || stayPrice.status === "loading") {
         return (
           <div className="ahv2-price" data-testid="home-card-price-loading">
             <span className="ahv2-price-meta">Checking price…</span>
@@ -375,27 +315,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
       }
     }
 
-    if (!model.price) return null;
-
-    const { baseNightlyPrice, finalNightlyPrice, appliedDiscountPercent, hasSpecialDateMultiplier, dateKey } =
-      model.price;
-
-    // TASK-1687: respect the user's selected display currency from CurrencyContext
-    // (was hardcoded to INR via local Intl.NumberFormat).
-    const formattedBase = formatCurrency(baseNightlyPrice);
-    const formattedFinal = formatCurrency(finalNightlyPrice);
-    const specialLabel = priceDisplayConfig.specialPricingLabels[dateKey];
-    const todayBreakdown = getListingPricing(apiListingId);
-
-    if (dailyPricingLoading || (tonightById === null && Boolean(tonightIdsKey))) {
-      return (
-        <div className="ahv2-price">
-          <span className="ahv2-price-meta">Loading price…</span>
-        </div>
-      );
-    }
-
-    // GUEST-065: sold tonight = say so once, and show no number. Tonight's price is not a price the guest can book.
+    // GUEST-065 (founder ruling 2026-11-19, item 1): with no dates picked the card names NO price. It never prints tonight's
+    // price, a listed base rate or any cached figure: the guest sees the price for the dates they pick (the branch above).
+    // A home that is sold tonight still says so; that is availability, not a price.
     const tonightSummary = tonightById?.[numericListingId];
     if (tonightSummary && !tonightSummary.isAvailableTonight) {
       return (
@@ -408,77 +330,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
       );
     }
 
-    // Founder ruling 2026-10-21: show tonight's real price with the direct-booking saving and the all-in total —
-    // the daily-summary row is built from the checkout quote, so this is what the guest is charged.
-    const display = todayBreakdown
-      ? directPriceDisplay({
-          baseAmount: todayBreakdown.baseAmount,
-          discountAmount: todayBreakdown.baseAmount - todayBreakdown.actualPrice,
-          finalAmount: todayBreakdown.finalAmount,
-          nights: 1,
-          paymentFeeCharged,
-          paymentFeeAmount:
-            (todayBreakdown.actualPrice * (todayBreakdown.convenienceFeePercent ?? 0)) / 100,
-        })
-      : null;
-
-    if (display) {
-      return (
-        <div className="ahv2-price" data-testid="home-card-price">
-          <div className="ahv2-price-row">
-            {display.standardNightly != null && (
-              <span className="ahv2-price-strike" data-testid="home-card-standard-price">
-                <span className="sr-only">Standard price </span>
-                {formatCurrency(display.standardNightly)}
-              </span>
-            )}
-            <span className="ahv2-price-amt" data-testid="home-card-real-price">
-              {formatCurrency(display.realNightly)}
-            </span>
-            {/* GUEST-048: this card is today's price (no dates picked); the booking box prices the chosen dates, so a weekend
-                rate there can differ. Say "tonight" instead of leaving a bare nightly figure. [FG: pricing] wording. */}
-            <span className="ahv2-price-meta" data-testid="home-card-night-label">{`/ ${nightUnit} tonight`}</span>
-          </div>
-          {display.savingsPercent > 0 && (
-            <span className="ahv2-price-save" data-testid="home-card-saving">
-              {directSavingsLabel(display.savingsPercent)}
-            </span>
-          )}
-          <span className="ahv2-price-meta" data-testid="home-card-total">
-            {allInTotalLabel(formatCurrency(display.total), display.nights)}
-            {hasSpecialDateMultiplier || specialLabel
-              ? ` · ${specialLabel ?? priceDisplayConfig.defaultSpecialLabel}`
-              : ""}
-          </span>
-        </div>
-      );
-    }
-
     return (
-      <div className="ahv2-price">
-        <div className="ahv2-price-row">
-          {todayBreakdown ? (
-            <span className="ahv2-price-amt">{formatCurrency(todayBreakdown.actualPrice)}</span>
-          ) : (
-            <>
-              <span className="ahv2-price-amt">{formattedFinal}</span>
-              {appliedDiscountPercent > 0 && (
-                <>
-                  <span className="ahv2-price-strike">{formattedBase}</span>
-                  <span className="ahv2-price-save">
-                    {priceDisplayConfig.discount.savingsPrefix} {appliedDiscountPercent}%
-                  </span>
-                </>
-              )}
-            </>
-          )}
-        </div>
-        <span className="ahv2-price-meta">
-          {perBed ? "per bed" : "per night"} · taxes included
-          {hasSpecialDateMultiplier || specialLabel
-            ? ` · ${specialLabel ?? priceDisplayConfig.defaultSpecialLabel}`
-            : ""}
-        </span>
+      <div className="ahv2-price" data-testid="home-card-price-hint">
+        <span className="ahv2-price-meta">{HOME_CARD_PRICE_HINT}</span>
       </div>
     );
   };
@@ -509,9 +363,9 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
   const allListingModels = React.useMemo(
     () =>
       sortedListings.map((item) =>
-        createListingModel(item, propertyLookup, checkIn, guests, getUrlsForListingId, tenantOverrides),
+        createListingModel(item, propertyLookup, getUrlsForListingId, tenantOverrides),
       ),
-    [checkIn, guests, sortedListings, propertyLookup, getUrlsForListingId, tenantOverrides],
+    [sortedListings, propertyLookup, getUrlsForListingId, tenantOverrides],
   );
 
   if (allListingModels.length === 0) {
@@ -556,15 +410,14 @@ const HomePage_Locations: React.FC<HomePageLocationsProps> = ({ listings }) => {
             const activeIndex = (activeImageIndex[model.listing.id] ?? 0) % Math.max(photos.length, 1);
             const imageSrc = photos[activeIndex] ?? model.images[0] ?? "";
             const cardTitle = getListingDisplayName(model.listing.id, model.listing.title);
-            // TASK-7194: Atlas unit descriptors + KPHB fallback must not leak on white-label.
-            const descriptor = hideAtlasBranding
-              ? (model.listing.subtitle ??
-                model.property?.property_description ??
-                `A calm, owner-run ${unitNoun.singular}.`)
-              : (getHomeDescriptor(model.listing.id) ??
-                model.listing.subtitle ??
-                model.property?.property_description ??
-                "A calm, owner-run home in this neighbourhood.");
+            // TASK-7194 / GUEST-065: host-authored facts win over fallback descriptors; Atlas descriptors never leak on white-label.
+            const descriptor = resolveHomeCardDescriptor({
+              id: model.listing.id,
+              subtitle: model.listing.subtitle,
+              propertyDescription: model.property?.property_description,
+              hideAtlasBranding,
+              unitSingular: unitNoun.singular,
+            });
 
             return (
               <Link

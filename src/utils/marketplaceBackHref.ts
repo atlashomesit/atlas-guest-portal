@@ -18,6 +18,12 @@ const SEARCH_FILTER_KEYS = [
   'amenities',
   'sort',
   'sortBy',
+  'freeCancellation',
+  'mealPlan',
+  'swLat',
+  'swLng',
+  'neLat',
+  'neLng',
 ] as const;
 
 export function hasPropertyDetailSearchFilters(searchParams: URLSearchParams): boolean {
