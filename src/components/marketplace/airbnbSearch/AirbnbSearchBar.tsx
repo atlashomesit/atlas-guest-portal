@@ -64,7 +64,12 @@ function buildSearchParams(
   return p;
 }
 
-export default function AirbnbSearchBar() {
+type AirbnbSearchBarProps = {
+  /** In-flow marketplace panels must not move a pointer target before its click. */
+  preserveFlowPointerTargets?: boolean;
+};
+
+export default function AirbnbSearchBar({ preserveFlowPointerTargets = false }: AirbnbSearchBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -102,6 +107,18 @@ export default function AirbnbSearchBar() {
   const whenRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const closeDestination = useCallback(() => {
+    if (preserveFlowPointerTargets && debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setIsDestinationOpen(false);
+  }, [preserveFlowPointerTargets]);
+
+  useEffect(() => () => {
+    if (preserveFlowPointerTargets && debounceRef.current) clearTimeout(debounceRef.current);
+  }, [preserveFlowPointerTargets]);
 
   const destinationErrorId = useId();
   const dateErrorId = useId();
@@ -180,22 +197,23 @@ export default function AirbnbSearchBar() {
   }, [searchParams]);
 
   const closeAllPanels = useCallback(() => {
-    setIsDestinationOpen(false);
+    closeDestination();
     setIsCalendarOpen(false);
     setIsGuestsOpen(false);
     setHighlightedIndex(-1);
-  }, []);
+  }, [closeDestination]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       const t = e.target as Node;
       if (destinationRef.current?.contains(t)) return;
       if (whenRef.current?.contains(t)) return;
-      setIsDestinationOpen(false);
+      closeDestination();
     };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, []);
+    const eventName = preserveFlowPointerTargets ? 'click' : 'mousedown';
+    document.addEventListener(eventName, onDocClick);
+    return () => document.removeEventListener(eventName, onDocClick);
+  }, [closeDestination, preserveFlowPointerTargets]);
 
   const handleDestinationInput = (value: string) => {
     setDestinationQuery(value);
@@ -212,7 +230,7 @@ export default function AirbnbSearchBar() {
     setDestination(label);
     setDestinationQuery(label);
     setDestinationError(null);
-    setIsDestinationOpen(false);
+    closeDestination();
     setHighlightedIndex(-1);
   };
 
@@ -306,7 +324,7 @@ export default function AirbnbSearchBar() {
       return;
     }
     if (e.key === 'Escape') {
-      setIsDestinationOpen(false);
+      closeDestination();
       return;
     }
     if (e.key === 'ArrowDown') {
@@ -417,7 +435,7 @@ export default function AirbnbSearchBar() {
             onClick={() => {
               setIsCalendarOpen((v) => !v);
               setIsGuestsOpen(false);
-              setIsDestinationOpen(false);
+              closeDestination();
             }}
             className="mt-1 w-full text-left text-sm text-text-body"
             data-testid="airbnb-search-when"
@@ -472,11 +490,12 @@ export default function AirbnbSearchBar() {
               value={guestCounts}
               onChange={setGuestCounts}
               maxCapacity={MAX_GUESTS}
+              preserveFlowPointerTargets={preserveFlowPointerTargets}
               isOpen={isGuestsOpen}
               onToggle={() => {
                 setIsGuestsOpen((v) => !v);
                 setIsCalendarOpen(false);
-                setIsDestinationOpen(false);
+                closeDestination();
               }}
               onClose={() => setIsGuestsOpen(false)}
               summary={formatGuestSummary(guestCounts)}
