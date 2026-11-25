@@ -53,6 +53,7 @@ type Props = {
   onToggle: () => void;
   onClose: () => void;
   summary: string;
+  preserveFlowPointerTargets?: boolean;
 };
 
 export function AirbnbGuestSelector({
@@ -63,6 +64,7 @@ export function AirbnbGuestSelector({
   onToggle,
   onClose,
   summary,
+  preserveFlowPointerTargets = false,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const totalOccupancy = value.adults + value.children;
@@ -81,13 +83,14 @@ export function AirbnbGuestSelector({
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
-    document.addEventListener('mousedown', onDoc);
+    const eventName = preserveFlowPointerTargets ? 'click' : 'mousedown';
+    document.addEventListener(eventName, onDoc);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener(eventName, onDoc);
       document.removeEventListener('keydown', onKey);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, preserveFlowPointerTargets]);
 
   return (
     <div ref={rootRef} className="relative">

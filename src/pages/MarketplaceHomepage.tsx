@@ -945,7 +945,7 @@ export default function MarketplaceHomepage() {
       )}
 
       <div className="mt-8">
-        <AirbnbSearchBar />
+        <AirbnbSearchBar preserveFlowPointerTargets />
       </div>
 
       <div className="marketplace-controls">
