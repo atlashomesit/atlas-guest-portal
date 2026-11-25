@@ -24,3 +24,37 @@
   .marketplace-primary-controls [data-testid="marketplace-sort-wrapper"] { margin-left: 0; flex-basis: 100%; }
   .marketplace-results-grid { grid-template-columns: 1fr; }
 }
+
+/* Nov21 approved daily UX; implementation approval Nov25. */
+
+/* 02-B: one shared clipping ancestor. Desktop closed geometry is unchanged. */
+.marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child { overflow:visible; }
+@media (max-width:767px) {
+  /* 02-A: three directly editable, labelled rows. No fixed height or ellipsis. */
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div {
+    display:grid; grid-template-columns:48px minmax(0,1fr); align-items:center;
+    column-gap:8px; padding:8px 16px; min-width:0;
+  }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(1) > label { grid-column:1; grid-row:1; }
+  .marketplace-homepage [data-testid="airbnb-search-destination"] { grid-column:2; grid-row:1; min-height:44px; margin:0; min-width:0; }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(1) > [role="alert"] { grid-column:2; margin:0 0 4px; }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(2) { grid-template-columns:48px minmax(0,1fr) max-content; }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(2) > span { grid-column:1; grid-row:1; }
+  .marketplace-homepage [data-testid="airbnb-search-when"] { grid-column:2; grid-row:1; min-height:44px; margin:0; overflow-wrap:anywhere; }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(2) > p:not([role="alert"]) { grid-column:3; grid-row:1; margin:0; }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(2) > [role="alert"] { grid-column:2 / -1; margin:0 0 4px; }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(3) { grid-template-columns:48px minmax(0,1fr) 48px; }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(3) > div,
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(3) > div > div { display:contents; }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] > div:first-child > div:nth-child(3) > div > span { grid-column:1; grid-row:1; }
+  .marketplace-homepage [data-testid="airbnb-search-guests-trigger"] { grid-column:2; grid-row:1; min-height:44px; margin:0; overflow-wrap:anywhere; white-space:normal; }
+  .marketplace-homepage [data-testid="airbnb-search-submit"] { grid-column:3; grid-row:1; }
+  /* 02-B phone panels expand in flow, preserving their native descendants/handlers. */
+  .marketplace-homepage [data-testid="airbnb-search-bar"] [role="listbox"] {
+    position:static; grid-column:1 / -1; width:100%; min-width:0; margin-top:8px;
+  }
+  .marketplace-homepage [data-testid="airbnb-search-bar"] [role="dialog"][aria-label="Guest selector"] {
+    position:static; grid-column:1 / -1; grid-row:2; width:100%; min-width:0;
+    margin-top:8px; box-sizing:border-box;
+  }
+}
