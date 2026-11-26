@@ -14,7 +14,7 @@ export const TrustBanner: React.FC = () => {
 
     const items = [
         {
-            title: "Verified Homestays & Villas",
+            title: "Book Direct with the Host",
             icon: ShieldCheck,
         },
         ...(showBestRate

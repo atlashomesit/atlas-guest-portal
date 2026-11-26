@@ -316,6 +316,12 @@ export default function AirbnbSearchBar({ preserveFlowPointerTargets = false }: 
     clearRecentSearches();
     setRecentEpoch((n) => n + 1);
     closeAllPanels();
+    // TASK-1040280: clear URL search params while preserving brand and utm_* params
+    const next = new URLSearchParams(searchParams);
+    for (const key of ['destination', 'location', 'city', 'checkIn', 'checkOut', 'guests', 'adults', 'children', 'infants', 'pets']) {
+      next.delete(key);
+    }
+    navigate({ search: next.toString() }, { replace: true });
   };
 
   const onDestinationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

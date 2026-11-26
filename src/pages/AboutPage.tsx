@@ -64,45 +64,45 @@ const serviceIllustration = `data:image/svg+xml;utf8,${encodeURIComponent(`
 const hospitalityStandards = [
   {
     title: "Thoughtful arrivals",
-    description: "48-hour pre-arrival walkthroughs, fresh linens, and climate-ready rooms before every check-in.",
+    description: "Clear check-in instructions and host contact details shared before your stay begins.",
     icon: Clock4,
   },
   {
     title: "Comfort-first stays",
-    description: "Queen beds with hotel-grade mattresses, stocked kitchens, and work-friendly layouts in every home.",
+    description: "Spaces prepared by the host with amenities listed clearly on each room page before you book.",
     icon: BedDouble,
   },
   {
-    title: "Local support, always",
-    description: "On-the-ground hosts with response times under 10 minutes for anything from Wi‑Fi resets to dinner reservations.",
+    title: "Direct host support",
+    description: "Reach your host directly for arrival questions, local tips, or anything you need during your stay.",
     icon: MapPin,
   },
   {
-    title: "Cleanliness without compromise",
-    description: "CDC-aligned cleaning checklists, double inspections, and eco-friendly supplies in rotation.",
+    title: "Clear house standards",
+    description: "House rules, check-in times, and cancellation terms are shown upfront before you confirm.",
     icon: CheckCircle2,
   },
 ];
 
 const trustBadges = [
   {
-    title: "Verified & insured",
-    description: "Licensed homestays with verified owners and comprehensive guest insurance on every booking.",
+    title: "Direct bookings",
+    description: "Book straight with the property host — your reservation and payment details stay transparent from start to finish.",
     icon: ShieldCheck,
   },
   {
     title: "Guest-first policies",
-    description: "Clear cancellation, transparent pricing, and no surprise fees—ever.",
+    description: "Clear cancellation, transparent pricing, and full price breakdowns before you pay.",
     icon: HeartHandshake,
   },
   {
     title: "Owner-run hosts",
-    description: "Every home is run by its owner and held to a consistent quality, safety, and cleanliness standard.",
+    description: "Every home is managed by its host, with direct communication before and during your stay.",
     icon: Medal,
   },
   {
-    title: "Security-led design",
-    description: "Smart locks, privacy-safe monitoring, and secure payments keep every stay protected.",
+    title: "Protected checkout",
+    description: "Instant booking confirmations and encrypted payment processing keep your reservation details safe.",
     icon: Sparkles,
   },
 ];
@@ -152,7 +152,7 @@ const AboutPage = () => {
             ))}
           </nav>
           <p className="text-lg text-text-muted max-w-2xl">
-            We are a collective of hosts, designers, and operators who believe every serviced apartment should feel personal—without sacrificing reliability. From the first message to checkout, our mission is to keep guests at ease and make every city feel familiar.
+            We believe every stay should feel personal and straightforward. From your first question to checkout, our goal is to make booking directly with the host simple and transparent.
           </p>
           <ul className="space-y-3 text-base text-text-muted leading-relaxed">
             {missionHighlights.map((highlight) => (
@@ -238,7 +238,7 @@ const AboutPage = () => {
           </div>
           <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary-dark font-semibold">
             <ShieldCheck className="w-4 h-4" />
-            Verified stays network
+            Direct host booking
           </span>
         </div>
         <div className="grid gap-4 mt-6 sm:grid-cols-2 lg:grid-cols-4">

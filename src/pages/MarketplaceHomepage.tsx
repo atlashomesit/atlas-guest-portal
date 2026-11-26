@@ -556,10 +556,10 @@ export default function MarketplaceHomepage() {
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
-    if (query.trim()) p.set('city', query.trim());
-    // TASK-4413 / MKT-022: pass date/guest/destination filters to API if present
-    const city = searchParams.get('city') || searchParams.get('destination');
-    if (city?.trim()) p.set('city', city.trim());
+    // TASK-1040280: user-typed 'Search by city' input takes precedence over stale URL ?city= / ?destination=
+    const urlCity = searchParams.get('city') || searchParams.get('destination');
+    const effectiveCity = query.trim() || urlCity?.trim() || '';
+    if (effectiveCity) p.set('city', effectiveCity);
     const checkIn = searchParams.get('checkIn');
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
@@ -696,19 +696,9 @@ export default function MarketplaceHomepage() {
       return item.pricePerNight;
     };
 
-    if (category !== 'all') {
-      result = result.filter((item) => {
-        const cat = resolvePropertyTypeBadge(item).toLowerCase();
-        if (category === 'homes') return cat === 'homestay' || cat === 'home' || cat === 'villa';
-        if (category === 'rooms') return cat === 'room' || cat === 'hotel' || cat === 'b&b' || cat === 'hostel';
-        if (category === 'homestays') return cat === 'homestay' || cat === 'home';
-        if (category === 'villas') return cat === 'villa' || (item.title && item.title.toLowerCase().includes('villa'));
-        if (category === 'bnb') return cat === 'b&b';
-        if (category === 'hotels') return cat === 'hotel';
-        if (category === 'hostels') return cat === 'hostel';
-        return true;
-      });
-    }
+    // TASK-1040277: Server-side GET /marketplace/listings?category=... already filters on authoritative
+    // Listing.Type / Property.Type (RankingScoreService). Do not re-filter with client-side badge heuristics
+    // that drop valid server-matched rooms/suites/hotels.
 
     if (topHostFilter) {
       result = result.filter((item) => item.topHost === true);
@@ -786,7 +776,7 @@ export default function MarketplaceHomepage() {
       searchParams.get('city')?.trim() ||
       searchParams.get('destination')?.trim() ||
       '';
-    if (activeCity) p.set('location', activeCity);
+    if (activeCity) p.set('city', activeCity);
     const checkIn = searchParams.get('checkIn');
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
@@ -794,6 +784,7 @@ export default function MarketplaceHomepage() {
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
     if (category !== 'all') p.set('category', category);
+    if (serverAmenityCodes.length > 0) p.set('amenities', serverAmenityCodes.join(','));
     if (freeCancellation) p.set('freeCancellation', 'true');
     if (breakfastIncluded) p.set('mealPlan', 'breakfast');
     if (topHostFilter) p.set('topHost', 'true');
@@ -804,7 +795,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, freeCancellation, breakfastIncluded, topHostFilter, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -837,7 +828,7 @@ export default function MarketplaceHomepage() {
       ''
     ).toLowerCase();
     const hasPriceOrCategoryFilter =
-      minPrice != null || maxPrice != null || category !== 'all';
+      minPrice != null || maxPrice != null || category !== 'all' || Boolean(selectedAmenity);
     const visibleListingIds = new Set(visibleItems.map((item) => item.id));
     const allLoadedListingIds = new Set(items.map((item) => item.id));
 
