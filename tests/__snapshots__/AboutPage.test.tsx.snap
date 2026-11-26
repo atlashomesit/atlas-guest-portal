@@ -47,7 +47,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
         <p
           class="text-lg text-text-muted max-w-2xl"
         >
-          We are a collective of hosts, designers, and operators who believe every serviced apartment should feel personal—without sacrificing reliability. From the first message to checkout, our mission is to keep guests at ease and make every city feel familiar.
+          We believe every stay should feel personal and straightforward. From your first question to checkout, our goal is to make booking directly with the host simple and transparent.
         </p>
         <ul
           class="space-y-3 text-base text-text-muted leading-relaxed"
@@ -178,7 +178,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
               <p
                 class="text-base text-text-muted leading-relaxed"
               >
-                48-hour pre-arrival walkthroughs, fresh linens, and climate-ready rooms before every check-in.
+                Clear check-in instructions and host contact details shared before your stay begins.
               </p>
             </div>
           </article>
@@ -204,7 +204,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
               <p
                 class="text-base text-text-muted leading-relaxed"
               >
-                Queen beds with hotel-grade mattresses, stocked kitchens, and work-friendly layouts in every home.
+                Spaces prepared by the host with amenities listed clearly on each room page before you book.
               </p>
             </div>
           </article>
@@ -225,12 +225,12 @@ exports[`AboutPage > matches the snapshot 1`] = `
               <h3
                 class="font-semibold text-text-primary"
               >
-                Local support, always
+                Direct host support
               </h3>
               <p
                 class="text-base text-text-muted leading-relaxed"
               >
-                On-the-ground hosts with response times under 10 minutes for anything from Wi‑Fi resets to dinner reservations.
+                Reach your host directly for arrival questions, local tips, or anything you need during your stay.
               </p>
             </div>
           </article>
@@ -251,12 +251,12 @@ exports[`AboutPage > matches the snapshot 1`] = `
               <h3
                 class="font-semibold text-text-primary"
               >
-                Cleanliness without compromise
+                Clear house standards
               </h3>
               <p
                 class="text-base text-text-muted leading-relaxed"
               >
-                CDC-aligned cleaning checklists, double inspections, and eco-friendly supplies in rotation.
+                House rules, check-in times, and cancellation terms are shown upfront before you confirm.
               </p>
             </div>
           </article>
@@ -353,7 +353,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
             class="w-4 h-4"
             data-icon="lucide"
           />
-          Verified stays network
+          Direct host booking
         </span>
       </div>
       <div
@@ -373,12 +373,12 @@ exports[`AboutPage > matches the snapshot 1`] = `
           <h3
             class="font-semibold text-text-primary mb-1"
           >
-            Verified & insured
+            Direct bookings
           </h3>
           <p
             class="text-base text-text-muted leading-relaxed"
           >
-            Licensed homestays with verified owners and comprehensive guest insurance on every booking.
+            Book straight with the property host — your reservation and payment details stay transparent from start to finish.
           </p>
         </article>
         <article
@@ -400,7 +400,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           <p
             class="text-base text-text-muted leading-relaxed"
           >
-            Clear cancellation, transparent pricing, and no surprise fees—ever.
+            Clear cancellation, transparent pricing, and full price breakdowns before you pay.
           </p>
         </article>
         <article
@@ -422,7 +422,7 @@ exports[`AboutPage > matches the snapshot 1`] = `
           <p
             class="text-base text-text-muted leading-relaxed"
           >
-            Every home is run by its owner and held to a consistent quality, safety, and cleanliness standard.
+            Every home is managed by its host, with direct communication before and during your stay.
           </p>
         </article>
         <article
@@ -439,12 +439,12 @@ exports[`AboutPage > matches the snapshot 1`] = `
           <h3
             class="font-semibold text-text-primary mb-1"
           >
-            Security-led design
+            Protected checkout
           </h3>
           <p
             class="text-base text-text-muted leading-relaxed"
           >
-            Smart locks, privacy-safe monitoring, and secure payments keep every stay protected.
+            Instant booking confirmations and encrypted payment processing keep your reservation details safe.
           </p>
         </article>
       </div>
