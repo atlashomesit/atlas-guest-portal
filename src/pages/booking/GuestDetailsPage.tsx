@@ -4190,6 +4190,10 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
       const digits = (whatsappNumber || '').replace(/\D/g, '');
       if (!digits) return null;
       const fullDigits = digits.length === 10 ? `91${digits}` : digits;
+      const formattedDisplay =
+        fullDigits.length === 12 && fullDigits.startsWith('91')
+          ? `+91 ${fullDigits.slice(2, 7)} ${fullDigits.slice(7)}`
+          : `+${fullDigits}`;
       const prefill = encodeURIComponent(`Hi ${brandName}, I need help with my booking.`);
       return (
         <div className="gd-trust-row">
@@ -4201,7 +4205,7 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
               target="_blank"
               rel="noopener noreferrer"
             >
-              WhatsApp {brandName} on {formatDisplayNumber()}
+              {formattedDisplay ? `WhatsApp ${brandName} on ${formattedDisplay}` : `WhatsApp ${brandName}`}
             </a>
           </span>
         </div>
