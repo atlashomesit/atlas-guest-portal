@@ -1407,7 +1407,13 @@ export default function MarketplaceHomepage() {
               setMaxPriceInput('');
               setSelectedAmenity(null);
               setSortBy('recommended');
-              setSearchParams({});
+              setSearchParams((prev) => {
+                const next = new URLSearchParams();
+                for (const [k, v] of prev.entries()) {
+                  if (k === 'brand' || k.startsWith('utm_')) next.set(k, v);
+                }
+                return next;
+              });
             }}
             className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-black px-6 py-2.5 text-sm font-semibold text-white shadow hover:bg-gray-800 transition-colors"
           >

@@ -365,7 +365,16 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
             </p>
             <button
               type="button"
-              onClick={() => navigate("/search")}
+              onClick={() => {
+                const cur = new URLSearchParams(window.location.search);
+                const preserved = new URLSearchParams();
+                for (const [k, v] of cur.entries()) {
+                  if (k === "brand" || k.startsWith("utm_")) preserved.set(k, v);
+                }
+                const qs = preserved.toString();
+                const isMarketplace = preserved.get("brand") === "atlastays" || window.location.hostname.toLowerCase().includes("atlastays");
+                navigate(isMarketplace ? (qs ? `/?${qs}` : "/") : (qs ? `/search?${qs}` : "/search"));
+              }}
               className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-cta-primary px-5 py-3 text-sm font-semibold text-[var(--text-on-cta)] shadow hover:bg-cta-secondary"
             >
               Open search

@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { CITY_DIRECTORY } from "@/content/cities/cityDirectory";
 import { sanitizeGuestImageUrl } from "@/utils/guestImageUrl";
@@ -29,6 +29,14 @@ function listingIsInCity(listing: DestinationStripListing, cityName: string): bo
  * would under-report. The full directory with counts is `/destinations`.
  */
 export default function ExploreDestinationsStrip({ listings = [] }: ExploreDestinationsStripProps) {
+  const { search } = useLocation();
+  const carryParams = new URLSearchParams();
+  for (const [k, v] of new URLSearchParams(search).entries()) {
+    if (k === "brand" || k.startsWith("utm_")) carryParams.set(k, v);
+  }
+  const carryQs = carryParams.toString();
+  const withCarry = (path: string) => (carryQs ? `${path}?${carryQs}` : path);
+
   return (
     <nav aria-labelledby="marketplace-destinations-heading" className="mt-6" data-testid="marketplace-destinations-strip">
       <div className="flex items-baseline justify-between gap-3">
@@ -36,7 +44,7 @@ export default function ExploreDestinationsStrip({ listings = [] }: ExploreDesti
         <p id="marketplace-destinations-heading" className="text-base font-semibold text-text-primary">
           Explore Top Destinations
         </p>
-        <Link to="/destinations" className="text-sm font-medium text-text-body underline hover:text-text-primary" data-testid="marketplace-destinations-all">
+        <Link to={withCarry("/destinations")} className="text-sm font-medium text-text-body underline hover:text-text-primary" data-testid="marketplace-destinations-all">
           All destinations
         </Link>
       </div>
@@ -49,7 +57,7 @@ export default function ExploreDestinationsStrip({ listings = [] }: ExploreDesti
           return (
             <li key={city.slug} className="shrink-0">
               <Link
-                to={city.path}
+                to={withCarry(city.path)}
                 data-testid={`marketplace-destination-chip-${city.slug}`}
                 className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-bg-surface py-1 pl-1 pr-4 text-sm font-medium text-text-primary shadow-sm transition-colors hover:border-border-subtle hover:bg-bg-muted"
               >
