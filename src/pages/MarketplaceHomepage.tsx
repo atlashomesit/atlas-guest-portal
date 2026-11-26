@@ -696,19 +696,9 @@ export default function MarketplaceHomepage() {
       return item.pricePerNight;
     };
 
-    if (category !== 'all') {
-      result = result.filter((item) => {
-        const cat = resolvePropertyTypeBadge(item).toLowerCase();
-        if (category === 'homes') return cat === 'homestay' || cat === 'home' || cat === 'villa';
-        if (category === 'rooms') return cat === 'room' || cat === 'hotel' || cat === 'b&b' || cat === 'hostel';
-        if (category === 'homestays') return cat === 'homestay' || cat === 'home';
-        if (category === 'villas') return cat === 'villa' || (item.title && item.title.toLowerCase().includes('villa'));
-        if (category === 'bnb') return cat === 'b&b';
-        if (category === 'hotels') return cat === 'hotel';
-        if (category === 'hostels') return cat === 'hostel';
-        return true;
-      });
-    }
+    // TASK-1040277: Server-side GET /marketplace/listings?category=... already filters on authoritative
+    // Listing.Type / Property.Type (RankingScoreService). Do not re-filter with client-side badge heuristics
+    // that drop valid server-matched rooms/suites/hotels.
 
     if (topHostFilter) {
       result = result.filter((item) => item.topHost === true);
