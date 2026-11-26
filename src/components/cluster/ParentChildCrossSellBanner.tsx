@@ -159,14 +159,14 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2">
         {rooms.map((room) => (
           <div
             key={room.id}
-            className="flex items-center justify-between p-2.5 rounded-lg border border-indigo-200 bg-white/90 text-xs shadow-2xs"
+            className="flex items-center justify-between gap-2 overflow-hidden p-2.5 rounded-lg border border-indigo-200 bg-white/90 text-xs shadow-2xs"
             data-testid={`child-room-card-${room.id}`}
           >
-            <div className="min-w-0 pr-2">
+            <div className="min-w-0 flex-1 pr-1">
               <p className="font-semibold text-slate-800 truncate">{room.name}</p>
               {room.price != null && (
                 <p className="text-indigo-700 font-medium">₹{room.price.toLocaleString('en-IN')}/night</p>
@@ -192,6 +192,7 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
               )}
               <a
                 href={room.href}
+                aria-label={`View ${room.name}`}
                 onClick={(e) => {
                   if (onSelectChildRoom) {
                     e.preventDefault();
@@ -199,9 +200,9 @@ export const ParentChildCrossSellBanner: React.FC<ParentChildCrossSellBannerProp
                   }
                 }}
                 data-testid={`select-child-room-${room.id}`}
-                className="flex-shrink-0 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700 transition"
+                className="flex-shrink-0 whitespace-nowrap rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700 transition"
               >
-                View {room.name}
+                View room
               </a>
             </div>
           </div>
