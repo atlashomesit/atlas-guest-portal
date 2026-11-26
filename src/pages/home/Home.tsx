@@ -58,8 +58,8 @@ const WHY_DIRECT_ITEMS_ATLAS = [
 const WHY_DIRECT_ITEMS_TENANT = [
     {
         icon: WHY_DIRECT_ITEMS_ATLAS[0].icon,
-        heading: "Verified stays",
-        body: "Photos on this page match the rooms you'll walk into. Book with confidence.",
+        heading: "Direct with the host",
+        body: "Book directly with the property owner for clear terms and direct communication before you arrive.",
     },
     {
         icon: WHY_DIRECT_ITEMS_ATLAS[1].icon,
