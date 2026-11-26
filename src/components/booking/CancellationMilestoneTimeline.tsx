@@ -34,6 +34,36 @@ export default function CancellationMilestoneTimeline({
   const checkIn = typeof checkInDate === 'string' ? new Date(checkInDate) : checkInDate;
   if (Number.isNaN(checkIn.getTime())) return null;
 
+  const isNonRefundable =
+    typeof cancellationTier === 'string' &&
+    cancellationTier.replace(/[\s_-]/g, '').toLowerCase() === 'nonrefundable';
+
+  if (isNonRefundable) {
+    return (
+      <div
+        className={`rounded-xl border border-border-subtle bg-bg-surface p-3.5 shadow-sm ${className}`}
+        data-testid="cancellation-milestone-timeline"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+            Cancellation policy (Non-Refundable)
+          </h4>
+        </div>
+        <div className="flex items-start gap-2.5" data-testid="cancellation-non-refundable-notice">
+          <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+            <AlertCircle className="h-3.5 w-3.5" aria-hidden="true" />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-text-primary">Non-refundable rate plan</div>
+            <div className="text-[11px] text-text-secondary mt-0.5">
+              This booking is non-refundable upon confirmation. No refund is issued for cancellations.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const effectiveTier = resolveEffectiveCancellationTier(cancellationTier);
   // TASK-1040050: the cutoff is computed from the RAW tier, exactly like the "Free cancellation until" line on the same
   // page (resolveFreeCancellationTrustCopy) and the deadline the API stamps on the booking (RefundDeadlineResolver: a
