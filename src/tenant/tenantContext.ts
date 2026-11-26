@@ -593,6 +593,12 @@ export async function fetchListingTenantContext(slug: string, apiBaseUrl?: strin
   const trimmed = slug?.trim().toLowerCase();
   if (!trimmed) return null;
 
+  // TASK-1040307: If the global tenant context already matches this slug, reuse it immediately
+  // instead of probing /tenants/from-domain?domain=<slug>.atlastays.com (which 404s on direct sites).
+  if (tenantInfo && tenantInfo.slug?.trim().toLowerCase() === trimmed) {
+    return tenantInfo;
+  }
+
   const cached = listingTenantCache.get(trimmed);
   if (cached) {
     return cached.promise;
