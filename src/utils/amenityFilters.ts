@@ -25,11 +25,14 @@ export const AMENITY_PILL_SERVER_CODES: Record<string, string[]> = {
   'mountain-view': ['mountain_view'],
 };
 
-/** Server amenity codes for the selected pill label (e.g. "Mountain View"); empty when client-only. */
+/** Server amenity codes for the selected pill label (e.g. "Mountain View") or direct master code (e.g. "mountain_view"). */
 export function serverAmenityCodesFor(selectedAmenity: string | null): string[] {
   if (!selectedAmenity) return [];
-  const key = selectedAmenity.trim().toLowerCase().replace(/\s+/g, '-');
-  return AMENITY_PILL_SERVER_CODES[key] ?? [];
+  const trimmed = selectedAmenity.trim().toLowerCase();
+  const key = trimmed.replace(/[\s_]+/g, '-');
+  if (AMENITY_PILL_SERVER_CODES[key]) return AMENITY_PILL_SERVER_CODES[key];
+  if (trimmed.includes('_') && key !== 'pet-friendly') return [trimmed];
+  return [];
 }
 
 export type ListingWithAmenities = {

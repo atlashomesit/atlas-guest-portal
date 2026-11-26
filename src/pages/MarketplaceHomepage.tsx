@@ -776,7 +776,7 @@ export default function MarketplaceHomepage() {
       searchParams.get('city')?.trim() ||
       searchParams.get('destination')?.trim() ||
       '';
-    if (activeCity) p.set('location', activeCity);
+    if (activeCity) p.set('city', activeCity);
     const checkIn = searchParams.get('checkIn');
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
@@ -784,6 +784,7 @@ export default function MarketplaceHomepage() {
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
     if (category !== 'all') p.set('category', category);
+    if (serverAmenityCodes.length > 0) p.set('amenities', serverAmenityCodes.join(','));
     if (freeCancellation) p.set('freeCancellation', 'true');
     if (breakfastIncluded) p.set('mealPlan', 'breakfast');
     if (topHostFilter) p.set('topHost', 'true');
@@ -794,7 +795,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, freeCancellation, breakfastIncluded, topHostFilter, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -827,7 +828,7 @@ export default function MarketplaceHomepage() {
       ''
     ).toLowerCase();
     const hasPriceOrCategoryFilter =
-      minPrice != null || maxPrice != null || category !== 'all';
+      minPrice != null || maxPrice != null || category !== 'all' || Boolean(selectedAmenity);
     const visibleListingIds = new Set(visibleItems.map((item) => item.id));
     const allLoadedListingIds = new Set(items.map((item) => item.id));
 
