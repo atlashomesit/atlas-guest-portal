@@ -556,10 +556,10 @@ export default function MarketplaceHomepage() {
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
     if (category !== 'all') p.set('category', category);
-    if (query.trim()) p.set('city', query.trim());
-    // TASK-4413 / MKT-022: pass date/guest/destination filters to API if present
-    const city = searchParams.get('city') || searchParams.get('destination');
-    if (city?.trim()) p.set('city', city.trim());
+    // TASK-1040280: user-typed 'Search by city' input takes precedence over stale URL ?city= / ?destination=
+    const urlCity = searchParams.get('city') || searchParams.get('destination');
+    const effectiveCity = query.trim() || urlCity?.trim() || '';
+    if (effectiveCity) p.set('city', effectiveCity);
     const checkIn = searchParams.get('checkIn');
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
