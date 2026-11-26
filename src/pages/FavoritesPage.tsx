@@ -248,7 +248,7 @@ export default function FavoritesPage() {
           >
             Manage preferences
           </Link>
-          <Link to="/" className="text-sm text-brand-primary underline underline-offset-2">
+          <Link to={(() => { const p = new URLSearchParams(); for (const [k, v] of new URLSearchParams(window.location.search).entries()) { if (k === "brand" || k.startsWith("utm_")) p.set(k, v); } const q = p.toString(); return q ? `/?${q}` : "/"; })()} className="text-sm text-brand-primary underline underline-offset-2">
             Back to home
           </Link>
         </div>
@@ -271,7 +271,7 @@ export default function FavoritesPage() {
         <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 space-y-4">
           <p className="text-text-secondary">No saved homes yet. Tap “Save” on a listing.</p>
           <Link
-            to="/search"
+            to={(() => { const p = new URLSearchParams(); for (const [k, v] of new URLSearchParams(window.location.search).entries()) { if (k === "brand" || k.startsWith("utm_")) p.set(k, v); } const q = p.toString(); const isMkt = p.get("brand") === "atlastays" || window.location.hostname.toLowerCase().includes("atlastays"); return isMkt ? (q ? `/?${q}` : "/") : (q ? `/search?${q}` : "/search"); })()}
             className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-base font-medium px-5 py-3 hover:opacity-95 transition-opacity"
           >
             Browse {brandName}
