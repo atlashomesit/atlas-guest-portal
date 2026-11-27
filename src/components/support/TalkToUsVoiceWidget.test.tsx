@@ -187,4 +187,35 @@ describe("TalkToUsVoiceWidget", () => {
     expect(capturedSignal?.aborted).toBe(true);
     expect(rec.start).toHaveBeenCalled();
   });
+
+  it("shows post-call CSAT rating card after a turn and submits to /api/public/voice/rating (TVOI-019)", async () => {
+    fetchMock
+      .mockResolvedValueOnce(res(true, { enabled: true }))
+      .mockResolvedValueOnce(res(true, { reply: "Rooms are open." }))
+      .mockResolvedValueOnce(res(true, { ok: true }));
+
+    render(<TalkToUsVoiceWidget />);
+    await settle();
+    fireEvent.click(screen.getByText("Talk to us"));
+    fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "Open?" } });
+    fireEvent.click(screen.getByText("Send"));
+    await settle();
+
+    fireEvent.click(screen.getByTestId("voice-hangup"));
+    expect(screen.getByTestId("voice-csat-card")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("voice-csat-star-5"));
+    fireEvent.change(screen.getByTestId("voice-csat-comment"), { target: { value: "Very helpful!" } });
+    fireEvent.click(screen.getByTestId("voice-csat-submit"));
+    await settle();
+
+    const [url, init] = fetchMock.mock.calls[2];
+    expect(url).toBe("https://api.test/api/public/voice/rating");
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
+      rating: 5,
+      comment: "Very helpful!",
+    });
+    expect(screen.getByText("Thanks for your feedback!")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("voice-csat-done"));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });

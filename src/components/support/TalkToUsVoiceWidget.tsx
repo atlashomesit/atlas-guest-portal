@@ -95,6 +95,11 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
   const [language, setLanguage] = useState<VoiceLanguage>("en-IN");
   const [personaKey, setPersonaKey] = useState<string | null>(null);
   const [followUpUrl, setFollowUpUrl] = useState<string | null>(null);
+  const [showRating, setShowRating] = useState(false);
+  const [rating, setRating] = useState<number>(0);
+  const [ratingComment, setRatingComment] = useState("");
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const sessionId = useRef<string>(newSessionId());
   const recognition = useRef<SpeechRecognitionLike | null>(null);
   const inFlightController = useRef<AbortController | null>(null);
@@ -235,13 +240,48 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
     }
   }, [send, language, interruptPlaybackAndPending]);
 
-  const hangUp = useCallback(() => {
+  const closeAndReset = useCallback(() => {
     stopAudio();
     setOpen(false);
     setTurns([]);
     setFollowUpUrl(null);
+    setShowRating(false);
+    setRating(0);
+    setRatingComment("");
+    setRatingSubmitting(false);
+    setRatingSubmitted(false);
     sessionId.current = newSessionId();
   }, [stopAudio]);
+
+  const hangUp = useCallback(() => {
+    stopAudio();
+    if (turns.length > 0 && !showRating) {
+      setShowRating(true);
+      return;
+    }
+    closeAndReset();
+  }, [stopAudio, turns.length, showRating, closeAndReset]);
+
+  const submitRating = useCallback(async () => {
+    if (rating < 1 || rating > 5 || ratingSubmitting) return;
+    setRatingSubmitting(true);
+    try {
+      await fetch(`${getApiBaseUrl()}/api/public/voice/rating`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getApiHeaders() },
+        body: JSON.stringify({
+          sessionId: sessionId.current,
+          rating,
+          comment: ratingComment.trim().slice(0, 300) || null,
+        }),
+      });
+    } catch {
+      /* fail-safe: never trap caller on rating error */
+    } finally {
+      setRatingSubmitting(false);
+      setRatingSubmitted(true);
+    }
+  }, [rating, ratingComment, ratingSubmitting]);
 
   if (!enabled) return null;
 
@@ -262,6 +302,77 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
       )}
       {open && (
         <div role="dialog" aria-label="Talk to us" style={{ width: "min(360px, calc(100vw - 32px))", background: "#fff", borderRadius: 16, boxShadow: "0 8px 30px rgba(0,0,0,.2)", padding: 16 }}>
+          {showRating ? (
+            <div data-testid="voice-csat-card">
+              {ratingSubmitted ? (
+                <div style={{ textAlign: "center", padding: "8px 0" }}>
+                  <p style={{ margin: "0 0 10px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Thanks for your feedback!</p>
+                  <button type="button" data-testid="voice-csat-done" onClick={closeAndReset} style={{ minHeight: 40, padding: "0 16px", borderRadius: 10, border: "none", background: "#0f172a", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <p style={{ margin: "0 0 8px", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>How was your voice call?</p>
+                  <div role="group" aria-label="Call satisfaction rating" style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        data-testid={`voice-csat-star-${star}`}
+                        aria-label={`${star} star${star === 1 ? "" : "s"}`}
+                        aria-pressed={rating === star}
+                        onClick={() => setRating(star)}
+                        style={{
+                          flex: 1,
+                          minHeight: 40,
+                          borderRadius: 10,
+                          border: rating >= star ? "1px solid #f59e0b" : "1px solid #cbd5e1",
+                          background: rating >= star ? "#fef3c7" : "#f8fafc",
+                          color: rating >= star ? "#b45309" : "#64748b",
+                          fontSize: 16,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {star}★
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    aria-label="Optional call feedback"
+                    data-testid="voice-csat-comment"
+                    maxLength={300}
+                    rows={2}
+                    placeholder="Optional comment (up to 300 characters)"
+                    value={ratingComment}
+                    onChange={(e) => setRatingComment(e.target.value)}
+                    style={{ width: "100%", boxSizing: "border-box", padding: 8, borderRadius: 10, border: "1px solid #cbd5e1", fontSize: 13, marginBottom: 8 }}
+                  />
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      type="button"
+                      data-testid="voice-csat-submit"
+                      disabled={rating < 1 || ratingSubmitting}
+                      onClick={() => void submitRating()}
+                      style={{ flex: 1, minHeight: 40, borderRadius: 10, border: "none", background: rating >= 1 ? "#0f172a" : "#94a3b8", color: "#fff", fontWeight: 600, cursor: rating >= 1 ? "pointer" : "not-allowed" }}
+                    >
+                      {ratingSubmitting ? "Sending…" : "Submit rating"}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="voice-csat-skip"
+                      onClick={closeAndReset}
+                      style={{ minHeight: 40, padding: "0 12px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#475569", cursor: "pointer" }}
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
           <div role="group" aria-label="Voice language" data-testid="voice-language-picker" style={{ display: "flex", gap: 6, marginBottom: 8 }}>
             {VOICE_LANGUAGE_OPTIONS.map((opt) => {
               const active = language === opt.code;
@@ -341,6 +452,8 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
               End call
             </button>
           </div>
+            </>
+          )}
         </div>
       )}
     </div>
