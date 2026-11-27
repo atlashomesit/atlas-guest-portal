@@ -500,6 +500,34 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
           ((data as Record<string, unknown>).gaMeasurementId as string).trim().length > 0
           ? ((data as Record<string, unknown>).gaMeasurementId as string).trim()
           : undefined,
+        // TASK-1040214: preserve payment, WhatsApp contact, UPI, and lifecycle fields from
+        // /tenants/{slug}/public identically to resolveFromDomain() so ?tenant=<slug> and
+        // fallback loads never misreport ONLINE Razorpay hosts as offline or drop fees.
+        paymentProvider: data.paymentProvider ?? undefined,
+        displayMerchantName: data.displayMerchantName ?? undefined,
+        upiVpa: data.upiVpa ?? undefined,
+        upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
+        upiInstructions: data.upiInstructions ?? undefined,
+        bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP' || data.bookingMode === 'BLOCKED_LIFECYCLE')
+          ? data.bookingMode
+          : undefined,
+        lifecycleStage: typeof data.lifecycleStage === 'string' ? data.lifecycleStage : (typeof data.stage === 'string' ? data.stage : undefined),
+        websiteStatus: typeof data.websiteStatus === 'string' ? data.websiteStatus : undefined,
+        onlinePaymentsEnabled: typeof data.onlinePaymentsEnabled === 'boolean'
+          ? data.onlinePaymentsEnabled
+          : (data.lifecycleStage === 'Trial' || data.lifecycleStage === 'TrialEndedNudge' || data.stage === 'Trial')
+            ? false
+            : undefined,
+        notTakingBookings: Boolean(
+          data.notTakingBookings === true ||
+          data.websiteStatus === 'not_taking_bookings' ||
+          data.lifecycleStage === 'Blocked' ||
+          data.stage === 'Blocked' ||
+          data.bookingMode === 'BLOCKED_LIFECYCLE'
+        ),
+        whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
+          ? data.whatsappBookingPhone
+          : undefined,
         // TASK-1040311: mirror resolveFromDomain() payment & lifecycle fields so ?tenant= and fallback storefronts
         // preserve ONLINE Razorpay checkout when /tenants/{slug}/public reports bookingMode='ONLINE'.
         paymentProvider: data.paymentProvider ?? undefined,
