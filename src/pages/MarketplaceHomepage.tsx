@@ -22,7 +22,7 @@ import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
-import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
+import AmenityFilterPills, { type PaymentTimingFilter } from '@/components/marketplace/AmenityFilterPills';
 import PriceRangeHistogram, {
   buildFallbackPriceHistogram,
   type PriceHistogramDto,
@@ -126,6 +126,9 @@ type MarketplaceItem = {
   // MKT-067: workation essentials
   hasDedicatedWorkspace?: boolean;
   wifiSpeedMbps?: number | null;
+  // MKT-073: payment timing
+  paymentTiming?: 'pay_at_property' | 'partial_advance' | 'full_prepayment' | null;
+  advanceDepositPercent?: number | null;
 };
 
 /**
@@ -340,6 +343,13 @@ function parseMinRatingParam(raw: string | null): number | null {
   return Math.round(n * 10) / 10;
 }
 
+function parsePaymentTimingParam(raw: string | null): PaymentTimingFilter | null {
+  if (raw === 'pay_at_property' || raw === 'partial_advance' || raw === 'no_full_prepayment') {
+    return raw;
+  }
+  return null;
+}
+
 // eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace helper
 export function formatRoomCapacitySummary(item: {
   bedrooms?: number | null;
@@ -453,6 +463,10 @@ export default function MarketplaceHomepage() {
   const [workation, setWorkation] = useState<boolean>(
     () => searchParams.get('workation') === 'true',
   );
+  // MKT-073: Payment timing filter synced with ?paymentTiming=
+  const [paymentTiming, setPaymentTiming] = useState<PaymentTimingFilter | null>(
+    () => parsePaymentTimingParam(searchParams.get('paymentTiming')),
+  );
 
   // MKT-048: Map bounding box synced with URL (?swLat=&swLng=&neLat=&neLng=)
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(() =>
@@ -484,6 +498,7 @@ export default function MarketplaceHomepage() {
     setEventsAllowed(searchParams.get('eventsAllowed') === 'true');
     setSmokingAllowed(searchParams.get('smokingAllowed') === 'true');
     setWorkation(searchParams.get('workation') === 'true');
+    setPaymentTiming(parsePaymentTimingParam(searchParams.get('paymentTiming')));
     setMapBounds(parseBoundsFromSearchParams(searchParams));
 
     const s = searchParams.get('sort') || searchParams.get('sortBy');
@@ -594,6 +609,19 @@ export default function MarketplaceHomepage() {
     [setSearchParams],
   );
 
+  const handlePaymentTimingChange = useCallback(
+    (value: PaymentTimingFilter | null) => {
+      setPaymentTiming(value);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set('paymentTiming', value);
+        else next.delete('paymentTiming');
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+
   const handleSearchThisArea = useCallback(() => {
     if (!pendingMapBounds) return;
     const b = pendingMapBounds;
@@ -688,6 +716,7 @@ export default function MarketplaceHomepage() {
       'eventsAllowed',
       'smokingAllowed',
       'workation',
+      'paymentTiming',
       'swLat',
       'swLng',
       'neLat',
@@ -789,6 +818,7 @@ export default function MarketplaceHomepage() {
     if (eventsAllowed) p.set('eventsAllowed', 'true');
     if (smokingAllowed) p.set('smokingAllowed', 'true');
     if (workation) p.set('workation', 'true');
+    if (paymentTiming) p.set('paymentTiming', paymentTiming);
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -797,7 +827,7 @@ export default function MarketplaceHomepage() {
     }
     if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, mapBounds, sortBy]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, mapBounds, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -955,6 +985,15 @@ export default function MarketplaceHomepage() {
     if (workation) {
       result = result.filter((item) => hasListingWorkation(item));
     }
+    if (paymentTiming) {
+      result = result.filter((item) => {
+        if (paymentTiming === 'pay_at_property') return item.paymentTiming === 'pay_at_property';
+        if (paymentTiming === 'partial_advance') return item.paymentTiming === 'partial_advance';
+        return (
+          item.paymentTiming === 'pay_at_property' || item.paymentTiming === 'partial_advance'
+        );
+      });
+    }
 
     if (freeCancellation) {
       result = result.filter((item) => item.hasFreeCancellation !== false);
@@ -1009,7 +1048,7 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -1049,6 +1088,7 @@ export default function MarketplaceHomepage() {
     if (eventsAllowed) p.set('eventsAllowed', 'true');
     if (smokingAllowed) p.set('smokingAllowed', 'true');
     if (workation) p.set('workation', 'true');
+    if (paymentTiming) p.set('paymentTiming', paymentTiming);
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -1056,7 +1096,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1204,7 +1244,7 @@ export default function MarketplaceHomepage() {
         <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
           open={wideFilters || filtersOpen}
           onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
-          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || minRating != null || instantBook || eventsAllowed || smokingAllowed || workation || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || minRating != null || instantBook || eventsAllowed || smokingAllowed || workation || paymentTiming != null || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
           <div className="marketplace-secondary-content">
             <ExploreDestinationsStrip listings={items} />
             <div className="marketplace-refinements">
@@ -1234,6 +1274,8 @@ export default function MarketplaceHomepage() {
         onToggleInstantBook={() => handleToggleBooleanParam('instantBook', instantBook)}
         workation={workation}
         onToggleWorkation={() => handleToggleBooleanParam('workation', workation)}
+        paymentTiming={paymentTiming}
+        onSelectPaymentTiming={handlePaymentTimingChange}
       />
 
         <PriceRangeHistogram
@@ -1540,6 +1582,22 @@ export default function MarketplaceHomepage() {
                         </span>
                       )}
                     </div>
+                  )}
+
+                  {/* MKT-073: Payment timing label from real tenant payment policy */}
+                  {(item.paymentTiming === 'pay_at_property' ||
+                    (item.paymentTiming === 'partial_advance' &&
+                      typeof item.advanceDepositPercent === 'number' &&
+                      item.advanceDepositPercent > 0 &&
+                      item.advanceDepositPercent < 100)) && (
+                    <span
+                      data-testid="marketplace-payment-timing-badge"
+                      className="inline-flex items-center self-start rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                    >
+                      {item.paymentTiming === 'pay_at_property'
+                        ? 'Pay at property'
+                        : `Reserve with ${item.advanceDepositPercent}% advance`}
+                    </span>
                   )}
 
                   {/* TASK-4511: Trust signal badges */}

@@ -1,5 +1,7 @@
 import { DEFAULT_MARKETPLACE_AMENITY_PILLS, type AmenityFilterPillItem } from '@/utils/amenityFilters';
 
+export type PaymentTimingFilter = 'pay_at_property' | 'partial_advance' | 'no_full_prepayment';
+
 export type AmenityFilterPillsProps = {
   selectedAmenity: string | null;
   onSelectAmenity: (amenity: string | null) => void;
@@ -19,6 +21,8 @@ export type AmenityFilterPillsProps = {
   onToggleInstantBook?: () => void;
   workation?: boolean;
   onToggleWorkation?: () => void;
+  paymentTiming?: PaymentTimingFilter | null;
+  onSelectPaymentTiming?: (value: PaymentTimingFilter | null) => void;
 };
 
 export default function AmenityFilterPills({
@@ -40,6 +44,8 @@ export default function AmenityFilterPills({
   onToggleInstantBook,
   workation = false,
   onToggleWorkation,
+  paymentTiming = null,
+  onSelectPaymentTiming,
 }: AmenityFilterPillsProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="marketplace-amenities-pills">
@@ -155,6 +161,40 @@ export default function AmenityFilterPills({
           <span aria-hidden="true">💻</span>
           <span>Workation (Wi-Fi + Desk)</span>
         </button>
+      )}
+      {onSelectPaymentTiming && (
+        <>
+          <button
+            type="button"
+            data-testid="marketplace-filter-pay-at-property"
+            aria-pressed={paymentTiming === 'pay_at_property'}
+            className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+              paymentTiming === 'pay_at_property'
+                ? 'bg-black text-white border-black'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+            }`}
+            onClick={() =>
+              onSelectPaymentTiming(paymentTiming === 'pay_at_property' ? null : 'pay_at_property')
+            }
+          >
+            <span>Pay at property</span>
+          </button>
+          <button
+            type="button"
+            data-testid="marketplace-filter-partial-advance"
+            aria-pressed={paymentTiming === 'partial_advance'}
+            className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+              paymentTiming === 'partial_advance'
+                ? 'bg-black text-white border-black'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+            }`}
+            onClick={() =>
+              onSelectPaymentTiming(paymentTiming === 'partial_advance' ? null : 'partial_advance')
+            }
+          >
+            <span>Partial advance</span>
+          </button>
+        </>
       )}
       {pills.map(({ label, icon }) => {
         const isSelected = selectedAmenity === label;

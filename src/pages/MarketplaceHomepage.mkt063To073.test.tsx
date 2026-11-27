@@ -225,4 +225,32 @@ describe('MarketplaceHomepage MKT-063..MKT-073 filters', () => {
     // Listing 102 has Wi-Fi only (no workspace) so only listing 101 remains
     expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
   });
+
+  it('MKT-073: filters by paymentTiming (Pay at property / Partial advance), syncs URL, and renders card labels', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const badges = screen.getAllByTestId('marketplace-payment-timing-badge').map((el) => el.textContent);
+    expect(badges).toContain('Reserve with 30% advance');
+    expect(badges).toContain('Pay at property');
+    expect(badges).toHaveLength(2);
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-pay-at-property'));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-partial-advance'));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('paymentTiming=pay_at_property'))).toBe(true);
+    expect(listingCalls.some((u) => u.includes('paymentTiming=partial_advance'))).toBe(true);
+  });
 });
