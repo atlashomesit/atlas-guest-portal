@@ -23,6 +23,11 @@ import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
+import {
+  CompareStaysDrawer,
+  MAX_COMPARE_STAYS,
+  type CompareStayItem,
+} from '@/components/marketplace/CompareStaysDrawer';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
 import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
 import { resolveAmenityLabel } from '@/utils/amenityCodes';
@@ -321,6 +326,16 @@ export default function MarketplaceHomepage() {
   const [loadingMore, setLoadingMore] = useState(false);
   // TASK-1873: save-heart state keyed by listing id
   const [favEpoch, setFavEpoch] = useState(0);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  const toggleCompareStay = useCallback((id: number) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_COMPARE_STAYS) return prev;
+      return [...prev, id];
+    });
+  }, []);
   const favIds = useMemo(() => {
     void favEpoch;
     return new Set(getFavoriteIds());
@@ -852,12 +867,30 @@ export default function MarketplaceHomepage() {
         if (!visibleListingIds.has(row.listingId)) continue;
       }
 
+      const matchedListing = items.find((it) => it.id === row.listingId);
+      const quoted = cardPrices.get(row.listingId);
+      const pinPriceAmount =
+        quoted?.status === 'ready'
+          ? quoted.display.realNightly
+          : matchedListing && matchedListing.pricePerNight > 0
+            ? matchedListing.pricePerNight
+            : null;
+      const priceLabel =
+        pinPriceAmount != null && pinPriceAmount > 0
+          ? formatCurrency(pinPriceAmount, { maximumFractionDigits: 0 })
+          : undefined;
+
       seen.set(row.propertyId, {
         id: `mp-${row.propertyId}`,
         lat: Number(row.latitude),
         lng: Number(row.longitude),
         title: row.propertyName || row.listingName || `Property ${row.propertyId}`,
         subtitle: row.propertyAddress ?? undefined,
+        priceLabel,
+        coverImageUrl: matchedListing ? (sanitizeGuestImageUrl(matchedListing.coverImageUrl) ?? undefined) : undefined,
+        rating: matchedListing?.rating ?? null,
+        reviewCount: matchedListing?.reviewCount ?? null,
+        propertyType: matchedListing?.accommodationType ?? 'Homestay',
         href: row.tenantSlug
           ? marketplaceListingPath(
               {
@@ -872,6 +905,7 @@ export default function MarketplaceHomepage() {
     }
     return Array.from(seen.values());
   }, [
+    cardPrices,
     category,
     items,
     loading,
@@ -899,16 +933,16 @@ export default function MarketplaceHomepage() {
         url={`${getPublicSiteOrigin()}/`}
         siteName={MARKETPLACE_BRAND_BASELINE}
       />
-      <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       {/* TASK-101317 / MKT-002: no verification is required to list here, so never claim "verified hosts".
           Matches the SEO description, which MKT-002 already corrected. */}
-      <p className="mt-2 text-text-body">Discover homes and rooms across India. Book direct with the owner.</p>
+      <p className="mt-1 sm:mt-2 text-sm sm:text-base text-text-body">Discover homes and rooms across India. Book direct with the owner.</p>
 
       {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
       {!loading && items.length > 0 && (
         <div
           data-testid="marketplace-trust-strip"
-          className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted"
+          className="mt-2 sm:mt-4 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm text-text-muted"
         >
           {/* MKT-002: `Listings.PhotosVerifiedAt` is unset on 0 of 136 prod listings today, so
               this item would always read "0 Verified homes" — an unearned trust claim. Omit it
@@ -935,8 +969,8 @@ export default function MarketplaceHomepage() {
         </div>
       )}
 
-      <div className="mt-8">
-        <AirbnbSearchBar preserveFlowPointerTargets />
+      <div className="mt-3 sm:mt-8">
+        <AirbnbSearchBar preserveFlowPointerTargets compactMobile />
       </div>
 
       <div className="marketplace-controls">
@@ -1124,6 +1158,32 @@ export default function MarketplaceHomepage() {
                     sizes="(max-width: 639px) 100vw, (max-width: 959px) 50vw, (max-width: 1279px) 33vw, (max-width: 1599px) 25vw, (max-width: 2099px) 20vw, 330px"
                   />
                 </div>
+
+                {/* MKT-062: Compare toggle */}
+                {(() => {
+                  const isCompared = compareIds.includes(item.id);
+                  const atCap = !isCompared && compareIds.length >= MAX_COMPARE_STAYS;
+                  return (
+                    <button
+                      type="button"
+                      data-testid={`marketplace-compare-toggle-${item.id}`}
+                      aria-pressed={isCompared}
+                      disabled={atCap}
+                      title={atCap ? `You can compare up to ${MAX_COMPARE_STAYS} stays at a time` : undefined}
+                      className={`absolute left-2 top-2 z-10 inline-flex min-h-[36px] items-center rounded-full px-3 py-1 text-xs font-semibold shadow border transition ${
+                        isCompared
+                          ? 'bg-black text-white border-black'
+                          : 'bg-bg-surface/95 text-text-primary border-border-subtle hover:bg-bg-surface'
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCompareStay(item.id);
+                      }}
+                    >
+                      {isCompared ? 'Comparing ✓' : 'Compare'}
+                    </button>
+                  );
+                })()}
 
                 {/* TASK-1873: save heart */}
                 <button
@@ -1421,6 +1481,57 @@ export default function MarketplaceHomepage() {
           </button>
         </div>
       )}
+      <CompareStaysDrawer
+        items={compareIds
+          .map((id) => items.find((it) => it.id === id))
+          .filter((it): it is MarketplaceListing => Boolean(it))
+          .map((it): CompareStayItem => {
+            const quoted = cardPrices.get(it.id);
+            const allInTotalLabel =
+              quoted?.status === 'ready'
+                ? allInTotalLabel(formatCurrency(quoted.display.total, { maximumFractionDigits: 0 }), quoted.display.nights)
+                : it.pricePerNight > 0
+                  ? `${formatCurrency(it.pricePerNight, { maximumFractionDigits: 0 })} / night`
+                  : 'Choose dates for price';
+            const nightlyRateLabel =
+              quoted?.status === 'ready'
+                ? `${formatCurrency(quoted.display.realNightly, { maximumFractionDigits: 0 })} / night`
+                : undefined;
+            const amenities = (it.amenityCodes ?? [])
+              .map((code) => resolveAmenityLabel(code))
+              .filter((x): x is string => Boolean(x))
+              .slice(0, 5);
+            return {
+              id: it.id,
+              title: resolveMarketplaceListingDisplayName(it),
+              location: it.city || undefined,
+              imageUrl: sanitizeGuestImageUrl(it.coverImageUrl) ?? '',
+              allInTotalLabel,
+              nightlyRateLabel,
+              rating: it.rating,
+              reviewCount: it.reviewCount,
+              maxGuests: it.maxGuests,
+              amenities,
+              breakfastIncluded: it.breakfastIncluded === true,
+              cancellationLabel: it.freeCancellation ? 'Free cancellation' : 'Standard',
+              href: marketplaceListingPath(it, searchSuffix),
+            };
+          })}
+        open={compareOpen}
+        onOpen={() => setCompareOpen(true)}
+        onClose={() => setCompareOpen(false)}
+        onRemove={(id) => {
+          setCompareIds((prev) => {
+            const next = prev.filter((x) => x !== id);
+            if (next.length < 2) setCompareOpen(false);
+            return next;
+          });
+        }}
+        onClear={() => {
+          setCompareIds([]);
+          setCompareOpen(false);
+        }}
+      />
     </section>
     </>
   );

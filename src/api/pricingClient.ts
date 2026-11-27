@@ -638,7 +638,18 @@ export type CalendarPricingResult = {
   convenienceFeePercent?: number;
 };
 
-/** GET /pricing/breakdown?startDate=YYYY-MM-DD&listingId=&months= — returns per-day pricing and convenienceFeePercent from API. */
+const CALENDAR_PRICING_TTL_MS = 15_000;
+const calendarPricingInFlight = new Map<string, Promise<CalendarPricingResult>>();
+const calendarPricingCache = new Map<string, { data: CalendarPricingResult; ts: number }>();
+
+/** Test-only helper to clear the calendar pricing dedup cache between unit tests. */
+export function __resetCalendarPricingCacheForTest(): void {
+  calendarPricingInFlight.clear();
+  calendarPricingCache.clear();
+}
+
+/** GET /pricing/breakdown?startDate=YYYY-MM-DD&listingId=&months= — returns per-day pricing and convenienceFeePercent from API.
+ * TASK-1040217: deduplicates concurrent in-flight and recent (15s TTL) identical calendar pricing requests. */
 export async function fetchCalendarPricing(
   listingId: string | number,
   startDate: string,
@@ -646,46 +657,76 @@ export async function fetchCalendarPricing(
   signal?: AbortSignal,
   tenantSlug?: string | null,
 ): Promise<CalendarPricingResult> {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
+  const clampedMonths = Math.max(1, Math.min(12, months));
+  const headers = getApiHeaders(tenantSlug);
+  const resolvedTenant = tenantSlug?.trim() || (headers as Record<string, string>)['X-Tenant-Slug'] || '';
+  const cacheKey = `${resolvedTenant}|${listingId}|${startDate}|${clampedMonths}`;
+
+  const cached = calendarPricingCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < CALENDAR_PRICING_TTL_MS) {
+    return cached.data;
+  }
+
+  const existing = calendarPricingInFlight.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
   const url = new URL(buildApiUrl(BREAKDOWN_ENDPOINT));
   url.searchParams.set('startDate', startDate);
   url.searchParams.set('listingId', String(listingId));
-  url.searchParams.set('months', String(Math.max(1, Math.min(12, months))));
+  url.searchParams.set('months', String(clampedMonths));
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders(tenantSlug) });
-  if (!response.ok) {
-    throw new Error(await messageFromApiResponse(response));
-  }
-
-  const raw = (await response.json()) as {
-    listings?: { listingId?: number; ListingId?: number; days?: Record<string, unknown>[]; Days?: Record<string, unknown>[] }[];
-    Listings?: { listingId?: number; ListingId?: number; days?: Record<string, unknown>[]; Days?: Record<string, unknown>[] }[];
-  };
-  const listings = raw.listings ?? raw.Listings ?? [];
-  const map = new Map<string, number>();
-  let convenienceFeePercent: number | undefined;
-  const targetId = Number(listingId);
-
-  for (const listing of listings) {
-    const id = listing.listingId ?? listing.ListingId;
-    if (id !== targetId) continue;
-    const days = listing.days ?? listing.Days ?? [];
-    for (const d of days) {
-      const dateStr = (d.date ?? d.Date) as string | undefined;
-      if (!dateStr) continue;
-      const base = Number(d.baseAmount ?? d.BaseAmount ?? 0);
-      const discount = Number(d.discountAmount ?? d.DiscountAmount ?? 0);
-      // Guard against NaN values (non-numeric data from server)
-      if (isNaN(base) || isNaN(discount)) continue;
-      const actualPrice = Math.max(0, base - discount);
-      map.set(dateStr, actualPrice);
-      if (convenienceFeePercent === undefined) {
-        const pct = d.convenienceFeePercent ?? d.ConvenienceFeePercent;
-        if (pct !== undefined && pct !== null) convenienceFeePercent = Number(pct);
+  const promise = (async () => {
+    try {
+      const response = await fetch(url.toString(), { headers });
+      if (!response.ok) {
+        throw new Error(await messageFromApiResponse(response));
       }
+
+      const raw = (await response.json()) as {
+        listings?: { listingId?: number; ListingId?: number; days?: Record<string, unknown>[]; Days?: Record<string, unknown>[] }[];
+        Listings?: { listingId?: number; ListingId?: number; days?: Record<string, unknown>[]; Days?: Record<string, unknown>[] }[];
+      };
+      const listings = raw.listings ?? raw.Listings ?? [];
+      const map = new Map<string, number>();
+      let convenienceFeePercent: number | undefined;
+      const targetId = Number(listingId);
+
+      for (const listing of listings) {
+        const id = listing.listingId ?? listing.ListingId;
+        if (id !== targetId) continue;
+        const days = listing.days ?? listing.Days ?? [];
+        for (const d of days) {
+          const dateStr = (d.date ?? d.Date) as string | undefined;
+          if (!dateStr) continue;
+          const base = Number(d.baseAmount ?? d.BaseAmount ?? 0);
+          const discount = Number(d.discountAmount ?? d.DiscountAmount ?? 0);
+          // Guard against NaN values (non-numeric data from server)
+          if (isNaN(base) || isNaN(discount)) continue;
+          const actualPrice = Math.max(0, base - discount);
+          map.set(dateStr, actualPrice);
+          if (convenienceFeePercent === undefined) {
+            const pct = d.convenienceFeePercent ?? d.ConvenienceFeePercent;
+            if (pct !== undefined && pct !== null) convenienceFeePercent = Number(pct);
+          }
+        }
+        break;
+      }
+      const result: CalendarPricingResult = { dateToPrice: map, convenienceFeePercent };
+      calendarPricingCache.set(cacheKey, { data: result, ts: Date.now() });
+      return result;
+    } finally {
+      calendarPricingInFlight.delete(cacheKey);
     }
-    break;
-  }
-  return { dateToPrice: map, convenienceFeePercent };
+  })();
+
+  calendarPricingInFlight.set(cacheKey, promise);
+  return promise;
 }
 
 /** GET /pricing/daily-summary. Uses server's current date.

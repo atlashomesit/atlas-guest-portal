@@ -67,9 +67,14 @@ function buildSearchParams(
 type AirbnbSearchBarProps = {
   /** In-flow marketplace panels must not move a pointer target before its click. */
   preserveFlowPointerTargets?: boolean;
+  /** MKT-056: collapse the 3-row mobile form into a single compact pill until tapped. */
+  compactMobile?: boolean;
 };
 
-export default function AirbnbSearchBar({ preserveFlowPointerTargets = false }: AirbnbSearchBarProps) {
+export default function AirbnbSearchBar({
+  preserveFlowPointerTargets = false,
+  compactMobile = false,
+}: AirbnbSearchBarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -98,6 +103,7 @@ export default function AirbnbSearchBar({ preserveFlowPointerTargets = false }: 
   const [isDestinationOpen, setIsDestinationOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isGuestsOpen, setIsGuestsOpen] = useState(false);
+  const [mobileExpanded, setMobileExpanded] = useState(false);
   const [activeDateField, setActiveDateField] = useState<'checkin' | 'checkout' | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [recentEpoch, setRecentEpoch] = useState(0);
@@ -356,6 +362,11 @@ export default function AirbnbSearchBar({ preserveFlowPointerTargets = false }: 
       ? calculateNights(dateRange.startDate, dateRange.endDate)
       : 0;
 
+  const mobileSummaryDestination = destinationQuery.trim() || destination.trim() || 'Where';
+  const mobileSummaryWhen = whenLabel === 'Add dates' ? 'Any dates' : whenLabel;
+  const mobileSummaryGuests = formatGuestSummary(guestCounts);
+  const showMobileCompactPill = compactMobile && !mobileExpanded;
+
   return (
     <form
       onSubmit={handleSearch}
@@ -363,7 +374,29 @@ export default function AirbnbSearchBar({ preserveFlowPointerTargets = false }: 
       data-testid="airbnb-search-bar"
       noValidate
     >
-      <div className="flex flex-col overflow-hidden rounded-3xl border border-border bg-bg-surface shadow-[0_2px_16px_rgba(0,0,0,0.12)] md:flex-row md:items-stretch md:rounded-full">
+      {showMobileCompactPill && (
+        <button
+          type="button"
+          data-testid="airbnb-search-mobile-pill"
+          aria-expanded={false}
+          onClick={() => setMobileExpanded(true)}
+          className="flex min-h-[48px] w-full items-center gap-3 rounded-full border border-border bg-bg-surface px-4 py-2.5 text-left shadow-[0_2px_12px_rgba(0,0,0,0.10)] md:hidden"
+        >
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--cta-primary,#222)] text-[var(--text-on-cta,#fff)]">
+            <Search className="h-4 w-4" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
+            {mobileSummaryDestination}
+            <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
+            <span className="font-normal text-text-muted">{mobileSummaryWhen}</span>
+            <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
+            <span className="font-normal text-text-muted">{mobileSummaryGuests}</span>
+          </span>
+        </button>
+      )}
+      <div
+        className={`${showMobileCompactPill ? 'hidden md:flex' : 'flex'} flex-col overflow-hidden rounded-3xl border border-border bg-bg-surface shadow-[0_2px_16px_rgba(0,0,0,0.12)] md:flex-row md:items-stretch md:rounded-full`}
+      >
         {/* Where */}
         <div
           ref={destinationRef}
@@ -519,7 +552,17 @@ export default function AirbnbSearchBar({ preserveFlowPointerTargets = false }: 
         </div>
       </div>
 
-      <div className="mt-3 flex justify-end">
+      <div className={`${showMobileCompactPill ? 'hidden md:flex' : 'mt-3 flex'} items-center justify-end gap-4`}>
+        {compactMobile && mobileExpanded && (
+          <button
+            type="button"
+            onClick={() => setMobileExpanded(false)}
+            className="inline-flex items-center gap-1 text-sm font-medium text-text-muted hover:text-text-primary md:hidden"
+            data-testid="airbnb-search-mobile-collapse"
+          >
+            Hide search
+          </button>
+        )}
         <button
           type="button"
           onClick={handleClearAll}

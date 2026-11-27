@@ -40,6 +40,11 @@ import {
 } from "../api/availabilitySummaryClient";
 import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { SearchByImageModal, type ImageSearchMatch } from "../components/search/SearchByImageModal";
+import {
+  CompareListingsDrawer,
+  MAX_COMPARE_LISTINGS,
+  type CompareListingItem,
+} from "../components/search/CompareListingsDrawer";
 import { fallbackCoordsForListing, hasMapCoords } from "../utils/mapCoords";
 import { amenityCodeMatchesCategory, resolveAmenityLabel } from "../utils/amenityCodes";
 import {
@@ -366,6 +371,16 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
   const [apiError, setApiError] = useState(false);
   const [loadingTimeoutReached, setLoadingTimeoutReached] = useState(false);
   const [imageSearchOpen, setImageSearchOpen] = useState(false);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  const toggleCompareId = useCallback((id: number) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_COMPARE_LISTINGS) return prev;
+      return [...prev, id];
+    });
+  }, []);
   const [imageSearchListings, setImageSearchListings] = useState<NormalizedListing[] | null>(null);
   const searchByImageEnabled = getTenantContext()?.searchByImageEnabled === true;
   const imageSearchMode = searchParams.get("image") === "true" || imageSearchListings !== null;
@@ -2210,9 +2225,32 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
                         />
                       )}
                     </div>
-                    <Link to={appendQuerySuffix(unit.canonicalPath, querySuffix)} className="search-card__cta">
-                      {`View ${unitNoun.singular}`}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      {listings.length >= 2 && (() => {
+                        const isCompared = compareIds.includes(unit.numericId);
+                        const atCap = !isCompared && compareIds.length >= MAX_COMPARE_LISTINGS;
+                        return (
+                          <button
+                            type="button"
+                            data-testid="guest-listing-compare-toggle"
+                            aria-pressed={isCompared}
+                            disabled={atCap}
+                            title={atCap ? `You can compare up to ${MAX_COMPARE_LISTINGS} rooms at a time` : undefined}
+                            onClick={() => toggleCompareId(unit.numericId)}
+                            className={`min-h-[44px] rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                              isCompared
+                                ? 'border-cta-primary bg-cta-primary/10 text-cta-primary'
+                                : 'border-border bg-bg-surface text-text-primary hover:bg-bg-muted'
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
+                          >
+                            {isCompared ? 'Comparing ✓' : 'Compare'}
+                          </button>
+                        );
+                      })()}
+                      <Link to={appendQuerySuffix(unit.canonicalPath, querySuffix)} className="search-card__cta">
+                        {`View ${unitNoun.singular}`}
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </article>
@@ -2239,6 +2277,63 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
         onClose={() => setImageSearchOpen(false)}
         onResults={handleImageSearchResults}
       />
+      {listings.length >= 2 && (
+        <CompareListingsDrawer
+          items={compareIds
+            .map((id) => listings.find((l) => l.numericId === id))
+            .filter((u): u is NormalizedListing => Boolean(u))
+            .map((u): CompareListingItem => {
+              const q = stayDisplayFor(u.numericId);
+              const allInTotalLabel = q
+                ? `${formatDisplayCurrency(q.totalAmount)} total`
+                : 'Pick dates for price';
+              const nightlyRateLabel = q
+                ? `${formatDisplayCurrency(q.realNightly)} / night`
+                : u.pricePerNight > 0
+                  ? `${formatDisplayCurrency(u.pricePerNight)} / night`
+                  : undefined;
+              const bedParts: string[] = [];
+              if (u.bedrooms && u.bedrooms > 0) bedParts.push(`${u.bedrooms} ${u.bedrooms === 1 ? 'bedroom' : 'bedrooms'}`);
+              if (u.bathrooms && u.bathrooms > 0) bedParts.push(`${u.bathrooms} ${u.bathrooms === 1 ? 'bath' : 'baths'}`);
+              const bedLayoutLabel = bedParts.length > 0 ? bedParts.join(' · ') : `Sleeps ${u.maxGuests}`;
+              const amenities = u.amenities
+                .map((a) => (a.amenities_icon ? resolveAmenityLabel(a.amenities_icon.trim()) : null))
+                .filter((x): x is string => Boolean(x))
+                .slice(0, 5);
+              const mealPlansLabel = u.breakfastIncluded ? 'Breakfast included (CP)' : 'Room only (EP)';
+              const cancellationLabel = u.cancellationTier
+                ? u.cancellationTier.charAt(0).toUpperCase() + u.cancellationTier.slice(1)
+                : 'Standard';
+              return {
+                id: u.numericId,
+                title: u.title,
+                imageUrl: u.imageUrl?.trim() ? u.imageUrl : getPropertyDesignImage(u.numericId),
+                allInTotalLabel,
+                nightlyRateLabel,
+                maxGuests: u.maxGuests,
+                bedLayoutLabel,
+                amenities,
+                mealPlansLabel,
+                cancellationLabel,
+                href: appendQuerySuffix(u.canonicalPath, querySuffix),
+              };
+            })}
+          open={compareOpen}
+          onOpen={() => setCompareOpen(true)}
+          onClose={() => setCompareOpen(false)}
+          onRemove={(id) => {
+            setCompareIds((prev) => {
+              const next = prev.filter((x) => x !== id);
+              if (next.length < 2) setCompareOpen(false);
+              return next;
+            });
+          }}
+          onClear={() => {
+            setCompareIds([]);
+            setCompareOpen(false);
+          }}
+        />
+      )}
       <div className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
         <GuestGroupAndQuoteForms
           defaultCity={searchParams.get("city") || searchParams.get("q") || ""}
