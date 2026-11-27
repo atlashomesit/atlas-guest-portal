@@ -21,6 +21,8 @@ export type AmenityFilterPillsProps = {
   onToggleInstantBook?: () => void;
   workation?: boolean;
   onToggleWorkation?: () => void;
+  couplesWelcome?: boolean;
+  onToggleCouplesWelcome?: () => void;
   paymentTiming?: PaymentTimingFilter | null;
   onSelectPaymentTiming?: (value: PaymentTimingFilter | null) => void;
 };
@@ -44,6 +46,8 @@ export default function AmenityFilterPills({
   onToggleInstantBook,
   workation = false,
   onToggleWorkation,
+  couplesWelcome = false,
+  onToggleCouplesWelcome,
   paymentTiming = null,
   onSelectPaymentTiming,
 }: AmenityFilterPillsProps) {
@@ -160,6 +164,22 @@ export default function AmenityFilterPills({
         >
           <span aria-hidden="true">💻</span>
           <span>Workation (Wi-Fi + Desk)</span>
+        </button>
+      )}
+      {onToggleCouplesWelcome && (
+        <button
+          type="button"
+          data-testid="marketplace-filter-couples-welcome"
+          aria-pressed={couplesWelcome}
+          className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+            couplesWelcome
+              ? 'bg-black text-white border-black'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+          }`}
+          onClick={onToggleCouplesWelcome}
+        >
+          <span aria-hidden="true">♥</span>
+          <span>Couples welcome</span>
         </button>
       )}
       {onSelectPaymentTiming && (
