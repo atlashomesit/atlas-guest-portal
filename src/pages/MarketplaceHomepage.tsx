@@ -7,6 +7,11 @@ import { buildApiUrl } from '@/api/client';
 import { fetchAllMarketplacePages } from '@/api/marketplacePaging'; // TASK-1040072
 import { formatCurrency } from '@/utils/formatting'; // TASK-1872
 import { getFavoriteIds, toggleFavorite } from '@/utils/guestHistory'; // TASK-1873
+import {
+  createTripWishlist,
+  getTripWishlists,
+  toggleListingInTripWishlist,
+} from '@/utils/tripWishlists'; // MKT-069
 import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
@@ -15,6 +20,7 @@ import { useMarketplaceCardPrices, type MarketplaceCardPrice } from '@/hooks/use
 import { sizedForPartyFirst } from '@/utils/smallParty'; // GUEST-033
 import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
+import { computeHaversineKm, formatDistanceLabel } from '@/components/marketplace/airbnbSearch/destinationData';
 import ExploreDestinationsStrip from '@/components/marketplace/ExploreDestinationsStrip'; // MKT-034
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
@@ -33,6 +39,13 @@ import {
   type CompareStayItem,
 } from '@/components/marketplace/CompareStaysDrawer';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
+import {
+  computeFallbackFlexWindow,
+  formatMatchedWindowBadge,
+  parseFlexDays,
+  parseFlexLength,
+  parseFlexMonths,
+} from '@/utils/flexibleSearch';
 import {
   hasListingWifi,
   hasListingWorkation,
@@ -118,6 +131,16 @@ type MarketplaceItem = {
   // MKT-047: Top host badge + criteria stats
   topHost?: boolean;
   topHostStats?: TopHostStatsDto | null;
+  // MKT-058 / MKT-059: flexible & shifted date search match fields
+  matchedCheckIn?: string | null;
+  matchedCheckOut?: string | null;
+  matchedTotalPrice?: number | null;
+  matchedDateDeltaDays?: number | null;
+  // MKT-060: landmark proximity search fields
+  latitude?: number | null;
+  longitude?: number | null;
+  distanceKm?: number | null;
+  distanceLabel?: string | null;
   // MKT-063: self check-in
   hasSelfCheckIn?: boolean;
   selfCheckInMethod?: string | null;
@@ -377,7 +400,7 @@ export function formatRoomCapacitySummary(item: {
   return parts.join(' · ');
 }
 
-export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc';
+export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'distance_asc';
 
 export default function MarketplaceHomepage() {
   const navigate = useNavigate();
@@ -405,6 +428,8 @@ export default function MarketplaceHomepage() {
   const [favEpoch, setFavEpoch] = useState(0);
   const [compareIds, setCompareIds] = useState<number[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [wishlistPickerItem, setWishlistPickerItem] = useState<{ id: number; tenantSlug: string; title: string } | null>(null);
+  const [newWishlistName, setNewWishlistName] = useState('');
 
   const toggleCompareStay = useCallback((id: number) => {
     setCompareIds((prev) => {
@@ -682,7 +707,7 @@ export default function MarketplaceHomepage() {
 
   const handleSortChange = useCallback((newSort: string) => {
     const valid: MarketplaceSortOption =
-      newSort === 'price_asc' || newSort === 'price_desc' || newSort === 'rating_desc'
+      newSort === 'price_asc' || newSort === 'price_desc' || newSort === 'rating_desc' || newSort === 'distance_asc'
         ? newSort
         : 'recommended';
     setSortBy(valid);
@@ -803,6 +828,19 @@ export default function MarketplaceHomepage() {
   // TASK-101491: the FILTER half of the query only - deliberately excludes page/pageSize so that
   // changing a filter produces a new key (resetting paging) while paging does not re-trigger the
   // first-page effect.
+  const nearSearch = useMemo(() => {
+    const latRaw = searchParams.get('nearLat');
+    const lngRaw = searchParams.get('nearLng');
+    if (!latRaw || !lngRaw) return null;
+    const lat = Number(latRaw);
+    const lng = Number(lngRaw);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const label = searchParams.get('nearLabel')?.trim() || searchParams.get('city')?.trim() || 'selected location';
+    const radiusRaw = Number(searchParams.get('radiusKm'));
+    const radiusKm = Number.isFinite(radiusRaw) && radiusRaw > 0 ? Math.min(100, radiusRaw) : 25;
+    return { lat, lng, label, radiusKm };
+  }, [searchParams]);
+
   const serverAmenityCodes = useMemo(() => serverAmenityCodesFor(selectedAmenity), [selectedAmenity]);
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
@@ -811,10 +849,26 @@ export default function MarketplaceHomepage() {
     const urlCity = searchParams.get('city') || searchParams.get('destination');
     const effectiveCity = query.trim() || urlCity?.trim() || '';
     if (effectiveCity) p.set('city', effectiveCity);
+    if (nearSearch) {
+      p.set('nearLat', String(nearSearch.lat));
+      p.set('nearLng', String(nearSearch.lng));
+      p.set('nearLabel', nearSearch.label);
+      p.set('radiusKm', String(nearSearch.radiusKm));
+    }
     const checkIn = searchParams.get('checkIn');
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
     if (checkOut) p.set('checkOut', checkOut);
+    const flexDays = parseFlexDays(searchParams.get('flexDays'));
+    if (flexDays > 0 && checkIn && checkOut) {
+      p.set('flexDays', String(flexDays));
+    }
+    const flexLength = parseFlexLength(searchParams.get('flexLength'));
+    if (flexLength && !checkIn && !checkOut) {
+      p.set('flexLength', flexLength);
+      const flexMonths = parseFlexMonths(searchParams.get('flexMonths'));
+      if (flexMonths.length > 0) p.set('flexMonths', flexMonths.join(','));
+    }
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
     if (minPrice != null) p.set('minPrice', String(minPrice));
@@ -1061,9 +1115,20 @@ export default function MarketplaceHomepage() {
       });
     }
 
+    if (sortBy === 'distance_asc' || (nearSearch && sortBy === 'recommended')) {
+      const distOf = (it: MarketplaceItem): number => {
+        if (typeof it.distanceKm === 'number' && Number.isFinite(it.distanceKm)) return it.distanceKm;
+        if (nearSearch && typeof it.latitude === 'number' && typeof it.longitude === 'number') {
+          return computeHaversineKm(nearSearch.lat, nearSearch.lng, it.latitude, it.longitude);
+        }
+        return Number.POSITIVE_INFINITY;
+      };
+      return [...result].sort((a, b) => distOf(a) - distOf(b));
+    }
+
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices, nearSearch]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -1087,6 +1152,16 @@ export default function MarketplaceHomepage() {
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
     if (checkOut) p.set('checkOut', checkOut);
+    const flexDays = parseFlexDays(searchParams.get('flexDays'));
+    if (flexDays > 0 && checkIn && checkOut) {
+      p.set('flexDays', String(flexDays));
+    }
+    const flexLength = parseFlexLength(searchParams.get('flexLength'));
+    if (flexLength && !checkIn && !checkOut) {
+      p.set('flexLength', flexLength);
+      const flexMonths = parseFlexMonths(searchParams.get('flexMonths'));
+      if (flexMonths.length > 0) p.set('flexMonths', flexMonths.join(','));
+    }
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
     if (category !== 'all') p.set('category', category);
@@ -1461,6 +1536,7 @@ export default function MarketplaceHomepage() {
             className="min-h-[40px] rounded-lg border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-black cursor-pointer"
           >
             <option value="recommended">Recommended</option>
+            {nearSearch && <option value="distance_asc">Distance: Nearest first</option>}
             <option value="price_asc">Price: Low to High</option>
             <option value="price_desc">Price: High to Low</option>
             <option value="rating_desc">Rating: High to Low</option>
@@ -1511,7 +1587,31 @@ export default function MarketplaceHomepage() {
           visibleItems.map((item) => {
             const isFav = favIds.has(item.id);
             const cardTitle = resolveMarketplaceListingDisplayName(item);
-            const canonicalUrl = marketplaceListingPath(item, searchSuffix);
+            const activeFlexLength = !searchParams.get('checkIn') && !searchParams.get('checkOut')
+              ? parseFlexLength(searchParams.get('flexLength'))
+              : null;
+            const activeFlexMonths = activeFlexLength ? parseFlexMonths(searchParams.get('flexMonths')) : [];
+            const fallbackFlex = activeFlexLength && !item.matchedCheckIn
+              ? computeFallbackFlexWindow(activeFlexLength, activeFlexMonths)
+              : null;
+            const effectiveMatchedCheckIn = item.matchedCheckIn ?? fallbackFlex?.checkIn ?? null;
+            const effectiveMatchedCheckOut = item.matchedCheckOut ?? fallbackFlex?.checkOut ?? null;
+            const matchedWindowBadge =
+              effectiveMatchedCheckIn && effectiveMatchedCheckOut
+                ? formatMatchedWindowBadge(
+                    effectiveMatchedCheckIn,
+                    effectiveMatchedCheckOut,
+                    item.matchedDateDeltaDays,
+                  )
+                : null;
+            const effectiveSearchSuffix = (() => {
+              if (!effectiveMatchedCheckIn || !effectiveMatchedCheckOut) return searchSuffix;
+              const p = new URLSearchParams(searchSuffix);
+              p.set('checkIn', effectiveMatchedCheckIn);
+              p.set('checkOut', effectiveMatchedCheckOut);
+              return p.toString();
+            })();
+            const canonicalUrl = marketplaceListingPath(item, effectiveSearchSuffix);
 
             return (
               <article
@@ -1563,15 +1663,18 @@ export default function MarketplaceHomepage() {
                   );
                 })()}
 
-                {/* TASK-1873: save heart */}
+                {/* TASK-1873 / MKT-069: save heart + named trip wishlist picker */}
                 <button
                   type="button"
                   aria-label={isFav ? 'Remove from saved' : 'Save listing'}
                   className="absolute right-2 top-2 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleFavorite(item.id);
+                    const added = toggleFavorite(item.id);
                     setFavEpoch((prev) => prev + 1);
+                    if (added) {
+                      setWishlistPickerItem({ id: item.id, tenantSlug: item.tenantSlug, title: cardTitle });
+                    }
                   }}
                 >
                   {isFav
@@ -1760,6 +1863,58 @@ export default function MarketplaceHomepage() {
                     {formatRoomCapacitySummary(item)}
                   </p>
 
+                  {/* MKT-060: landmark proximity distance badge */}
+                  {(() => {
+                    const label =
+                      item.distanceLabel?.trim() ||
+                      (typeof item.distanceKm === 'number' && nearSearch
+                        ? formatDistanceLabel(item.distanceKm, nearSearch.label)
+                        : nearSearch && typeof item.latitude === 'number' && typeof item.longitude === 'number'
+                          ? formatDistanceLabel(
+                              computeHaversineKm(nearSearch.lat, nearSearch.lng, item.latitude, item.longitude),
+                              nearSearch.label,
+                            )
+                          : null);
+                    if (!label) return null;
+                    return (
+                      <p
+                        className="text-xs font-medium text-indigo-700"
+                        data-testid="marketplace-distance-label"
+                      >
+                        📍 {label}
+                      </p>
+                    );
+                  })()}
+
+                  {/* MKT-058 / MKT-059: matched open or shifted date window + all-in total */}
+                  {matchedWindowBadge && (
+                    <div
+                      className="flex flex-wrap items-center gap-1.5"
+                      data-testid="marketplace-matched-window"
+                    >
+                      <span className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-900">
+                        {matchedWindowBadge}
+                      </span>
+                      {(() => {
+                        const matchedTotal =
+                          typeof item.matchedTotalPrice === 'number' && item.matchedTotalPrice > 0
+                            ? item.matchedTotalPrice
+                            : fallbackFlex && item.pricePerNight > 0
+                              ? item.pricePerNight * fallbackFlex.nights
+                              : null;
+                        if (matchedTotal == null) return null;
+                        return (
+                          <span
+                            className="text-xs font-semibold text-text-primary"
+                            data-testid="marketplace-matched-total"
+                          >
+                            {formatCurrency(matchedTotal)} total
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
+
                   {/* TASK-1873 / TASK-10298776: rating row — enforce >= 4★ suppression guard */}
                   {item.rating != null && item.rating >= 4 && (item.reviewCount == null || item.reviewCount > 0) && (
                     <p className="text-sm font-medium text-[var(--accent-text)]">
@@ -1912,6 +2067,97 @@ export default function MarketplaceHomepage() {
           </button>
         </div>
       )}
+      {/* MKT-069: 1-tap Save to named collaborative trip wishlist dialog */}
+      {wishlistPickerItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={() => setWishlistPickerItem(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Save to trip wishlist"
+            data-testid="marketplace-wishlist-picker"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-neutral-900">Save to a trip wishlist</h3>
+              <button
+                type="button"
+                onClick={() => setWishlistPickerItem(null)}
+                className="min-h-[40px] min-w-[40px] rounded-full text-sm text-neutral-500 hover:bg-neutral-100"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-neutral-600 truncate">Saved: {wishlistPickerItem.title}</p>
+            <div className="space-y-2 max-h-44 overflow-y-auto">
+              {getTripWishlists().map((wl) => {
+                const inList = wl.items.some((i) => i.listingId === wishlistPickerItem.id);
+                return (
+                  <button
+                    key={wl.id}
+                    type="button"
+                    data-testid={`wishlist-pick-${wl.id}`}
+                    onClick={() => {
+                      toggleListingInTripWishlist(wl.id, {
+                        listingId: wishlistPickerItem.id,
+                        tenantSlug: wishlistPickerItem.tenantSlug,
+                        title: wishlistPickerItem.title,
+                      });
+                      setWishlistPickerItem(null);
+                    }}
+                    className="flex min-h-[44px] w-full items-center justify-between rounded-xl border border-neutral-200 px-3 py-2 text-left text-sm font-medium text-neutral-900 hover:bg-neutral-50"
+                  >
+                    <span>{wl.title}</span>
+                    <span className="text-xs text-neutral-500">{inList ? 'Added ✓' : '+ Add'}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newWishlistName.trim()) return;
+                const wl = createTripWishlist(newWishlistName.trim(), {
+                  checkIn: searchParams.get('checkIn') || undefined,
+                  checkOut: searchParams.get('checkOut') || undefined,
+                  guests: Number(searchParams.get('guests')) || 2,
+                });
+                toggleListingInTripWishlist(wl.id, {
+                  listingId: wishlistPickerItem.id,
+                  tenantSlug: wishlistPickerItem.tenantSlug,
+                  title: wishlistPickerItem.title,
+                });
+                setNewWishlistName('');
+                setWishlistPickerItem(null);
+              }}
+              className="flex gap-2 border-t border-neutral-100 pt-3"
+            >
+              <input
+                type="text"
+                aria-label="New trip wishlist name"
+                data-testid="marketplace-new-wishlist-name"
+                value={newWishlistName}
+                onChange={(e) => setNewWishlistName(e.target.value)}
+                placeholder="New trip name (e.g. Goa NYE)"
+                maxLength={80}
+                className="min-h-[44px] flex-1 rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                data-testid="marketplace-create-wishlist-btn"
+                className="min-h-[44px] rounded-xl bg-black px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90"
+              >
+                Create
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <CompareStaysDrawer
         items={compareIds
           .map((id) => items.find((it) => it.id === id))

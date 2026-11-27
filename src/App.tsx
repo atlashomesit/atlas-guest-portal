@@ -361,6 +361,7 @@ function AppWrapper() {
           <Route path="/embed/:embedKey" element={withBoundary(<Suspense fallback={<LazyFallback />}><EmbedPage /></Suspense>, "embed-widget-route")} />
           <Route path="/login" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestLoginPage /></Suspense>, "guest-login-route")} />
           <Route path="/favorites" element={withBoundary(<Suspense fallback={<LazyFallback />}><FavoritesPage /></Suspense>, "favorites-route")} />
+          <Route path="/wishlists/:shareToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><FavoritesPage /></Suspense>, "wishlists-route")} />
           <Route path="/saved" element={withBoundary(<Navigate to="/favorites" replace />, "saved-alias-route")} />
           <Route path="/recent" element={withBoundary(<Suspense fallback={<LazyFallback />}><RecentlyViewedPage /></Suspense>, "recent-route")} />
           <Route path="/become-a-host" element={withBoundary(<Suspense fallback={<LazyFallback />}><BecomeHost /></Suspense>, "become-host-route")} />
