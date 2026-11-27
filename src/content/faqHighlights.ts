@@ -16,7 +16,9 @@ export type FaqHighlight = {
  * instead of rendering "the owner line is .".
  */
 function buildSupportAnswer(businessPhone: string, ownerPhone: string): string {
-  const base = `Message us on WhatsApp at ${businessPhone} or call the same number for quick help.`;
+  const base = businessPhone.trim()
+    ? `Message us on WhatsApp at ${businessPhone} or call the same number for quick help.`
+    : "Use the chat button on this site to reach your host for quick help.";
   return ownerPhone.trim() ? `${base} For escalations, the owner line is ${ownerPhone}.` : base;
 }
 

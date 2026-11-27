@@ -42,6 +42,13 @@ describe('getFaqHighlights owner line (TASK-101710)', () => {
     expect(support!.answer).toMatch(/Message us on WhatsApp/);
   });
 
+  it('never prints an empty WhatsApp number when the business phone is empty (GUEST-101)', () => {
+    vi.mocked(formatDisplayNumber).mockReturnValue('');
+    const support = getFaqHighlights().find((f) => f.id === 'support-contact');
+    expect(support!.answer).toBe('Use the chat button on this site to reach your host for quick help.');
+    expect(support!.answer).not.toMatch(/WhatsApp at\s+or/);
+  });
+
   it('keeps the owner escalation clause when owner phone is present', () => {
     vi.mocked(formatDisplayNumber).mockImplementation(
       (channel: string = 'business') =>
