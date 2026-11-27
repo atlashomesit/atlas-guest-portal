@@ -212,6 +212,10 @@ interface BookingSummary {
   guestId?: number;
   guestName: string;
   guestPhone?: string;
+  /** GUEST-085: Actual staying guest when booked on someone else's behalf. */
+  stayingGuestName?: string | null;
+  stayingGuestPhone?: string | null;
+  stayingGuestEmail?: string | null;
   propertyName: string;
   listingName: string;
   checkinDate: string;
