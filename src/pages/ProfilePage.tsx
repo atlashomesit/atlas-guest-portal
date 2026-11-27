@@ -7,6 +7,7 @@ import { buildApiUrl, getApiHeaders } from "../api/client";
 import { toast } from "react-toastify";
 import { messageFromApiResponse } from "../utils/serverErrorFromResponse";
 import { isValidPhoneNumber } from "libphonenumber-js";
+import { normalizeGstin, validateCompanyGstInput } from "../utils/gstin";
 
 interface GuestProfile {
   id: number;
@@ -14,6 +15,8 @@ interface GuestProfile {
   email?: string | null;
   phone?: string | null;
   photoUrl?: string | null;
+  defaultCompanyName?: string | null;
+  defaultGstin?: string | null;
 }
 
 /**
@@ -52,6 +55,10 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
+  const [defaultCompanyName, setDefaultCompanyName] = useState("");
+  const [defaultGstin, setDefaultGstin] = useState("");
+  const [companyNameError, setCompanyNameError] = useState("");
+  const [gstinError, setGstinError] = useState("");
   const [saving, setSaving] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarError, setAvatarError] = useState("");
@@ -144,6 +151,8 @@ export default function ProfilePage() {
         setEmail(p.email ?? "");
         setPhone(p.phone ?? "");
         setAvatarUrl(p.photoUrl ?? null);
+        setDefaultCompanyName(p.defaultCompanyName ?? "");
+        setDefaultGstin(p.defaultGstin ?? "");
       })
       .catch((err: Error) => {
         console.error(err);
@@ -155,11 +164,24 @@ export default function ProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPhoneError("");
+    setCompanyNameError("");
+    setGstinError("");
 
     const trimPhone = phone.trim();
     if (trimPhone && !isValidGuestPhone(trimPhone)) {
       setPhoneError("Enter a valid phone number (include + and country code for non-Indian numbers).");
       return;
+    }
+
+    const trimCompany = defaultCompanyName.trim();
+    const trimGstin = defaultGstin.trim();
+    if (trimCompany || trimGstin) {
+      const gstValidation = validateCompanyGstInput({ companyName: trimCompany, guestGstin: trimGstin });
+      if (gstValidation.companyNameError || gstValidation.gstinError) {
+        setCompanyNameError(gstValidation.companyNameError ?? "");
+        setGstinError(gstValidation.gstinError ?? "");
+        return;
+      }
     }
 
     setSaving(true);
@@ -172,6 +194,8 @@ export default function ProfilePage() {
           name: name.trim() || undefined,
           email: email.trim() || undefined,
           phone: trimPhone || undefined,
+          defaultCompanyName: trimCompany || null,
+          defaultGstin: trimGstin ? normalizeGstin(trimGstin) : null,
         }),
       });
       if (res.status === 400) {
@@ -324,6 +348,48 @@ export default function ProfilePage() {
               className={`w-full rounded-xl border bg-bg-surface px-4 py-3 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary ${phoneError ? "border-red-400" : "border-border-subtle"}`}
             />
             {phoneError && <p className="text-xs text-red-600">{phoneError}</p>}
+          </div>
+
+          <div className="pt-2 border-t border-border-subtle space-y-4" data-testid="profile-company-gst-section">
+            <div>
+              <h2 className="text-sm font-semibold text-text-primary">Company GST Invoice Details (optional)</h2>
+              <p className="text-xs text-text-muted mt-0.5">
+                Saved for automatic pre-fill on future business bookings.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="profile-company-name" className="text-sm font-medium text-text-primary">
+                Company Name
+              </label>
+              <input
+                id="profile-company-name"
+                type="text"
+                value={defaultCompanyName}
+                onChange={(e) => { setDefaultCompanyName(e.target.value); setCompanyNameError(""); }}
+                maxLength={120}
+                placeholder="e.g. Acme Travels Pvt Ltd"
+                data-testid="profile-company-name-input"
+                className={`w-full rounded-xl border bg-bg-surface px-4 py-3 text-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary ${companyNameError ? "border-red-400" : "border-border-subtle"}`}
+              />
+              {companyNameError && <p className="text-xs text-red-600" role="alert">{companyNameError}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="profile-gstin" className="text-sm font-medium text-text-primary">
+                Company GSTIN
+              </label>
+              <input
+                id="profile-gstin"
+                type="text"
+                value={defaultGstin}
+                onChange={(e) => { setDefaultGstin(e.target.value.toUpperCase()); setGstinError(""); }}
+                maxLength={15}
+                placeholder="e.g. 29ABCDE1234F1Z5"
+                data-testid="profile-gstin-input"
+                className={`w-full rounded-xl border bg-bg-surface px-4 py-3 text-base text-text-primary uppercase placeholder:normal-case placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary ${gstinError ? "border-red-400" : "border-border-subtle"}`}
+              />
+              {gstinError && <p className="text-xs text-red-600" role="alert">{gstinError}</p>}
+            </div>
           </div>
 
           <button

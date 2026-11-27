@@ -90,6 +90,7 @@ import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
 import { DormAgeAcknowledgement } from '@/components/hostel/DormAgeAcknowledgement';
+import { fetchSignedInGuestProfile, type VerifiedIdSummary } from '@/api/guestAuthProfileClient';
 import { PaymentPlanSelector, type PaymentPlanChoice } from '@/components/checkout/PaymentPlanSelector';
 import { createMultiRoomOrder } from '@/api/multiRoomClient';
 import { ageYearsFromDob, dormNeedsAgeAcknowledgement, dormNeedsGenderAcknowledgement, readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
@@ -688,17 +689,81 @@ const GuestDetailsPage: React.FC = () => {
   const [isPrefilledFromSaved, setIsPrefilledFromSaved] = useState(
     () => initialGuestProfile.prefilledFromSaved,
   );
+  // GUEST-099: Cross-device server-backed profile pre-fill for signed-in returning guests.
+  const [prefilledFromServerProfile, setPrefilledFromServerProfile] = useState(false);
+  const [savedVerifiedIdSummary, setSavedVerifiedIdSummary] = useState<VerifiedIdSummary | null>(null);
 
   const handleClearPrefilledGuestDetails = useCallback(() => {
-    setFormData((p) => ({ ...p, name: '', email: '', phone: '' }));
+    setFormData((p) => ({ ...p, name: '', email: '', phone: '', nationality: 'India' }));
     setFormErrors({ name: '', email: '', phone: '' });
+    setCompanyName('');
+    setGuestGstin('');
+    setGstInvoiceEnabled(false);
+    setCompanyNameError(undefined);
+    setGstinError(undefined);
     setIsPrefilledFromSaved(false);
+    setPrefilledFromServerProfile(false);
     try {
       window.localStorage.removeItem('atlas_guest_name');
       window.localStorage.removeItem('atlas_guest_email');
       window.localStorage.removeItem('atlas_guest_phone');
       window.sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
     } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    void fetchSignedInGuestProfile(ac.signal).then((profile) => {
+      if (ac.signal.aborted || !profile) return;
+      if (profile.verifiedIdSummary) {
+        setSavedVerifiedIdSummary(profile.verifiedIdSummary);
+      }
+      let didPrefill = false;
+      setFormData((prev) => {
+        const next = { ...prev };
+        if (!prev.name.trim() && profile.name) { next.name = profile.name; didPrefill = true; }
+        if (!prev.email.trim() && profile.email) { next.email = profile.email; didPrefill = true; }
+        if (!prev.phone.trim() && profile.phone) {
+          const raw = profile.phone.trim();
+          if (raw.startsWith('+')) {
+            const sortedOptions = [...GUEST_DIAL_OPTIONS].sort((a, b) => b.code.length - a.code.length);
+            const matched = sortedOptions.find((o) => raw.startsWith(o.code));
+            if (matched) {
+              setPhoneDialCode(matched.code);
+              next.phone = clampNationalDigits(raw.slice(matched.code.length), matched.maxDigits);
+            } else {
+              next.phone = clampNationalDigits(raw, GUEST_DIAL_OPTIONS[0].maxDigits);
+            }
+          } else {
+            next.phone = clampNationalDigits(raw, getGuestDialOption(phoneDialCode).maxDigits);
+          }
+          didPrefill = true;
+        }
+        if ((!prev.nationality || prev.nationality === 'India') && profile.nationality && profile.nationality !== prev.nationality) {
+          next.nationality = profile.nationality;
+          didPrefill = true;
+        }
+        return next;
+      });
+      if (profile.defaultCompanyName || profile.defaultGstin) {
+        setCompanyName((prev) => {
+          if (!prev.trim() && profile.defaultCompanyName) { didPrefill = true; return profile.defaultCompanyName; }
+          return prev;
+        });
+        setGuestGstin((prev) => {
+          if (!prev.trim() && profile.defaultGstin) { didPrefill = true; return profile.defaultGstin; }
+          return prev;
+        });
+        setGstInvoiceEnabled(true);
+      }
+      if (didPrefill) {
+        setIsPrefilledFromSaved(true);
+        setPrefilledFromServerProfile(true);
+      }
+    });
+    return () => ac.abort();
+    // Run once on mount to hydrate empty fields from the signed-in guest profile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   // GUEST-084: Self-service company name & GSTIN for B2B GST tax invoices.
@@ -2974,10 +3039,19 @@ const GuestDetailsPage: React.FC = () => {
                     className="gd-pill"
                     style={{ cursor: 'pointer', border: '1px solid var(--gd-border, #e5d5c5)', background: 'transparent', fontSize: 12, padding: '2px 8px' }}
                   >
-                    Saved details pre-filled · Clear
+                    {prefilledFromServerProfile ? 'Filled from your saved profile · Clear' : 'Saved details pre-filled · Clear'}
                   </button>
                 )}
               </div>
+
+              {savedVerifiedIdSummary && (
+                <div
+                  className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900"
+                  data-testid="saved-verified-id-banner"
+                >
+                  Verified ID on file: <strong>{savedVerifiedIdSummary.govtIdType}</strong> ending in <strong>{savedVerifiedIdSummary.maskedLast4}</strong> — ready to reuse at online check-in.
+                </div>
+              )}
 
               <div className="gd-field">
                 <label className="gd-field-label" htmlFor="gd-name">
