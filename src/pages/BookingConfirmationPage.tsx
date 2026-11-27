@@ -32,6 +32,7 @@ import { BookingGstDetailsCard } from "../components/booking/BookingGstDetailsCa
 import { CoTravellersCard, type BookingCoTraveller } from "../components/booking/CoTravellersCard"; // GUEST-086
 import { SelfCheckoutCard } from "../components/booking/SelfCheckoutCard"; // GUEST-087
 import { LostItemReportCard, type LostItemReport } from "../components/booking/LostItemReportCard"; // GUEST-093
+import { TripSummaryShareCard } from "../components/booking/TripSummaryShareCard"; // GUEST-098
 import BookingPaymentPlanCard, { type GuestBookingInstalment } from "../components/booking/BookingPaymentPlanCard";
 import {
   buildReceiptHtml,
@@ -1909,6 +1910,16 @@ export default function BookingConfirmationPage() {
             checkoutDateIso={booking.checkoutDateIso ?? summaryDisplayDateToIso(booking.checkoutDate)}
             guestReportedCheckoutAtUtc={booking.guestReportedCheckoutAtUtc}
             initialReports={(booking as { lostItemReports?: LostItemReport[] }).lostItemReports}
+          />
+        )}
+
+        {/* GUEST-098: Privacy-safe read-only trip summary share link (hides codes & prices) */}
+        {!isCancelled && !searchParams.get("ct") && (
+          <TripSummaryShareCard
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            propertyName={booking.propertyName}
+            initialShareToken={(booking as { tripSummaryShareToken?: string | null }).tripSummaryShareToken ?? null}
           />
         )}
 
