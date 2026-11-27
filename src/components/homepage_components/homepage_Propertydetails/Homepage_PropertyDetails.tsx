@@ -2182,18 +2182,19 @@ useEffect(() => {
                 );
               })}
 
-              <button
-                type="button"
-                className="pp-gallery-more"
-                onClick={() => {
-                  if (galleryUrls.length === 0) return;
-                  setLightboxIndex(0);
-                  setShowLightbox(true);
-                }}
-              >
-                <PpGridIcon size={13} />
-                {galleryUrls.length > 5 ? `View all ${galleryUrls.length} photos` : 'View gallery'}
-              </button>
+              {galleryUrls.length > 0 && (
+                <button
+                  type="button"
+                  className="pp-gallery-more"
+                  onClick={() => {
+                    setLightboxIndex(0);
+                    setShowLightbox(true);
+                  }}
+                >
+                  <PpGridIcon size={13} />
+                  {galleryUrls.length > 5 ? `View all ${galleryUrls.length} photos` : 'View gallery'}
+                </button>
+              )}
             </div>
 
             {showLightbox && (
