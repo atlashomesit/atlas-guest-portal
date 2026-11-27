@@ -8,6 +8,7 @@ import { formatDisplayNumber } from '@/config/contact';
 import { isCheckoutAfterCheckin } from '@/utils/dateRangeValidation';
 
 import { DateRangePickerPopover } from '../homepage_components/hotelBooking_form/DateRangePickerPopover';
+import { FlexibleDateChips, type DateFlexibilityMode } from './FlexibleDateChips';
 // CALENDAR basis throughout this picker — see the header comment in utils/date.ts.
 // react-date-range builds every day cell as a LOCAL-midnight Date (a civil date, not an
 // instant), and date-fns reads it back on the same basis, so that is the basis this component
@@ -61,6 +62,9 @@ interface AtlasDateRangePickerProps {
   onActiveFieldChange?: (field: 'checkin' | 'checkout' | null) => void;
   instructionText?: string;
   popoverClassName?: string;
+  /** GUEST-095: Optional flexible-dates mode selector rendered inside the date picker. */
+  flexibility?: DateFlexibilityMode;
+  onFlexibilityChange?: (mode: DateFlexibilityMode) => void;
 }
 
 export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
@@ -90,6 +94,8 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
   value,
   activeField,
   onActiveFieldChange,
+  flexibility = 'exact',
+  onFlexibilityChange,
 }) => {
   const fallbackLabelId = useId();
   const fallbackContentId = useId();
@@ -574,6 +580,16 @@ export const AtlasDateRangePicker: React.FC<AtlasDateRangePickerProps> = ({
             {...dateRangeProps}
             onChange={handleRangeChange}
           />
+          {onFlexibilityChange && (
+            <div className="border-t border-[#f0e6dc] px-3 py-2.5">
+              <FlexibleDateChips
+                value={flexibility}
+                onChange={onFlexibilityChange}
+                compact
+                testIdPrefix="picker-flex-date"
+              />
+            </div>
+          )}
           {afterCalendar}
         </div>
       )}

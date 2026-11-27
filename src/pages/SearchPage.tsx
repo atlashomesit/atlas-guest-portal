@@ -38,6 +38,12 @@ import {
   fetchAvailabilitySummary,
   type ListingAvailabilitySummary,
 } from "../api/availabilitySummaryClient";
+import {
+  FlexibleDateChips,
+  formatShortDateWindow,
+  type DateFlexibilityMode,
+  type FlexibleAvailabilityMatch,
+} from "../components/date/FlexibleDateChips";
 import RecentlyViewedStrip from "../components/RecentlyViewedStrip";
 import { SearchByImageModal, type ImageSearchMatch } from "../components/search/SearchByImageModal";
 import {
@@ -393,6 +399,31 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
 
   const checkInParam = searchParams.get("checkIn") ?? searchParams.get("checkin");
   const checkOutParam = searchParams.get("checkOut") ?? searchParams.get("checkout");
+  const rawFlex = searchParams.get("flex");
+  const flexMode: DateFlexibilityMode =
+    rawFlex === "plus_minus_1" || rawFlex === "plus_minus_3" || rawFlex === "any_weekend"
+      ? rawFlex
+      : "exact";
+  const [flexMatchesByListingId, setFlexMatchesByListingId] = useState<
+    Record<number, FlexibleAvailabilityMatch>
+  >({});
+  const handleFlexChange = useCallback(
+    (nextMode: DateFlexibilityMode) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (nextMode === "exact") {
+            next.delete("flex");
+          } else {
+            next.set("flex", nextMode);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const guestsParam = searchParams.get("guests");
   const adultsParam = searchParams.get("adults");
   const childrenParam = searchParams.get("children");
@@ -534,6 +565,46 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
   const [dateAvailableIds, setDateAvailableIds] = useState<Set<number> | null>(null);
   const [dateAvailLoading, setDateAvailLoading] = useState(false);
   const dateAvailCacheRef = useRef<Map<string, Set<number>>>(new Map());
+  // GUEST-095: Tenant-scoped flexible-dates availability lookup (±1d, ±3d, or any open weekend)
+  useEffect(() => {
+    if (isMarketplaceSearch || flexMode === "exact") {
+      setFlexMatchesByListingId({});
+      return;
+    }
+    let cancelled = false;
+    const params = new URLSearchParams({ mode: flexMode });
+    if (checkInParam) params.set("checkIn", checkInParam);
+    if (checkOutParam) params.set("checkOut", checkOutParam);
+    if (guestsParam) params.set("guests", guestsParam);
+    fetch(buildApiUrl(`/api/availability/flexible?${params.toString()}`), {
+      headers: getApiHeaders(),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const items: FlexibleAvailabilityMatch[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data.matches)
+            ? data.matches
+            : Array.isArray(data.listings)
+              ? data.listings
+              : [];
+        const map: Record<number, FlexibleAvailabilityMatch> = {};
+        for (const m of items) {
+          if (m && typeof m.listingId === "number" && m.checkIn && m.checkOut) {
+            map[m.listingId] = m;
+          }
+        }
+        setFlexMatchesByListingId(map);
+      })
+      .catch(() => {
+        if (!cancelled) setFlexMatchesByListingId({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isMarketplaceSearch, flexMode, checkInParam, checkOutParam, guestsParam]);
+
   /** TASK-1460: batch availability hints for cards when guest has not set explicit date search. */
   const [availabilityById, setAvailabilityById] = useState<Record<number, ListingAvailabilitySummary>>({});
   const [availabilityFetchDone, setAvailabilityFetchDone] = useState(false);
@@ -1311,6 +1382,39 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
               />
             </div>
           </div>
+
+          {/* GUEST-095: Flexible-dates search chips on tenant direct booking search */}
+          {!isMarketplaceSearch && (
+            <div className="mt-3 pt-3 border-t border-border-subtle" data-testid="search-flex-dates-bar">
+              <FlexibleDateChips
+                value={flexMode}
+                onChange={handleFlexChange}
+                testIdPrefix="search-flex-date"
+              />
+              {flexMode !== "exact" && Object.keys(flexMatchesByListingId).length > 0 && (
+                <div
+                  data-testid="search-flex-matches-summary"
+                  className="mt-2 flex flex-wrap gap-2 text-xs text-text-secondary"
+                >
+                  {Object.values(flexMatchesByListingId)
+                    .slice(0, 4)
+                    .map((m) => (
+                      <Link
+                        key={m.listingId}
+                        to={`/listing/${m.listingId}?checkIn=${encodeURIComponent(m.checkIn)}&checkOut=${encodeURIComponent(m.checkOut)}`}
+                        data-testid={`flex-match-pill-${m.listingId}`}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-brand-primary/10 px-3 py-1 font-medium text-brand-primary hover:bg-brand-primary/20 transition"
+                      >
+                        <span>{formatShortDateWindow(m.checkIn, m.checkOut)}</span>
+                        {typeof m.allInTotal === "number" && (
+                          <span>· ₹{Math.round(m.allInTotal).toLocaleString("en-IN")} total</span>
+                        )}
+                      </Link>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
 
           <div className="search-filters__row search-filters__row--meta">
