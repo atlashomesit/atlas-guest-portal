@@ -16,6 +16,15 @@ import { fetchPublicCities } from '@/api/publicCities';
 import { clearRecentSearches, persistRecentSearch, readRecentSearches } from './recentSearches';
 import type { AirbnbSearchValues, DestinationOption } from './types';
 import { isMarketplaceMode } from '@/tenant/tenantResolver';
+import {
+  FLEX_LENGTH_OPTIONS,
+  formatFlexSummary,
+  getUpcomingFlexMonths,
+  parseFlexDays,
+  parseFlexLength,
+  parseFlexMonths,
+  type FlexLength,
+} from '@/utils/flexibleSearch';
 
 const MAX_GUESTS = 20;
 const DEBOUNCE_MS = 300;
@@ -53,8 +62,22 @@ function buildSearchParams(
   }
   p.set('destination', values.destination.trim());
   p.set('location', values.destination.trim());
+  if (typeof values.nearLat === 'number' && typeof values.nearLng === 'number') {
+    p.set('nearLat', String(values.nearLat));
+    p.set('nearLng', String(values.nearLng));
+    if (values.nearLabel) p.set('nearLabel', values.nearLabel);
+  }
   if (values.checkIn) p.set('checkIn', values.checkIn);
   if (values.checkOut) p.set('checkOut', values.checkOut);
+  if (values.flexDays && values.flexDays > 0 && values.checkIn && values.checkOut) {
+    p.set('flexDays', String(values.flexDays));
+  }
+  if (values.flexLength) {
+    p.set('flexLength', values.flexLength);
+    if (values.flexMonths && values.flexMonths.length > 0) {
+      p.set('flexMonths', values.flexMonths.join(','));
+    }
+  }
   p.set('adults', String(values.guests.adults));
   p.set('children', String(values.guests.children));
   p.set('infants', String(values.guests.infants));
@@ -83,10 +106,16 @@ export default function AirbnbSearchBar({
 
   const [destination, setDestination] = useState('');
   const [destinationQuery, setDestinationQuery] = useState('');
+  const [nearLandmark, setNearLandmark] = useState<{ lat: number; lng: number; label: string; city?: string } | null>(null);
   const [dateRange, setDateRange] = useState<{ startDate: Date | null; endDate: Date | null }>({
     startDate: null,
     endDate: null,
   });
+  const [dateMode, setDateMode] = useState<'dates' | 'flexible'>('dates');
+  const [flexDays, setFlexDays] = useState<number>(0);
+  const [flexLength, setFlexLength] = useState<FlexLength>('weekend');
+  const [flexMonths, setFlexMonths] = useState<string[]>([]);
+  const upcomingMonths = useMemo(() => getUpcomingFlexMonths(today, 6), [today]);
   // GUEST-036: the month the calendar is paging through is view state, kept apart from the stay
   // dates. It used to be written into dateRange.startDate, which planted a phantom check-in on
   // every month change and snapped the grid forward again.
@@ -160,7 +189,19 @@ export default function AirbnbSearchBar({
   // homepage search writes only the `guests` TOTAL, never adults/children, so the
   // total must hydrate Who — otherwise Back-navigation silently resets guests to 2.
   useEffect(() => {
-    const dest = searchParams.get('destination') ?? searchParams.get('city') ?? '';
+    const dest = searchParams.get('nearLabel') ?? searchParams.get('destination') ?? searchParams.get('city') ?? '';
+    const nearLatRaw = searchParams.get('nearLat');
+    const nearLngRaw = searchParams.get('nearLng');
+    const nearLabelRaw = searchParams.get('nearLabel');
+    if (nearLatRaw && nearLngRaw) {
+      const lat = Number(nearLatRaw);
+      const lng = Number(nearLngRaw);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setNearLandmark({ lat, lng, label: nearLabelRaw?.trim() || dest || 'Selected area' });
+      }
+    } else {
+      setNearLandmark(null);
+    }
     const checkIn = searchParams.get('checkIn') ?? searchParams.get('checkin');
     const checkOut = searchParams.get('checkOut') ?? searchParams.get('checkout');
     const adultsRaw = searchParams.get('adults');
@@ -175,8 +216,18 @@ export default function AirbnbSearchBar({
     }
     const start = parseIsoDate(checkIn);
     const end = parseIsoDate(checkOut);
+    const urlFlexDays = parseFlexDays(searchParams.get('flexDays'));
+    const urlFlexLength = parseFlexLength(searchParams.get('flexLength'));
+    const urlFlexMonths = parseFlexMonths(searchParams.get('flexMonths'));
     if (start || end) {
       setDateRange({ startDate: start, endDate: end });
+      setDateMode('dates');
+      setFlexDays(urlFlexDays);
+    } else if (urlFlexLength) {
+      setDateMode('flexible');
+      setFlexLength(urlFlexLength);
+      setFlexMonths(urlFlexMonths);
+      setDateRange({ startDate: null, endDate: null });
     }
     // Only touch guest state when the URL actually carries guest criteria, so an
     // unrelated param change never clobbers an in-progress Who edit.
@@ -224,6 +275,7 @@ export default function AirbnbSearchBar({
   const handleDestinationInput = (value: string) => {
     setDestinationQuery(value);
     setDestination(value);
+    setNearLandmark(null);
     setDestinationError(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -232,9 +284,15 @@ export default function AirbnbSearchBar({
     }, DEBOUNCE_MS);
   };
 
-  const selectDestination = (label: string) => {
+  const selectDestination = (item: DestinationOption | string) => {
+    const label = typeof item === 'string' ? item : item.label;
     setDestination(label);
     setDestinationQuery(label);
+    if (typeof item !== 'string' && typeof item.lat === 'number' && typeof item.lng === 'number') {
+      setNearLandmark({ lat: item.lat, lng: item.lng, label: item.label, city: item.city });
+    } else {
+      setNearLandmark(null);
+    }
     setDestinationError(null);
     closeDestination();
     setHighlightedIndex(-1);
@@ -266,7 +324,7 @@ export default function AirbnbSearchBar({
       setDestinationError('Please select a destination.');
       ok = false;
     }
-    const hasAnyDate = Boolean(dateRange.startDate || dateRange.endDate);
+    const hasAnyDate = dateMode === 'dates' && Boolean(dateRange.startDate || dateRange.endDate);
     if (hasAnyDate) {
       if (!dateRange.startDate || !dateRange.endDate || dateRange.endDate <= dateRange.startDate) {
         setDateError('Please select valid travel dates.');
@@ -280,8 +338,14 @@ export default function AirbnbSearchBar({
 
     return {
       destination: destination.trim(),
-      checkIn: dateRange.startDate ? toCalendarISO(dateRange.startDate) : undefined,
-      checkOut: dateRange.endDate ? toCalendarISO(dateRange.endDate) : undefined,
+      checkIn: dateMode === 'dates' && dateRange.startDate ? toCalendarISO(dateRange.startDate) : undefined,
+      checkOut: dateMode === 'dates' && dateRange.endDate ? toCalendarISO(dateRange.endDate) : undefined,
+      flexDays: dateMode === 'dates' && dateRange.startDate && dateRange.endDate && flexDays > 0 ? flexDays : undefined,
+      flexLength: dateMode === 'flexible' ? flexLength : undefined,
+      flexMonths: dateMode === 'flexible' && flexMonths.length > 0 ? flexMonths : undefined,
+      nearLat: nearLandmark?.lat,
+      nearLng: nearLandmark?.lng,
+      nearLabel: nearLandmark?.label,
       guests: guestCounts,
     };
   };
@@ -301,9 +365,25 @@ export default function AirbnbSearchBar({
       if (currentBrand?.trim().toLowerCase() === 'atlastays' || isMarketplaceMode()) {
         p.set('brand', currentBrand?.trim() || 'atlastays');
       }
-      p.set('city', values.destination.trim());
+      if (typeof values.nearLat === 'number' && typeof values.nearLng === 'number') {
+        p.set('nearLat', String(values.nearLat));
+        p.set('nearLng', String(values.nearLng));
+        p.set('nearLabel', values.nearLabel || values.destination.trim());
+        if (nearLandmark?.city) p.set('city', nearLandmark.city);
+      } else {
+        p.set('city', values.destination.trim());
+      }
       if (values.checkIn) p.set('checkIn', values.checkIn);
       if (values.checkOut) p.set('checkOut', values.checkOut);
+      if (values.flexDays && values.flexDays > 0 && values.checkIn && values.checkOut) {
+        p.set('flexDays', String(values.flexDays));
+      }
+      if (values.flexLength) {
+        p.set('flexLength', values.flexLength);
+        if (values.flexMonths && values.flexMonths.length > 0) {
+          p.set('flexMonths', values.flexMonths.join(','));
+        }
+      }
       const guestTotal = values.guests.adults + values.guests.children;
       if (guestTotal > 0) p.set('guests', String(guestTotal));
       navigate({ pathname: '/', search: p.toString() });
@@ -315,7 +395,12 @@ export default function AirbnbSearchBar({
   const handleClearAll = () => {
     setDestination('');
     setDestinationQuery('');
+    setNearLandmark(null);
     setDateRange({ startDate: null, endDate: null });
+    setDateMode('dates');
+    setFlexDays(0);
+    setFlexLength('weekend');
+    setFlexMonths([]);
     setGuestCounts({ adults: 2, children: 0, infants: 0, pets: 0 });
     setDestinationError(null);
     setDateError(null);
@@ -324,7 +409,7 @@ export default function AirbnbSearchBar({
     closeAllPanels();
     // TASK-1040280: clear URL search params while preserving brand and utm_* params
     const next = new URLSearchParams(searchParams);
-    for (const key of ['destination', 'location', 'city', 'checkIn', 'checkOut', 'guests', 'adults', 'children', 'infants', 'pets']) {
+    for (const key of ['destination', 'location', 'city', 'nearLat', 'nearLng', 'nearLabel', 'radiusKm', 'checkIn', 'checkOut', 'flexDays', 'flexLength', 'flexMonths', 'guests', 'adults', 'children', 'infants', 'pets']) {
       next.delete(key);
     }
     navigate({ search: next.toString() }, { replace: true });
@@ -349,16 +434,26 @@ export default function AirbnbSearchBar({
     }
     if (e.key === 'Enter' && highlightedIndex >= 0 && filteredDestinations[highlightedIndex]) {
       e.preventDefault();
-      selectDestination(filteredDestinations[highlightedIndex].label);
+      selectDestination(filteredDestinations[highlightedIndex]);
     }
   };
 
+  const toggleFlexMonth = (key: string) => {
+    setFlexMonths((prev) =>
+      prev.includes(key) ? prev.filter((m) => m !== key) : [...prev, key].slice(0, 6),
+    );
+  };
+
   const whenLabel =
-    dateRange.startDate && dateRange.endDate
-      ? `${format(dateRange.startDate, 'dd MMM')} – ${format(dateRange.endDate, 'dd MMM')}`
-      : 'Add dates';
+    dateMode === 'flexible'
+      ? formatFlexSummary(flexLength, flexMonths)
+      : dateRange.startDate && dateRange.endDate
+        ? `${format(dateRange.startDate, 'dd MMM')} – ${format(dateRange.endDate, 'dd MMM')}${
+            flexDays > 0 ? ` (±${flexDays} ${flexDays === 1 ? 'day' : 'days'})` : ''
+          }`
+        : 'Add dates';
   const nights =
-    dateRange.startDate && dateRange.endDate
+    dateMode === 'dates' && dateRange.startDate && dateRange.endDate
       ? calculateNights(dateRange.startDate, dateRange.endDate)
       : 0;
 
@@ -447,7 +542,7 @@ export default function AirbnbSearchBar({
                         highlightedIndex === index ? 'bg-bg-muted' : ''
                       }`}
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => selectDestination(item.label)}
+                      onClick={() => selectDestination(item)}
                     >
                       <span className="text-sm font-medium text-text-primary">{item.label}</span>
                       <span className="text-xs text-text-muted">{item.region}</span>
@@ -496,7 +591,7 @@ export default function AirbnbSearchBar({
             labelId={calendarLabelId}
             heading="When is your trip?"
             loadingLabel="Loading calendar…"
-            open={isCalendarOpen}
+            open={isCalendarOpen && dateMode === 'dates'}
             onClose={() => {
               setIsCalendarOpen(false);
               setActiveDateField(null);
@@ -518,7 +613,158 @@ export default function AirbnbSearchBar({
                 setIsCalendarOpen(true);
               }
             }}
+            afterCalendar={
+              <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3" data-testid="date-picker-mode-footer">
+                {/* MKT-059: ±1 / ±2 / ±3 day flexibility chips */}
+                <div className="flex flex-wrap items-center justify-center gap-2" role="group" aria-label="Date flexibility" data-testid="flex-days-chips">
+                  {[
+                    { value: 0, label: 'Exact dates' },
+                    { value: 1, label: '±1 day' },
+                    { value: 2, label: '±2 days' },
+                    { value: 3, label: '±3 days' },
+                  ].map((chip) => {
+                    const active = flexDays === chip.value;
+                    return (
+                      <button
+                        key={chip.value}
+                        type="button"
+                        data-testid={`flex-days-${chip.value}`}
+                        aria-pressed={active}
+                        onClick={() => setFlexDays(chip.value)}
+                        className={`min-h-[36px] rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                          active
+                            ? 'border-black bg-black text-white'
+                            : 'border-border bg-bg-surface text-text-primary hover:border-text-primary'
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="inline-flex self-center rounded-full bg-bg-muted p-1" role="tablist" aria-label="Date search mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={dateMode === 'dates'}
+                    data-testid="date-mode-exact-tab"
+                    onClick={() => setDateMode('dates')}
+                    className="min-h-[36px] rounded-full bg-bg-surface px-4 py-1.5 text-xs font-semibold text-text-primary shadow-sm"
+                  >
+                    Choose dates
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={dateMode === 'flexible'}
+                    data-testid="date-mode-flexible-tab"
+                    onClick={() => {
+                      setDateMode('flexible');
+                      setDateError(null);
+                    }}
+                    className="min-h-[36px] rounded-full px-4 py-1.5 text-xs font-semibold text-text-muted hover:text-text-primary"
+                  >
+                    I&apos;m flexible
+                  </button>
+                </div>
+              </div>
+            }
           />
+          {isCalendarOpen && dateMode === 'flexible' && (
+            <div
+              id={calendarContentId}
+              role="dialog"
+              aria-label="Flexible trip dates"
+              data-testid="flexible-dates-popover"
+              className="absolute left-0 right-0 top-full z-50 mt-2 w-full min-w-[280px] rounded-2xl border border-border bg-bg-surface p-4 shadow-xl md:min-w-[380px]"
+            >
+              <div className="mb-4 flex justify-center">
+                <div className="inline-flex rounded-full bg-bg-muted p-1" role="tablist" aria-label="Date search mode">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={false}
+                    data-testid="date-mode-exact-tab"
+                    onClick={() => setDateMode('dates')}
+                    className="min-h-[36px] rounded-full px-4 py-1.5 text-xs font-semibold text-text-muted hover:text-text-primary"
+                  >
+                    Choose dates
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={true}
+                    data-testid="date-mode-flexible-tab"
+                    onClick={() => setDateMode('flexible')}
+                    className="min-h-[36px] rounded-full bg-bg-surface px-4 py-1.5 text-xs font-semibold text-text-primary shadow-sm"
+                  >
+                    I&apos;m flexible
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <p className="mb-2 text-xs font-semibold text-text-primary">How long would you like to stay?</p>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Flexible stay length">
+                  {FLEX_LENGTH_OPTIONS.map((opt) => {
+                    const active = flexLength === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        data-testid={`flex-length-${opt.value}`}
+                        aria-pressed={active}
+                        onClick={() => setFlexLength(opt.value)}
+                        className={`min-h-[44px] rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                          active
+                            ? 'border-black bg-black text-white'
+                            : 'border-border bg-bg-surface text-text-primary hover:border-text-primary'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <p className="mb-2 text-xs font-semibold text-text-primary">Go anytime in</p>
+                <div className="grid grid-cols-3 gap-2" role="group" aria-label="Flexible travel months">
+                  {upcomingMonths.map((m) => {
+                    const active = flexMonths.includes(m.key);
+                    return (
+                      <button
+                        key={m.key}
+                        type="button"
+                        data-testid={`flex-month-${m.key}`}
+                        aria-pressed={active}
+                        onClick={() => toggleFlexMonth(m.key)}
+                        className={`min-h-[44px] rounded-xl border px-2 py-2 text-xs font-semibold transition ${
+                          active
+                            ? 'border-black bg-black text-white'
+                            : 'border-border bg-bg-surface text-text-primary hover:border-text-primary'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+                <button
+                  type="button"
+                  data-testid="flex-dates-done"
+                  onClick={() => setIsCalendarOpen(false)}
+                  className="min-h-[40px] rounded-full bg-[var(--cta-primary,#222)] px-4 py-1.5 text-xs font-semibold text-[var(--text-on-cta,#fff)]"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Who */}

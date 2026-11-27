@@ -1,6 +1,6 @@
 import { useTenantProcessingFee } from "../hooks/useTenantProcessingFee";
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { FaHeart } from "react-icons/fa";
 import SEO from "../components/SEO";
 import { fetchPublicListings, type PublicListing } from "../api/listingClient";
@@ -23,6 +23,10 @@ import {
   MAX_COMPARE_STAYS,
   type CompareStayItem,
 } from "../components/marketplace/CompareStaysDrawer";
+import {
+  CollaborativeTripWishlistBoard,
+  type WishlistListingMeta,
+} from "../components/marketplace/CollaborativeTripWishlistBoard";
 
 type FavoriteListing = PublicListing & { tenantSlug?: string };
 
@@ -60,6 +64,7 @@ export default function FavoritesPage() {
   // TASK-1299: Wishlist share — copy link to clipboard
   const [shareState, setShareState] = useState<"idle" | "copied">("idle");
   const [searchParams] = useSearchParams();
+  const { shareToken } = useParams<{ shareToken?: string }>();
   // TASK-4010: Server-side sync status indicator
   const [syncStatus, setSyncStatus] = useState<"idle" | "synced" | "local">("idle");
   const sharedWishlistIds = useMemo(() => {
@@ -268,6 +273,34 @@ export default function FavoritesPage() {
           </Link>
         </div>
       </div>
+
+      {/* MKT-069: Named collaborative trip wishlists with voting, shared notes, and shared dates */}
+      <CollaborativeTripWishlistBoard
+        shareToken={shareToken}
+        encodedData={searchParams.get("data")}
+        listingsById={
+          new Map<number, WishlistListingMeta>(
+            all.map((l) => {
+              const slug = getPropertySlug({ property_name: l.name });
+              const basePath = buildHomeUnitPath(slug, l.id);
+              const href = l.tenantSlug ? appendQuerySuffix(basePath, `tenant=${encodeURIComponent(l.tenantSlug)}`) : basePath;
+              return [
+                l.id,
+                {
+                  id: l.id,
+                  title: l.name,
+                  city: undefined,
+                  tenantSlug: l.tenantSlug,
+                  pricePerNight: l.baseNightlyRate ?? undefined,
+                  href,
+                },
+              ];
+            }),
+          )
+        }
+        formatMoney={formatDisplayCurrency}
+        processingFeePercent={processingFeePercent}
+      />
 
       {loading ? (
         <LoadingState kind="skeleton-grid" count={6} message="Loading saved homes…" />
