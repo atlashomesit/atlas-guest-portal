@@ -106,6 +106,10 @@ type MarketplaceItem = {
   // MKT-063: self check-in
   hasSelfCheckIn?: boolean;
   selfCheckInMethod?: string | null;
+  // MKT-064: bedrooms, beds, bathrooms
+  bedrooms?: number | null;
+  beds?: number | null;
+  bathrooms?: number | null;
 };
 
 /**
@@ -298,6 +302,34 @@ function parseBoundsFromSearchParams(sp: URLSearchParams): MapBounds | null {
   return null;
 }
 
+function parsePositiveIntParam(raw: string | null): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace helper
+export function formatRoomCapacitySummary(item: {
+  bedrooms?: number | null;
+  beds?: number | null;
+  bathrooms?: number | null;
+  maxGuests: number;
+}): string {
+  const parts: string[] = [];
+  if (typeof item.bedrooms === 'number' && item.bedrooms > 0) {
+    parts.push(`${item.bedrooms} bedroom${item.bedrooms === 1 ? '' : 's'}`);
+  }
+  if (typeof item.beds === 'number' && item.beds > 0) {
+    parts.push(`${item.beds} bed${item.beds === 1 ? '' : 's'}`);
+  }
+  if (typeof item.bathrooms === 'number' && item.bathrooms > 0) {
+    parts.push(`${item.bathrooms} bath${item.bathrooms === 1 ? '' : 's'}`);
+  }
+  const sleeps = `Sleeps up to ${item.maxGuests} guest${item.maxGuests === 1 ? '' : 's'}`;
+  parts.push(sleeps);
+  return parts.join(' · ');
+}
+
 export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc';
 
 export default function MarketplaceHomepage() {
@@ -361,6 +393,16 @@ export default function MarketplaceHomepage() {
   const [selfCheckIn, setSelfCheckIn] = useState<boolean>(
     () => searchParams.get('selfCheckIn') === 'true',
   );
+  // MKT-064: Min bedrooms, beds, bathrooms synced with URL
+  const [minBedrooms, setMinBedrooms] = useState<number | null>(
+    () => parsePositiveIntParam(searchParams.get('minBedrooms')),
+  );
+  const [minBeds, setMinBeds] = useState<number | null>(
+    () => parsePositiveIntParam(searchParams.get('minBeds')),
+  );
+  const [minBathrooms, setMinBathrooms] = useState<number | null>(
+    () => parsePositiveIntParam(searchParams.get('minBathrooms')),
+  );
 
   // MKT-048: Map bounding box synced with URL (?swLat=&swLng=&neLat=&neLng=)
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(() =>
@@ -384,6 +426,9 @@ export default function MarketplaceHomepage() {
     setBreakfastIncluded(searchParams.get('mealPlan') === 'breakfast');
     setTopHostFilter(searchParams.get('topHost') === 'true');
     setSelfCheckIn(searchParams.get('selfCheckIn') === 'true');
+    setMinBedrooms(parsePositiveIntParam(searchParams.get('minBedrooms')));
+    setMinBeds(parsePositiveIntParam(searchParams.get('minBeds')));
+    setMinBathrooms(parsePositiveIntParam(searchParams.get('minBathrooms')));
     setMapBounds(parseBoundsFromSearchParams(searchParams));
 
     const s = searchParams.get('sort') || searchParams.get('sortBy');
@@ -450,6 +495,21 @@ export default function MarketplaceHomepage() {
       return next;
     }, { replace: true });
   }, [selfCheckIn, setSearchParams]);
+
+  const handleRoomCountFilterChange = useCallback(
+    (key: 'minBedrooms' | 'minBeds' | 'minBathrooms', value: number | null) => {
+      if (key === 'minBedrooms') setMinBedrooms(value);
+      if (key === 'minBeds') setMinBeds(value);
+      if (key === 'minBathrooms') setMinBathrooms(value);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value != null && value > 0) next.set(key, String(value));
+        else next.delete(key);
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
 
   const handleSearchThisArea = useCallback(() => {
     if (!pendingMapBounds) return;
@@ -537,6 +597,9 @@ export default function MarketplaceHomepage() {
       'mealPlan',
       'topHost',
       'selfCheckIn',
+      'minBedrooms',
+      'minBeds',
+      'minBathrooms',
       'swLat',
       'swLng',
       'neLat',
@@ -594,6 +657,9 @@ export default function MarketplaceHomepage() {
     if (breakfastIncluded) p.set('mealPlan', 'breakfast');
     if (topHostFilter) p.set('topHost', 'true');
     if (selfCheckIn) p.set('selfCheckIn', 'true');
+    if (minBedrooms != null) p.set('minBedrooms', String(minBedrooms));
+    if (minBeds != null) p.set('minBeds', String(minBeds));
+    if (minBathrooms != null) p.set('minBathrooms', String(minBathrooms));
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -602,7 +668,7 @@ export default function MarketplaceHomepage() {
     }
     if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, mapBounds, sortBy]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, mapBounds, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -729,6 +795,16 @@ export default function MarketplaceHomepage() {
       result = result.filter((item) => hasListingSelfCheckIn(item));
     }
 
+    if (minBedrooms != null) {
+      result = result.filter((item) => typeof item.bedrooms === 'number' && item.bedrooms >= minBedrooms);
+    }
+    if (minBeds != null) {
+      result = result.filter((item) => typeof item.beds === 'number' && item.beds >= minBeds);
+    }
+    if (minBathrooms != null) {
+      result = result.filter((item) => typeof item.bathrooms === 'number' && item.bathrooms >= minBathrooms);
+    }
+
     if (freeCancellation) {
       result = result.filter((item) => item.hasFreeCancellation !== false);
     }
@@ -782,7 +858,7 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, selfCheckIn, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -814,6 +890,9 @@ export default function MarketplaceHomepage() {
     if (breakfastIncluded) p.set('mealPlan', 'breakfast');
     if (topHostFilter) p.set('topHost', 'true');
     if (selfCheckIn) p.set('selfCheckIn', 'true');
+    if (minBedrooms != null) p.set('minBedrooms', String(minBedrooms));
+    if (minBeds != null) p.set('minBeds', String(minBeds));
+    if (minBathrooms != null) p.set('minBathrooms', String(minBathrooms));
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -821,7 +900,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -969,7 +1048,7 @@ export default function MarketplaceHomepage() {
         <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
           open={wideFilters || filtersOpen}
           onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
-          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
           <div className="marketplace-secondary-content">
             <ExploreDestinationsStrip listings={items} />
             <div className="marketplace-refinements">
@@ -1033,6 +1112,43 @@ export default function MarketplaceHomepage() {
               Clear price
             </button>
           )}
+        </div>
+
+        {/* MKT-064: Bedrooms, Beds, and Bathrooms steppers */}
+        <div
+          className="mt-3 flex flex-wrap items-center gap-4"
+          data-testid="marketplace-filter-rooms-steppers"
+        >
+          {(
+            [
+              { key: 'minBedrooms', label: 'Bedrooms', value: minBedrooms },
+              { key: 'minBeds', label: 'Beds', value: minBeds },
+              { key: 'minBathrooms', label: 'Bathrooms', value: minBathrooms },
+            ] as const
+          ).map(({ key, label, value }) => (
+            <div key={key} className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-semibold text-text-muted">{label}:</span>
+              {([null, 1, 2, 3, 4] as const).map((opt) => {
+                const active = value === opt;
+                return (
+                  <button
+                    key={opt ?? 'any'}
+                    type="button"
+                    data-testid={`marketplace-filter-${key}-${opt ?? 'any'}`}
+                    aria-pressed={active}
+                    onClick={() => handleRoomCountFilterChange(key, opt)}
+                    className={`min-h-[44px] min-w-[44px] rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                      active
+                        ? 'bg-black text-white border-black'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    {opt == null ? 'Any' : `${opt}+`}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
 
             </div>
@@ -1306,7 +1422,9 @@ export default function MarketplaceHomepage() {
                     );
                   })()}
 
-                  <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
+                  <p className="text-sm text-text-body" data-testid="marketplace-card-capacity">
+                    {formatRoomCapacitySummary(item)}
+                  </p>
 
                   {/* TASK-1873 / TASK-10298776: rating row — enforce >= 4★ suppression guard */}
                   {item.rating != null && item.rating >= 4 && (item.reviewCount == null || item.reviewCount > 0) && (

@@ -135,4 +135,27 @@ describe('MarketplaceHomepage MKT-063..MKT-073 filters', () => {
     expect(listingCalls.some((u) => u.includes('selfCheckIn=true'))).toBe(true);
     expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
   });
+
+  it('MKT-064: filters by minBedrooms/minBathrooms, syncs URL params, and renders room counts on cards', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const capacities = screen.getAllByTestId('marketplace-card-capacity').map((el) => el.textContent);
+    expect(capacities[0]).toContain('2 bedrooms · 3 beds · 2 baths · Sleeps up to 5 guests');
+    // Unconfigured listing 103 must not fabricate 0 bedrooms
+    expect(capacities[2]).toBe('Sleeps up to 2 guests');
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-minBedrooms-2'));
+    await settle();
+
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('minBedrooms=2'))).toBe(true);
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+  });
 });
