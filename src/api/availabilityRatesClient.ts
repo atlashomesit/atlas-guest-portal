@@ -73,11 +73,22 @@ function normalizeDay(row: Record<string, unknown>): GuestAvailabilityRateDay | 
   };
 }
 
+const AVAILABILITY_RATES_TTL_MS = 15_000;
+const availabilityRatesInFlight = new Map<string, Promise<GuestAvailabilityRateDay[]>>();
+const availabilityRatesCache = new Map<string, { data: GuestAvailabilityRateDay[]; ts: number }>();
+
+/** Test-only helper to clear the dedup cache between unit tests. */
+export function __resetAvailabilityRatesCacheForTest(): void {
+  availabilityRatesInFlight.clear();
+  availabilityRatesCache.clear();
+}
+
 /**
  * GET /api/pricing/availability-rates?listingId=&startDate=&endDate= — guest-facing per-day
  * availability + rate for a listing, including the TASK-7491 bookable/reason/priceSource
  * fail-closed fields. Response wrapper shape isn't pinned beyond "has a days[] array" (contract:
  * `GuestAvailabilityRateResponseDto`) — tolerate `{ days }`, `{ Days }`, or a bare array.
+ * TASK-1040217: deduplicates concurrent in-flight and recent (15s TTL) identical range requests.
  */
 export async function fetchAvailabilityRates({
   listingId,
@@ -85,27 +96,58 @@ export async function fetchAvailabilityRates({
   endDate,
   signal,
 }: AvailabilityRatesParams): Promise<GuestAvailabilityRateDay[]> {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
+  const headers = getApiHeaders();
+  const tenantKey = (headers as Record<string, string>)['X-Tenant-Slug'] ?? '';
+  const cacheKey = `${tenantKey}|${listingId}|${startDate}|${endDate}`;
+
+  const cached = availabilityRatesCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < AVAILABILITY_RATES_TTL_MS) {
+    return cached.data;
+  }
+
+  const existing = availabilityRatesInFlight.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
   const url = new URL(buildApiUrl(AVAILABILITY_RATES_ENDPOINT));
   url.searchParams.set('listingId', String(listingId));
   url.searchParams.set('startDate', startDate);
   url.searchParams.set('endDate', endDate);
 
-  const response = await fetch(url.toString(), { signal, headers: getApiHeaders() });
-  if (!response.ok) {
-    throw new Error(await messageFromApiResponse(response));
-  }
+  // Do not bind a single caller's AbortSignal to the shared in-flight fetch so
+  // React StrictMode / concurrent widget mounts do not abort a sibling's request.
+  const promise = (async () => {
+    try {
+      const response = await fetch(url.toString(), { headers });
+      if (!response.ok) {
+        throw new Error(await messageFromApiResponse(response));
+      }
 
-  const raw = (await response.json()) as unknown;
-  const rows: unknown = Array.isArray(raw)
-    ? raw
-    : (raw as { days?: unknown; Days?: unknown } | null)?.days ??
-      (raw as { days?: unknown; Days?: unknown } | null)?.Days ??
-      [];
-  if (!Array.isArray(rows)) return [];
+      const raw = (await response.json()) as unknown;
+      const rows: unknown = Array.isArray(raw)
+        ? raw
+        : (raw as { days?: unknown; Days?: unknown } | null)?.days ??
+          (raw as { days?: unknown; Days?: unknown } | null)?.Days ??
+          [];
+      if (!Array.isArray(rows)) return [];
 
-  return rows
-    .map((r) => normalizeDay(r as Record<string, unknown>))
-    .filter((d): d is GuestAvailabilityRateDay => d != null);
+      const normalized = rows
+        .map((r) => normalizeDay(r as Record<string, unknown>))
+        .filter((d): d is GuestAvailabilityRateDay => d != null);
+      availabilityRatesCache.set(cacheKey, { data: normalized, ts: Date.now() });
+      return normalized;
+    } finally {
+      availabilityRatesInFlight.delete(cacheKey);
+    }
+  })();
+
+  availabilityRatesInFlight.set(cacheKey, promise);
+  return promise;
 }
 
 /**

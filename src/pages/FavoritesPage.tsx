@@ -18,6 +18,11 @@ import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEs
 import SavedHomeCover from "../components/SavedHomeCover";
 import SavedHomesReminder from "../components/SavedHomesReminder";
 import { useGuestAuth } from "../contexts/GuestAuthContext";
+import {
+  CompareStaysDrawer,
+  MAX_COMPARE_STAYS,
+  type CompareStayItem,
+} from "../components/marketplace/CompareStaysDrawer";
 
 type FavoriteListing = PublicListing & { tenantSlug?: string };
 
@@ -42,6 +47,16 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favEpoch, setFavEpoch] = useState(0);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  const toggleCompareStay = (id: number) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_COMPARE_STAYS) return prev;
+      return [...prev, id];
+    });
+  };
   // TASK-1299: Wishlist share — copy link to clipboard
   const [shareState, setShareState] = useState<"idle" | "copied">("idle");
   const [searchParams] = useSearchParams();
@@ -313,6 +328,27 @@ export default function FavoritesPage() {
                   <Link to={path} className="block" aria-label={`View ${l.name || 'saved home'}`}>
                     <SavedHomeCover src={l.coverPhotoUrl} alt={l.name ?? "Home"} />
                   </Link>
+                  {/* MKT-062: Compare toggle on favorites cards when >= 2 favorites */}
+                  {favorites.length >= 2 && (() => {
+                    const isCompared = compareIds.includes(l.id);
+                    const atCap = !isCompared && compareIds.length >= MAX_COMPARE_STAYS;
+                    return (
+                      <button
+                        type="button"
+                        data-testid={`favorites-compare-toggle-${l.id}`}
+                        aria-pressed={isCompared}
+                        disabled={atCap}
+                        onClick={() => toggleCompareStay(l.id)}
+                        className={`absolute top-2 left-2 z-10 inline-flex min-h-[36px] items-center rounded-full px-3 py-1 text-xs font-semibold shadow-level1 border transition ${
+                          isCompared
+                            ? "bg-black text-white border-black"
+                            : "bg-bg-surface/95 text-text-primary border-border-subtle hover:bg-bg-surface"
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                      >
+                        {isCompared ? "Comparing ✓" : "Compare"}
+                      </button>
+                    );
+                  })()}
                   {/* TASK-4297: in a SHARED wishlist view the listing isn't the viewer's own save —
                       the remove heart would silently mutate the viewer's own favorites and never
                       update this (shared-IDs-driven) card. Only show it on the viewer's own list. */}
@@ -371,6 +407,45 @@ export default function FavoritesPage() {
             );
           })}
         </div>
+        {favorites.length >= 2 && (
+          <CompareStaysDrawer
+            items={compareIds
+              .map((id) => favorites.find((f) => f.id === id))
+              .filter((f): f is FavoriteListing => Boolean(f))
+              .map((f): CompareStayItem => {
+                const daily = getDailyListingPricing(f.id);
+                const price = (daily?.actualPrice ?? 0) > 0 ? daily!.actualPrice : (f.baseNightlyRate ?? 0);
+                return {
+                  id: f.id,
+                  title: f.name || "Saved home",
+                  location: f.propertyName || undefined,
+                  imageUrl: f.coverPhotoUrl || "",
+                  allInTotalLabel:
+                    price > 0
+                      ? formatEstTotalInclGst(price, estimateNights, formatDisplayCurrency, processingFeePercent, f.isGstRegistered)
+                      : "Pick dates for price",
+                  nightlyRateLabel: price > 0 ? `${formatDisplayCurrency(price)} / night` : undefined,
+                  maxGuests: f.maxGuests,
+                  cancellationLabel: "Standard",
+                  href: listingPath(f),
+                };
+              })}
+            open={compareOpen}
+            onOpen={() => setCompareOpen(true)}
+            onClose={() => setCompareOpen(false)}
+            onRemove={(id) => {
+              setCompareIds((prev) => {
+                const next = prev.filter((x) => x !== id);
+                if (next.length < 2) setCompareOpen(false);
+                return next;
+              });
+            }}
+            onClear={() => {
+              setCompareIds([]);
+              setCompareOpen(false);
+            }}
+          />
+        )}
         </>
       )}
     </div>

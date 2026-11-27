@@ -18,10 +18,22 @@ export interface MapPin {
   lat: number;
   lng: number;
   title: string;
-  /** Optional href — when set, info-window content links to this URL. */
+  /** Optional href — when set, preview card / info-window links to this URL. */
   href?: string;
-  /** Optional subtitle/address shown in the info window. */
+  /** Optional subtitle/address shown in the preview card / info window. */
   subtitle?: string;
+  /** MKT-070: live all-in price label displayed inside the map pin pill and preview card. */
+  priceLabel?: string;
+  /** MKT-070: cover photo shown in the compact tap-to-preview card. */
+  coverImageUrl?: string;
+  /** MKT-070: average rating (only shown when >= 4.0 and reviewCount > 0). */
+  rating?: number | null;
+  /** MKT-070: review count paired with rating. */
+  reviewCount?: number | null;
+  /** MKT-070: property type label (e.g. Villa, Homestay, Hotel). */
+  propertyType?: string;
+  /** MKT-070: optional controlled selected state. */
+  isSelected?: boolean;
 }
 
 export interface MapBounds {
@@ -81,11 +93,16 @@ export default function MultiPinMap({
   const onBoundsChangedRef = useRef(onBoundsChanged);
   onBoundsChangedRef.current = onBoundsChanged;
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
+  const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
 
   const apiKey = GOOGLE_MAPS_API_KEY;
   const validPins = useMemo(
     () => pins.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)),
     [pins],
+  );
+  const selectedPin = useMemo(
+    () => validPins.find((p) => p.id === selectedPinId || p.isSelected) ?? null,
+    [validPins, selectedPinId],
   );
 
   useEffect(() => {
@@ -159,23 +176,70 @@ export default function MultiPinMap({
 
     for (const pin of validPins) {
       const pos = { lat: pin.lat, lng: pin.lng };
-      const marker = new window.google.maps.Marker({
-        position: pos,
-        map,
-        title: pin.title,
-      });
-      const linkHtml = pin.href
-        ? `<a href="${pin.href}" style="color: var(--cta-primary, #1a73e8); font-weight: 600;">View details →</a>`
-        : "";
-      const subtitleHtml = pin.subtitle
-        ? `<div style="margin-top: 4px; color: #555; font-size: 12px;">${pin.subtitle}</div>`
-        : "";
-      marker.addListener("click", () => {
-        infoWindow.setContent(
-          `<div style="font-family: inherit; min-width: 160px;"><div style="font-weight: 700;">${pin.title}</div>${subtitleHtml}<div style="margin-top: 6px;">${linkHtml}</div></div>`,
-        );
-        infoWindow.open({ map, anchor: marker });
-      });
+      const isSelected = pin.id === selectedPinId || Boolean(pin.isSelected);
+      let marker: any;
+
+      if (pin.priceLabel && window.google?.maps?.marker?.AdvancedMarkerElement) {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.textContent = pin.priceLabel;
+        pill.setAttribute("data-testid", `map-price-pill-${pin.id}`);
+        pill.style.cssText = [
+          "padding:6px 10px",
+          "border-radius:9999px",
+          "font-size:12px",
+          "font-weight:700",
+          "line-height:1",
+          "white-space:nowrap",
+          "cursor:pointer",
+          "box-shadow:0 2px 8px rgba(0,0,0,0.22)",
+          "border:1px solid rgba(0,0,0,0.12)",
+          isSelected
+            ? "background:#111827;color:#ffffff;transform:scale(1.06);"
+            : "background:#ffffff;color:#111827;",
+        ].join(";");
+        marker = new window.google.maps.marker.AdvancedMarkerElement({
+          position: pos,
+          map,
+          title: pin.title,
+          content: pill,
+        });
+        marker.addListener("click", () => {
+          setSelectedPinId(pin.id);
+        });
+      } else {
+        marker = new window.google.maps.Marker({
+          position: pos,
+          map,
+          title: pin.priceLabel ? `${pin.title} · ${pin.priceLabel}` : pin.title,
+          ...(pin.priceLabel
+            ? {
+                label: {
+                  text: pin.priceLabel,
+                  color: isSelected ? "#ffffff" : "#111827",
+                  fontSize: "12px",
+                  fontWeight: "700",
+                },
+              }
+            : {}),
+        });
+        marker.addListener("click", () => {
+          if (pin.priceLabel || pin.coverImageUrl) {
+            setSelectedPinId(pin.id);
+            return;
+          }
+          const linkHtml = pin.href
+            ? `<a href="${pin.href}" style="color: var(--cta-primary, #1a73e8); font-weight: 600;">View details →</a>`
+            : "";
+          const subtitleHtml = pin.subtitle
+            ? `<div style="margin-top: 4px; color: #555; font-size: 12px;">${pin.subtitle}</div>`
+            : "";
+          infoWindow.setContent(
+            `<div style="font-family: inherit; min-width: 160px;"><div style="font-weight: 700;">${pin.title}</div>${subtitleHtml}<div style="margin-top: 6px;">${linkHtml}</div></div>`,
+          );
+          infoWindow.open({ map, anchor: marker });
+        });
+      }
       markersRef.current.push(marker);
       bounds.extend(pos);
     }
@@ -190,7 +254,7 @@ export default function MultiPinMap({
         map.setZoom(15);
       }
     }
-  }, [validPins, status, initialBounds]);
+  }, [validPins, status, initialBounds, selectedPinId]);
 
   if (!apiKey || status === "failed") {
     return (
@@ -208,10 +272,71 @@ export default function MultiPinMap({
 
   return (
     <div
-      className={`rounded-2xl overflow-hidden border border-border-subtle ${className ?? ""}`}
+      className={`relative rounded-2xl overflow-hidden border border-border-subtle ${className ?? ""}`}
       style={{ height }}
     >
       <div ref={containerRef} style={{ width: "100%", height: "100%" }} aria-busy={status === "loading"} />
+      {/* MKT-070: Compact photo, rating, and live all-in price preview card anchored inside the map */}
+      {selectedPin && (
+        <div
+          data-testid="map-pin-preview-card"
+          role="region"
+          aria-label={selectedPin.title}
+          className="absolute inset-x-3 bottom-3 z-20 mx-auto max-w-md rounded-2xl border border-border bg-bg-surface p-3 shadow-2xl"
+        >
+          <div className="flex items-center gap-3">
+            {selectedPin.coverImageUrl && (
+              <img
+                src={selectedPin.coverImageUrl}
+                alt={selectedPin.title}
+                className="h-20 w-24 shrink-0 rounded-xl object-cover bg-bg-muted"
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  {selectedPin.propertyType && (
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                      {selectedPin.propertyType}
+                    </p>
+                  )}
+                  <h3 className="truncate text-sm font-bold text-text-primary">{selectedPin.title}</h3>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close map preview"
+                  data-testid="map-pin-preview-close"
+                  onClick={() => setSelectedPinId(null)}
+                  className="inline-flex h-11 w-11 -mr-1.5 -mt-1.5 shrink-0 items-center justify-center rounded-full text-text-muted hover:bg-bg-muted hover:text-text-primary"
+                >
+                  ✕
+                </button>
+              </div>
+              {selectedPin.rating != null && selectedPin.rating >= 4 && (selectedPin.reviewCount ?? 0) > 0 && (
+                <p className="mt-0.5 text-xs font-semibold text-amber-800" data-testid="map-pin-preview-rating">
+                  ★ {selectedPin.rating.toFixed(1)} ({selectedPin.reviewCount})
+                </p>
+              )}
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                {selectedPin.priceLabel && (
+                  <span className="text-sm font-bold text-text-primary" data-testid="map-pin-preview-price">
+                    {selectedPin.priceLabel}
+                  </span>
+                )}
+                {selectedPin.href && (
+                  <a
+                    href={selectedPin.href}
+                    data-testid="map-pin-preview-link"
+                    className="inline-flex min-h-[44px] items-center rounded-xl bg-black px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90"
+                  >
+                    View home
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

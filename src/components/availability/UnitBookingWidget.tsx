@@ -1772,13 +1772,19 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
   // of the provisional base-rate/₹0-fee number that would otherwise silently jump ~12% once
   // the pricing API responds. Only a terminal fetch failure degrades to the old fallback
   // estimate (graceful offline UX) — matching the widget's existing degradation pattern.
+  // GUEST-048: a quote counts only for the stay it was fetched for (this used to compare the selection with itself, so it was always true).
+  const serverGstMatchesSelection = hasSelectedRange && quoteKey != null && serverPriceBreakdownKey === quoteKey;
+  // TASK-1040217: once the authoritative guest-breakdown for THIS stay has resolved, do not keep
+  // Reserve stuck on "Fetching latest prices…" waiting for slow multi-month calendar prefetches.
+  const hasAuthoritativeServerQuote = serverGstMatchesSelection && serverPriceBreakdown != null;
   // GUEST-048: the server quote for THIS stay has not answered yet (after a date / guest / plan change): hold the skeleton instead of showing the previous stay's total.
   const serverQuotePending =
     hasSelectedRange && !invalidIstStayRange && Boolean(listingId && String(listingId).trim() !== '') && quoteKey != null && quoteSettledKey !== quoteKey;
   const rangePricingPending =
-    hasSelectedRange && !invalidIstStayRange && ((!selectedRangeNightsPriced && !calendarPricingFailed) || serverQuotePending);
-  // GUEST-048: a quote counts only for the stay it was fetched for (this used to compare the selection with itself, so it was always true).
-  const serverGstMatchesSelection = hasSelectedRange && quoteKey != null && serverPriceBreakdownKey === quoteKey;
+    hasSelectedRange &&
+    !invalidIstStayRange &&
+    !hasAuthoritativeServerQuote &&
+    ((!selectedRangeNightsPriced && !calendarPricingFailed) || serverQuotePending);
 
   const serverGstPercent =
     serverGstMatchesSelection && serverPriceBreakdown ? serverPriceBreakdown.gstPercent : null;
@@ -2018,8 +2024,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     // stay clickable (TASK-4277): rangePricingPending is false without both dates.
     // Do NOT gate on availability-fetch loading — that violated TASK-4277 on F1 (2026-07-12).
     rangePricingPending ||
-    // TASK-4554: pricing fetch failed — disable Reserve until a real price loads.
-    (hasSelectedRange && calendarPricingFailed) ||
+    // TASK-4554 / TASK-1040217: pricing fetch failed — disable Reserve unless authoritative server quote loaded.
+    (hasSelectedRange && calendarPricingFailed && !hasAuthoritativeServerQuote) ||
     // TASK-4729: guard against NaN pricing (non-numeric server response)
     (hasSelectedRange && !rangePricingPending && isNaN(finalTotal));
   const canReviewBooking = hasSelectedRange && !reserveDisabled && !calendarOpenPricingPending && displayFinalTotal > 0;

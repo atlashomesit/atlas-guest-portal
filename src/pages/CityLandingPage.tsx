@@ -310,7 +310,7 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
   const pagePath = `/homestays-in-${citySlug}`;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-10 text-text-primary">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-4 sm:py-8 text-text-primary">
       <SEO
         title={pageCopy.metaTitle}
         description={pageCopy.metaDescription}
@@ -318,40 +318,19 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
         jsonLd={faqJsonLd}
       />
 
-      <header className="mb-10">
+      {/* MKT-056: compact header + stay count so the first stay card renders above the fold on 393px */}
+      <header className="mb-4 sm:mb-6">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Destination guide</p>
-        <h1 className="mt-2 text-3xl sm:text-4xl font-bold text-text-primary">{content.h1}</h1>
-        <p className="mt-3 text-sm text-text-muted max-w-3xl">
-          Showing available homes in {content.cityName}. Browse below and find your perfect stay.
+        <h1 className="mt-1 text-2xl sm:text-4xl font-bold text-text-primary">{content.h1}</h1>
+        <p className="mt-1.5 text-sm text-text-muted max-w-3xl">
+          {!loading && !loadError && cardList.length > 0
+            ? `${cardList.length} ${cardList.length === 1 ? "stay" : "stays"} in ${content.cityName} · Book direct with the owner.`
+            : `Browse available homes in ${content.cityName} and book direct.`}
           {/* TASK-4516: server-side city filter planned (warm backlog item D4) */}
         </p>
       </header>
 
       <article className="prose prose-neutral max-w-none dark:prose-invert">
-        <div className="space-y-4 text-base leading-relaxed text-text-primary not-prose">
-          {pageCopy.introParagraphs.map((p, i) => (
-            <p key={`intro-${i}`}>{p}</p>
-          ))}
-        </div>
-
-        <h2 className="text-2xl font-bold text-text-primary mt-12 mb-4 not-prose">{content.areasTitle}</h2>
-        <ul className="space-y-6 list-none p-0 m-0 not-prose">
-          {content.areas.map((a) => (
-            <li key={a.title} className="rounded-2xl border border-border-subtle bg-bg-surface p-5 shadow-sm">
-              <h3 className="text-lg font-semibold text-text-primary">{a.title}</h3>
-              <p className="mt-2 text-sm text-text-muted leading-relaxed">{a.body}</p>
-            </li>
-          ))}
-        </ul>
-
-        <h2 className="text-2xl font-bold text-text-primary mt-12 mb-4 not-prose">{content.seasonTitle}</h2>
-        <div className="space-y-3 text-base leading-relaxed text-text-primary not-prose">
-          {pageCopy.seasonParagraphs.map((p, i) => (
-            <p key={`season-${i}`}>{p}</p>
-          ))}
-        </div>
-
-        <h2 className="text-2xl font-bold text-text-primary mt-12 mb-4 not-prose">Homestays in {content.cityName}</h2>
         {loading && (
           <p className="text-text-muted not-prose" role="status">
             Loading listings…
@@ -449,15 +428,41 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
           </section>
         )}
 
-        <h2 className="text-2xl font-bold text-text-primary mt-14 mb-4 not-prose">Frequently asked questions</h2>
-        <dl className="space-y-6 not-prose">
-          {pageCopy.faq.map((item) => (
-            <div key={item.question} className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
-              <dt className="font-semibold text-text-primary">{item.question}</dt>
-              <dd className="mt-2 text-sm text-text-muted leading-relaxed">{item.answer}</dd>
-            </div>
-          ))}
-        </dl>
+        {/* MKT-056: editorial guide prose stays in DOM for SEO crawlers & FAQPage JSON-LD, placed below the live stays grid */}
+        <section className="mt-12 not-prose" data-testid="city-landing-guide">
+          <div className="space-y-4 text-base leading-relaxed text-text-primary">
+            {pageCopy.introParagraphs.map((p, i) => (
+              <p key={`intro-${i}`}>{p}</p>
+            ))}
+          </div>
+
+          <h2 className="text-2xl font-bold text-text-primary mt-12 mb-4">{content.areasTitle}</h2>
+          <ul className="space-y-6 list-none p-0 m-0">
+            {content.areas.map((a) => (
+              <li key={a.title} className="rounded-2xl border border-border-subtle bg-bg-surface p-5 shadow-sm">
+                <h3 className="text-lg font-semibold text-text-primary">{a.title}</h3>
+                <p className="mt-2 text-sm text-text-muted leading-relaxed">{a.body}</p>
+              </li>
+            ))}
+          </ul>
+
+          <h2 className="text-2xl font-bold text-text-primary mt-12 mb-4">{content.seasonTitle}</h2>
+          <div className="space-y-3 text-base leading-relaxed text-text-primary">
+            {pageCopy.seasonParagraphs.map((p, i) => (
+              <p key={`season-${i}`}>{p}</p>
+            ))}
+          </div>
+
+          <h2 className="text-2xl font-bold text-text-primary mt-14 mb-4">Frequently asked questions</h2>
+          <dl className="space-y-6">
+            {pageCopy.faq.map((item) => (
+              <div key={item.question} className="rounded-2xl border border-border-subtle bg-bg-surface p-5">
+                <dt className="font-semibold text-text-primary">{item.question}</dt>
+                <dd className="mt-2 text-sm text-text-muted leading-relaxed">{item.answer}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
       </article>
     </div>
   );
