@@ -1,4 +1,5 @@
 import MarketplaceHostIdentity from '@/components/property/MarketplaceHostIdentity';
+import { SleepingArrangementsSection, type BedroomConfigEntry } from '../../listing/SleepingArrangementsSection';
 import './Homepage_PropertyDetails.css';
 import RatingDistribution from '../../property/RatingDistribution';
 import { starDistribution } from '../../property/starDistribution';
@@ -2446,6 +2447,11 @@ useEffect(() => {
                   hostDisplayName={ppHostDisplayName}
                   heading="A note from your host"
                   ariaLabel="A note from your host"
+                />
+
+                {/* GUEST-097: Visual "Where you'll sleep" room-by-room sleeping arrangements */}
+                <SleepingArrangementsSection
+                  bedroomsConfig={(data as { bedroomsConfig?: BedroomConfigEntry[] | string | null }).bedroomsConfig}
                 />
 
                 {/* About this home — DESIGN-031: omit invented prose; Ask host when empty */}

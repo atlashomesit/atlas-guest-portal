@@ -59,6 +59,7 @@ const SupportWidget = React.lazy(() => import("./components/support/SupportWidge
 const Reserve = React.lazy(() => import("./pages/Reserve"))
 const BecomeHost = React.lazy(() => import("./pages/BecomeHost"))
 const BookingConfirmationPage = React.lazy(() => import("./pages/BookingConfirmationPage"))
+const TripSummarySharePage = React.lazy(() => import("./pages/TripSummarySharePage"))
 const SecurityDepositPage = React.lazy(() => import("./pages/SecurityDepositPage")) // TASK-10299239
 const SelfCheckIn = React.lazy(() => import("./pages/SelfCheckIn")) // TASK-1254
 const KioskCheckIn = React.lazy(() => import("./pages/KioskCheckIn"))
@@ -328,6 +329,7 @@ function AppWrapper() {
           <Route path="/property/:id" element={withBoundary(<Suspense fallback={<PropertyDetailsLazyFallback />}><LegacyPropertyRedirect /></Suspense>, "property-details-singular-redirect-route")} />
           <Route path="/reserve" element={withBoundary(<Suspense fallback={<LazyFallback />}><Reserve /></Suspense>, "reserve-route")} />
           <Route path="/booking/:bookingId" element={withBoundary(<Suspense fallback={<LazyFallback />}><BookingConfirmationPage /></Suspense>, "booking-confirmation-route")} />
+          <Route path="/trip-summary/:shareToken" element={withBoundary(<Suspense fallback={<LazyFallback />}><TripSummarySharePage /></Suspense>, "trip-summary-share-route")} />
           {/* ADMIN-166: Shared group-hold room selection & claim page */}
           <Route path="/group/:token" element={withBoundary(<Suspense fallback={<LazyFallback />}><GroupHoldBookingPage /></Suspense>, "group-hold-booking-route")} />
           {/* TASK-10299239: security-deposit hold page, reached from the pre-arrival message; authorised by the same booking-link token (?t=). */}

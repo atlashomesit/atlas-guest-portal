@@ -8,6 +8,7 @@ import PoweredByAtlasLink from "../components/PoweredByAtlasLink";
 import { getPoweredBySlug } from "../tenant/poweredByAtlas";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
+import { SelfCheckInStayPreferences } from "../components/booking/StayPreferenceChips"; // GUEST-090
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
 import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
 
@@ -2241,6 +2242,15 @@ export default function SelfCheckIn() {
             <div className="rounded-xl bg-bg-page border border-border-subtle p-4 text-left text-sm mb-6">
               <StayAccessBlock wifiName={details.wifiName} wifiPass={details.wifiPassword} doorCode={details.doorCode} />
               {details.emergencyContactPhone && <InfoRow label="Emergency contact" value={details.emergencyContactPhone} />}
+            </div>
+
+            {/* GUEST-090: Structured quick stay-preference chips editable before arrival */}
+            <div className="mb-6">
+              <SelfCheckInStayPreferences
+                bookingId={details.bookingId}
+                token={token}
+                initialTags={(details as { stayPreferenceTags?: string[] }).stayPreferenceTags ?? []}
+              />
             </div>
 
             {/* BNB-009: meal choices saved to the host; the selector loads the summary and hides itself unless the server says to ask */}

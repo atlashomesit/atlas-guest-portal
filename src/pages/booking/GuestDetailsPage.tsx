@@ -58,6 +58,7 @@ import {
   razorpayOrderAmountInrToPaise,
 } from '@/utils/razorpayOrderAmount';
 import { formatDisplayNumber, getContactEmail, getTelLink, getWhatsAppLink } from '@/config/contact';
+import { StayPreferenceChips } from '@/components/booking/StayPreferenceChips';
 import {
   computeCheckoutTotal,
   resolveCheckoutChargeReconciliation,
@@ -862,6 +863,7 @@ const GuestDetailsPage: React.FC = () => {
   const [referralOpen, setReferralOpen] = useState(false);
   const [addOnsOpen, setAddOnsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [stayPreferenceTags, setStayPreferenceTags] = useState<string[]>([]);
 
   // ── Promo / Referral ─────────────────────────────────────────────────────
   const [promoCode, setPromoCode] = useState(() => {
@@ -1807,6 +1809,7 @@ const GuestDetailsPage: React.FC = () => {
         promoCode: promoCode.trim() || undefined,
         bookingDraft: {
           notes: formData.notes.trim().slice(0, 500) || undefined,
+          ...(stayPreferenceTags.length > 0 ? { stayPreferenceTags } : {}),
           guestNationality: formData.nationality || 'India',
           selectedAddOns: selectedAddOnsList.length > 0 ? selectedAddOnsList : undefined,
           ...(includeBreakfast ? { includeBreakfast: true } : {}),
@@ -3291,6 +3294,15 @@ const GuestDetailsPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {/* GUEST-090: Quick stay-preference chips */}
+                <div style={{ marginBottom: 14 }}>
+                  <StayPreferenceChips
+                    selected={stayPreferenceTags}
+                    onChange={setStayPreferenceTags}
+                    testIdPrefix="gd-stay-pref"
+                  />
+                </div>
 
                 {/* Notes */}
                 <div className={`gd-disclosure${notesOpen ? ' open' : ''}`}>
