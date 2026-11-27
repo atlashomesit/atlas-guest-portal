@@ -28,6 +28,7 @@ import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector, { type GuestMealPreferences } from "../components/bnb/GuestDietarySelector"; // BNB-002 / BNB-009
 import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
+import { BookingGstDetailsCard } from "../components/booking/BookingGstDetailsCard"; // GUEST-084
 import BookingPaymentPlanCard, { type GuestBookingInstalment } from "../components/booking/BookingPaymentPlanCard";
 import {
   buildReceiptHtml,
@@ -229,6 +230,10 @@ interface BookingSummary {
   hasGstInvoice?: boolean;
   gstInvoiceNumber?: string | null;
   gstInvoiceTotal?: number | null;
+  /** GUEST-084: B2B GST invoice company name & GSTIN. */
+  companyName?: string | null;
+  guestGstin?: string | null;
+  gstLocked?: boolean;
   /** TASK-1888: server-computed; show pre-arrival checklist when true. */
   preArrivalBriefingVisible?: boolean;
   /** GUEST-005: server owns the near-checkout timing policy; absent means hidden. */
@@ -1861,6 +1866,16 @@ export default function BookingConfirmationPage() {
         )}
 
         {/* BNB-009: meal choices saved to the host with the booking-link token; shown only when the server says to ask */}
+        {!isCancelled && (
+          <BookingGstDetailsCard
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            initialCompanyName={booking.companyName}
+            initialGuestGstin={booking.guestGstin}
+            gstLocked={booking.gstLocked}
+          />
+        )}
+
         {!isCancelled && (
           <GuestDietarySelector
             bookingId={booking.bookingId ?? bookingId}

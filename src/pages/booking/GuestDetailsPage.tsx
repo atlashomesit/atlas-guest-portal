@@ -81,6 +81,8 @@ import { fetchListingById } from '@/api/listingClient';
 import { fetchGuestPriceBreakdown } from '@/api/pricingClient';
 import { fetchListingCheckoutInfo, type ListingCheckoutInfo } from '@/api/checkoutInfoClient';
 import { HouseRulesAcceptance } from '@/components/checkout/HouseRulesAcceptance';
+import { CompanyGstFields } from '@/components/checkout/CompanyGstFields';
+import { normalizeGstin, validateCompanyGstInput } from '@/utils/gstin';
 import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
@@ -687,6 +689,12 @@ const GuestDetailsPage: React.FC = () => {
     } catch { /* ignore */ }
   }, []);
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
+  // GUEST-084: Self-service company name & GSTIN for B2B GST tax invoices.
+  const [gstInvoiceEnabled, setGstInvoiceEnabled] = useState(false);
+  const [companyName, setCompanyName] = useState('');
+  const [guestGstin, setGuestGstin] = useState('');
+  const [companyNameError, setCompanyNameError] = useState<string | undefined>();
+  const [gstinError, setGstinError] = useState<string | undefined>();
   const [consentAccepted, setConsentAccepted] = useState(false);
   const [consentError, setConsentError] = useState('');
   /** One plain sentence naming everything that stopped Pay (set by the failed validation in handleSubmit; shown while any inline error remains). */
@@ -1554,6 +1562,9 @@ const GuestDetailsPage: React.FC = () => {
           ...(includeBreakfast ? { includeBreakfast: true } : {}),
           ...(bringingPet ? { pets: 1, hasPets: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          ...(gstInvoiceEnabled && companyName.trim() && guestGstin.trim()
+            ? { companyName: companyName.trim(), guestGstin: normalizeGstin(guestGstin) }
+            : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
           ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
         },
@@ -1697,6 +1708,17 @@ const GuestDetailsPage: React.FC = () => {
         return;
       }
 
+      // GUEST-084: Validate company name & GSTIN if B2B GST invoice toggle is on.
+      if (gstInvoiceEnabled) {
+        const gstErrs = validateCompanyGstInput({ companyName, guestGstin });
+        setCompanyNameError(gstErrs.companyNameError);
+        setGstinError(gstErrs.gstinError);
+        if (gstErrs.companyNameError || gstErrs.gstinError) {
+          setValidationSummary('Enter a valid company name and 15-character GSTIN.');
+          return;
+        }
+      }
+
       setIsSubmitting(true);
       setOrderError(null);
       setOrderErrorIs409(false);
@@ -1752,6 +1774,9 @@ const GuestDetailsPage: React.FC = () => {
           ...(includeBreakfast ? { includeBreakfast: true } : {}),
           ...(bringingPet ? { pets: 1, hasPets: true } : {}),
           ...(booking.listingRatePlanId != null ? { listingRatePlanId: booking.listingRatePlanId } : {}),
+          ...(gstInvoiceEnabled && companyName.trim() && guestGstin.trim()
+            ? { companyName: companyName.trim(), guestGstin: normalizeGstin(guestGstin) }
+            : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
           ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
         },
@@ -3255,6 +3280,30 @@ const GuestDetailsPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* GUEST-084: Optional B2B GST invoice company name & GSTIN */}
+            <CompanyGstFields
+              enabled={gstInvoiceEnabled}
+              onToggle={(next) => {
+                setGstInvoiceEnabled(next);
+                if (!next) {
+                  setCompanyNameError(undefined);
+                  setGstinError(undefined);
+                }
+              }}
+              companyName={companyName}
+              onCompanyNameChange={(val) => {
+                setCompanyName(val);
+                if (companyNameError) setCompanyNameError(undefined);
+              }}
+              guestGstin={guestGstin}
+              onGuestGstinChange={(val) => {
+                setGuestGstin(val);
+                if (gstinError) setGstinError(undefined);
+              }}
+              companyNameError={companyNameError}
+              gstinError={gstinError}
+            />
 
             {/* GUEST-024: Visual cancellation policy milestone timeline */}
             <div className="mb-6">
