@@ -7,6 +7,11 @@ import { buildApiUrl } from '@/api/client';
 import { fetchAllMarketplacePages } from '@/api/marketplacePaging'; // TASK-1040072
 import { formatCurrency } from '@/utils/formatting'; // TASK-1872
 import { getFavoriteIds, toggleFavorite } from '@/utils/guestHistory'; // TASK-1873
+import {
+  createTripWishlist,
+  getTripWishlists,
+  toggleListingInTripWishlist,
+} from '@/utils/tripWishlists'; // MKT-069
 import OptimizedImage from '@/components/ui/OptimizedImage'; // TASK-1874
 import SkeletonCard from '@/components/apartments/SkeletonCard'; // TASK-1875
 import SEO from '@/components/SEO'; // TASK-1876
@@ -346,6 +351,8 @@ export default function MarketplaceHomepage() {
   const [favEpoch, setFavEpoch] = useState(0);
   const [compareIds, setCompareIds] = useState<number[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [wishlistPickerItem, setWishlistPickerItem] = useState<{ id: number; tenantSlug: string; title: string } | null>(null);
+  const [newWishlistName, setNewWishlistName] = useState('');
 
   const toggleCompareStay = useCallback((id: number) => {
     setCompareIds((prev) => {
@@ -1278,15 +1285,18 @@ export default function MarketplaceHomepage() {
                   );
                 })()}
 
-                {/* TASK-1873: save heart */}
+                {/* TASK-1873 / MKT-069: save heart + named trip wishlist picker */}
                 <button
                   type="button"
                   aria-label={isFav ? 'Remove from saved' : 'Save listing'}
                   className="absolute right-2 top-2 z-10 flex min-h-11 min-w-11 items-center justify-center rounded-full bg-bg-surface/95 p-2 shadow border border-border-subtle hover:opacity-90 transition-opacity"
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleFavorite(item.id);
+                    const added = toggleFavorite(item.id);
                     setFavEpoch((prev) => prev + 1);
+                    if (added) {
+                      setWishlistPickerItem({ id: item.id, tenantSlug: item.tenantSlug, title: cardTitle });
+                    }
                   }}
                 >
                   {isFav
@@ -1626,6 +1636,97 @@ export default function MarketplaceHomepage() {
           </button>
         </div>
       )}
+      {/* MKT-069: 1-tap Save to named collaborative trip wishlist dialog */}
+      {wishlistPickerItem && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={() => setWishlistPickerItem(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Save to trip wishlist"
+            data-testid="marketplace-wishlist-picker"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-neutral-900">Save to a trip wishlist</h3>
+              <button
+                type="button"
+                onClick={() => setWishlistPickerItem(null)}
+                className="min-h-[40px] min-w-[40px] rounded-full text-sm text-neutral-500 hover:bg-neutral-100"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-neutral-600 truncate">Saved: {wishlistPickerItem.title}</p>
+            <div className="space-y-2 max-h-44 overflow-y-auto">
+              {getTripWishlists().map((wl) => {
+                const inList = wl.items.some((i) => i.listingId === wishlistPickerItem.id);
+                return (
+                  <button
+                    key={wl.id}
+                    type="button"
+                    data-testid={`wishlist-pick-${wl.id}`}
+                    onClick={() => {
+                      toggleListingInTripWishlist(wl.id, {
+                        listingId: wishlistPickerItem.id,
+                        tenantSlug: wishlistPickerItem.tenantSlug,
+                        title: wishlistPickerItem.title,
+                      });
+                      setWishlistPickerItem(null);
+                    }}
+                    className="flex min-h-[44px] w-full items-center justify-between rounded-xl border border-neutral-200 px-3 py-2 text-left text-sm font-medium text-neutral-900 hover:bg-neutral-50"
+                  >
+                    <span>{wl.title}</span>
+                    <span className="text-xs text-neutral-500">{inList ? 'Added ✓' : '+ Add'}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newWishlistName.trim()) return;
+                const wl = createTripWishlist(newWishlistName.trim(), {
+                  checkIn: searchParams.get('checkIn') || undefined,
+                  checkOut: searchParams.get('checkOut') || undefined,
+                  guests: Number(searchParams.get('guests')) || 2,
+                });
+                toggleListingInTripWishlist(wl.id, {
+                  listingId: wishlistPickerItem.id,
+                  tenantSlug: wishlistPickerItem.tenantSlug,
+                  title: wishlistPickerItem.title,
+                });
+                setNewWishlistName('');
+                setWishlistPickerItem(null);
+              }}
+              className="flex gap-2 border-t border-neutral-100 pt-3"
+            >
+              <input
+                type="text"
+                aria-label="New trip wishlist name"
+                data-testid="marketplace-new-wishlist-name"
+                value={newWishlistName}
+                onChange={(e) => setNewWishlistName(e.target.value)}
+                placeholder="New trip name (e.g. Goa NYE)"
+                maxLength={80}
+                className="min-h-[44px] flex-1 rounded-xl border border-neutral-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                data-testid="marketplace-create-wishlist-btn"
+                className="min-h-[44px] rounded-xl bg-black px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90"
+              >
+                Create
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       <CompareStaysDrawer
         items={compareIds
           .map((id) => items.find((it) => it.id === id))
