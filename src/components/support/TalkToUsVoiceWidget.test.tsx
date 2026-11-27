@@ -158,4 +158,33 @@ describe("TalkToUsVoiceWidget", () => {
     expect(speak.mock.calls[0][0].rate).toBe(1.05);
     expect(speak.mock.calls[0][0].pitch).toBe(0.92);
   });
+
+  it("cancels active speechSynthesis and aborts in-flight turn on barge-in (TVOI-032)", async () => {
+    const rec = { lang: "", interimResults: false, continuous: false, onresult: null, onerror: null, onend: null, start: vi.fn(), stop: vi.fn(), abort };
+    (window as unknown as Json).webkitSpeechRecognition = function () {
+      return rec;
+    };
+    let capturedSignal: AbortSignal | undefined;
+    fetchMock
+      .mockResolvedValueOnce(res(true, { enabled: true }))
+      .mockImplementationOnce((_url: string, init?: RequestInit) => {
+        capturedSignal = init?.signal as AbortSignal | undefined;
+        return new Promise(() => {
+          /* pending in-flight request */
+        });
+      });
+
+    render(<TalkToUsVoiceWidget />);
+    await settle();
+    fireEvent.click(screen.getByText("Talk to us"));
+    fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "Check availability" } });
+    fireEvent.click(screen.getByText("Send"));
+    expect(capturedSignal?.aborted).toBe(false);
+
+    // Tapping Speak while busy/speaking interrupts playback and aborts stale turn
+    fireEvent.click(screen.getByTestId("voice-mic"));
+    expect(cancel).toHaveBeenCalled();
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(rec.start).toHaveBeenCalled();
+  });
 });

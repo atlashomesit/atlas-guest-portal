@@ -90,12 +90,15 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [slowLookup, setSlowLookup] = useState(false);
   const [listening, setListening] = useState(false);
   const [language, setLanguage] = useState<VoiceLanguage>("en-IN");
   const [personaKey, setPersonaKey] = useState<string | null>(null);
   const [followUpUrl, setFollowUpUrl] = useState<string | null>(null);
   const sessionId = useRef<string>(newSessionId());
   const recognition = useRef<SpeechRecognitionLike | null>(null);
+  const inFlightController = useRef<AbortController | null>(null);
+  const slowTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +120,19 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
     };
   }, []);
 
+  const interruptPlaybackAndPending = useCallback(() => {
+    window.speechSynthesis?.cancel?.();
+    if (inFlightController.current) {
+      inFlightController.current.abort();
+      inFlightController.current = null;
+    }
+    if (slowTimer.current) {
+      clearTimeout(slowTimer.current);
+      slowTimer.current = null;
+    }
+    setSlowLookup(false);
+  }, []);
+
   const stopAudio = useCallback(() => {
     const rec = recognition.current;
     recognition.current = null;
@@ -131,8 +147,8 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
       }
     }
     setListening(false);
-    window.speechSynthesis?.cancel?.();
-  }, []);
+    interruptPlaybackAndPending();
+  }, [interruptPlaybackAndPending]);
 
   useEffect(() => stopAudio, [stopAudio]);
 
@@ -140,17 +156,26 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
     async (raw: string) => {
       const transcript = raw.trim();
       if (!transcript) return;
+      interruptPlaybackAndPending();
+      const controller = new AbortController();
+      inFlightController.current = controller;
       setTurns((t) => [...t, { role: "guest", text: transcript }]);
       setDraft("");
       setBusy(true);
+      slowTimer.current = setTimeout(() => {
+        setSlowLookup(true);
+      }, 1200);
       try {
         const res = await fetch(`${getApiBaseUrl()}/api/public/voice/turn`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getApiHeaders() },
+          signal: controller.signal,
           body: JSON.stringify({ surface: "guest", sessionId: sessionId.current, transcript, listingId: listingId ?? null, language }),
         });
+        if (controller.signal.aborted) return;
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as { reply?: string; text?: string; followUpUrl?: string | null };
+        if (controller.signal.aborted) return;
         const reply = body.reply ?? body.text ?? "";
         if (reply) {
           setTurns((t) => [...t, { role: "agent", text: reply }]);
@@ -168,16 +193,26 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
           }
         }
         if (body.followUpUrl) setFollowUpUrl(body.followUpUrl);
-      } catch {
+      } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError" || controller.signal.aborted) return;
         setTurns((t) => [...t, { role: "agent", text: "Sorry, I could not reach the assistant. Please try again or use WhatsApp." }]);
       } finally {
-        setBusy(false);
+        if (inFlightController.current === controller) {
+          inFlightController.current = null;
+          if (slowTimer.current) {
+            clearTimeout(slowTimer.current);
+            slowTimer.current = null;
+          }
+          setSlowLookup(false);
+          setBusy(false);
+        }
       }
     },
-    [listingId, language, personaKey],
+    [listingId, language, personaKey, interruptPlaybackAndPending],
   );
 
   const startListening = useCallback(() => {
+    interruptPlaybackAndPending();
     const w = window as unknown as SpeechWindow;
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Ctor) return;
@@ -198,7 +233,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
     } catch {
       setListening(false);
     }
-  }, [send, language]);
+  }, [send, language, interruptPlaybackAndPending]);
 
   const hangUp = useCallback(() => {
     stopAudio();
@@ -261,6 +296,11 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
                 {t.text}
               </div>
             ))}
+            {slowLookup && (
+              <div data-testid="voice-slow-indicator" style={{ alignSelf: "flex-start", fontSize: 12, color: "#64748b", fontStyle: "italic" }}>
+                Checking live availability…
+              </div>
+            )}
           </div>
           {followUpUrl && (
             <a
@@ -293,7 +333,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
           </form>
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
             {speechSupported && (
-              <button type="button" data-testid="voice-mic" onClick={startListening} disabled={listening || busy} style={{ minHeight: 44, flex: 1 }}>
+              <button type="button" data-testid="voice-mic" onClick={startListening} disabled={listening} style={{ minHeight: 44, flex: 1 }}>
                 {listening ? "Listening…" : "Speak"}
               </button>
             )}
