@@ -89,9 +89,11 @@ import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
+import { DormAgeAcknowledgement } from '@/components/hostel/DormAgeAcknowledgement';
+import { fetchSignedInGuestProfile, type VerifiedIdSummary } from '@/api/guestAuthProfileClient';
 import { PaymentPlanSelector, type PaymentPlanChoice } from '@/components/checkout/PaymentPlanSelector';
 import { createMultiRoomOrder } from '@/api/multiRoomClient';
-import { dormNeedsGenderAcknowledgement, readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
+import { ageYearsFromDob, dormNeedsAgeAcknowledgement, dormNeedsGenderAcknowledgement, readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
 import { hostCallDigits } from '@/utils/hostCallDigits';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
 import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
@@ -241,6 +243,8 @@ type CheckoutHoldCache = {
   holdGraceHours?: number | null;
   /** HSL-011: the dorm's gender rule, so a reload keeps asking the tick. */
   holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** HSL-034: the dorm's minimum age rule, so a reload keeps asking the age confirmation. */
+  holdDormMinAge?: number | null;
   /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
   holdSecurityDepositAmount?: number | null;
   /** TASK-1040087: marketplace booking origin channel preserved across refreshes. */
@@ -439,6 +443,7 @@ const GuestDetailsPage: React.FC = () => {
         holdRefundFreeUntilUtc: cached?.holdRefundFreeUntilUtc ?? booking.holdRefundFreeUntilUtc ?? null,
         holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
+        holdDormMinAge: cached?.holdDormMinAge ?? booking.holdDormMinAge ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
         holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : urlParams.isAiReceptionistSrc ? 'ai_receptionist' : urlParams.isInstagramLinkSrc ? 'instagram_link' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
         holdPackage: booking.holdPackage ?? null,
@@ -474,6 +479,7 @@ const GuestDetailsPage: React.FC = () => {
           holdRefundFreeUntilUtc: cached.holdRefundFreeUntilUtc ?? booking.holdRefundFreeUntilUtc ?? null,
           holdGraceHours: cached.holdGraceHours ?? booking.holdGraceHours ?? null,
           holdDormGenderPolicy: cached.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
+          holdDormMinAge: cached.holdDormMinAge ?? booking.holdDormMinAge ?? null,
           holdSecurityDepositAmount: cached.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
           holdBookingChannel: cached.holdBookingChannel ?? booking.holdBookingChannel ?? null,
           checkIn: cached.checkIn ?? booking.checkIn ?? null,
@@ -683,17 +689,81 @@ const GuestDetailsPage: React.FC = () => {
   const [isPrefilledFromSaved, setIsPrefilledFromSaved] = useState(
     () => initialGuestProfile.prefilledFromSaved,
   );
+  // GUEST-099: Cross-device server-backed profile pre-fill for signed-in returning guests.
+  const [prefilledFromServerProfile, setPrefilledFromServerProfile] = useState(false);
+  const [savedVerifiedIdSummary, setSavedVerifiedIdSummary] = useState<VerifiedIdSummary | null>(null);
 
   const handleClearPrefilledGuestDetails = useCallback(() => {
-    setFormData((p) => ({ ...p, name: '', email: '', phone: '' }));
+    setFormData((p) => ({ ...p, name: '', email: '', phone: '', nationality: 'India' }));
     setFormErrors({ name: '', email: '', phone: '' });
+    setCompanyName('');
+    setGuestGstin('');
+    setGstInvoiceEnabled(false);
+    setCompanyNameError(undefined);
+    setGstinError(undefined);
     setIsPrefilledFromSaved(false);
+    setPrefilledFromServerProfile(false);
     try {
       window.localStorage.removeItem('atlas_guest_name');
       window.localStorage.removeItem('atlas_guest_email');
       window.localStorage.removeItem('atlas_guest_phone');
       window.sessionStorage.removeItem(CHECKOUT_DRAFT_KEY);
     } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    void fetchSignedInGuestProfile(ac.signal).then((profile) => {
+      if (ac.signal.aborted || !profile) return;
+      if (profile.verifiedIdSummary) {
+        setSavedVerifiedIdSummary(profile.verifiedIdSummary);
+      }
+      let didPrefill = false;
+      setFormData((prev) => {
+        const next = { ...prev };
+        if (!prev.name.trim() && profile.name) { next.name = profile.name; didPrefill = true; }
+        if (!prev.email.trim() && profile.email) { next.email = profile.email; didPrefill = true; }
+        if (!prev.phone.trim() && profile.phone) {
+          const raw = profile.phone.trim();
+          if (raw.startsWith('+')) {
+            const sortedOptions = [...GUEST_DIAL_OPTIONS].sort((a, b) => b.code.length - a.code.length);
+            const matched = sortedOptions.find((o) => raw.startsWith(o.code));
+            if (matched) {
+              setPhoneDialCode(matched.code);
+              next.phone = clampNationalDigits(raw.slice(matched.code.length), matched.maxDigits);
+            } else {
+              next.phone = clampNationalDigits(raw, GUEST_DIAL_OPTIONS[0].maxDigits);
+            }
+          } else {
+            next.phone = clampNationalDigits(raw, getGuestDialOption(phoneDialCode).maxDigits);
+          }
+          didPrefill = true;
+        }
+        if ((!prev.nationality || prev.nationality === 'India') && profile.nationality && profile.nationality !== prev.nationality) {
+          next.nationality = profile.nationality;
+          didPrefill = true;
+        }
+        return next;
+      });
+      if (profile.defaultCompanyName || profile.defaultGstin) {
+        setCompanyName((prev) => {
+          if (!prev.trim() && profile.defaultCompanyName) { didPrefill = true; return profile.defaultCompanyName; }
+          return prev;
+        });
+        setGuestGstin((prev) => {
+          if (!prev.trim() && profile.defaultGstin) { didPrefill = true; return profile.defaultGstin; }
+          return prev;
+        });
+        setGstInvoiceEnabled(true);
+      }
+      if (didPrefill) {
+        setIsPrefilledFromSaved(true);
+        setPrefilledFromServerProfile(true);
+      }
+    });
+    return () => ac.abort();
+    // Run once on mount to hydrate empty fields from the signed-in guest profile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [formErrors, setFormErrors] = useState({ name: '', email: '', phone: '' });
   // GUEST-084: Self-service company name & GSTIN for B2B GST tax invoices.
@@ -740,6 +810,18 @@ const GuestDetailsPage: React.FC = () => {
   const [dormAckAccepted, setDormAckAccepted] = useState(false);
   const [dormAckError, setDormAckError] = useState('');
   const dormAckRowRef = useRef<HTMLDivElement>(null);
+
+  // HSL-034: age-restricted dorms (e.g. 18+ only) require an age-rule confirmation tick before Pay
+  // and block checkout if the youngest guest's entered DOB is under the dorm's minimum age.
+  const [listingDormMinAge, setListingDormMinAge] = useState<number | null>(null);
+  const effectiveDormMinAge = booking.holdDormMinAge ?? listingDormMinAge ?? null;
+  const dormAgeAckRequired = dormNeedsAgeAcknowledgement(effectiveDormMinAge);
+  const [dormAgeAckAccepted, setDormAgeAckAccepted] = useState(false);
+  const [dormYoungestDob, setDormYoungestDob] = useState('');
+  const [dormAgeAckError, setDormAgeAckError] = useState('');
+  const dormAgeAckRowRef = useRef<HTMLDivElement>(null);
+  const dormYoungestAge = dormYoungestDob ? ageYearsFromDob(dormYoungestDob) : null;
+  const dormIsUnderage = dormAgeAckRequired && dormYoungestAge != null && dormYoungestAge < effectiveDormMinAge!;
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
@@ -756,7 +838,7 @@ const GuestDetailsPage: React.FC = () => {
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
-    if (booking.holdSecurityDepositAmount != null && booking.holdDormGenderPolicy != null) return;
+    if (booking.holdSecurityDepositAmount != null && booking.holdDormGenderPolicy != null && booking.holdDormMinAge != null) return;
     const ac = new AbortController();
     void fetchListingById(id, ac.signal)
       .then((l) => {
@@ -770,11 +852,14 @@ const GuestDetailsPage: React.FC = () => {
           if (dorm.accommodationType === 'HostelDorm' && dorm.dormGenderPolicy) {
             setListingDormGenderPolicy(dorm.dormGenderPolicy);
           }
+          if (dorm.accommodationType === 'HostelDorm' && dorm.dormMinAge != null) {
+            setListingDormMinAge(dorm.dormMinAge);
+          }
         }
       })
       .catch(() => { /* non-critical */ });
     return () => ac.abort();
-  }, [holdListingId, booking.holdSecurityDepositAmount, booking.holdDormGenderPolicy]);
+  }, [holdListingId, booking.holdSecurityDepositAmount, booking.holdDormGenderPolicy, booking.holdDormMinAge]);
 
   const effectiveSecurityDepositAmount =
     booking.holdSecurityDepositAmount ??
@@ -838,6 +923,7 @@ const GuestDetailsPage: React.FC = () => {
       holdRefundFreeUntilUtc: booking.holdRefundFreeUntilUtc ?? null,
       holdGraceHours: booking.holdGraceHours ?? null,
       holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
+      holdDormMinAge: booking.holdDormMinAge ?? null,
       holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
       holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : isAiReceptionistCheckout ? 'ai_receptionist' : isInstagramLinkCheckout ? 'instagram_link' : (booking.holdBookingChannel ?? null),
       checkIn: booking.checkIn ?? null,
@@ -1349,6 +1435,17 @@ const GuestDetailsPage: React.FC = () => {
     // HSL-011: women-only / men-only dorm - the guest must confirm the rule before Pay.
     if (dormAckRequired && !dormAckAccepted) { setDormAckError('Please confirm the dorm rule to continue.'); valid = false; }
     else { setDormAckError(''); }
+
+    // HSL-034: age-restricted dorm - block underage guests and require confirmation tick before Pay.
+    if (dormIsUnderage) {
+      setDormAgeAckError(`Guests under ${effectiveDormMinAge} cannot stay in this shared dorm. Please book a private room instead.`);
+      valid = false;
+    } else if (dormAgeAckRequired && !dormAgeAckAccepted) {
+      setDormAgeAckError(`Please confirm every guest is at least ${effectiveDormMinAge} years old to continue.`);
+      valid = false;
+    } else {
+      setDormAgeAckError('');
+    }
 
     // TASK-1039977 / PAY-006: refundable security deposit consent
     if (depositRequired && !depositAccepted) { setDepositError('Please accept the refundable security deposit terms to continue.'); valid = false; }
@@ -2795,6 +2892,7 @@ const GuestDetailsPage: React.FC = () => {
     consentAccepted &&
     (!houseRulesRequired || houseRulesAccepted) &&
     (!dormAckRequired || dormAckAccepted) &&
+    (!dormAgeAckRequired || (dormAgeAckAccepted && !dormIsUnderage)) &&
     (!depositRequired || depositAccepted);
   // TASK-1040051: a stay the API refused to price can never be paid for here.
   const payDisabled = isSubmitting || !readyToPay || notTakingBookings || quoteRefusedMessage != null;
@@ -2941,10 +3039,19 @@ const GuestDetailsPage: React.FC = () => {
                     className="gd-pill"
                     style={{ cursor: 'pointer', border: '1px solid var(--gd-border, #e5d5c5)', background: 'transparent', fontSize: 12, padding: '2px 8px' }}
                   >
-                    Saved details pre-filled · Clear
+                    {prefilledFromServerProfile ? 'Filled from your saved profile · Clear' : 'Saved details pre-filled · Clear'}
                   </button>
                 )}
               </div>
+
+              {savedVerifiedIdSummary && (
+                <div
+                  className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-900"
+                  data-testid="saved-verified-id-banner"
+                >
+                  Verified ID on file: <strong>{savedVerifiedIdSummary.govtIdType}</strong> ending in <strong>{savedVerifiedIdSummary.maskedLast4}</strong> — ready to reuse at online check-in.
+                </div>
+              )}
 
               <div className="gd-field">
                 <label className="gd-field-label" htmlFor="gd-name">
@@ -3448,6 +3555,25 @@ const GuestDetailsPage: React.FC = () => {
                 accepted={dormAckAccepted}
                 onChange={(next) => { setDormAckAccepted(next); if (next) setDormAckError(''); }}
                 error={dormAckError}
+              />
+            </div>
+
+            {/* HSL-034: age-restricted dorm (e.g. 18+ only) - REQUIRED age confirmation & optional DOB check before Pay. */}
+            <div ref={dormAgeAckRowRef}>
+              <DormAgeAcknowledgement
+                dormMinAge={effectiveDormMinAge}
+                accepted={dormAgeAckAccepted}
+                onChange={(next) => { setDormAgeAckAccepted(next); if (next) setDormAgeAckError(''); }}
+                youngestDob={dormYoungestDob}
+                onYoungestDobChange={(dob) => {
+                  setDormYoungestDob(dob);
+                  const age = dob ? ageYearsFromDob(dob) : null;
+                  if (age != null && effectiveDormMinAge != null && age < effectiveDormMinAge) {
+                    setDormAgeAckAccepted(false);
+                  }
+                }}
+                privateRoomsHref={propertySlug ? `/homes/${propertySlug}` : '/search'}
+                error={dormAgeAckError}
               />
             </div>
 

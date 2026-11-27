@@ -42,6 +42,8 @@ type ListingCardProps = {
   accommodationType?: string;
   /** HSL-011: `Listing.DormGenderPolicy` from the API (FemaleOnly / MaleOnly / Mixed); never guessed from the name. */
   dormGenderPolicy?: string | null;
+  /** HSL-034: Optional minimum age for shared dorm guests (e.g. 18). */
+  dormMinAge?: number | null;
   guests: number;
   bedrooms?: number | null;
   hasWifi?: boolean;
@@ -105,6 +107,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
   propertyType,
   accommodationType,
   dormGenderPolicy,
+  dormMinAge,
   guests,
   bedrooms,
   hasWifi,
@@ -342,7 +345,7 @@ const ListingCard: React.FC<ListingCardProps> = ({
 
         <HostIdentityLabel marketplace={marketplace} verified={hostIdentityVerified} />
 
-        <HostelDormBadge accommodationType={accommodationType} genderPolicy={dormGenderPolicy} />
+        <HostelDormBadge accommodationType={accommodationType} genderPolicy={dormGenderPolicy} dormMinAge={dormMinAge} />
 
         {/* TASK-1360: Last-booked social-proof badge */}
         {lastBookedLabel && (

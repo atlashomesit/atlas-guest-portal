@@ -11,6 +11,7 @@ import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BN
 import { SelfCheckInStayPreferences } from "../components/booking/StayPreferenceChips"; // GUEST-090
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
 import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
+import { fetchSignedInGuestProfile, type VerifiedIdSummary } from "@/api/guestAuthProfileClient"; // GUEST-099
 
 interface CheckinDetails {
   /** BNB-009: lets the page reach the booking-link-token guest endpoints (meal preferences). */
@@ -463,6 +464,33 @@ export default function SelfCheckIn() {
       activeVerifyTab: "digilocker",
     },
   ]);
+
+  // GUEST-099: Signed-in returning guest's previously verified ID summary for 1-tap reuse.
+  const [savedVerifiedId, setSavedVerifiedId] = useState<VerifiedIdSummary | null>(null);
+  const [reusedVerifiedId, setReusedVerifiedId] = useState(false);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    void fetchSignedInGuestProfile(ac.signal).then((profile) => {
+      if (!ac.signal.aborted && profile?.verifiedIdSummary) {
+        setSavedVerifiedId(profile.verifiedIdSummary);
+      }
+    });
+    return () => ac.abort();
+  }, []);
+
+  const handleReuseVerifiedId = () => {
+    if (!savedVerifiedId) return;
+    setReusedVerifiedId(true);
+    setGovtIdType(savedVerifiedId.govtIdType);
+    updateGuest(0, {
+      govtIdType: savedVerifiedId.govtIdType,
+      govtIdNumber: `XXXX${savedVerifiedId.maskedLast4}`,
+      maskedNumber: `•••• ${savedVerifiedId.maskedLast4}`,
+      isVerified: true,
+      verificationMethod: "DigiLocker",
+    });
+  };
 
   const stepIndex: Record<Step, number> = {
     auth: 0, summary: 1, "id-upload": 2, "house-rules": 3, "damage-waiver": 4, done: 5,
@@ -1535,6 +1563,49 @@ export default function SelfCheckIn() {
               Please provide and verify government-issued ID for all {guests.length} {guests.length === 1 ? "guest" : "guests"}.
               <span className="block mt-1 text-text-muted">(IDs can be verified via DigiLocker or Mobile OTP connected to the ID)</span>
             </p>
+
+            {/* GUEST-099: 1-tap reuse of previously verified ID for signed-in returning guests */}
+            {savedVerifiedId && (
+              <div
+                className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                data-testid="self-checkin-verified-id-reuse-card"
+              >
+                <div className="text-sm text-emerald-950">
+                  <div className="font-semibold">
+                    {reusedVerifiedId
+                      ? `Reusing verified ${savedVerifiedId.govtIdType} ending in ${savedVerifiedId.maskedLast4}`
+                      : `Verified ${savedVerifiedId.govtIdType} ending in ${savedVerifiedId.maskedLast4} on file`}
+                  </div>
+                  <p className="text-xs text-emerald-800 mt-0.5">
+                    {reusedVerifiedId
+                      ? "Your verified ID proof is attached. You can still upload a fresh ID below if needed."
+                      : "Skip re-uploading photos by reusing your verified check-in ID from a previous stay."}
+                  </p>
+                </div>
+                {!reusedVerifiedId ? (
+                  <button
+                    type="button"
+                    onClick={handleReuseVerifiedId}
+                    data-testid="reuse-verified-id-btn"
+                    className="shrink-0 min-h-[44px] rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold px-4 py-2 transition-colors"
+                  >
+                    Reuse verified {savedVerifiedId.govtIdType} ending in {savedVerifiedId.maskedLast4}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReusedVerifiedId(false);
+                      updateGuest(0, { isVerified: false, maskedNumber: undefined, govtIdNumber: "" });
+                    }}
+                    data-testid="switch-to-fresh-id-btn"
+                    className="shrink-0 min-h-[44px] rounded-lg border border-emerald-300 bg-white text-emerald-900 text-xs font-semibold px-3 py-2 hover:bg-emerald-50 transition-colors"
+                  >
+                    Upload fresh ID instead
+                  </button>
+                )}
+              </div>
+            )}
 
             <label htmlFor="checkin-nationality" className="block text-sm font-medium text-text-primary mb-1">
               Nationality

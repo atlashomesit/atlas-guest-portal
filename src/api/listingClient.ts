@@ -193,6 +193,8 @@ export type PublicListing = {
   accommodationType?: string | null;
   /** HSL-011: `Listing.DormGenderPolicy` - FemaleOnly / MaleOnly / Mixed. Null when the API states none. */
   dormGenderPolicy?: 'FemaleOnly' | 'MaleOnly' | 'Mixed' | null;
+  /** HSL-034: `Listing.DormMinAge` - optional minimum age for shared dorm guests (e.g. 18). */
+  dormMinAge?: number | null;
   /** TASK-1039977 / PAY-006: refundable security deposit configured on listing (null/0 = none). */
   securityDepositAmount?: number | null;
   /** TASK-10299183: online payment / checkout gateway available for listing. */
@@ -332,10 +334,14 @@ function normalizePublicListing(payload: Record<string, unknown>): PublicListing
     })(),
     // TASK-2739-v1: publish state drives noindex + the "not yet available" notice on Draft detail pages.
     publishStatus: typeof payload.publishStatus === 'string' ? payload.publishStatus : undefined,
-    // HSL-011: dorm facts come from the API only (never guessed from the listing name).
+    // HSL-011 / HSL-034: dorm facts come from the API only (never guessed from the listing name).
     ...(() => {
       const dorm = readDormListingFields(payload);
-      return { accommodationType: dorm.accommodationType, dormGenderPolicy: dorm.dormGenderPolicy };
+      return {
+        accommodationType: dorm.accommodationType,
+        dormGenderPolicy: dorm.dormGenderPolicy,
+        dormMinAge: dorm.dormMinAge,
+      };
     })(),
     securityDepositAmount: (() => {
       const raw = payload.securityDepositAmount ?? payload.SecurityDepositAmount;

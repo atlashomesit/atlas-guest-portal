@@ -1,6 +1,6 @@
 import React from 'react';
 import HostelDormBadge, { formatBedType } from './HostelDormBadge';
-import { type DormGenderPolicy } from '@/utils/dormListing';
+import { dormNeedsAgeAcknowledgement, type DormGenderPolicy } from '@/utils/dormListing';
 
 const DORM_GENDER_FILTERS = ['All', 'Mixed Dorm', 'Female Only', 'Male Only'] as const;
 export type DormGenderFilter = (typeof DORM_GENDER_FILTERS)[number];
@@ -28,6 +28,10 @@ export interface DormRoomSelectorProps {
   onGenderFilterChange?: (filter: DormGenderFilter | string) => void;
   onSelectBed?: (bedId: string | number) => void;
   onCountChange?: (count: number) => void;
+  /** HSL-034: Minimum age required for this dorm (e.g. 18). */
+  dormMinAge?: number | null;
+  /** HSL-034: Optional link to private rooms at the same property for families / under-age guests. */
+  privateRoomsHref?: string | null;
   className?: string;
 }
 
@@ -55,6 +59,8 @@ export const DormRoomSelector: React.FC<DormRoomSelectorProps> = ({
   onGenderFilterChange,
   onSelectBed,
   onCountChange,
+  dormMinAge = null,
+  privateRoomsHref = null,
   className = '',
 }) => {
   const [internalGenderFilter, setInternalGenderFilter] = React.useState<string>('All');
@@ -109,8 +115,30 @@ export const DormRoomSelector: React.FC<DormRoomSelectorProps> = ({
         <HostelDormBadge
           accommodationType={accommodationType}
           genderPolicy={dormGenderPolicy}
+          dormMinAge={dormMinAge}
         />
       </div>
+
+      {dormNeedsAgeAcknowledgement(dormMinAge) && dormMinAge! >= 18 && (
+        <div
+          className="rounded-xl border border-rose-200 bg-rose-50/70 px-3.5 py-2.5 text-xs text-rose-900 flex flex-wrap items-center justify-between gap-2"
+          role="note"
+          data-testid="dorm-age-restriction-notice"
+        >
+          <span>
+            Children and infants are not permitted in {dormMinAge}+ shared dorms. Guests under {dormMinAge} must book a private room.
+          </span>
+          {privateRoomsHref && (
+            <a
+              href={privateRoomsHref}
+              className="font-semibold underline text-rose-900 hover:text-rose-700 shrink-0"
+              data-testid="dorm-view-private-rooms-link"
+            >
+              View private rooms →
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Gender filter selector (TASK-10299109 & TASK-1039779) */}
       <div className="space-y-2 pt-1" data-testid="dorm-gender-filter-selector">
