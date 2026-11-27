@@ -82,6 +82,7 @@ const CityVanityRedirect = React.lazy(() => import("./components/CityVanityRedir
 const GuestDetailsPage = React.lazy(() => import("./pages/booking/GuestDetailsPage"))
 // TASK-8093: Embeddable booking widget (iframe entry)
 const EmbedPage = React.lazy(() => import("./pages/EmbedPage"))
+const ReviewsWidgetEmbedPage = React.lazy(() => import("./pages/ReviewsWidgetEmbedPage"))
 // TASK-4017: Guest OTP login
 const GuestLoginPage = React.lazy(() => import("./pages/GuestLoginPage"))
 const QrMenuPage = React.lazy(() => import("./pages/QrMenuPage"))
@@ -197,7 +198,7 @@ function AppWrapper() {
 
   const hideNavbarRoutes = ['/property_LocationDetails/:id'];
   // TASK-8093: embed widget runs inside an iframe on a host's own site — no Atlas chrome.
-  const isEmbedRoute = Boolean(matchPath('/embed/:embedKey', location.pathname));
+  const isEmbedRoute = Boolean(matchPath('/embed/:embedKey', location.pathname) || matchPath('/embed/:embedKey/reviews', location.pathname));
   const isQrMenuRoute = Boolean(matchPath('/qr-menu/:tenantSlug', location.pathname));
   // REV-046: the review QR page is a standalone, one-screen page (no navbar, footer, support widget or cookie banner).
   const isReviewQrRoute = Boolean(matchPath('/rate/:tenantSlug/:code', location.pathname));
@@ -351,6 +352,7 @@ function AppWrapper() {
           {/* TASK-4283: /bookings used to hit the catch-all "Link not found" — alias it to /my-bookings. */}
           <Route path="/bookings" element={withBoundary(<Navigate to="/my-bookings" replace />, "bookings-alias-route")} />
           {/* TASK-8093: embeddable widget iframe — must be before /:shortCode catch-all, no navbar/footer */}
+          <Route path="/embed/:embedKey/reviews" element={withBoundary(<Suspense fallback={<LazyFallback />}><ReviewsWidgetEmbedPage /></Suspense>, "embed-reviews-widget-route")} />
           <Route path="/embed/:embedKey" element={withBoundary(<Suspense fallback={<LazyFallback />}><EmbedPage /></Suspense>, "embed-widget-route")} />
           <Route path="/login" element={withBoundary(<Suspense fallback={<LazyFallback />}><GuestLoginPage /></Suspense>, "guest-login-route")} />
           <Route path="/favorites" element={withBoundary(<Suspense fallback={<LazyFallback />}><FavoritesPage /></Suspense>, "favorites-route")} />
