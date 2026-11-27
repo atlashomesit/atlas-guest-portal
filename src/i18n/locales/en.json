@@ -3,20 +3,40 @@
     "hero": "Find your perfect homestay",
     "checkIn": "Check-in",
     "checkOut": "Check-out",
-    "guests": "Guests"
+    "guests": "Guests",
+    "search": "Search",
+    "filters": "Filters"
   },
   "listingDetail": {
     "perNight": "per night",
     "nearbyAttractions": "Nearby attractions & things to do",
-    "distance": "distance away"
+    "distance": "distance away",
+    "amenities": "Amenities",
+    "houseRules": "House rules"
   },
   "bookingWidget": {
     "book": "Book now",
     "reserve": "Reserve",
-    "total": "Total"
+    "total": "Total",
+    "nights": "nights",
+    "payNow": "Pay now"
+  },
+  "checkout": {
+    "title": "Complete your booking",
+    "guestDetails": "Guest details",
+    "confirmBooking": "Confirm booking",
+    "priceSummary": "Price summary"
+  },
+  "stayPage": {
+    "arrivalHub": "Your Stay & Arrival Hub",
+    "checkInInstructions": "Check-in instructions",
+    "extendStay": "Extend your stay",
+    "needHelp": "Need help?"
   },
   "common": {
     "loading": "Loading...",
-    "error": "Something went wrong"
+    "error": "Something went wrong",
+    "language": "Language",
+    "close": "Close"
   }
 }

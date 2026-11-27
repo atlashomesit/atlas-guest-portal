@@ -477,6 +477,29 @@ const Navbar = () => {
 
           {/* MOBILE ACTIONS — account links grouped (DESIGN-009 / TASK-7088) */}
           <div className="mt-2 flex flex-col gap-3">
+            {LANGUAGE_SWITCHER_ENABLED && (
+              <div className="flex items-center justify-between gap-2 py-1" data-testid="mobile-lang-switcher">
+                <label htmlFor="mobile-navbar-lang-select" className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  Language
+                </label>
+                <select
+                  id="mobile-navbar-lang-select"
+                  value={language}
+                  onChange={(e) => {
+                    changeLanguage(e.target.value as typeof language);
+                    closeMobile();
+                  }}
+                  aria-label="Select language"
+                  className="min-h-11 rounded-lg border border-border-subtle bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary"
+                >
+                  {availableLanguages.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {getLanguageName(lang)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <p className="py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Account</p>
             {tripsMenuNav.map((item) => (
               <NavLink

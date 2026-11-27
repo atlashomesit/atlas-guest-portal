@@ -1,5 +1,42 @@
 {
   "searchPage": {
-    "guests": "पाहुणे"
+    "hero": "तुमचे योग्य होमस्टे शोधा",
+    "checkIn": "चेक-इन",
+    "checkOut": "चेक-आउट",
+    "guests": "पाहुणे",
+    "search": "शोधा",
+    "filters": "फिल्टर"
+  },
+  "listingDetail": {
+    "perNight": "प्रति रात्र",
+    "nearbyAttractions": "जवळची आकर्षणे आणि पाहण्यासारखी ठिकाणे",
+    "distance": "अंतरावर",
+    "amenities": "सुविधा",
+    "houseRules": "घराचे नियम"
+  },
+  "bookingWidget": {
+    "book": "आत्ताच बुक करा",
+    "reserve": "आरक्षित करा",
+    "total": "एकूण",
+    "nights": "रात्री",
+    "payNow": "आत्ताच पैसे भरा"
+  },
+  "checkout": {
+    "title": "तुमचे बुकिंग पूर्ण करा",
+    "guestDetails": "पाहुण्यांचा तपशील",
+    "confirmBooking": "बुकिंग निश्चित करा",
+    "priceSummary": "किंमत सारांश"
+  },
+  "stayPage": {
+    "arrivalHub": "तुमचा मुक्काम आणि आगमन केंद्र",
+    "checkInInstructions": "चेक-इन सूचना",
+    "extendStay": "तुमचा मुक्काम वाढवा",
+    "needHelp": "मदत हवी आहे का?"
+  },
+  "common": {
+    "loading": "लोड होत आहे...",
+    "error": "काहीतरी चूक झाली",
+    "language": "भाषा",
+    "close": "बंद करा"
   }
 }

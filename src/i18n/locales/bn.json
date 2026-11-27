@@ -1,5 +1,42 @@
 {
   "searchPage": {
-    "guests": "অতিথি"
+    "hero": "আপনার সেরা হোমস্টে খুঁজুন",
+    "checkIn": "চেক-ইন",
+    "checkOut": "চেক-আউট",
+    "guests": "অতিথি",
+    "search": "খুঁজুন",
+    "filters": "ফিল্টার"
+  },
+  "listingDetail": {
+    "perNight": "প্রতি রাত",
+    "nearbyAttractions": "কাছাকাছি দর্শনীয় স্থান এবং করণীয়",
+    "distance": "দূরত্বে",
+    "amenities": "সুযোগ-সুবিধা",
+    "houseRules": "বাড়ির নিয়মাবলী"
+  },
+  "bookingWidget": {
+    "book": "এখনই বুক করুন",
+    "reserve": "সংরক্ষণ করুন",
+    "total": "মোট",
+    "nights": "রাত",
+    "payNow": "এখনই পেমেন্ট করুন"
+  },
+  "checkout": {
+    "title": "আপনার বুকিং সম্পূর্ণ করুন",
+    "guestDetails": "অতিথির বিবরণ",
+    "confirmBooking": "বুকিং নিশ্চিত করুন",
+    "priceSummary": "মূল্যের সারাংশ"
+  },
+  "stayPage": {
+    "arrivalHub": "আপনার অবস্থান এবং আগমন কেন্দ্র",
+    "checkInInstructions": "চেক-ইন নির্দেশাবলী",
+    "extendStay": "আপনার থাকা বাড়ান",
+    "needHelp": "সাহায্য প্রয়োজন?"
+  },
+  "common": {
+    "loading": "লোড হচ্ছে...",
+    "error": "কিছু ভুল হয়েছে",
+    "language": "ভাষা",
+    "close": "বন্ধ করুন"
   }
 }

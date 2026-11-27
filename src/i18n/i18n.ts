@@ -9,6 +9,7 @@ import mrLocale from './locales/mr.json'; // TASK-1740: Marathi (Pune market)
 import bnLocale from './locales/bn.json'; // TASK-1741: Bengali (Kolkata + NE markets)
 import taLocale from './locales/ta.json'; // TASK-1742: Tamil (Chennai market)
 import knLocale from './locales/kn.json'; // TASK-1743: Kannada (Bangalore market)
+import mlLocale from './locales/ml.json'; // GUEST-094: Malayalam (Kerala market)
 
 /**
  * TASK-8103 — PROVENANCE OF mr/bn/ta/kn, read before adding keys to those files.
@@ -40,6 +41,7 @@ const locales = {
   bn: bnLocale,
   ta: taLocale,
   kn: knLocale,
+  ml: mlLocale,
 };
 
 export type Language = keyof typeof locales;
@@ -52,7 +54,7 @@ export type Language = keyof typeof locales;
  * `atlas-lang`. They are deliberately NOT shared (different origins, different
  * supported-copy levels) — do not "unify" them without checking both initialisers.
  */
-const SUPPORTED_LANGUAGES: readonly Language[] = ['en', 'hi', 'te', 'mr', 'bn', 'ta', 'kn'];
+const SUPPORTED_LANGUAGES: readonly Language[] = ['en', 'hi', 'te', 'mr', 'bn', 'ta', 'kn', 'ml'];
 
 /**
  * The locales the product advertises when the switcher is OFF (kept for the rollback
@@ -163,6 +165,7 @@ export function getLanguageName(lang: Language): string {
     bn: 'বাংলা',
     ta: 'தமிழ்',
     kn: 'ಕನ್ನಡ',
+    ml: 'മലയാളം',
   };
   return names[lang];
 }

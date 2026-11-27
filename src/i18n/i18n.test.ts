@@ -39,7 +39,7 @@ function flattenKeys(obj: Record<string, unknown>, prefix = ''): string[] {
 }
 
 const ENGLISH_KEYS = flattenKeys(enLocale as unknown as Record<string, unknown>);
-const ALL_LOCALES: Language[] = ['en', 'hi', 'te', 'mr', 'bn', 'ta', 'kn'];
+const ALL_LOCALES: Language[] = ['en', 'hi', 'te', 'mr', 'bn', 'ta', 'kn', 'ml'];
 
 let savedLanguage: string | null = null;
 
@@ -60,7 +60,7 @@ describe('TASK-8103 locale parity', () => {
     expect(getSupportedLanguages()).toEqual(ALL_LOCALES);
   });
 
-  it.each(['mr', 'bn', 'ta', 'kn'] as const)(
+  it.each(['mr', 'bn', 'ta', 'kn', 'ml'] as const)(
     'resolves %s as the active language when persisted',
     (lang) => {
       localStorage.setItem(STORAGE_KEY, lang);
@@ -78,26 +78,18 @@ describe('TASK-8103 locale parity', () => {
     expect(getLanguageName('bn')).toBe('বাংলা');
     expect(getLanguageName('ta')).toBe('தமிழ்');
     expect(getLanguageName('kn')).toBe('ಕನ್ನಡ');
+    expect(getLanguageName('ml')).toBe('മലയാളം');
   });
 });
 
 describe('TASK-8103 done-when #2: English fallback, never blank', () => {
-  it('falls back to the English string for a key missing from Marathi', () => {
+  it('translates Marathi natively and falls back cleanly for unknown keys', () => {
     localStorage.setItem(STORAGE_KEY, 'mr');
-
-    // Guard: without this the fallback assertion below would pass vacuously,
-    // because an unsupported language silently resolves to English anyway.
     expect(getCurrentLanguage()).toBe('mr');
-
-    // Proves the mr resource is genuinely wired in: this is the ONE guest key with
-    // real sourced Marathi copy (admin `guests` -> guest `searchPage.guests`).
     expect(translate('searchPage.guests')).toBe('पाहुणे');
-
-    // `bookingWidget.book` has no Marathi copy anywhere in the corpus.
-    const fellBack = translate('bookingWidget.book');
-    expect(fellBack).toBe('Book now');
-    expect(fellBack).not.toBe('');
-    expect(fellBack).not.toBe('bookingWidget.book');
+    expect(translate('bookingWidget.book')).toBe('आत्ताच बुक करा');
+    // Unknown key falls back to the key itself, never empty.
+    expect(translate('nonexistent.key')).toBe('nonexistent.key');
   });
 
   it.each(ALL_LOCALES)(
@@ -169,6 +161,7 @@ describe('TASK-8103: script/glyph coverage — endonyms and translated strings u
     bn: new RegExp(`^[ঀ-৿${NEUTRAL}]+$`), // Bengali
     ta: new RegExp(`^[஀-௿${NEUTRAL}]+$`), // Tamil
     kn: new RegExp(`^[ಀ-೿${NEUTRAL}]+$`), // Kannada
+    ml: new RegExp(`^[ഀ-ൿ${NEUTRAL}]+$`), // Malayalam
   };
 
   it.each(Object.keys(SCRIPT_RANGES) as Array<Exclude<Language, 'en'>>)(
@@ -195,8 +188,8 @@ describe('TASK-8103: script/glyph coverage — endonyms and translated strings u
           );
         }
       }
-      // Guard against a vacuous pass: every locale under test has at least one real key.
-      expect(realTranslationCount).toBeGreaterThan(0);
+      // GUEST-094: every Indian locale must have full core key parity with en.json (zero 1-key stubs).
+      expect(realTranslationCount).toBe(ENGLISH_KEYS.length);
     },
   );
 });

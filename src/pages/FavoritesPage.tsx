@@ -28,6 +28,8 @@ import {
   CollaborativeTripWishlistBoard,
   type WishlistListingMeta,
 } from "../components/marketplace/CollaborativeTripWishlistBoard";
+import SharedWishlistBoard from "../components/favorites/SharedWishlistBoard"; // GUEST-091
+import { createTripWishlist, toggleListingInTripWishlist } from "../utils/tripWishlists";
 
 type FavoriteListing = PublicListing & { tenantSlug?: string };
 
@@ -66,6 +68,7 @@ export default function FavoritesPage() {
   const [shareState, setShareState] = useState<"idle" | "copied">("idle");
   const [searchParams] = useSearchParams();
   const { shareToken } = useParams<{ shareToken?: string }>();
+  const boardToken = searchParams.get("board");
   // TASK-4010: Server-side sync status indicator
   const [syncStatus, setSyncStatus] = useState<"idle" | "synced" | "local">("idle");
   const sharedWishlistIds = useMemo(() => {
@@ -208,17 +211,42 @@ export default function FavoritesPage() {
     return appendQuerySuffix(basePath, params.toString());
   };
 
-  // TASK-1299: encode saved IDs into shareable URL (no backend needed)
-  const handleShareWishlist = () => {
+  // GUEST-091: Create a collaborative shared wishlist board (/favorites?board=<token>) via API with local tripWishlists fallback
+  const handleShareWishlist = async () => {
     const ids = sharedWishlistIds ?? getFavoriteIds();
     if (!ids.length) return;
-    const token = btoa(ids.join(","));
-    const shareParams = new URLSearchParams({ wishlist: token });
+    let resolvedBoardToken: string | null = null;
+    try {
+      const res = await fetch(buildApiUrl("/api/public/wishlists"), {
+        method: "POST",
+        headers: { ...getApiHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ title: `${brandName} shortlist`, listingIds: ids }),
+      });
+      if (res.ok) {
+        const data = (await res.json().catch(() => null)) as { token?: string; shareToken?: string } | null;
+        resolvedBoardToken = data?.token || data?.shareToken || null;
+      }
+    } catch {
+      // Fall back to local tripWishlists board
+    }
+    if (!resolvedBoardToken) {
+      const created = createTripWishlist(`${brandName} shortlist`);
+      for (const id of ids) {
+        const match = all.find((l) => l.id === id);
+        toggleListingInTripWishlist(created.id, {
+          listingId: id,
+          tenantSlug: match?.tenantSlug,
+          title: match?.name,
+        });
+      }
+      resolvedBoardToken = created.shareToken;
+    }
+    const shareParams = new URLSearchParams({ board: resolvedBoardToken });
     const tenantSlug = getTenantContext()?.slug ?? getApiHeaders()["X-Tenant-Slug"];
     if (tenantSlug) shareParams.set("tenant", tenantSlug);
     if (isBrandAtlastaysParam) shareParams.set("brand", "atlastays");
     const shareUrl = `${window.location.origin}/favorites?${shareParams}`;
-    const waText = `Check out these ${brandName} I saved! ${shareUrl}`;
+    const waText = `Vote on our ${brandName} shortlist! ${shareUrl}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
     if (navigator.share) {
       navigator.share({ title: `My ${brandName} Wishlist`, url: shareUrl }).catch(() => {});
@@ -274,6 +302,27 @@ export default function FavoritesPage() {
           </Link>
         </div>
       </div>
+
+      {/* GUEST-091: Collaborative shared wishlist board (/favorites?board=<token>) with voting & <=200 char notes */}
+      {boardToken && (
+        <SharedWishlistBoard
+          boardToken={boardToken}
+          defaultVisitorName={auth.isAuthenticated ? auth.email?.split("@")[0] : undefined}
+          listingsById={
+            new Map(
+              all.map((l) => [
+                l.id,
+                {
+                  id: l.id,
+                  name: l.name,
+                  href: listingPath(l),
+                  priceLabel: l.baseNightlyRate ? `${formatDisplayCurrency(l.baseNightlyRate)} / night` : undefined,
+                },
+              ])
+            )
+          }
+        />
+      )}
 
       {/* MKT-069: Named collaborative trip wishlists with voting, shared notes, and shared dates */}
       <CollaborativeTripWishlistBoard

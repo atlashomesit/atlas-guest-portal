@@ -1,5 +1,42 @@
 {
   "searchPage": {
-    "guests": "ಅತಿಥಿಗಳು"
+    "hero": "ನಿಮಗೆ ಸೂಕ್ತವಾದ ಹೋಮ್‌ಸ್ಟೇ ಹುಡುಕಿ",
+    "checkIn": "ಚೆಕ್-ಇನ್",
+    "checkOut": "ಚೆಕ್-ಔಟ್",
+    "guests": "ಅತಿಥಿಗಳು",
+    "search": "ಹುಡುಕಿ",
+    "filters": "ಫಿಲ್ಟರ್‌ಗಳು"
+  },
+  "listingDetail": {
+    "perNight": "ಪ್ರತಿ ರಾತ್ರಿಗೆ",
+    "nearbyAttractions": "ಸಮೀಪದ ಆಕರ್ಷಣೆಗಳು ಮತ್ತು ಚಟುವಟಿಕೆಗಳು",
+    "distance": "ದೂರದಲ್ಲಿ",
+    "amenities": "ಸೌಲಭ್ಯಗಳು",
+    "houseRules": "ಮನೆಯ ನಿಯಮಗಳು"
+  },
+  "bookingWidget": {
+    "book": "ಈಗಲೇ ಬುಕ್ ಮಾಡಿ",
+    "reserve": "ಕಾಯ್ದಿರಿಸಿ",
+    "total": "ಒಟ್ಟು",
+    "nights": "ರಾತ್ರಿಗಳು",
+    "payNow": "ಈಗಲೇ ಪಾವತಿಸಿ"
+  },
+  "checkout": {
+    "title": "ನಿಮ್ಮ ಬುಕಿಂಗ್ ಪೂರ್ಣಗೊಳಿಸಿ",
+    "guestDetails": "ಅತಿಥಿ ವಿವರಗಳು",
+    "confirmBooking": "ಬುಕಿಂಗ್ ದೃಢೀಕರಿಸಿ",
+    "priceSummary": "ಬೆಲೆ ವಿವರ"
+  },
+  "stayPage": {
+    "arrivalHub": "ನಿಮ್ಮ ವಾಸ್ತವ್ಯ ಮತ್ತು ಆಗಮನ ಕೇಂದ್ರ",
+    "checkInInstructions": "ಚೆಕ್-ಇನ್ ಸೂಚನೆಗಳು",
+    "extendStay": "ನಿಮ್ಮ ವಾಸ್ತವ್ಯವನ್ನು ವಿಸ್ತರಿಸಿ",
+    "needHelp": "ಸಹಾಯ ಬೇಕೇ?"
+  },
+  "common": {
+    "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    "error": "ಏನೋ ತಪ್ಪಾಗಿದೆ",
+    "language": "ಭಾಷೆ",
+    "close": "ಮುಚ್ಚಿ"
   }
 }
