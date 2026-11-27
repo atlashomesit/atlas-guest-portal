@@ -243,7 +243,7 @@ type CheckoutHoldCache = {
   /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
   holdSecurityDepositAmount?: number | null;
   /** TASK-1040087: marketplace booking origin channel preserved across refreshes. */
-  holdBookingChannel?: 'marketplace' | 'ai_receptionist' | null;
+  holdBookingChannel?: 'marketplace' | 'ai_receptionist' | 'instagram_link' | null;
   checkIn?: string | null;
   checkOut?: string | null;
   guests?: number;
@@ -396,8 +396,10 @@ const GuestDetailsPage: React.FC = () => {
     const rawRatePlanId = sp.get('ratePlanId') || sp.get('listingRatePlanId');
     const rawBrand = sp.get('brand')?.trim().toLowerCase() ?? '';
     const isMarketplaceBrand = rawBrand === 'atlastays' || rawBrand === 'marketplace';
-    // AGT-005: only this exact value marks a checkout that came from the AI sales agent's link.
-    const isAiReceptionistSrc = sp.get('src') === 'ai_receptionist';
+    // AGT-005 & REV-059: preserve exact attribution src values (ai_receptionist, instagram_link).
+    const rawSrc = sp.get('src');
+    const isAiReceptionistSrc = rawSrc === 'ai_receptionist';
+    const isInstagramLinkSrc = rawSrc === 'instagram_link';
     return {
       checkIn: normalizeDateParam(rawCheckIn),
       checkOut: normalizeDateParam(rawCheckOut),
@@ -407,6 +409,7 @@ const GuestDetailsPage: React.FC = () => {
       ratePlanId: rawRatePlanId && !isNaN(Number(rawRatePlanId)) ? Number(rawRatePlanId) : null,
       isMarketplaceBrand,
       isAiReceptionistSrc,
+      isInstagramLinkSrc,
     };
   }, [location.search]);
 
@@ -436,7 +439,7 @@ const GuestDetailsPage: React.FC = () => {
         holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
-        holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : urlParams.isAiReceptionistSrc ? 'ai_receptionist' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
+        holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : urlParams.isAiReceptionistSrc ? 'ai_receptionist' : urlParams.isInstagramLinkSrc ? 'instagram_link' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
         holdPackage: booking.holdPackage ?? null,
       });
 
@@ -514,6 +517,8 @@ const GuestDetailsPage: React.FC = () => {
     isMarketplaceHostname();
   const isAiReceptionistCheckout =
     !isMarketplaceCheckout && (booking.holdBookingChannel === 'ai_receptionist' || urlParams.isAiReceptionistSrc);
+  const isInstagramLinkCheckout =
+    !isMarketplaceCheckout && !isAiReceptionistCheckout && (booking.holdBookingChannel === 'instagram_link' || urlParams.isInstagramLinkSrc);
 
   // Synchronize BookingContext and window.location query string if one was populated and the other missing
   useEffect(() => {
@@ -833,7 +838,7 @@ const GuestDetailsPage: React.FC = () => {
       holdGraceHours: booking.holdGraceHours ?? null,
       holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
       holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
-      holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : isAiReceptionistCheckout ? 'ai_receptionist' : (booking.holdBookingChannel ?? null),
+      holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : isAiReceptionistCheckout ? 'ai_receptionist' : isInstagramLinkCheckout ? 'instagram_link' : (booking.holdBookingChannel ?? null),
       checkIn: booking.checkIn ?? null,
       checkOut: booking.checkOut ?? null,
       guests: booking.guests,
@@ -848,7 +853,7 @@ const GuestDetailsPage: React.FC = () => {
     booking.guests, booking.holdPropertySlug, booking.holdUnitSlug, booking.holdTenantSlug,
     booking.holdListingName, booking.holdCancellationTier, booking.holdCancellationWindowHours, booking.holdRefundFreeUntilUtc,
     booking.holdGraceHours, booking.holdDormGenderPolicy, booking.holdSecurityDepositAmount,
-    booking.holdBookingChannel, isMarketplaceCheckout, isAiReceptionistCheckout,
+    booking.holdBookingChannel, isMarketplaceCheckout, isAiReceptionistCheckout, isInstagramLinkCheckout,
     booking.listingRatePlanId, booking.ratePlanName, propertySlug, unitSlug, effectiveTenantSlug,
   ]);
 
@@ -1585,6 +1590,7 @@ const GuestDetailsPage: React.FC = () => {
             : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
           ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
+          ...(isInstagramLinkCheckout ? { channel: 'instagram_link', bookingSource: 'instagram_link' } : {}),
         },
         ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
         currency: 'INR',
@@ -1818,6 +1824,7 @@ const GuestDetailsPage: React.FC = () => {
             : {}),
           ...(isMarketplaceCheckout ? { channel: 'marketplace', bookingSource: 'marketplace' } : {}),
           ...(isAiReceptionistCheckout ? { channel: 'ai_receptionist' } : {}),
+          ...(isInstagramLinkCheckout ? { channel: 'instagram_link', bookingSource: 'instagram_link' } : {}),
         },
         ...(selectedPaymentPlan !== 'Full' ? { paymentPlan: selectedPaymentPlan } : {}),
       });

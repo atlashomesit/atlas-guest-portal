@@ -108,7 +108,7 @@ type BookingState = {
     }>;
   } | null;
   /** TASK-1040087: Marketplace booking origin channel ('marketplace') forwarded from UnitBookingWidget. */
-  holdBookingChannel?: 'marketplace' | 'ai_receptionist' | null;
+  holdBookingChannel?: 'marketplace' | 'ai_receptionist' | 'instagram_link' | null;
   /** CLU-038: Multi-room group checkout state (session-only). */
   holdGroupReference?: string | null;
   holdMultiRoomSelections?: Array<{
