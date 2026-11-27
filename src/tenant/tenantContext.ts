@@ -606,51 +606,60 @@ export async function fetchListingTenantContext(slug: string, apiBaseUrl?: strin
 
   const promise = (async () => {
     try {
-      const domain = `${trimmed}.atlastays.com`;
-      const lookupDomain = normalizeHostForDomainLookup(domain);
       const base = (apiBaseUrl || (hasRuntimeConfig() ? getRuntimeConfig().apiBaseUrl : '') || '').replace(/\/$/, '');
-      const url =
-        import.meta.env.DEV && typeof window !== 'undefined'
-          ? `/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`
-          : `${base}/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`;
+      // TASK-1040217: when the URL explicitly carries ?tenant=<slug>, skip the futile
+      // /tenants/from-domain?domain=<slug>.atlastays.com probe (guaranteed 404 on direct/QA loads)
+      // and fall straight through to /tenants/{slug}/public below.
+      const urlTenantParam =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('tenant')?.trim().toLowerCase()
+          : null;
+      if (urlTenantParam !== trimmed) {
+        const domain = `${trimmed}.atlastays.com`;
+        const lookupDomain = normalizeHostForDomainLookup(domain);
+        const url =
+          import.meta.env.DEV && typeof window !== 'undefined'
+            ? `/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`
+            : `${base}/tenants/from-domain?domain=${encodeURIComponent(lookupDomain)}`;
 
-      const res = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (res.ok) {
-        const data = await res.json();
-        const brandShort = String(data.brandName ?? '').trim();
-        const brandLong =
-          typeof data.legalContactPack?.legalName === 'string' ? data.legalContactPack.legalName.trim() : '';
+        const res = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (res.ok) {
+          const data = await res.json();
+          const brandShort = String(data.brandName ?? '').trim();
+          const brandLong =
+            typeof data.legalContactPack?.legalName === 'string' ? data.legalContactPack.legalName.trim() : '';
 
-        const info: TenantInfo = {
-          name: brandShort || trimmed,
-          brandName: brandShort || undefined,
-          brandNameLong: brandLong || undefined,
-          slug: data.tenantSlug || trimmed,
-          logoUrl: data.logoUrl ?? undefined,
-          primaryColor: data.primaryColor ?? undefined,
-          tagline: data.tagline ?? undefined,
-          faviconUrl: data.faviconUrl ?? undefined,
-          category: data.category ?? undefined,
-          isMarketplaceRoot: Boolean(data.isMarketplaceRoot),
-          brandColor: data.primaryColor ?? undefined,
-          isGstVerified: Boolean(data.isGstVerified),
-          paymentProvider: data.paymentProvider ?? undefined,
-          displayMerchantName: data.displayMerchantName ?? undefined,
-          upiVpa: data.upiVpa ?? undefined,
-          upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
-          upiInstructions: data.upiInstructions ?? undefined,
-          bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP')
-            ? data.bookingMode
-            : undefined,
-          whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
-            ? data.whatsappBookingPhone
-            : undefined,
-          legalContactPack: parseLegalContactPack(data as Record<string, unknown>),
-          isInternal: Boolean(data.isInternal),
-        };
-        const entry = listingTenantCache.get(trimmed);
-        if (entry) entry.value = info;
-        return info;
+          const info: TenantInfo = {
+            name: brandShort || trimmed,
+            brandName: brandShort || undefined,
+            brandNameLong: brandLong || undefined,
+            slug: data.tenantSlug || trimmed,
+            logoUrl: data.logoUrl ?? undefined,
+            primaryColor: data.primaryColor ?? undefined,
+            tagline: data.tagline ?? undefined,
+            faviconUrl: data.faviconUrl ?? undefined,
+            category: data.category ?? undefined,
+            isMarketplaceRoot: Boolean(data.isMarketplaceRoot),
+            brandColor: data.primaryColor ?? undefined,
+            isGstVerified: Boolean(data.isGstVerified),
+            paymentProvider: data.paymentProvider ?? undefined,
+            displayMerchantName: data.displayMerchantName ?? undefined,
+            upiVpa: data.upiVpa ?? undefined,
+            upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
+            upiInstructions: data.upiInstructions ?? undefined,
+            bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP')
+              ? data.bookingMode
+              : undefined,
+            whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
+              ? data.whatsappBookingPhone
+              : undefined,
+            legalContactPack: parseLegalContactPack(data as Record<string, unknown>),
+            isInternal: Boolean(data.isInternal),
+          };
+          const entry = listingTenantCache.get(trimmed);
+          if (entry) entry.value = info;
+          return info;
+        }
       }
 
       // Fallback: /tenants/${slug}/public
