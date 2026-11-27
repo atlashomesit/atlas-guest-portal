@@ -6,6 +6,7 @@ import SEO from "@/components/SEO";
 import { LoadingState } from "@/components/LoadingState";
 import { getTenantBrandName } from "@/tenant/displayBrand";
 import { messageFromApiResponse } from "@/utils/serverErrorFromResponse";
+import { normalizeCommunicationPreferences } from "@/utils/communicationPreferencesMapping";
 
 type PurposeRow = {
   purpose: string;
@@ -60,12 +61,7 @@ export default function CommunicationPreferences() {
       })
       .then((data) => {
         if (cancelled) return;
-        setForm({
-          transactional: !!data.transactional,
-          checkInCheckoutReminders: !!data.checkInCheckoutReminders,
-          postStayReviewRequest: !!data.postStayReviewRequest,
-          promotionalOffers: !!data.promotionalOffers,
-        });
+        setForm(normalizeCommunicationPreferences(data as Record<string, unknown>));
         setLoadedToken(guestToken);
       })
       .catch((e: unknown) => {
