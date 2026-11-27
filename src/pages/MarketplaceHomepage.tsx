@@ -29,6 +29,12 @@ import {
   type CompareStayItem,
 } from '@/components/marketplace/CompareStaysDrawer';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
+import {
+  computeFallbackFlexWindow,
+  formatMatchedWindowBadge,
+  parseFlexLength,
+  parseFlexMonths,
+} from '@/utils/flexibleSearch';
 import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
 import { resolveAmenityLabel } from '@/utils/amenityCodes';
 import { isHostelDormType } from '@/utils/dormListing';
@@ -108,6 +114,11 @@ type MarketplaceItem = {
   // MKT-047: Top host badge + criteria stats
   topHost?: boolean;
   topHostStats?: TopHostStatsDto | null;
+  // MKT-058 / MKT-059: flexible & shifted date search match fields
+  matchedCheckIn?: string | null;
+  matchedCheckOut?: string | null;
+  matchedTotalPrice?: number | null;
+  matchedDateDeltaDays?: number | null;
 };
 
 /**
@@ -579,6 +590,12 @@ export default function MarketplaceHomepage() {
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
     if (checkOut) p.set('checkOut', checkOut);
+    const flexLength = parseFlexLength(searchParams.get('flexLength'));
+    if (flexLength && !checkIn && !checkOut) {
+      p.set('flexLength', flexLength);
+      const flexMonths = parseFlexMonths(searchParams.get('flexMonths'));
+      if (flexMonths.length > 0) p.set('flexMonths', flexMonths.join(','));
+    }
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
     if (minPrice != null) p.set('minPrice', String(minPrice));
@@ -796,6 +813,12 @@ export default function MarketplaceHomepage() {
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
     if (checkOut) p.set('checkOut', checkOut);
+    const flexLength = parseFlexLength(searchParams.get('flexLength'));
+    if (flexLength && !checkIn && !checkOut) {
+      p.set('flexLength', flexLength);
+      const flexMonths = parseFlexMonths(searchParams.get('flexMonths'));
+      if (flexMonths.length > 0) p.set('flexMonths', flexMonths.join(','));
+    }
     const guests = searchParams.get('guests');
     if (guests) p.set('guests', guests);
     if (category !== 'all') p.set('category', category);
@@ -1133,7 +1156,31 @@ export default function MarketplaceHomepage() {
           visibleItems.map((item) => {
             const isFav = favIds.has(item.id);
             const cardTitle = resolveMarketplaceListingDisplayName(item);
-            const canonicalUrl = marketplaceListingPath(item, searchSuffix);
+            const activeFlexLength = !searchParams.get('checkIn') && !searchParams.get('checkOut')
+              ? parseFlexLength(searchParams.get('flexLength'))
+              : null;
+            const activeFlexMonths = activeFlexLength ? parseFlexMonths(searchParams.get('flexMonths')) : [];
+            const fallbackFlex = activeFlexLength && !item.matchedCheckIn
+              ? computeFallbackFlexWindow(activeFlexLength, activeFlexMonths)
+              : null;
+            const effectiveMatchedCheckIn = item.matchedCheckIn ?? fallbackFlex?.checkIn ?? null;
+            const effectiveMatchedCheckOut = item.matchedCheckOut ?? fallbackFlex?.checkOut ?? null;
+            const matchedWindowBadge =
+              effectiveMatchedCheckIn && effectiveMatchedCheckOut
+                ? formatMatchedWindowBadge(
+                    effectiveMatchedCheckIn,
+                    effectiveMatchedCheckOut,
+                    item.matchedDateDeltaDays,
+                  )
+                : null;
+            const effectiveSearchSuffix = (() => {
+              if (!effectiveMatchedCheckIn || !effectiveMatchedCheckOut) return searchSuffix;
+              const p = new URLSearchParams(searchSuffix);
+              p.set('checkIn', effectiveMatchedCheckIn);
+              p.set('checkOut', effectiveMatchedCheckOut);
+              return p.toString();
+            })();
+            const canonicalUrl = marketplaceListingPath(item, effectiveSearchSuffix);
 
             return (
               <article
@@ -1328,6 +1375,35 @@ export default function MarketplaceHomepage() {
                   })()}
 
                   <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
+
+                  {/* MKT-058 / MKT-059: matched open or shifted date window + all-in total */}
+                  {matchedWindowBadge && (
+                    <div
+                      className="flex flex-wrap items-center gap-1.5"
+                      data-testid="marketplace-matched-window"
+                    >
+                      <span className="inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-900">
+                        {matchedWindowBadge}
+                      </span>
+                      {(() => {
+                        const matchedTotal =
+                          typeof item.matchedTotalPrice === 'number' && item.matchedTotalPrice > 0
+                            ? item.matchedTotalPrice
+                            : fallbackFlex && item.pricePerNight > 0
+                              ? item.pricePerNight * fallbackFlex.nights
+                              : null;
+                        if (matchedTotal == null) return null;
+                        return (
+                          <span
+                            className="text-xs font-semibold text-text-primary"
+                            data-testid="marketplace-matched-total"
+                          >
+                            {formatCurrency(matchedTotal)} total
+                          </span>
+                        );
+                      })()}
+                    </div>
+                  )}
 
                   {/* TASK-1873 / TASK-10298776: rating row — enforce >= 4★ suppression guard */}
                   {item.rating != null && item.rating >= 4 && (item.reviewCount == null || item.reviewCount > 0) && (

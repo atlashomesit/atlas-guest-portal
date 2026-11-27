@@ -1,3 +1,5 @@
+import type { FlexLength } from '@/utils/flexibleSearch';
+
 export type GuestCounts = {
   adults: number;
   children: number;
@@ -9,6 +11,8 @@ export type AirbnbSearchValues = {
   destination: string;
   checkIn?: string;
   checkOut?: string;
+  flexLength?: FlexLength;
+  flexMonths?: string[];
   guests: GuestCounts;
 };
 
