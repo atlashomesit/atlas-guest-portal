@@ -100,7 +100,8 @@ import { useDailyPricingSummary } from '@/hooks/useDailyPricingSummary';
 import SkeletonCard from '../../apartments/SkeletonCard';
 import { getTodayBreakdownFromListing } from '@/api/pricingClient';
 import PropertyMobileStickyBar from '@/components/property/PropertyMobileStickyBar';
-import ListingWhatsAppFloat, { buildListingWhatsAppUrl } from '@/components/property/ListingWhatsAppFloat'; // TASK-102116
+import ListingWhatsAppFloat, { buildListingWhatsAppUrl } from '@/components/property/ListingWhatsAppFloat';
+import AskHostThreadDrawer from '@/components/marketplace/AskHostThreadDrawer'; // TASK-102116
 import HostAboutNote from '@/components/property/HostAboutNote';
 import ReviewFilterSortControls, { applyReviewFilterSort, type ReviewSortKey } from '@/components/property/ReviewFilterSort'; // TASK-102112
 import AccessibilitySection from '@/components/accessibility/AccessibilitySection'; // TASK-10086
@@ -545,6 +546,7 @@ function isoFromUrlDateParam(value: string | null): string | undefined {
 }
 
 const PropertyDetails = () => {
+    const [askHostOpen, setAskHostOpen] = useState(false);
     const location = useLocation();
     const { propertySlug: propertySlugParam, unitSlug: unitSlugParam, id: legacyIdParam } = useParams();
     const { properties: apiProperties } = useTenantListings();
@@ -3378,6 +3380,31 @@ useEffect(() => {
           brandName={ppBrandName}
           listingId={resolvedListingId ?? data.listingId ?? null}
         />
+
+        {/* MKT-068: On-site pre-booking Q&A message thread without leaving atlastays.com */}
+        {(isMarketplaceMode() || isMarketplaceHostname() || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('brand')?.toLowerCase() === 'atlastays')) && (
+          <>
+            <button
+              type="button"
+              data-testid="ask-host-button"
+              onClick={() => setAskHostOpen(true)}
+              className="fixed bottom-20 left-4 z-40 inline-flex min-h-[44px] items-center gap-2 rounded-full border border-neutral-900 bg-white px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-lg hover:bg-neutral-50 sm:bottom-6"
+            >
+              Ask the host
+            </button>
+            <AskHostThreadDrawer
+              open={askHostOpen}
+              onClose={() => setAskHostOpen(false)}
+              listingId={resolvedListingId ?? data.listingId ?? data.id ?? 0}
+              listingTitle={getListingDisplayName(data.id ?? data.listingId, data.property_name) || 'This property'}
+              hostName={data.hostName || ppBrandName || 'the host'}
+              tenantSlug={effectiveTenantCtx?.slug ?? tenantSlugFromUrl ?? undefined}
+              checkIn={typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('checkIn') : null}
+              checkOut={typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('checkOut') : null}
+              guests={typeof window !== 'undefined' ? Number(new URLSearchParams(window.location.search).get('guests')) || null : null}
+            />
+          </>
+        )}
         </>
     );
 };
