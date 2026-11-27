@@ -68,6 +68,9 @@ export interface MenuItem {
   /** POS-137: per-item serving schedule availability. */
   isAvailableNow?: boolean;
   servingWindowLabel?: string | null;
+  /** POS-140: daily portion limit and live remaining count (null = unlimited). */
+  dailyPortionLimit?: number | null;
+  portionsRemaining?: number | null;
 }
 
 export interface MenuCategory {
@@ -1609,10 +1612,14 @@ export default function QrMenuPage() {
                     const orderable = isOrderable(modifierGroups);
                     const isOutsideServingWindow = item.isAvailableNow === false;
                     const blockedBySchedule = isOutsideServingWindow && fulfillAt === "NOW";
+                    const hasPortionCap = typeof item.portionsRemaining === "number";
+                    const portionsRemaining = hasPortionCap ? Math.max(0, item.portionsRemaining as number) : null;
+                    const isPortionExhausted = portionsRemaining === 0;
                     // An item with choices is added through its picker, so its row shows how many are already in the order.
                     const inCartQty = hasModifiers
                       ? cartLines.reduce((sum, l) => (l.item.id === item.id ? sum + l.qty : sum), 0)
                       : cart[String(item.id)]?.qty || 0;
+                    const atPortionCap = portionsRemaining !== null && inCartQty >= portionsRemaining;
 
                     return (
                       <div key={item.id}>
@@ -1711,6 +1718,37 @@ export default function QrMenuPage() {
                               <span>{item.servingWindowLabel?.trim() || "Outside serving hours"}</span>
                             </div>
                           )}
+
+                          {portionsRemaining !== null && (
+                            <div
+                              data-testid={`menu-item-portions-${item.id}`}
+                              style={{
+                                marginTop: "6px",
+                                marginLeft: isOutsideServingWindow ? "6px" : "0",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                padding: "2px 8px",
+                                borderRadius: "999px",
+                                backgroundColor: isPortionExhausted
+                                  ? "#fef2f2"
+                                  : portionsRemaining <= 5
+                                    ? "#fef3c7"
+                                    : "#f3f4f6",
+                                border: `1px solid ${
+                                  isPortionExhausted ? "#fecaca" : portionsRemaining <= 5 ? "#f59e0b" : "#d1d5db"
+                                }`,
+                                color: isPortionExhausted ? "#991b1b" : portionsRemaining <= 5 ? "#92400e" : "#4b5563",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {isPortionExhausted
+                                ? "Sold out for today"
+                                : portionsRemaining <= 5
+                                  ? `Only ${portionsRemaining} left today`
+                                  : `${portionsRemaining} left today`}
+                            </div>
+                          )}
                         </div>
 
                         {/* POS-014: dish photo, lazy-loaded at a fixed size so the list does not jump */}
@@ -1762,11 +1800,13 @@ export default function QrMenuPage() {
                               </span>
                               <button
                                 onClick={() => handleAdjustQty(String(item.id), 1)}
+                                disabled={atPortionCap}
                                 style={{
                                   background: "none",
                                   border: "none",
                                   color: "#fff",
-                                  cursor: "pointer",
+                                  cursor: atPortionCap ? "not-allowed" : "pointer",
+                                  opacity: atPortionCap ? 0.45 : 1,
                                   padding: "2px",
                                   display: "flex",
                                 }}
@@ -1779,27 +1819,33 @@ export default function QrMenuPage() {
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                               <button
                                 onClick={() => handleAddToCart(item)}
-                                disabled={(hasModifiers && !orderable) || blockedBySchedule}
+                                disabled={(hasModifiers && !orderable) || blockedBySchedule || isPortionExhausted}
                                 style={{
                                   backgroundColor: "#fff",
-                                  border: `1.5px solid ${blockedBySchedule ? "#9ca3af" : "#9e402a"}`,
-                                  color: blockedBySchedule ? "#6b7280" : "#9e402a",
+                                  border: `1.5px solid ${blockedBySchedule || isPortionExhausted ? "#9ca3af" : "#9e402a"}`,
+                                  color: blockedBySchedule || isPortionExhausted ? "#6b7280" : "#9e402a",
                                   padding: "6px 14px",
                                   borderRadius: "8px",
                                   fontWeight: 700,
                                   fontSize: "13px",
-                                  cursor: (hasModifiers && !orderable) || blockedBySchedule ? "not-allowed" : "pointer",
-                                  opacity: (hasModifiers && !orderable) || blockedBySchedule ? 0.55 : 1,
+                                  cursor:
+                                    (hasModifiers && !orderable) || blockedBySchedule || isPortionExhausted
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  opacity:
+                                    (hasModifiers && !orderable) || blockedBySchedule || isPortionExhausted ? 0.55 : 1,
                                 }}
                                 data-testid={`add-to-cart-${item.id}`}
                               >
-                                {blockedBySchedule
-                                  ? "Not served now"
-                                  : hasModifiers && !orderable
-                                    ? "Unavailable"
-                                    : hasModifiers
-                                      ? "CHOOSE +"
-                                      : "ADD +"}
+                                {isPortionExhausted
+                                  ? "Sold out"
+                                  : blockedBySchedule
+                                    ? "Not served now"
+                                    : hasModifiers && !orderable
+                                      ? "Unavailable"
+                                      : hasModifiers
+                                        ? "CHOOSE +"
+                                        : "ADD +"}
                               </button>
                               {hasModifiers && inCartQty > 0 && (
                                 <span style={{ fontSize: "11px", fontWeight: 700, color: "#9e402a" }}>{inCartQty} in your order</span>
