@@ -198,7 +198,7 @@ describe('UnitBookingWidget - HSL-011 dorm sells beds', () => {
   it('control: a non-dorm listing keeps "Guests" and shows no bed lines, badge or per-bed total', async () => {
     mocks.booking.guests = 2;
     await renderWidget({ accommodationType: 'Hotel' }, [5, 3]);
-    const trigger = screen.getByRole('button', { name: /^Guests[ ]*2 adults/ });
+    const trigger = screen.getByRole('button', { name: /^Guests[ ]*2 guests/ });
     expect(trigger).toHaveTextContent('Guests');
     expect(screen.queryByTestId('dorm-beds-left')).toBeNull();
     expect(screen.queryByTestId('dorm-per-bed-total')).toBeNull();
@@ -208,7 +208,7 @@ describe('UnitBookingWidget - HSL-011 dorm sells beds', () => {
   it('control: a dorm-named listing with no API dorm type is NOT a dorm (the name is never read)', async () => {
     mocks.booking.guests = 2;
     await renderWidget({}, [5, 3]);
-    expect(screen.getByRole('button', { name: /^Guests[ ]*2 adults/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Guests[ ]*2 guests/ })).toBeInTheDocument();
     expect(screen.queryByTestId('hostel-dorm-container')).toBeNull();
   });
 });

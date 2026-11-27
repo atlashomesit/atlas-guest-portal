@@ -150,7 +150,7 @@ describe('UnitBookingWidget - GUEST-060: guest count above the maximum, and what
     mocks.booking.guests = 4;
     await renderWidget({ maxGuests: 3 });
     expect(screen.getByTestId('bw-guests-over-limit').textContent).toMatch(/You asked for 4 guests, but this home allows up to 3\. We've set 3\./);
-    expect(screen.getByText('3 adults')).toBeTruthy();
+    expect(screen.getByText('3 guests')).toBeTruthy();
   });
 
   it('shows no over-limit message when the count fits', async () => {
@@ -182,7 +182,7 @@ describe('UnitBookingWidget - GUEST-060: guest count above the maximum, and what
     stubPlansEndpoint([plan({ id: 28, name: 'Standard', isDefault: true })]);
     mocks.booking.guests = 1;
     await renderWidget({ maxGuests: 4, includedGuests: 2, extraGuestRate: 600 });
-    expect(screen.getByText('1 adult')).toBeTruthy();
+    expect(screen.getByText('1 guest')).toBeTruthy();
     expect(screen.queryByTestId('bw-included-guests')).toBeNull();
     cleanup();
 
