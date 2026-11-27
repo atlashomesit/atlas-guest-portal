@@ -1,4 +1,6 @@
 import { buildApiUrl, getApiHeaders } from './client';
+import type { VirtualBankAccount } from '../components/checkout/VirtualBankAccountCard';
+import type { AllowedCheckoutMethods } from '../utils/razorpayCheckoutOptions';
 
 /**
  * PAY-016: the first-party pay link (`/pay/:token`). The signed token in the path is the only credential; the API
@@ -27,6 +29,19 @@ export interface PayLinkSummary {
   upgradeTitle?: string | null;
   upgradeHoldLapsed?: boolean;
   checkInReturnUrl?: string | null;
+  /** PAY-049: custom link expiry timestamp (ISO-8601 UTC) and partial/installment payment fields. */
+  expiresAtUtc?: string | null;
+  isExpired?: boolean;
+  allowPartialPayments?: boolean;
+  minPartialAmountInr?: number | null;
+  totalAmountInr?: number | null;
+  paidSoFarInr?: number | null;
+  remainingInr?: number | null;
+  /** PAY-053: per-booking Smart Collect virtual bank account details when created by host. */
+  virtualAccount?: VirtualBankAccount | null;
+  /** PAY-054: per-property allowed checkout payment methods. */
+  allowedCheckoutMethods?: AllowedCheckoutMethods | null;
+  allowedPaymentMethods?: AllowedCheckoutMethods | null;
 }
 
 export interface PayLinkOrder {
@@ -44,8 +59,15 @@ export interface PayLinkOrder {
   payeeName?: string | null;
   qrCodeUrl?: string | null;
   txnRef?: string | null;
+  /** PAY-052: Razorpay Dynamic UPI QR fields (auto-confirms via webhook polling). */
+  isDynamicQr?: boolean;
+  qrCodeId?: string | null;
+  qrImageUrl?: string | null;
   /** UPI: the secret the "I have paid" call (`reportUpiPaid`) and the booking page need. */
   bookingToken?: string | null;
+  /** PAY-054: per-property allowed checkout payment methods. */
+  allowedCheckoutMethods?: AllowedCheckoutMethods | null;
+  allowedPaymentMethods?: AllowedCheckoutMethods | null;
 }
 
 /** Thrown for a bad link so the page can say so without a stack of status codes. */
@@ -77,10 +99,16 @@ export async function getPayLink(token: string, instalmentId?: number | null): P
   return res.json() as Promise<PayLinkSummary>;
 }
 
-export async function createPayLinkOrder(token: string, instalmentId?: number | null): Promise<PayLinkOrder> {
+export async function createPayLinkOrder(
+  token: string,
+  instalmentId?: number | null,
+  amountInr?: number | null,
+): Promise<PayLinkOrder> {
+  const hasCustomAmount = amountInr != null && Number.isFinite(amountInr) && amountInr > 0;
   const res = await fetch(buildApiUrl(withInstalment(`${base(token)}/order`, instalmentId)), {
     method: 'POST',
     headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
+    ...(hasCustomAmount ? { body: JSON.stringify({ amountInr }) } : {}),
   });
   if (res.status === 404) throw new PayLinkError('This payment link is not valid any more. Please ask your host for a new one.', 404);
   if (!res.ok) throw await readError(res, 'We could not start the payment. Please try again.');

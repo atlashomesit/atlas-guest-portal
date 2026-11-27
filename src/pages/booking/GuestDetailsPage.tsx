@@ -2101,7 +2101,18 @@ const GuestDetailsPage: React.FC = () => {
               const isMobileCheckout = isMobileCheckoutUserAgent(
                 typeof navigator !== 'undefined' ? navigator.userAgent : '',
               );
-              const checkoutDisplay = buildRazorpayCheckoutDisplayConfig(lastUpiVpa, isMobileCheckout);
+              const rawOrder = orderData as Record<string, unknown> | undefined;
+              const rawTenant = getTenantContext() as Record<string, unknown> | null | undefined;
+              const allowedCheckoutMethods = (rawOrder?.allowedCheckoutMethods ??
+                rawOrder?.allowedPaymentMethods ??
+                rawTenant?.allowedCheckoutMethods ??
+                rawTenant?.allowedPaymentMethods ??
+                null) as import('@/utils/razorpayCheckoutOptions').AllowedCheckoutMethods | null;
+              const checkoutDisplay = buildRazorpayCheckoutDisplayConfig(
+                lastUpiVpa,
+                isMobileCheckout,
+                allowedCheckoutMethods,
+              );
 
               const handleClose = () => {
                 if (paymentCompleted) return;
@@ -2140,6 +2151,7 @@ const GuestDetailsPage: React.FC = () => {
                   ...checkoutDisplay.prefillExtras,
                 },
                 ...(checkoutDisplay.upi ? { upi: checkoutDisplay.upi } : {}),
+                ...(checkoutDisplay.method ? { method: checkoutDisplay.method } : {}),
                 config: checkoutDisplay.config,
                 theme: { color: '#b8472f' },
                 modal: { ondismiss: handleClose },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildRazorpayCheckoutDisplayConfig,
+  buildRazorpayMethodFilter,
   isMobileCheckoutUserAgent,
 } from './razorpayCheckoutOptions';
 
@@ -41,5 +42,41 @@ describe('buildRazorpayCheckoutDisplayConfig (TASK-5202)', () => {
     expect(result.upi).toBeUndefined();
     expect(result.prefillExtras).toEqual({});
     expect(result.config.display.blocks.card_block.instruments[0]).toEqual({ method: 'card' });
+  });
+});
+
+describe('PAY-054 allowedCheckoutMethods / allowedPaymentMethods filter', () => {
+  it('returns undefined when unset or when all methods are disabled (never locks out guests)', () => {
+    expect(buildRazorpayMethodFilter(undefined)).toBeUndefined();
+    expect(buildRazorpayMethodFilter(null)).toBeUndefined();
+    expect(buildRazorpayMethodFilter({})).toBeUndefined();
+    expect(buildRazorpayMethodFilter({ upi: false, card: false, netbanking: false, wallet: false })).toBeUndefined();
+  });
+
+  it('filters Razorpay method map, blocks, and sequence when wallets/netbanking are disabled', () => {
+    const result = buildRazorpayCheckoutDisplayConfig('guest@upi', false, {
+      upi: true,
+      card: true,
+      netbanking: false,
+      wallet: false,
+    });
+    expect(result.method).toEqual({ upi: true, card: true, netbanking: false, wallet: false });
+    expect(result.config.display.sequence).toEqual(['block.upi_block', 'block.card']);
+    expect(result.config.display.blocks.upi_block).toBeDefined();
+    expect(result.config.display.blocks.card_block).toBeDefined();
+  });
+
+  it('omits UPI block and prefill when UPI is disabled', () => {
+    const result = buildRazorpayCheckoutDisplayConfig('guest@upi', true, {
+      upi: false,
+      card: true,
+      netbanking: true,
+      wallet: false,
+    });
+    expect(result.method).toEqual({ upi: false, card: true, netbanking: true, wallet: false });
+    expect(result.upi).toBeUndefined();
+    expect(result.prefillExtras).toEqual({});
+    expect(result.config.display.blocks.upi_block).toBeUndefined();
+    expect(result.config.display.sequence).toEqual(['block.card', 'block.netbanking']);
   });
 });
