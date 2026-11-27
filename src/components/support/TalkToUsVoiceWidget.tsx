@@ -27,6 +27,14 @@ type SpeechWindow = {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike;
 };
 
+export type VoiceLanguage = "en-IN" | "hi-IN" | "te-IN";
+
+export const VOICE_LANGUAGE_OPTIONS: ReadonlyArray<{ code: VoiceLanguage; label: string }> = [
+  { code: "en-IN", label: "English" },
+  { code: "hi-IN", label: "हिंदी" },
+  { code: "te-IN", label: "తెలుగు" },
+];
+
 export const VOICE_DISCLOSURE =
   "Hi, I'm the AI voice assistant for this property — you can ask for a person or a human callback at any time.";
 
@@ -35,9 +43,16 @@ const newSessionId = (): string =>
     ? crypto.randomUUID()
     : `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-function pickIndianVoice(): SpeechSynthesisVoice | undefined {
+export function pickIndianVoice(lang: VoiceLanguage = "en-IN"): SpeechSynthesisVoice | undefined {
   const voices = window.speechSynthesis?.getVoices?.() ?? [];
-  return voices.find((v) => v.lang === "en-IN") ?? voices.find((v) => v.lang?.toLowerCase().startsWith("en-in"));
+  const lower = lang.toLowerCase();
+  const prefix = lower.split("-")[0];
+  return (
+    voices.find((v) => v.lang?.toLowerCase() === lower) ??
+    voices.find((v) => v.lang?.toLowerCase().startsWith(`${prefix}-`)) ??
+    voices.find((v) => v.lang?.toLowerCase() === "en-in") ??
+    voices.find((v) => v.lang?.toLowerCase().startsWith("en-in"))
+  );
 }
 
 export interface TalkToUsVoiceWidgetProps {
@@ -51,6 +66,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
+  const [language, setLanguage] = useState<VoiceLanguage>("en-IN");
   const [followUpUrl, setFollowUpUrl] = useState<string | null>(null);
   const sessionId = useRef<string>(newSessionId());
   const recognition = useRef<SpeechRecognitionLike | null>(null);
@@ -102,7 +118,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
         const res = await fetch(`${getApiBaseUrl()}/api/public/voice/turn`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...getApiHeaders() },
-          body: JSON.stringify({ surface: "guest", sessionId: sessionId.current, transcript, listingId: listingId ?? null }),
+          body: JSON.stringify({ surface: "guest", sessionId: sessionId.current, transcript, listingId: listingId ?? null, language }),
         });
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as { reply?: string; text?: string; followUpUrl?: string | null };
@@ -111,8 +127,8 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
           setTurns((t) => [...t, { role: "agent", text: reply }]);
           if (typeof window !== "undefined" && window.speechSynthesis && typeof SpeechSynthesisUtterance !== "undefined") {
             const u = new SpeechSynthesisUtterance(reply);
-            u.lang = "en-IN";
-            const v = pickIndianVoice();
+            u.lang = language;
+            const v = pickIndianVoice(language);
             if (v) u.voice = v;
             window.speechSynthesis.speak(u);
           }
@@ -124,7 +140,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
         setBusy(false);
       }
     },
-    [listingId],
+    [listingId, language],
   );
 
   const startListening = useCallback(() => {
@@ -132,7 +148,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Ctor) return;
     const rec = new Ctor();
-    rec.lang = "en-IN";
+    rec.lang = language;
     rec.interimResults = false;
     rec.continuous = false;
     rec.onresult = (e) => {
@@ -148,7 +164,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
     } catch {
       setListening(false);
     }
-  }, [send]);
+  }, [send, language]);
 
   const hangUp = useCallback(() => {
     stopAudio();
@@ -177,6 +193,33 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
       )}
       {open && (
         <div role="dialog" aria-label="Talk to us" style={{ width: "min(360px, calc(100vw - 32px))", background: "#fff", borderRadius: 16, boxShadow: "0 8px 30px rgba(0,0,0,.2)", padding: 16 }}>
+          <div role="group" aria-label="Voice language" data-testid="voice-language-picker" style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            {VOICE_LANGUAGE_OPTIONS.map((opt) => {
+              const active = language === opt.code;
+              return (
+                <button
+                  key={opt.code}
+                  type="button"
+                  data-testid={`voice-lang-${opt.code}`}
+                  aria-pressed={active}
+                  onClick={() => setLanguage(opt.code)}
+                  style={{
+                    flex: 1,
+                    minHeight: 36,
+                    borderRadius: 999,
+                    border: active ? "1px solid #0f172a" : "1px solid #cbd5e1",
+                    background: active ? "#0f172a" : "#f8fafc",
+                    color: active ? "#fff" : "#334155",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
           <p style={{ margin: "0 0 8px", fontSize: 13, color: "#475569" }}>{VOICE_DISCLOSURE}</p>
           <div aria-live="polite" style={{ maxHeight: 220, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
             {turns.map((t, i) => (

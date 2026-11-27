@@ -53,7 +53,7 @@ describe("TalkToUsVoiceWidget", () => {
     render(<TalkToUsVoiceWidget listingId={42} />);
     await settle();
     fireEvent.click(screen.getByText("Talk to us"));
-    expect(screen.getByText(/Atlas AI voice assistant/)).toBeTruthy();
+    expect(screen.getByText(/AI voice assistant/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "Is 5 Dec free?" } });
     fireEvent.click(screen.getByText("Send"));
     await settle();
@@ -84,5 +84,46 @@ describe("TalkToUsVoiceWidget", () => {
     expect(abort).toHaveBeenCalled();
     expect(cancel).toHaveBeenCalled();
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("switches SpeechRecognition and SpeechSynthesis lang via language pills (TVOI-012)", async () => {
+    const rec = { lang: "", interimResults: false, continuous: false, onresult: null, onerror: null, onend: null, start: vi.fn(), stop: vi.fn(), abort };
+    (window as unknown as Json).webkitSpeechRecognition = function () {
+      return rec;
+    };
+    const speak = vi.fn();
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: { cancel, speak, getVoices: () => [{ lang: "hi-IN", name: "Google हिन्दी" }] },
+    });
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      voice: unknown = null;
+      rate = 1;
+      pitch = 1;
+      constructor(t: string) {
+        this.text = t;
+      }
+    }
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+    fetchMock
+      .mockResolvedValueOnce(res(true, { enabled: true }))
+      .mockResolvedValueOnce(res(true, { reply: "जी हाँ, कमरा उपलब्ध है।" }));
+
+    render(<TalkToUsVoiceWidget />);
+    await settle();
+    fireEvent.click(screen.getByText("Talk to us"));
+    fireEvent.click(screen.getByTestId("voice-lang-hi-IN"));
+    fireEvent.click(screen.getByTestId("voice-mic"));
+    expect(rec.lang).toBe("hi-IN");
+
+    fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "क्या कमरा खाली है?" } });
+    fireEvent.click(screen.getByText("Send"));
+    await settle();
+    const [, init] = fetchMock.mock.calls[1];
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({ language: "hi-IN" });
+    expect(speak).toHaveBeenCalledTimes(1);
+    expect(speak.mock.calls[0][0].lang).toBe("hi-IN");
   });
 });
