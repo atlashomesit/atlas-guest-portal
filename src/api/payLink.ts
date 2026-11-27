@@ -52,6 +52,10 @@ export interface PayLinkOrder {
   payeeName?: string | null;
   qrCodeUrl?: string | null;
   txnRef?: string | null;
+  /** PAY-052: Razorpay Dynamic UPI QR fields (auto-confirms via webhook polling). */
+  isDynamicQr?: boolean;
+  qrCodeId?: string | null;
+  qrImageUrl?: string | null;
   /** UPI: the secret the "I have paid" call (`reportUpiPaid`) and the booking page need. */
   bookingToken?: string | null;
 }

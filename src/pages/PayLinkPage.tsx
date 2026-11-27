@@ -51,13 +51,16 @@ function isMobileViewport(): boolean {
 }
 
 function toUpiOrder(o: PayLinkOrder): UpiOrder | null {
-  if (!isUpiProvider(o.mode) || !o.upiUri || !o.upiVpa) return null;
+  const isDynamic = Boolean(o.isDynamicQr || o.qrCodeId || o.mode.trim().toUpperCase() === 'RAZORPAY_DYNAMIC_QR');
+  if (!isDynamic && (!isUpiProvider(o.mode) || !o.upiUri || !o.upiVpa)) return null;
+  const qrUrl = o.qrImageUrl || (o.qrCodeUrl && (o.qrCodeUrl.startsWith('data:image/') || (isDynamic && o.qrCodeUrl.startsWith('https://'))) ? o.qrCodeUrl : '');
   return {
-    provider: o.mode.trim().toUpperCase() as UpiOrder['provider'],
-    upiUri: o.upiUri,
-    upiVpa: o.upiVpa,
-    qrCodeUrl: o.qrCodeUrl && o.qrCodeUrl.startsWith('data:image/') ? o.qrCodeUrl : '',
+    provider: (isUpiProvider(o.mode) ? o.mode.trim().toUpperCase() : 'RAZORPAY_DYNAMIC_QR') as UpiOrder['provider'],
+    upiUri: o.upiUri ?? '',
+    upiVpa: o.upiVpa ?? '',
+    qrCodeUrl: qrUrl,
     reference: o.txnRef ?? '',
+    ...(isDynamic ? { isDynamicQr: true, qrCodeId: o.qrCodeId ?? null, qrImageUrl: o.qrImageUrl ?? null } : {}),
   };
 }
 
@@ -199,6 +202,19 @@ export default function PayLinkPage() {
       setChecking(false);
     }
   }, [unconfirmed, summary, confirmPayment]);
+
+  const pollDynamicQrStatus = useCallback(async (): Promise<'pending' | 'paid' | 'expired'> => {
+    const latest = await getPayLink(token, instalmentId);
+    if (latest.alreadyPaid) return 'paid';
+    if (latest.isExpired) return 'expired';
+    return 'pending';
+  }, [token, instalmentId]);
+
+  const handleDynamicQrConfirmed = useCallback(() => {
+    if (!upi) return;
+    const t = upi.raw.bookingToken;
+    navigate(t ? `/booking/${upi.raw.bookingId}?t=${encodeURIComponent(t)}` : `/booking/${upi.raw.bookingId}`, { replace: true });
+  }, [upi, navigate]);
 
   const iHavePaid = useCallback(async () => {
     if (!upi) return;
@@ -385,6 +401,9 @@ export default function PayLinkPage() {
               onIHavePaid={() => void iHavePaid()}
               busy={reporting}
               error={actionError}
+              isDynamicQr={Boolean(upi.order.isDynamicQr)}
+              pollStatus={upi.order.isDynamicQr ? pollDynamicQrStatus : undefined}
+              onAutoConfirmed={upi.order.isDynamicQr ? handleDynamicQrConfirmed : undefined}
             />
           )}
 

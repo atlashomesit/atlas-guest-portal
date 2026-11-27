@@ -24,6 +24,11 @@ interface Props {
   showHold?: boolean;
   busy?: boolean;
   error?: string | null;
+  /** PAY-052: Razorpay Dynamic UPI QR auto-confirm polling (hides manual "I have paid"). */
+  isDynamicQr?: boolean;
+  pollStatus?: () => Promise<'pending' | 'paid' | 'expired'>;
+  pollIntervalMs?: number;
+  onAutoConfirmed?: () => void;
 }
 
 function formatInr(amount: number): string {
@@ -41,16 +46,48 @@ export const UpiPaymentPanel: React.FC<Props> = ({
   showHold = true,
   busy = false,
   error = null,
+  isDynamicQr: isDynamicQrProp,
+  pollStatus,
+  pollIntervalMs = 3000,
+  onAutoConfirmed,
 }) => {
   const [copied, setCopied] = useState(false);
   const [qrImgFailed, setQrImgFailed] = useState(false);
+  const [dynamicStatus, setDynamicStatus] = useState<'pending' | 'paid' | 'expired'>('pending');
+  const isDynamic = Boolean(isDynamicQrProp ?? order.isDynamicQr);
   const amountLabel = formatInr(amountInr);
-  const trimmedQrUrl = typeof order.qrCodeUrl === 'string' ? order.qrCodeUrl.trim() : '';
+  const trimmedQrUrl = (typeof order.qrImageUrl === 'string' && order.qrImageUrl.trim())
+    ? order.qrImageUrl.trim()
+    : (typeof order.qrCodeUrl === 'string' ? order.qrCodeUrl.trim() : '');
   const trimmedUpiUri = typeof order.upiUri === 'string' ? order.upiUri.trim() : '';
 
   useEffect(() => {
     setQrImgFailed(false);
   }, [trimmedQrUrl]);
+
+  useEffect(() => {
+    if (!isDynamic || !pollStatus || dynamicStatus !== 'pending') return;
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const result = await pollStatus();
+        if (cancelled) return;
+        if (result === 'paid') {
+          setDynamicStatus('paid');
+          onAutoConfirmed?.();
+        } else if (result === 'expired') {
+          setDynamicStatus('expired');
+        }
+      } catch {
+        // Ignore transient poll errors and keep polling until confirmed or expired.
+      }
+    };
+    const timer = window.setInterval(() => { void tick(); }, Math.max(500, pollIntervalMs));
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [isDynamic, pollStatus, pollIntervalMs, dynamicStatus, onAutoConfirmed]);
 
   const copyAddress = async () => {
     try {
@@ -110,14 +147,18 @@ export const UpiPaymentPanel: React.FC<Props> = ({
 
       {isMobile ? (
         <div className="mt-3">
-          <a
-            href={order.upiUri}
-            className="block w-full rounded-lg bg-emerald-700 px-4 py-3 text-center text-base font-semibold text-white"
-            data-testid="upi-pay-open-app"
-          >
-            Pay {amountLabel} in your UPI app
-          </a>
-          {qr && (
+          {trimmedUpiUri ? (
+            <a
+              href={trimmedUpiUri}
+              className="block w-full rounded-lg bg-emerald-700 px-4 py-3 text-center text-base font-semibold text-white"
+              data-testid="upi-pay-open-app"
+            >
+              Pay {amountLabel} in your UPI app
+            </a>
+          ) : (
+            qr && <div className="mt-2">{qr}</div>
+          )}
+          {trimmedUpiUri && qr && (
             <details className="mt-2">
               <summary className="cursor-pointer text-stone-700">Paying from another phone? Show the QR code</summary>
               <div className="mt-2">{qr}</div>
@@ -131,42 +172,76 @@ export const UpiPaymentPanel: React.FC<Props> = ({
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-stone-700">UPI ID:</span>
-        <code className="rounded bg-white px-2 py-1" data-testid="upi-pay-vpa">{order.upiVpa}</code>
-        <button
-          type="button"
-          onClick={() => void copyAddress()}
-          className="rounded-md border border-stone-300 bg-white px-2 py-1"
-          data-testid="upi-pay-copy-vpa"
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
+      {order.upiVpa && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-stone-700">UPI ID:</span>
+          <code className="rounded bg-white px-2 py-1" data-testid="upi-pay-vpa">{order.upiVpa}</code>
+          <button
+            type="button"
+            onClick={() => void copyAddress()}
+            className="rounded-md border border-stone-300 bg-white px-2 py-1"
+            data-testid="upi-pay-copy-vpa"
+          >
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
+      )}
       {order.reference && (
         <p className="mt-1 text-stone-600" data-testid="upi-pay-reference">
           Reference: {order.reference}
         </p>
       )}
 
-      <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-emerald-100/70 py-2 px-3 text-xs text-emerald-900 font-medium" data-testid="upi-live-observer-badge">
-        <span className="inline-block h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
-        <span>Direct Bank Settlement &bull; Auto-verifying in real time</span>
-      </div>
+      {isDynamic ? (
+        dynamicStatus === 'paid' ? (
+          <div
+            className="mt-4 rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-3 text-center text-sm font-semibold text-emerald-950"
+            role="status"
+            data-testid="upi-dynamic-qr-confirmed"
+          >
+            Payment confirmed! Redirecting to your booking…
+          </div>
+        ) : dynamicStatus === 'expired' ? (
+          <div
+            className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-3 text-center text-sm font-medium text-amber-900"
+            role="alert"
+            data-testid="upi-dynamic-qr-expired"
+          >
+            This UPI QR code has expired. Please refresh to generate a new QR code.
+          </div>
+        ) : (
+          <div
+            className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-emerald-100/80 px-3 py-3 text-xs font-semibold text-emerald-900"
+            role="status"
+            aria-live="polite"
+            data-testid="upi-dynamic-qr-status"
+          >
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-600 animate-pulse" />
+            <span>Waiting for UPI confirmation… Your booking confirms automatically once paid.</span>
+          </div>
+        )
+      ) : (
+        <>
+          <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-emerald-100/70 py-2 px-3 text-xs text-emerald-900 font-medium" data-testid="upi-live-observer-badge">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+            <span>Direct Bank Settlement &bull; Auto-verifying in real time</span>
+          </div>
 
-      <button
-        type="button"
-        onClick={onIHavePaid}
-        disabled={busy}
-        className="mt-3 w-full rounded-lg border border-emerald-700 bg-white px-4 py-3 text-base font-semibold text-emerald-800 disabled:opacity-60"
-        data-testid="upi-pay-i-have-paid"
-      >
-        {busy ? 'Telling the host…' : 'I have paid'}
-      </button>
-      <p className="mt-2 text-xs text-stone-600">
-        Your booking is confirmed once the host sees your payment. Only tap this after your UPI app shows the payment as
-        successful.
-      </p>
+          <button
+            type="button"
+            onClick={onIHavePaid}
+            disabled={busy}
+            className="mt-3 w-full rounded-lg border border-emerald-700 bg-white px-4 py-3 text-base font-semibold text-emerald-800 disabled:opacity-60"
+            data-testid="upi-pay-i-have-paid"
+          >
+            {busy ? 'Telling the host…' : 'I have paid'}
+          </button>
+          <p className="mt-2 text-xs text-stone-600">
+            Your booking is confirmed once the host sees your payment. Only tap this after your UPI app shows the payment as
+            successful.
+          </p>
+        </>
+      )}
       {error && (
         <p className="mt-2 text-sm text-red-700" role="alert" data-testid="upi-pay-error">
           {error}
