@@ -22,15 +22,25 @@ import { sanitizeGuestImageUrl } from '@/utils/guestImageUrl';
 import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
-import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
+import AmenityFilterPills, { type PaymentTimingFilter } from '@/components/marketplace/AmenityFilterPills';
+import PriceRangeHistogram, {
+  buildFallbackPriceHistogram,
+  type PriceHistogramDto,
+} from '@/components/marketplace/PriceRangeHistogram';
 import {
   CompareStaysDrawer,
   MAX_COMPARE_STAYS,
   type CompareStayItem,
 } from '@/components/marketplace/CompareStaysDrawer';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
-import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
-import { resolveAmenityLabel } from '@/utils/amenityCodes';
+import {
+  hasListingWifi,
+  hasListingWorkation,
+  hasListingWorkspace,
+  matchesAmenityFilter,
+  serverAmenityCodesFor,
+} from '@/utils/amenityFilters';
+import { hasListingSelfCheckIn, resolveAmenityLabel } from '@/utils/amenityCodes';
 import { isHostelDormType } from '@/utils/dormListing';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
@@ -108,6 +118,22 @@ type MarketplaceItem = {
   // MKT-047: Top host badge + criteria stats
   topHost?: boolean;
   topHostStats?: TopHostStatsDto | null;
+  // MKT-063: self check-in
+  hasSelfCheckIn?: boolean;
+  selfCheckInMethod?: string | null;
+  // MKT-064: bedrooms, beds, bathrooms
+  bedrooms?: number | null;
+  beds?: number | null;
+  bathrooms?: number | null;
+  // MKT-066: house rules
+  eventsAllowed?: boolean | null;
+  smokingAllowed?: boolean | null;
+  // MKT-067: workation essentials
+  hasDedicatedWorkspace?: boolean;
+  wifiSpeedMbps?: number | null;
+  // MKT-073: payment timing
+  paymentTiming?: 'pay_at_property' | 'partial_advance' | 'full_prepayment' | null;
+  advanceDepositPercent?: number | null;
 };
 
 /**
@@ -234,7 +260,14 @@ export function formatExternalReviewsLabel(
   return count === 1 ? `1 review on ${normalizedSource}` : `${count} reviews on ${normalizedSource}`;
 }
 
-type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number; topHostEnabled?: boolean };
+type ApiResponse = {
+  items: MarketplaceItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  topHostEnabled?: boolean;
+  priceHistogram?: PriceHistogramDto | null;
+};
 
 // TASK-101491: the grid requests one page at a time and appends. This constant is the request
 // size, NOT a ceiling on what the page can show - everything past it is reachable via the
@@ -298,6 +331,50 @@ function parseBoundsFromSearchParams(sp: URLSearchParams): MapBounds | null {
     return { swLat, swLng, neLat, neLng };
   }
   return null;
+}
+
+function parsePositiveIntParam(raw: string | null): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function parseMinRatingParam(raw: string | null): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  if (n < 4.0) return 4.0;
+  if (n > 5.0) return 5.0;
+  return Math.round(n * 10) / 10;
+}
+
+function parsePaymentTimingParam(raw: string | null): PaymentTimingFilter | null {
+  if (raw === 'pay_at_property' || raw === 'partial_advance' || raw === 'no_full_prepayment') {
+    return raw;
+  }
+  return null;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace helper
+export function formatRoomCapacitySummary(item: {
+  bedrooms?: number | null;
+  beds?: number | null;
+  bathrooms?: number | null;
+  maxGuests: number;
+}): string {
+  const parts: string[] = [];
+  if (typeof item.bedrooms === 'number' && item.bedrooms > 0) {
+    parts.push(`${item.bedrooms} bedroom${item.bedrooms === 1 ? '' : 's'}`);
+  }
+  if (typeof item.beds === 'number' && item.beds > 0) {
+    parts.push(`${item.beds} bed${item.beds === 1 ? '' : 's'}`);
+  }
+  if (typeof item.bathrooms === 'number' && item.bathrooms > 0) {
+    parts.push(`${item.bathrooms} bath${item.bathrooms === 1 ? '' : 's'}`);
+  }
+  const sleeps = `Sleeps up to ${item.maxGuests} guest${item.maxGuests === 1 ? '' : 's'}`;
+  parts.push(sleeps);
+  return parts.join(' · ');
 }
 
 export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc';
@@ -369,6 +446,42 @@ export default function MarketplaceHomepage() {
     () => searchParams.get('topHost') === 'true',
   );
   const [topHostFeatureEnabled, setTopHostFeatureEnabled] = useState<boolean>(false);
+  // MKT-063: Self check-in filter synced with ?selfCheckIn=true
+  const [selfCheckIn, setSelfCheckIn] = useState<boolean>(
+    () => searchParams.get('selfCheckIn') === 'true',
+  );
+  // MKT-064: Min bedrooms, beds, bathrooms synced with URL
+  const [minBedrooms, setMinBedrooms] = useState<number | null>(
+    () => parsePositiveIntParam(searchParams.get('minBedrooms')),
+  );
+  const [minBeds, setMinBeds] = useState<number | null>(
+    () => parsePositiveIntParam(searchParams.get('minBeds')),
+  );
+  const [minBathrooms, setMinBathrooms] = useState<number | null>(
+    () => parsePositiveIntParam(searchParams.get('minBathrooms')),
+  );
+  // MKT-065: Minimum guest review score (>= 4.0 visible review rule)
+  const [minRating, setMinRating] = useState<number | null>(
+    () => parseMinRatingParam(searchParams.get('minRating')),
+  );
+  // MKT-066: Instant Book & House Rules filters synced with URL
+  const [instantBook, setInstantBook] = useState<boolean>(
+    () => searchParams.get('instantBook') === 'true',
+  );
+  const [eventsAllowed, setEventsAllowed] = useState<boolean>(
+    () => searchParams.get('eventsAllowed') === 'true',
+  );
+  const [smokingAllowed, setSmokingAllowed] = useState<boolean>(
+    () => searchParams.get('smokingAllowed') === 'true',
+  );
+  // MKT-067: Workation essentials (Dedicated workspace + Wi-Fi) synced with ?workation=true
+  const [workation, setWorkation] = useState<boolean>(
+    () => searchParams.get('workation') === 'true',
+  );
+  // MKT-073: Payment timing filter synced with ?paymentTiming=
+  const [paymentTiming, setPaymentTiming] = useState<PaymentTimingFilter | null>(
+    () => parsePaymentTimingParam(searchParams.get('paymentTiming')),
+  );
 
   // MKT-048: Map bounding box synced with URL (?swLat=&swLng=&neLat=&neLng=)
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(() =>
@@ -391,6 +504,16 @@ export default function MarketplaceHomepage() {
     setFreeCancellation(searchParams.get('freeCancellation') === 'true');
     setBreakfastIncluded(searchParams.get('mealPlan') === 'breakfast');
     setTopHostFilter(searchParams.get('topHost') === 'true');
+    setSelfCheckIn(searchParams.get('selfCheckIn') === 'true');
+    setMinBedrooms(parsePositiveIntParam(searchParams.get('minBedrooms')));
+    setMinBeds(parsePositiveIntParam(searchParams.get('minBeds')));
+    setMinBathrooms(parsePositiveIntParam(searchParams.get('minBathrooms')));
+    setMinRating(parseMinRatingParam(searchParams.get('minRating')));
+    setInstantBook(searchParams.get('instantBook') === 'true');
+    setEventsAllowed(searchParams.get('eventsAllowed') === 'true');
+    setSmokingAllowed(searchParams.get('smokingAllowed') === 'true');
+    setWorkation(searchParams.get('workation') === 'true');
+    setPaymentTiming(parsePaymentTimingParam(searchParams.get('paymentTiming')));
     setMapBounds(parseBoundsFromSearchParams(searchParams));
 
     const s = searchParams.get('sort') || searchParams.get('sortBy');
@@ -446,6 +569,73 @@ export default function MarketplaceHomepage() {
       return next;
     }, { replace: true });
   }, [topHostFilter, setSearchParams]);
+
+  const handleToggleSelfCheckIn = useCallback(() => {
+    const nextVal = !selfCheckIn;
+    setSelfCheckIn(nextVal);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (nextVal) next.set('selfCheckIn', 'true');
+      else next.delete('selfCheckIn');
+      return next;
+    }, { replace: true });
+  }, [selfCheckIn, setSearchParams]);
+
+  const handleRoomCountFilterChange = useCallback(
+    (key: 'minBedrooms' | 'minBeds' | 'minBathrooms', value: number | null) => {
+      if (key === 'minBedrooms') setMinBedrooms(value);
+      if (key === 'minBeds') setMinBeds(value);
+      if (key === 'minBathrooms') setMinBathrooms(value);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value != null && value > 0) next.set(key, String(value));
+        else next.delete(key);
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+
+  const handleMinRatingChange = useCallback((rating: number | null) => {
+    const clamped = rating == null ? null : Math.min(5.0, Math.max(4.0, Math.round(rating * 10) / 10));
+    setMinRating(clamped);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (clamped != null) next.set('minRating', String(clamped));
+      else next.delete('minRating');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleToggleBooleanParam = useCallback(
+    (key: 'instantBook' | 'eventsAllowed' | 'smokingAllowed' | 'workation', currentVal: boolean) => {
+      const nextVal = !currentVal;
+      if (key === 'instantBook') setInstantBook(nextVal);
+      if (key === 'eventsAllowed') setEventsAllowed(nextVal);
+      if (key === 'smokingAllowed') setSmokingAllowed(nextVal);
+      if (key === 'workation') setWorkation(nextVal);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextVal) next.set(key, 'true');
+        else next.delete(key);
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+
+  const handlePaymentTimingChange = useCallback(
+    (value: PaymentTimingFilter | null) => {
+      setPaymentTiming(value);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set('paymentTiming', value);
+        else next.delete('paymentTiming');
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
 
   const handleSearchThisArea = useCallback(() => {
     if (!pendingMapBounds) return;
@@ -532,6 +722,16 @@ export default function MarketplaceHomepage() {
       'freeCancellation',
       'mealPlan',
       'topHost',
+      'selfCheckIn',
+      'minBedrooms',
+      'minBeds',
+      'minBathrooms',
+      'minRating',
+      'instantBook',
+      'eventsAllowed',
+      'smokingAllowed',
+      'workation',
+      'paymentTiming',
       'swLat',
       'swLng',
       'neLat',
@@ -549,11 +749,47 @@ export default function MarketplaceHomepage() {
     }
     return p.toString();
   }, [searchParams]);
-  // TASK-4413 / MKT-016: price-range control — forwarded as minPrice/maxPrice query params to
-  // GET /marketplace/listings so server-side filtering and pagination work across all pages,
-  // while keeping the client-side filter as a safety net.
-  const [minPriceInput, setMinPriceInput] = useState('');
-  const [maxPriceInput, setMaxPriceInput] = useState('');
+  // TASK-4413 / MKT-016 / MKT-071: price-range control synced with ?minPrice=&maxPrice=
+  // and paired with the visual price distribution histogram.
+  const [minPriceInput, setMinPriceInput] = useState(() => searchParams.get('minPrice') ?? '');
+  const [maxPriceInput, setMaxPriceInput] = useState(() => searchParams.get('maxPrice') ?? '');
+  const [serverPriceHistogram, setServerPriceHistogram] = useState<PriceHistogramDto | null>(null);
+
+  const handleMinPriceInputChange = useCallback((val: string) => {
+    setMinPriceInput(val);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (val.trim() !== '') next.set('minPrice', val.trim());
+      else next.delete('minPrice');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleMaxPriceInputChange = useCallback((val: string) => {
+    setMaxPriceInput(val);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (val.trim() !== '') next.set('maxPrice', val.trim());
+      else next.delete('maxPrice');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleClearPrice = useCallback(() => {
+    setMinPriceInput('');
+    setMaxPriceInput('');
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('minPrice');
+      next.delete('maxPrice');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const effectivePriceHistogram = useMemo(
+    () => serverPriceHistogram ?? buildFallbackPriceHistogram(items.map((i) => i.pricePerNight)),
+    [serverPriceHistogram, items],
+  );
 
   const minPrice = useMemo(() => {
     const n = Number(minPriceInput);
@@ -588,6 +824,16 @@ export default function MarketplaceHomepage() {
     if (freeCancellation) p.set('freeCancellation', 'true');
     if (breakfastIncluded) p.set('mealPlan', 'breakfast');
     if (topHostFilter) p.set('topHost', 'true');
+    if (selfCheckIn) p.set('selfCheckIn', 'true');
+    if (minBedrooms != null) p.set('minBedrooms', String(minBedrooms));
+    if (minBeds != null) p.set('minBeds', String(minBeds));
+    if (minBathrooms != null) p.set('minBathrooms', String(minBathrooms));
+    if (minRating != null) p.set('minRating', String(minRating));
+    if (instantBook) p.set('instantBook', 'true');
+    if (eventsAllowed) p.set('eventsAllowed', 'true');
+    if (smokingAllowed) p.set('smokingAllowed', 'true');
+    if (workation) p.set('workation', 'true');
+    if (paymentTiming) p.set('paymentTiming', paymentTiming);
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -596,7 +842,7 @@ export default function MarketplaceHomepage() {
     }
     if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, mapBounds, sortBy]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, mapBounds, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -630,6 +876,7 @@ export default function MarketplaceHomepage() {
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
         if (cancelled) return;
         setTopHostFeatureEnabled(Boolean(data.topHostEnabled || enriched.some((x) => x.topHost)));
+        setServerPriceHistogram(data.priceHistogram ?? null);
         setItems(enriched);
         // TASK-101491: trust the server's count. Note the API returns the CURRENT PAGE's match
         // count (not a global one) when a `city` filter is applied - city filtering happens after
@@ -719,6 +966,50 @@ export default function MarketplaceHomepage() {
       result = result.filter((item) => item.topHost === true);
     }
 
+    if (selfCheckIn) {
+      result = result.filter((item) => hasListingSelfCheckIn(item));
+    }
+
+    if (minBedrooms != null) {
+      result = result.filter((item) => typeof item.bedrooms === 'number' && item.bedrooms >= minBedrooms);
+    }
+    if (minBeds != null) {
+      result = result.filter((item) => typeof item.beds === 'number' && item.beds >= minBeds);
+    }
+    if (minBathrooms != null) {
+      result = result.filter((item) => typeof item.bathrooms === 'number' && item.bathrooms >= minBathrooms);
+    }
+    if (minRating != null) {
+      result = result.filter(
+        (item) =>
+          item.rating != null &&
+          item.rating >= 4 &&
+          item.rating >= minRating &&
+          (item.reviewCount == null || item.reviewCount > 0),
+      );
+    }
+    if (instantBook) {
+      result = result.filter((item) => item.isInstantBookable === true);
+    }
+    if (eventsAllowed) {
+      result = result.filter((item) => item.eventsAllowed === true);
+    }
+    if (smokingAllowed) {
+      result = result.filter((item) => item.smokingAllowed === true);
+    }
+    if (workation) {
+      result = result.filter((item) => hasListingWorkation(item));
+    }
+    if (paymentTiming) {
+      result = result.filter((item) => {
+        if (paymentTiming === 'pay_at_property') return item.paymentTiming === 'pay_at_property';
+        if (paymentTiming === 'partial_advance') return item.paymentTiming === 'partial_advance';
+        return (
+          item.paymentTiming === 'pay_at_property' || item.paymentTiming === 'partial_advance'
+        );
+      });
+    }
+
     if (freeCancellation) {
       result = result.filter((item) => item.hasFreeCancellation !== false);
     }
@@ -772,7 +1063,7 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -803,6 +1094,16 @@ export default function MarketplaceHomepage() {
     if (freeCancellation) p.set('freeCancellation', 'true');
     if (breakfastIncluded) p.set('mealPlan', 'breakfast');
     if (topHostFilter) p.set('topHost', 'true');
+    if (selfCheckIn) p.set('selfCheckIn', 'true');
+    if (minBedrooms != null) p.set('minBedrooms', String(minBedrooms));
+    if (minBeds != null) p.set('minBeds', String(minBeds));
+    if (minBathrooms != null) p.set('minBathrooms', String(minBathrooms));
+    if (minRating != null) p.set('minRating', String(minRating));
+    if (instantBook) p.set('instantBook', 'true');
+    if (eventsAllowed) p.set('eventsAllowed', 'true');
+    if (smokingAllowed) p.set('smokingAllowed', 'true');
+    if (workation) p.set('workation', 'true');
+    if (paymentTiming) p.set('paymentTiming', paymentTiming);
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -810,7 +1111,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -977,7 +1278,7 @@ export default function MarketplaceHomepage() {
         <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
           open={wideFilters || filtersOpen}
           onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
-          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || minRating != null || instantBook || eventsAllowed || smokingAllowed || workation || paymentTiming != null || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
           <div className="marketplace-secondary-content">
             <ExploreDestinationsStrip listings={items} />
             <div className="marketplace-refinements">
@@ -999,46 +1300,123 @@ export default function MarketplaceHomepage() {
         showTopHost={topHostFeatureEnabled || topHostFilter}
         topHost={topHostFilter}
         onToggleTopHost={handleToggleTopHost}
+        selfCheckIn={selfCheckIn}
+        onToggleSelfCheckIn={handleToggleSelfCheckIn}
+        minRating={minRating}
+        onSelectMinRating={handleMinRatingChange}
+        instantBook={instantBook}
+        onToggleInstantBook={() => handleToggleBooleanParam('instantBook', instantBook)}
+        workation={workation}
+        onToggleWorkation={() => handleToggleBooleanParam('workation', workation)}
+        paymentTiming={paymentTiming}
+        onSelectPaymentTiming={handlePaymentTimingChange}
       />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="marketplace-min-price" className="text-sm font-medium text-text-muted">
-            Price / night
-          </label>
-          <input
-            id="marketplace-min-price"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            placeholder="Min"
-            value={minPriceInput}
-            onChange={(e) => setMinPriceInput(e.target.value)}
-            className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
-          />
-          <span aria-hidden className="text-text-muted">–</span>
-          <input
-            id="marketplace-max-price"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            placeholder="Max"
-            aria-label="Max price"
-            value={maxPriceInput}
-            onChange={(e) => setMaxPriceInput(e.target.value)}
-            className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
-          />
-          {(minPriceInput !== '' || maxPriceInput !== '') && (
-            <button
-              type="button"
-              onClick={() => {
-                setMinPriceInput('');
-                setMaxPriceInput('');
-              }}
-              className="min-h-[40px] rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-muted"
-            >
-              Clear price
-            </button>
-          )}
+        <PriceRangeHistogram
+          histogram={effectivePriceHistogram}
+          minPriceInput={minPriceInput}
+          maxPriceInput={maxPriceInput}
+          onMinPriceChange={handleMinPriceInputChange}
+          onMaxPriceChange={handleMaxPriceInputChange}
+          onClear={handleClearPrice}
+        />
+
+        {/* MKT-064: Bedrooms, Beds, and Bathrooms steppers */}
+        <div
+          className="mt-3 flex flex-wrap items-center gap-4"
+          data-testid="marketplace-filter-rooms-steppers"
+        >
+          {(
+            [
+              { key: 'minBedrooms', label: 'Bedrooms', value: minBedrooms },
+              { key: 'minBeds', label: 'Beds', value: minBeds },
+              { key: 'minBathrooms', label: 'Bathrooms', value: minBathrooms },
+            ] as const
+          ).map(({ key, label, value }) => (
+            <div key={key} className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-semibold text-text-muted">{label}:</span>
+              {([null, 1, 2, 3, 4] as const).map((opt) => {
+                const active = value === opt;
+                return (
+                  <button
+                    key={opt ?? 'any'}
+                    type="button"
+                    data-testid={`marketplace-filter-${key}-${opt ?? 'any'}`}
+                    aria-pressed={active}
+                    onClick={() => handleRoomCountFilterChange(key, opt)}
+                    className={`min-h-[44px] min-w-[44px] rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                      active
+                        ? 'bg-black text-white border-black'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    {opt == null ? 'Any' : `${opt}+`}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        {/* MKT-065: Guest review score threshold selector (>= 4★ visible review rule) */}
+        <div
+          className="mt-3 flex flex-wrap items-center gap-1.5"
+          data-testid="marketplace-filter-min-rating"
+        >
+          <span className="text-xs font-semibold text-text-muted">Guest rating:</span>
+          {([null, 4.0, 4.5, 4.8] as const).map((opt) => {
+            const active = minRating === opt;
+            return (
+              <button
+                key={opt ?? 'any'}
+                type="button"
+                data-testid={`marketplace-filter-min-rating-option-${opt == null ? 'any' : String(opt).replace('.', '')}`}
+                aria-pressed={active}
+                onClick={() => handleMinRatingChange(opt)}
+                className={`min-h-[44px] rounded-full px-3.5 py-1 text-xs font-medium border transition-colors ${
+                  active
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                }`}
+              >
+                {opt == null ? 'Any' : `${opt.toFixed(1)}★+`}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* MKT-066: House rules toggles (Events allowed, Smoking allowed) */}
+        <div
+          className="mt-3 flex flex-wrap items-center gap-2"
+          data-testid="marketplace-filter-house-rules"
+        >
+          <span className="text-xs font-semibold text-text-muted">House rules:</span>
+          <button
+            type="button"
+            data-testid="marketplace-filter-events-allowed"
+            aria-pressed={eventsAllowed}
+            onClick={() => handleToggleBooleanParam('eventsAllowed', eventsAllowed)}
+            className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors ${
+              eventsAllowed
+                ? 'bg-black text-white border-black'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            Events allowed
+          </button>
+          <button
+            type="button"
+            data-testid="marketplace-filter-smoking-allowed"
+            aria-pressed={smokingAllowed}
+            onClick={() => handleToggleBooleanParam('smokingAllowed', smokingAllowed)}
+            className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors ${
+              smokingAllowed
+                ? 'bg-black text-white border-black'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            Smoking allowed
+          </button>
         </div>
 
             </div>
@@ -1231,6 +1609,57 @@ export default function MarketplaceHomepage() {
                     </span>
                   )}
 
+                  {/* MKT-063: Self check-in card label when listing supports smart lock, keypad, lockbox, or 24h front desk */}
+                  {hasListingSelfCheckIn(item) && (
+                    <span
+                      data-testid="marketplace-self-checkin-badge"
+                      className="inline-flex items-center gap-1 self-start rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-800"
+                    >
+                      <span aria-hidden>🔑</span>
+                      Self check-in
+                    </span>
+                  )}
+
+                  {/* MKT-067: Workation essentials badges (Dedicated workspace + Wi-Fi) */}
+                  {(hasListingWorkspace(item) || hasListingWifi(item)) && (
+                    <div className="flex flex-wrap gap-1.5" data-testid="marketplace-workation-badges">
+                      {hasListingWorkspace(item) && (
+                        <span
+                          data-testid="marketplace-workspace-badge"
+                          className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700"
+                        >
+                          💻 Dedicated workspace
+                        </span>
+                      )}
+                      {hasListingWifi(item) && (
+                        <span
+                          data-testid="marketplace-wifi-badge"
+                          className="inline-flex items-center gap-1 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800"
+                        >
+                          {typeof item.wifiSpeedMbps === 'number' && item.wifiSpeedMbps >= 100
+                            ? `${item.wifiSpeedMbps} Mbps Wi-Fi`
+                            : 'Wi-Fi'}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* MKT-073: Payment timing label from real tenant payment policy */}
+                  {(item.paymentTiming === 'pay_at_property' ||
+                    (item.paymentTiming === 'partial_advance' &&
+                      typeof item.advanceDepositPercent === 'number' &&
+                      item.advanceDepositPercent > 0 &&
+                      item.advanceDepositPercent < 100)) && (
+                    <span
+                      data-testid="marketplace-payment-timing-badge"
+                      className="inline-flex items-center self-start rounded-md border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800"
+                    >
+                      {item.paymentTiming === 'pay_at_property'
+                        ? 'Pay at property'
+                        : `Reserve with ${item.advanceDepositPercent}% advance`}
+                    </span>
+                  )}
+
                   {/* TASK-4511: Trust signal badges */}
                   {(item.hasVerifiedPhotos || item.isGstRegistered) && (
                     <div className="flex flex-wrap gap-1">
@@ -1327,7 +1756,9 @@ export default function MarketplaceHomepage() {
                     );
                   })()}
 
-                  <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
+                  <p className="text-sm text-text-body" data-testid="marketplace-card-capacity">
+                    {formatRoomCapacitySummary(item)}
+                  </p>
 
                   {/* TASK-1873 / TASK-10298776: rating row — enforce >= 4★ suppression guard */}
                   {item.rating != null && item.rating >= 4 && (item.reviewCount == null || item.reviewCount > 0) && (

@@ -1,0 +1,256 @@
+import '@testing-library/jest-dom/vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { settle } from '@/test/settle';
+import MarketplaceHomepage from './MarketplaceHomepage';
+
+vi.mock('@/components/map/MultiPinMap', () => ({
+  default: () => null,
+}));
+
+vi.mock('@/components/ReviewSummary', () => ({
+  default: () => null,
+}));
+
+const sampleListings = [
+  {
+    id: 101,
+    tenantSlug: 'smart-villa',
+    tenantName: 'Smart Villa',
+    title: 'Goa Smart Lock Villa',
+    city: 'Goa',
+    pricePerNight: 4500,
+    maxGuests: 5,
+    slug: '101',
+    hasSelfCheckIn: true,
+    selfCheckInMethod: 'smart_lock',
+    amenityCodes: ['smart_lock', 'wifi', 'workspace_dedicated'],
+    bedrooms: 2,
+    beds: 3,
+    bathrooms: 2,
+    rating: 4.8,
+    reviewCount: 24,
+    isInstantBookable: true,
+    eventsAllowed: true,
+    smokingAllowed: false,
+    hasDedicatedWorkspace: true,
+    wifiSpeedMbps: 150,
+    paymentTiming: 'partial_advance',
+    advanceDepositPercent: 30,
+  },
+  {
+    id: 102,
+    tenantSlug: 'host-key-stay',
+    tenantName: 'Key Handover Stay',
+    title: 'Coorg Garden Cottage',
+    city: 'Coorg',
+    pricePerNight: 2800,
+    maxGuests: 2,
+    slug: '102',
+    hasSelfCheckIn: false,
+    amenityCodes: ['wifi'],
+    bedrooms: 1,
+    beds: 1,
+    bathrooms: 1,
+    rating: 4.2,
+    reviewCount: 10,
+    isInstantBookable: false,
+    eventsAllowed: false,
+    smokingAllowed: true,
+    hasDedicatedWorkspace: false,
+    wifiSpeedMbps: 50,
+    paymentTiming: 'pay_at_property',
+    advanceDepositPercent: null,
+  },
+  {
+    id: 103,
+    tenantSlug: 'unrated-stay',
+    tenantName: 'Unrated Homestay',
+    title: 'Simple Studio',
+    city: 'Kochi',
+    pricePerNight: 1800,
+    maxGuests: 2,
+    slug: '103',
+    amenityCodes: ['keypad'],
+    rating: null,
+    reviewCount: 0,
+    isInstantBookable: true,
+    eventsAllowed: null,
+    smokingAllowed: null,
+    paymentTiming: 'full_prepayment',
+    advanceDepositPercent: 100,
+  },
+];
+
+describe('MarketplaceHomepage MKT-063..MKT-073 filters', () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/marketplace/listings')) {
+        return {
+          ok: true,
+          json: async () => ({
+            items: sampleListings,
+            total: sampleListings.length,
+            page: 1,
+            pageSize: 20,
+          }),
+        };
+      }
+      if (url.includes('/marketplace/properties')) {
+        return { ok: true, json: async () => [] };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('MKT-063: toggles Self check-in pill, syncs ?selfCheckIn=true, and renders Self check-in card badges', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    // 2 of 3 listings qualify (101 has hasSelfCheckIn=true, 103 has keypad amenityCode)
+    expect(screen.getAllByTestId('marketplace-self-checkin-badge')).toHaveLength(2);
+
+    const pill = screen.getByTestId('marketplace-filter-self-checkin');
+    expect(pill).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(pill);
+    await settle();
+
+    expect(pill).toHaveAttribute('aria-pressed', 'true');
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('selfCheckIn=true'))).toBe(true);
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
+  });
+
+  it('MKT-064: filters by minBedrooms/minBathrooms, syncs URL params, and renders room counts on cards', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const capacities = screen.getAllByTestId('marketplace-card-capacity').map((el) => el.textContent);
+    expect(capacities[0]).toContain('2 bedrooms · 3 beds · 2 baths · Sleeps up to 5 guests');
+    // Unconfigured listing 103 must not fabricate 0 bedrooms
+    expect(capacities[2]).toBe('Sleeps up to 2 guests');
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-minBedrooms-2'));
+    await settle();
+
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('minBedrooms=2'))).toBe(true);
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+  });
+
+  it('MKT-065: filters by minRating (4.5★ & up pill and selector), syncs URL, excludes unrated stays', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const pill = screen.getByTestId('marketplace-filter-min-rating-45');
+    fireEvent.click(pill);
+    await settle();
+
+    expect(pill).toHaveAttribute('aria-pressed', 'true');
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('minRating=4.5'))).toBe(true);
+    // Only listing 101 (4.8★, 24 reviews) qualifies; 102 (4.2★) and 103 (unrated) are excluded
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+  });
+
+  it('MKT-066: filters by Instant Book and House rules (Events allowed, Smoking allowed)', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-instant-book'));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-events-allowed'));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('instantBook=true') && u.includes('eventsAllowed=true'))).toBe(true);
+  });
+
+  it('MKT-067: filters by workation (requires BOTH Wi-Fi + workspace) and renders workation card badges', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    expect(screen.getByTestId('marketplace-workspace-badge')).toHaveTextContent('Dedicated workspace');
+    expect(screen.getAllByTestId('marketplace-wifi-badge')[0]).toHaveTextContent('150 Mbps Wi-Fi');
+
+    const pill = screen.getByTestId('marketplace-filter-workation');
+    fireEvent.click(pill);
+    await settle();
+
+    expect(pill).toHaveAttribute('aria-pressed', 'true');
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('workation=true'))).toBe(true);
+    // Listing 102 has Wi-Fi only (no workspace) so only listing 101 remains
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+  });
+
+  it('MKT-073: filters by paymentTiming (Pay at property / Partial advance), syncs URL, and renders card labels', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const badges = screen.getAllByTestId('marketplace-payment-timing-badge').map((el) => el.textContent);
+    expect(badges).toContain('Reserve with 30% advance');
+    expect(badges).toContain('Pay at property');
+    expect(badges).toHaveLength(2);
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-pay-at-property'));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-partial-advance'));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('paymentTiming=pay_at_property'))).toBe(true);
+    expect(listingCalls.some((u) => u.includes('paymentTiming=partial_advance'))).toBe(true);
+  });
+});
