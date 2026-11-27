@@ -16,7 +16,7 @@ import { useListingTenantName } from '@/hooks/useListingTenantName';
 import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantListingAddress, getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
-import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { dedupeAddressSegments, resolveEffectiveListingAddress } from '@/utils/listingAddress';
 import { readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
 import { readClusterListingFields } from '@/utils/clusterListing';
 import { getTenantBrandName } from '@/tenant/displayBrand';
@@ -2054,7 +2054,7 @@ useEffect(() => {
                   {(data.propertyAddress || data.property_address || data.property_location) && (
                     <>
                       <span data-testid="property-street-address">
-                        {String(data.propertyAddress || data.property_address || data.property_location).trim()}
+                        {dedupeAddressSegments(String(data.propertyAddress || data.property_address || data.property_location))}
                       </span>
                       <span className="pp-submeta-sep" aria-hidden="true">·</span>
                     </>
@@ -2246,7 +2246,7 @@ useEffect(() => {
                   {(data.propertyAddress || data.property_address || data.property_location) && (
                     <span className="pp-v2-loc-chip">
                       <PpV2PinIcon size={12} />
-                      {String(data.propertyAddress || data.property_address || data.property_location).trim()}
+                      {dedupeAddressSegments(String(data.propertyAddress || data.property_address || data.property_location))}
                     </span>
                   )}
                 </div>

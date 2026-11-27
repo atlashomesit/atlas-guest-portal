@@ -18,7 +18,7 @@ import { buildHomeUnitPath, getPropertySlug } from "../utils/navigation";
 import { getTenantContext } from "../tenant/tenantContext";
 import { getTenantBrandName } from "../tenant/displayBrand";
 import { getTenantOverrides, getTenantPublicListingIdAllowlist, getUnitNoun, shouldHideAtlasBranding, getTenantListingAddress } from "../tenant/tenantOverrides";
-import { resolveEffectiveListingAddress } from "../utils/listingAddress";
+import { dedupeAddressSegments, resolveEffectiveListingAddress } from "../utils/listingAddress";
 import { LoadingState } from "../components/LoadingState";
 import ErrorBanner from "../components/ErrorBanner"; // TASK-7195
 import SEO from "../components/SEO"; // TASK-4290
@@ -1854,7 +1854,7 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
                       </div>
                       <div className="flex flex-1 flex-col gap-2 p-4">
                         <h4 className="line-clamp-2 text-base font-semibold text-text-primary">{unit.title}</h4>
-                        <p className="text-sm text-text-muted">{unit.location}</p>
+                        <p className="text-sm text-text-muted">{dedupeAddressSegments(unit.location)}</p>
                         {(() => {
                           const stayQuote = stayDisplayFor(unit.numericId);
                           const suggestBreakdown = getDailyListingPricing(unit.numericId);
@@ -2141,7 +2141,7 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
                         </span>
                       )}
                     </div>
-                    <span className="search-card__loc" title={unit.location}>{unit.location}</span>
+                    <span className="search-card__loc" title={unit.location}>{dedupeAddressSegments(unit.location)}</span>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5">
