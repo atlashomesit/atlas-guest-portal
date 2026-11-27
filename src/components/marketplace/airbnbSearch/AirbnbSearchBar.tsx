@@ -62,6 +62,11 @@ function buildSearchParams(
   }
   p.set('destination', values.destination.trim());
   p.set('location', values.destination.trim());
+  if (typeof values.nearLat === 'number' && typeof values.nearLng === 'number') {
+    p.set('nearLat', String(values.nearLat));
+    p.set('nearLng', String(values.nearLng));
+    if (values.nearLabel) p.set('nearLabel', values.nearLabel);
+  }
   if (values.checkIn) p.set('checkIn', values.checkIn);
   if (values.checkOut) p.set('checkOut', values.checkOut);
   if (values.flexDays && values.flexDays > 0 && values.checkIn && values.checkOut) {
@@ -101,6 +106,7 @@ export default function AirbnbSearchBar({
 
   const [destination, setDestination] = useState('');
   const [destinationQuery, setDestinationQuery] = useState('');
+  const [nearLandmark, setNearLandmark] = useState<{ lat: number; lng: number; label: string; city?: string } | null>(null);
   const [dateRange, setDateRange] = useState<{ startDate: Date | null; endDate: Date | null }>({
     startDate: null,
     endDate: null,
@@ -183,7 +189,19 @@ export default function AirbnbSearchBar({
   // homepage search writes only the `guests` TOTAL, never adults/children, so the
   // total must hydrate Who — otherwise Back-navigation silently resets guests to 2.
   useEffect(() => {
-    const dest = searchParams.get('destination') ?? searchParams.get('city') ?? '';
+    const dest = searchParams.get('nearLabel') ?? searchParams.get('destination') ?? searchParams.get('city') ?? '';
+    const nearLatRaw = searchParams.get('nearLat');
+    const nearLngRaw = searchParams.get('nearLng');
+    const nearLabelRaw = searchParams.get('nearLabel');
+    if (nearLatRaw && nearLngRaw) {
+      const lat = Number(nearLatRaw);
+      const lng = Number(nearLngRaw);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setNearLandmark({ lat, lng, label: nearLabelRaw?.trim() || dest || 'Selected area' });
+      }
+    } else {
+      setNearLandmark(null);
+    }
     const checkIn = searchParams.get('checkIn') ?? searchParams.get('checkin');
     const checkOut = searchParams.get('checkOut') ?? searchParams.get('checkout');
     const adultsRaw = searchParams.get('adults');
@@ -257,6 +275,7 @@ export default function AirbnbSearchBar({
   const handleDestinationInput = (value: string) => {
     setDestinationQuery(value);
     setDestination(value);
+    setNearLandmark(null);
     setDestinationError(null);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -265,9 +284,15 @@ export default function AirbnbSearchBar({
     }, DEBOUNCE_MS);
   };
 
-  const selectDestination = (label: string) => {
+  const selectDestination = (item: DestinationOption | string) => {
+    const label = typeof item === 'string' ? item : item.label;
     setDestination(label);
     setDestinationQuery(label);
+    if (typeof item !== 'string' && typeof item.lat === 'number' && typeof item.lng === 'number') {
+      setNearLandmark({ lat: item.lat, lng: item.lng, label: item.label, city: item.city });
+    } else {
+      setNearLandmark(null);
+    }
     setDestinationError(null);
     closeDestination();
     setHighlightedIndex(-1);
@@ -318,6 +343,9 @@ export default function AirbnbSearchBar({
       flexDays: dateMode === 'dates' && dateRange.startDate && dateRange.endDate && flexDays > 0 ? flexDays : undefined,
       flexLength: dateMode === 'flexible' ? flexLength : undefined,
       flexMonths: dateMode === 'flexible' && flexMonths.length > 0 ? flexMonths : undefined,
+      nearLat: nearLandmark?.lat,
+      nearLng: nearLandmark?.lng,
+      nearLabel: nearLandmark?.label,
       guests: guestCounts,
     };
   };
@@ -337,7 +365,14 @@ export default function AirbnbSearchBar({
       if (currentBrand?.trim().toLowerCase() === 'atlastays' || isMarketplaceMode()) {
         p.set('brand', currentBrand?.trim() || 'atlastays');
       }
-      p.set('city', values.destination.trim());
+      if (typeof values.nearLat === 'number' && typeof values.nearLng === 'number') {
+        p.set('nearLat', String(values.nearLat));
+        p.set('nearLng', String(values.nearLng));
+        p.set('nearLabel', values.nearLabel || values.destination.trim());
+        if (nearLandmark?.city) p.set('city', nearLandmark.city);
+      } else {
+        p.set('city', values.destination.trim());
+      }
       if (values.checkIn) p.set('checkIn', values.checkIn);
       if (values.checkOut) p.set('checkOut', values.checkOut);
       if (values.flexDays && values.flexDays > 0 && values.checkIn && values.checkOut) {
@@ -360,6 +395,7 @@ export default function AirbnbSearchBar({
   const handleClearAll = () => {
     setDestination('');
     setDestinationQuery('');
+    setNearLandmark(null);
     setDateRange({ startDate: null, endDate: null });
     setDateMode('dates');
     setFlexDays(0);
@@ -373,7 +409,7 @@ export default function AirbnbSearchBar({
     closeAllPanels();
     // TASK-1040280: clear URL search params while preserving brand and utm_* params
     const next = new URLSearchParams(searchParams);
-    for (const key of ['destination', 'location', 'city', 'checkIn', 'checkOut', 'flexDays', 'flexLength', 'flexMonths', 'guests', 'adults', 'children', 'infants', 'pets']) {
+    for (const key of ['destination', 'location', 'city', 'nearLat', 'nearLng', 'nearLabel', 'radiusKm', 'checkIn', 'checkOut', 'flexDays', 'flexLength', 'flexMonths', 'guests', 'adults', 'children', 'infants', 'pets']) {
       next.delete(key);
     }
     navigate({ search: next.toString() }, { replace: true });
@@ -398,7 +434,7 @@ export default function AirbnbSearchBar({
     }
     if (e.key === 'Enter' && highlightedIndex >= 0 && filteredDestinations[highlightedIndex]) {
       e.preventDefault();
-      selectDestination(filteredDestinations[highlightedIndex].label);
+      selectDestination(filteredDestinations[highlightedIndex]);
     }
   };
 
@@ -506,7 +542,7 @@ export default function AirbnbSearchBar({
                         highlightedIndex === index ? 'bg-bg-muted' : ''
                       }`}
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => selectDestination(item.label)}
+                      onClick={() => selectDestination(item)}
                     >
                       <span className="text-sm font-medium text-text-primary">{item.label}</span>
                       <span className="text-xs text-text-muted">{item.region}</span>

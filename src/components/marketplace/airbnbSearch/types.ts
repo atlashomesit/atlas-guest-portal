@@ -14,6 +14,9 @@ export type AirbnbSearchValues = {
   flexDays?: number;
   flexLength?: FlexLength;
   flexMonths?: string[];
+  nearLat?: number;
+  nearLng?: number;
+  nearLabel?: string;
   guests: GuestCounts;
 };
 
@@ -28,9 +31,13 @@ export type DestinationOption = {
   label: string;
   region: string;
   /**
-   * 'recent' - this guest's own history (top of the dropdown).
-   * 'popular' - the bundled fallback pool (Bali/Dubai/Paris included).
-   * 'city'    - a live city served by GET /api/public/cities (TASK-102491).
+   * 'recent'   - this guest's own history (top of the dropdown).
+   * 'popular'  - the bundled fallback pool.
+   * 'city'     - a live city served by GET /api/public/cities (TASK-102491).
+   * 'landmark' - curated Indian landmark / neighbourhood with coordinates (MKT-060).
    */
-  kind: 'recent' | 'popular' | 'city';
+  kind: 'recent' | 'popular' | 'city' | 'landmark';
+  lat?: number;
+  lng?: number;
+  city?: string;
 };

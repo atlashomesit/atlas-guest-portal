@@ -15,6 +15,7 @@ import { useMarketplaceCardPrices, type MarketplaceCardPrice } from '@/hooks/use
 import { sizedForPartyFirst } from '@/utils/smallParty'; // GUEST-033
 import { allInTotalLabel, directSavingsLabel } from '@/utils/directBookingPrice';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
+import { computeHaversineKm, formatDistanceLabel } from '@/components/marketplace/airbnbSearch/destinationData';
 import ExploreDestinationsStrip from '@/components/marketplace/ExploreDestinationsStrip'; // MKT-034
 import { buildHomeUnitPath, getPropertySlug } from '@/utils/navigation';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
@@ -120,6 +121,11 @@ type MarketplaceItem = {
   matchedCheckOut?: string | null;
   matchedTotalPrice?: number | null;
   matchedDateDeltaDays?: number | null;
+  // MKT-060: landmark proximity search fields
+  latitude?: number | null;
+  longitude?: number | null;
+  distanceKm?: number | null;
+  distanceLabel?: string | null;
 };
 
 /**
@@ -312,7 +318,7 @@ function parseBoundsFromSearchParams(sp: URLSearchParams): MapBounds | null {
   return null;
 }
 
-export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc';
+export type MarketplaceSortOption = 'recommended' | 'price_asc' | 'price_desc' | 'rating_desc' | 'distance_asc';
 
 export default function MarketplaceHomepage() {
   const navigate = useNavigate();
@@ -504,7 +510,7 @@ export default function MarketplaceHomepage() {
 
   const handleSortChange = useCallback((newSort: string) => {
     const valid: MarketplaceSortOption =
-      newSort === 'price_asc' || newSort === 'price_desc' || newSort === 'rating_desc'
+      newSort === 'price_asc' || newSort === 'price_desc' || newSort === 'rating_desc' || newSort === 'distance_asc'
         ? newSort
         : 'recommended';
     setSortBy(valid);
@@ -579,6 +585,19 @@ export default function MarketplaceHomepage() {
   // TASK-101491: the FILTER half of the query only - deliberately excludes page/pageSize so that
   // changing a filter produces a new key (resetting paging) while paging does not re-trigger the
   // first-page effect.
+  const nearSearch = useMemo(() => {
+    const latRaw = searchParams.get('nearLat');
+    const lngRaw = searchParams.get('nearLng');
+    if (!latRaw || !lngRaw) return null;
+    const lat = Number(latRaw);
+    const lng = Number(lngRaw);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    const label = searchParams.get('nearLabel')?.trim() || searchParams.get('city')?.trim() || 'selected location';
+    const radiusRaw = Number(searchParams.get('radiusKm'));
+    const radiusKm = Number.isFinite(radiusRaw) && radiusRaw > 0 ? Math.min(100, radiusRaw) : 25;
+    return { lat, lng, label, radiusKm };
+  }, [searchParams]);
+
   const serverAmenityCodes = useMemo(() => serverAmenityCodesFor(selectedAmenity), [selectedAmenity]);
   const filterQuery = useMemo(() => {
     const p = new URLSearchParams();
@@ -587,6 +606,12 @@ export default function MarketplaceHomepage() {
     const urlCity = searchParams.get('city') || searchParams.get('destination');
     const effectiveCity = query.trim() || urlCity?.trim() || '';
     if (effectiveCity) p.set('city', effectiveCity);
+    if (nearSearch) {
+      p.set('nearLat', String(nearSearch.lat));
+      p.set('nearLng', String(nearSearch.lng));
+      p.set('nearLabel', nearSearch.label);
+      p.set('radiusKm', String(nearSearch.radiusKm));
+    }
     const checkIn = searchParams.get('checkIn');
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
@@ -792,9 +817,20 @@ export default function MarketplaceHomepage() {
       });
     }
 
+    if (sortBy === 'distance_asc' || (nearSearch && sortBy === 'recommended')) {
+      const distOf = (it: MarketplaceItem): number => {
+        if (typeof it.distanceKm === 'number' && Number.isFinite(it.distanceKm)) return it.distanceKm;
+        if (nearSearch && typeof it.latitude === 'number' && typeof it.longitude === 'number') {
+          return computeHaversineKm(nearSearch.lat, nearSearch.lng, it.latitude, it.longitude);
+        }
+        return Number.POSITIVE_INFINITY;
+      };
+      return [...result].sort((a, b) => distOf(a) - distOf(b));
+    }
+
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices, nearSearch]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -1115,6 +1151,7 @@ export default function MarketplaceHomepage() {
             className="min-h-[40px] rounded-lg border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary focus:outline-none focus:ring-2 focus:ring-black cursor-pointer"
           >
             <option value="recommended">Recommended</option>
+            {nearSearch && <option value="distance_asc">Distance: Nearest first</option>}
             <option value="price_asc">Price: Low to High</option>
             <option value="price_desc">Price: High to Low</option>
             <option value="rating_desc">Rating: High to Low</option>
@@ -1384,6 +1421,29 @@ export default function MarketplaceHomepage() {
                   })()}
 
                   <p className="text-sm text-text-body">Sleeps up to {item.maxGuests} guest{item.maxGuests === 1 ? '' : 's'}</p>
+
+                  {/* MKT-060: landmark proximity distance badge */}
+                  {(() => {
+                    const label =
+                      item.distanceLabel?.trim() ||
+                      (typeof item.distanceKm === 'number' && nearSearch
+                        ? formatDistanceLabel(item.distanceKm, nearSearch.label)
+                        : nearSearch && typeof item.latitude === 'number' && typeof item.longitude === 'number'
+                          ? formatDistanceLabel(
+                              computeHaversineKm(nearSearch.lat, nearSearch.lng, item.latitude, item.longitude),
+                              nearSearch.label,
+                            )
+                          : null);
+                    if (!label) return null;
+                    return (
+                      <p
+                        className="text-xs font-medium text-indigo-700"
+                        data-testid="marketplace-distance-label"
+                      >
+                        📍 {label}
+                      </p>
+                    );
+                  })()}
 
                   {/* MKT-058 / MKT-059: matched open or shifted date window + all-in total */}
                   {matchedWindowBadge && (
