@@ -28,6 +28,9 @@ import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector, { type GuestMealPreferences } from "../components/bnb/GuestDietarySelector"; // BNB-002 / BNB-009
 import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
+import { BookingGstDetailsCard } from "../components/booking/BookingGstDetailsCard"; // GUEST-084
+import { CoTravellersCard, type BookingCoTraveller } from "../components/booking/CoTravellersCard"; // GUEST-086
+import { SelfCheckoutCard } from "../components/booking/SelfCheckoutCard"; // GUEST-087
 import BookingPaymentPlanCard, { type GuestBookingInstalment } from "../components/booking/BookingPaymentPlanCard";
 import {
   buildReceiptHtml,
@@ -211,6 +214,10 @@ interface BookingSummary {
   guestId?: number;
   guestName: string;
   guestPhone?: string;
+  /** GUEST-085: Actual staying guest when booked on someone else's behalf. */
+  stayingGuestName?: string | null;
+  stayingGuestPhone?: string | null;
+  stayingGuestEmail?: string | null;
   propertyName: string;
   listingName: string;
   checkinDate: string;
@@ -229,6 +236,15 @@ interface BookingSummary {
   hasGstInvoice?: boolean;
   gstInvoiceNumber?: string | null;
   gstInvoiceTotal?: number | null;
+  /** GUEST-084: B2B GST invoice company name & GSTIN. */
+  companyName?: string | null;
+  guestGstin?: string | null;
+  gstLocked?: boolean;
+  /** GUEST-086: Co-travellers with shareable arrival-hub links. */
+  coTravellers?: BookingCoTraveller[] | null;
+  maxGuests?: number;
+  /** GUEST-087: Timestamp when guest tapped "I have checked out". */
+  guestReportedCheckoutAtUtc?: string | null;
   /** TASK-1888: server-computed; show pre-arrival checklist when true. */
   preArrivalBriefingVisible?: boolean;
   /** GUEST-005: server owns the near-checkout timing policy; absent means hidden. */
@@ -1861,6 +1877,39 @@ export default function BookingConfirmationPage() {
         )}
 
         {/* BNB-009: meal choices saved to the host with the booking-link token; shown only when the server says to ask */}
+        {!isCancelled && (
+          <BookingGstDetailsCard
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            initialCompanyName={booking.companyName}
+            initialGuestGstin={booking.guestGstin}
+            gstLocked={booking.gstLocked}
+          />
+        )}
+
+        {/* GUEST-087: Departure-day "I have checked out" self-checkout card */}
+        {!isCancelled && (
+          <SelfCheckoutCard
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            status={booking.status}
+            checkoutDateIso={booking.checkoutDateIso ?? summaryDisplayDateToIso(booking.checkoutDate)}
+            guidebookCheckoutChecklistText={booking.guidebookCheckoutChecklistText}
+            guestReportedCheckoutAtUtc={booking.guestReportedCheckoutAtUtc}
+          />
+        )}
+
+        {/* GUEST-086: Add/remove co-travellers with shareable arrival-hub link (hidden in companion view) */}
+        {!isCancelled && !searchParams.get("ct") && (
+          <CoTravellersCard
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            propertyName={booking.propertyName}
+            maxCoTravellers={Math.max(1, (booking.maxGuests ?? 4) - 1)}
+            initialCoTravellers={booking.coTravellers}
+          />
+        )}
+
         {!isCancelled && (
           <GuestDietarySelector
             bookingId={booking.bookingId ?? bookingId}
