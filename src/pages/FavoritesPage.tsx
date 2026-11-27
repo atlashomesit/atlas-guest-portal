@@ -17,6 +17,7 @@ import { useDailyPricingSummary } from "../hooks/useDailyPricingSummary";
 import { estimateStayNights, formatEstTotalInclGst } from "../utils/guestPriceEstimate";
 import SavedHomeCover from "../components/SavedHomeCover";
 import SavedHomesReminder from "../components/SavedHomesReminder";
+import { PriceDropAlertControl } from "../components/PriceDropAlertModal";
 import { useGuestAuth } from "../contexts/GuestAuthContext";
 import {
   CompareStaysDrawer,
@@ -429,12 +430,21 @@ export default function FavoritesPage() {
                   <p className="text-xs text-text-secondary">
                     You saved this — still available for your dates?
                   </p>
-                  <Link
-                    to={path}
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
-            >
-              Book now
-                  </Link>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link
+                      to={path}
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg bg-brand-primary text-white text-sm font-medium px-4 py-3 hover:opacity-95 transition-opacity"
+                    >
+                      Book now
+                    </Link>
+                    <PriceDropAlertControl
+                      listingId={l.id}
+                      listingName={l.name ?? l.propertyName ?? `Listing ${l.id}`}
+                      nightlyRateInr={displayedPrice}
+                      maxGuests={l.maxGuests || 6}
+                      initialEmail={knownEmail}
+                    />
+                  </div>
                 </div>
               </div>
             );

@@ -65,6 +65,12 @@ export interface MenuItem {
   imageUrl?: string | null;
   /** POS-017: modifier groups the guest can pick from (the API sends only the available options). Read through parseModifierGroups. */
   modifierGroups?: unknown;
+  /** POS-137: per-item serving schedule availability. */
+  isAvailableNow?: boolean;
+  servingWindowLabel?: string | null;
+  /** POS-140: daily portion limit and live remaining count (null = unlimited). */
+  dailyPortionLimit?: number | null;
+  portionsRemaining?: number | null;
 }
 
 export interface MenuCategory {
@@ -98,6 +104,16 @@ export interface MenuResponse {
   categories: MenuCategory[];
   /** POS-132: active guest-menu upsell suggestions from the server. */
   suggestions?: MenuSuggestionOffer[];
+  /** POS-136: kitchen QR ordering pause / throttle status. */
+  orderingPaused?: boolean;
+  orderingPausedUntilUtc?: string | null;
+  orderingPauseMessage?: string | null;
+  estimatedPrepMinutes?: number | null;
+  qrPrepTimeBufferMinutes?: number | null;
+  /** POS-137: kitchen operating hours status. */
+  isKitchenOpen?: boolean;
+  kitchenHoursSummary?: string | null;
+  nextOpenLabel?: string | null;
 }
 
 export interface MenuSuggestionOffer {
@@ -334,6 +350,31 @@ export default function QrMenuPage() {
   const restrictFallback = fallbackList.includes("PAY_NOW_UPI") || fallbackList.includes("PAY_ON_DELIVERY");
   const offerPayNow = !restrictFallback || fallbackList.includes("PAY_NOW_UPI");
   const offerPayOnDelivery = !restrictFallback || fallbackList.includes("PAY_ON_DELIVERY");
+
+  // POS-136: kitchen QR ordering pause / busy-kitchen prep-time buffer
+  const pauseUntilMs = menu?.orderingPausedUntilUtc ? new Date(menu.orderingPausedUntilUtc).getTime() : NaN;
+  const isOrderingPaused =
+    menu?.orderingPaused === true &&
+    (Number.isNaN(pauseUntilMs) || pauseUntilMs > Date.now());
+  const pauseResumeLabel = formatRetryTime(menu?.orderingPausedUntilUtc);
+  const orderingPausedBannerText = isOrderingPaused
+    ? menu?.orderingPauseMessage?.trim() ||
+      (pauseResumeLabel
+        ? `Kitchen is busy — phone ordering resumes at ${pauseResumeLabel}.`
+        : "Kitchen is busy — phone ordering is temporarily paused.")
+    : null;
+  const hasPrepBuffer =
+    !isOrderingPaused &&
+    ((typeof menu?.qrPrepTimeBufferMinutes === "number" && menu.qrPrepTimeBufferMinutes > 0) ||
+      (typeof menu?.estimatedPrepMinutes === "number" &&
+        menu.estimatedPrepMinutes > 0 &&
+        Boolean(menu?.orderingPauseMessage?.trim())));
+  const prepBufferBannerText = hasPrepBuffer
+    ? menu?.orderingPauseMessage?.trim() ||
+      (typeof menu?.estimatedPrepMinutes === "number" && menu.estimatedPrepMinutes > 0
+        ? `Kitchen is busy — estimated prep time is ~${menu.estimatedPrepMinutes} mins (+${menu?.qrPrepTimeBufferMinutes ?? 0} min extra wait).`
+        : `Kitchen is busy — please allow +${menu?.qrPrepTimeBufferMinutes} mins extra prep time.`)
+    : null;
 
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -1320,6 +1361,85 @@ export default function QrMenuPage() {
           </section>
         ) : null}
 
+        {/* POS-137: Kitchen closed banner */}
+        {menu?.isKitchenOpen === false && (
+          <div
+            role="status"
+            data-testid="qr-kitchen-closed-banner"
+            style={{
+              backgroundColor: "#f3f4f6",
+              border: "1px solid #d1d5db",
+              color: "#374151",
+              borderRadius: "12px",
+              padding: "12px 14px",
+              marginBottom: "14px",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              fontSize: "13px",
+              fontWeight: 600,
+              lineHeight: "1.4",
+            }}
+          >
+            <Clock size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
+            <div>
+              <div>Kitchen is currently closed{menu.nextOpenLabel ? ` — ${menu.nextOpenLabel}` : "."}</div>
+              {menu.kitchenHoursSummary && (
+                <div style={{ fontSize: "12px", fontWeight: 500, color: "#6b7280", marginTop: "2px" }}>
+                  Kitchen hours: {menu.kitchenHoursSummary}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* POS-136: Kitchen ordering paused or busy-kitchen extra-wait banner */}
+        {orderingPausedBannerText && (
+          <div
+            role="status"
+            data-testid="qr-ordering-paused-banner"
+            style={{
+              backgroundColor: "#fef3c7",
+              border: "1px solid #f59e0b",
+              color: "#92400e",
+              borderRadius: "12px",
+              padding: "12px 14px",
+              marginBottom: "14px",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              fontSize: "13px",
+              fontWeight: 600,
+              lineHeight: "1.4",
+            }}
+          >
+            <Clock size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
+            <span>{orderingPausedBannerText}</span>
+          </div>
+        )}
+        {prepBufferBannerText && (
+          <div
+            role="status"
+            data-testid="qr-prep-buffer-banner"
+            style={{
+              backgroundColor: "#fffbeb",
+              border: "1px solid #fde68a",
+              color: "#92400e",
+              borderRadius: "12px",
+              padding: "10px 14px",
+              marginBottom: "14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "13px",
+              fontWeight: 600,
+            }}
+          >
+            <Clock size={16} style={{ flexShrink: 0 }} />
+            <span>{prepBufferBannerText}</span>
+          </div>
+        )}
+
         {/* Category Tabs */}
         <nav
           style={{
@@ -1490,10 +1610,16 @@ export default function QrMenuPage() {
                     const modifierGroups = parseModifierGroups(item.modifierGroups);
                     const hasModifiers = modifierGroups.length > 0;
                     const orderable = isOrderable(modifierGroups);
+                    const isOutsideServingWindow = item.isAvailableNow === false;
+                    const blockedBySchedule = isOutsideServingWindow && fulfillAt === "NOW";
+                    const hasPortionCap = typeof item.portionsRemaining === "number";
+                    const portionsRemaining = hasPortionCap ? Math.max(0, item.portionsRemaining as number) : null;
+                    const isPortionExhausted = portionsRemaining === 0;
                     // An item with choices is added through its picker, so its row shows how many are already in the order.
                     const inCartQty = hasModifiers
                       ? cartLines.reduce((sum, l) => (l.item.id === item.id ? sum + l.qty : sum), 0)
                       : cart[String(item.id)]?.qty || 0;
+                    const atPortionCap = portionsRemaining !== null && inCartQty >= portionsRemaining;
 
                     return (
                       <div key={item.id}>
@@ -1570,6 +1696,59 @@ export default function QrMenuPage() {
                           <span style={{ fontSize: "14px", fontWeight: 800, color: "#9e402a" }}>
                             ₹{item.price.toLocaleString("en-IN")}
                           </span>
+
+                          {isOutsideServingWindow && (
+                            <div
+                              data-testid={`menu-item-serving-window-${item.id}`}
+                              style={{
+                                marginTop: "6px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "2px 8px",
+                                borderRadius: "999px",
+                                backgroundColor: "#f3f4f6",
+                                border: "1px solid #d1d5db",
+                                color: "#4b5563",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              <Clock size={11} />
+                              <span>{item.servingWindowLabel?.trim() || "Outside serving hours"}</span>
+                            </div>
+                          )}
+
+                          {portionsRemaining !== null && (
+                            <div
+                              data-testid={`menu-item-portions-${item.id}`}
+                              style={{
+                                marginTop: "6px",
+                                marginLeft: isOutsideServingWindow ? "6px" : "0",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                padding: "2px 8px",
+                                borderRadius: "999px",
+                                backgroundColor: isPortionExhausted
+                                  ? "#fef2f2"
+                                  : portionsRemaining <= 5
+                                    ? "#fef3c7"
+                                    : "#f3f4f6",
+                                border: `1px solid ${
+                                  isPortionExhausted ? "#fecaca" : portionsRemaining <= 5 ? "#f59e0b" : "#d1d5db"
+                                }`,
+                                color: isPortionExhausted ? "#991b1b" : portionsRemaining <= 5 ? "#92400e" : "#4b5563",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {isPortionExhausted
+                                ? "Sold out for today"
+                                : portionsRemaining <= 5
+                                  ? `Only ${portionsRemaining} left today`
+                                  : `${portionsRemaining} left today`}
+                            </div>
+                          )}
                         </div>
 
                         {/* POS-014: dish photo, lazy-loaded at a fixed size so the list does not jump */}
@@ -1621,11 +1800,13 @@ export default function QrMenuPage() {
                               </span>
                               <button
                                 onClick={() => handleAdjustQty(String(item.id), 1)}
+                                disabled={atPortionCap}
                                 style={{
                                   background: "none",
                                   border: "none",
                                   color: "#fff",
-                                  cursor: "pointer",
+                                  cursor: atPortionCap ? "not-allowed" : "pointer",
+                                  opacity: atPortionCap ? 0.45 : 1,
                                   padding: "2px",
                                   display: "flex",
                                 }}
@@ -1638,21 +1819,33 @@ export default function QrMenuPage() {
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                               <button
                                 onClick={() => handleAddToCart(item)}
-                                disabled={hasModifiers && !orderable}
+                                disabled={(hasModifiers && !orderable) || blockedBySchedule || isPortionExhausted}
                                 style={{
                                   backgroundColor: "#fff",
-                                  border: "1.5px solid #9e402a",
-                                  color: "#9e402a",
+                                  border: `1.5px solid ${blockedBySchedule || isPortionExhausted ? "#9ca3af" : "#9e402a"}`,
+                                  color: blockedBySchedule || isPortionExhausted ? "#6b7280" : "#9e402a",
                                   padding: "6px 14px",
                                   borderRadius: "8px",
                                   fontWeight: 700,
                                   fontSize: "13px",
-                                  cursor: hasModifiers && !orderable ? "not-allowed" : "pointer",
-                                  opacity: hasModifiers && !orderable ? 0.5 : 1,
+                                  cursor:
+                                    (hasModifiers && !orderable) || blockedBySchedule || isPortionExhausted
+                                      ? "not-allowed"
+                                      : "pointer",
+                                  opacity:
+                                    (hasModifiers && !orderable) || blockedBySchedule || isPortionExhausted ? 0.55 : 1,
                                 }}
                                 data-testid={`add-to-cart-${item.id}`}
                               >
-                                {hasModifiers && !orderable ? "Unavailable" : hasModifiers ? "CHOOSE +" : "ADD +"}
+                                {isPortionExhausted
+                                  ? "Sold out"
+                                  : blockedBySchedule
+                                    ? "Not served now"
+                                    : hasModifiers && !orderable
+                                      ? "Unavailable"
+                                      : hasModifiers
+                                        ? "CHOOSE +"
+                                        : "ADD +"}
                               </button>
                               {hasModifiers && inCartQty > 0 && (
                                 <span style={{ fontSize: "11px", fontWeight: 700, color: "#9e402a" }}>{inCartQty} in your order</span>
@@ -2206,17 +2399,21 @@ export default function QrMenuPage() {
               {/* Place Order CTA */}
               <button
                 type="submit"
-                disabled={submitting || (settlementMethod === "POST_TO_ROOM" && (showVerificationWarning || !verificationCode.trim()))}
+                disabled={
+                  submitting ||
+                  isOrderingPaused ||
+                  (settlementMethod === "POST_TO_ROOM" && (showVerificationWarning || !verificationCode.trim()))
+                }
                 style={{
                   width: "100%",
-                  backgroundColor: "#9e402a",
+                  backgroundColor: isOrderingPaused ? "#9ca3af" : "#9e402a",
                   color: "#fff",
                   padding: "12px",
                   borderRadius: "10px",
                   border: "none",
                   fontWeight: 800,
                   fontSize: "15px",
-                  cursor: submitting ? "not-allowed" : "pointer",
+                  cursor: submitting || isOrderingPaused ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -2224,7 +2421,17 @@ export default function QrMenuPage() {
                 }}
                 data-testid="pos-qr-submit-btn"
               >
-                {submitting ? "Placing Order..." : takeawayActive ? `Place Takeaway Order • ₹${cartSubtotal.toLocaleString("en-IN")}` : settlementMethod === "POST_TO_ROOM" ? `Charge to Room • ₹${cartSubtotal.toLocaleString("en-IN")}` : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
+                {isOrderingPaused
+                  ? pauseResumeLabel
+                    ? `Ordering resumes at ${pauseResumeLabel}`
+                    : "Ordering temporarily paused"
+                  : submitting
+                    ? "Placing Order..."
+                    : takeawayActive
+                      ? `Place Takeaway Order • ₹${cartSubtotal.toLocaleString("en-IN")}`
+                      : settlementMethod === "POST_TO_ROOM"
+                        ? `Charge to Room • ₹${cartSubtotal.toLocaleString("en-IN")}`
+                        : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
                 <ArrowRight size={18} />
               </button>
             </div>
