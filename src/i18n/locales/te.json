@@ -1,22 +1,42 @@
 {
   "searchPage": {
-    "hero": "మీ ఖాయం హోమ్‌స్టేను కనుగొనండి",
+    "hero": "మీకు సరిపోయే హోమ్‌స్టేను కనుగొనండి",
     "checkIn": "చెక్-ఇన్",
     "checkOut": "చెక్-అవుట్",
-    "guests": "అతిథులు"
+    "guests": "అతిథులు",
+    "search": "వెతకండి",
+    "filters": "ఫిల్టర్లు"
   },
   "listingDetail": {
     "perNight": "రాత్రికి",
-    "nearbyAttractions": "సమీపంలోని ఆకర్షణ & చేయవలసిన విషయాలు",
-    "distance": "దూరంలో"
+    "nearbyAttractions": "సమీప ఆకర్షణలు మరియు చూడదగిన ప్రదేశాలు",
+    "distance": "దూరంలో",
+    "amenities": "సౌకర్యాలు",
+    "houseRules": "ఇంటి నియమాలు"
   },
   "bookingWidget": {
     "book": "ఇప్పుడే బుక్ చేయండి",
     "reserve": "రిజర్వ్ చేయండి",
-    "total": "మొత్తం"
+    "total": "మొత్తం",
+    "nights": "రాత్రులు",
+    "payNow": "ఇప్పుడే చెల్లించండి"
+  },
+  "checkout": {
+    "title": "మీ బుకింగ్ పూర్తి చేయండి",
+    "guestDetails": "అతిథి వివరాలు",
+    "confirmBooking": "బుకింగ్ నిర్ధారించండి",
+    "priceSummary": "ధర వివరాలు"
+  },
+  "stayPage": {
+    "arrivalHub": "మీ బస మరియు రాక కేంద్రం",
+    "checkInInstructions": "చెక్-ఇన్ సూచనలు",
+    "extendStay": "మీ బసను పొడిగించండి",
+    "needHelp": "సహాయం కావాలా?"
   },
   "common": {
     "loading": "లోడ్ చేస్తోంది...",
-    "error": "ఏదో తప్పు జరిగింది"
+    "error": "ఏదో తప్పు జరిగింది",
+    "language": "భాష",
+    "close": "మూసివేయండి"
   }
 }

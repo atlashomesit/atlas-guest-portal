@@ -29,6 +29,7 @@ import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector, { type GuestMealPreferences } from "../components/bnb/GuestDietarySelector"; // BNB-002 / BNB-009
 import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
 import StayExtensionCard from "../components/booking/StayExtensionCard"; // GUEST-089
+import { getAvailableLanguages, getLanguageName, type Language } from "../i18n/i18n"; // GUEST-094
 import { BookingGstDetailsCard } from "../components/booking/BookingGstDetailsCard"; // GUEST-084
 import { CoTravellersCard, type BookingCoTraveller } from "../components/booking/CoTravellersCard"; // GUEST-086
 import { SelfCheckoutCard } from "../components/booking/SelfCheckoutCard"; // GUEST-087
@@ -453,7 +454,7 @@ export default function BookingConfirmationPage() {
   useEffect(() => () => {
     if (copyDoorCodeTimerRef.current) clearTimeout(copyDoorCodeTimerRef.current);
   }, []);
-  const [shareLanguage, setShareLanguage] = useState<"en" | "hi" | "te">("en");
+  const [shareLanguage, setShareLanguage] = useState<Language>("en");
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "success" | "failed">("pending");
   const [paymentFailureReason, setPaymentFailureReason] = useState<string | null>(null);
   const [paymentFailedAt, setPaymentFailedAt] = useState<string | null>(null);
@@ -2552,12 +2553,14 @@ export default function BookingConfirmationPage() {
               <select
                 id="referral-lang"
                 value={shareLanguage}
-                onChange={(e) => setShareLanguage(e.target.value as "en" | "hi" | "te")}
+                onChange={(e) => setShareLanguage(e.target.value as Language)}
                 className="rounded-lg border border-border-subtle bg-bg-surface px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-brand-primary"
               >
-                <option value="en">English</option>
-                <option value="hi">हिन्दी</option>
-                <option value="te">తెలుగు</option>
+                {getAvailableLanguages().map((lang) => (
+                  <option key={lang} value={lang}>
+                    {getLanguageName(lang)}
+                  </option>
+                ))}
               </select>
             </div>
             <a
