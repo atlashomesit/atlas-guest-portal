@@ -31,6 +31,17 @@ function formatInr(amount: number, currency = 'INR'): string {
   }
 }
 
+function formatExpiryCountdown(msRemaining: number): string {
+  const totalSec = Math.max(0, Math.floor(msRemaining / 1000));
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  return `${minutes}m ${seconds}s`;
+}
+
 function isMobileViewport(): boolean {
   try {
     return typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches;
@@ -67,16 +78,58 @@ export default function PayLinkPage() {
   /** Razorpay Checkout returned but the API has not confirmed it yet: kept so "check again" never makes the guest pay twice. */
   const [unconfirmed, setUnconfirmed] = useState<RazorpayCheckoutResult | null>(null);
   const [checking, setChecking] = useState(false);
+  /** PAY-049: live clock for expiry countdown and editable partial payment amount. */
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [partialAmountInput, setPartialAmountInput] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
     getPayLink(token, instalmentId)
-      .then((s) => { if (!cancelled) setSummary(s); })
+      .then((s) => {
+        if (!cancelled) {
+          setSummary(s);
+          const rem = typeof s.remainingInr === 'number' ? s.remainingInr : s.amountDueInr;
+          setPartialAmountInput(String(rem));
+        }
+      })
       .catch((e: unknown) => {
         if (!cancelled) setLoadError(e instanceof Error ? e.message : 'We could not load this payment page.');
       });
     return () => { cancelled = true; };
   }, [token, instalmentId]);
+
+  useEffect(() => {
+    if (!summary?.expiresAtUtc || summary.alreadyPaid || summary.upgradeHoldLapsed) return;
+    const expiryMs = Date.parse(summary.expiresAtUtc);
+    if (!Number.isFinite(expiryMs)) return;
+    setNowMs(Date.now());
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [summary?.expiresAtUtc, summary?.alreadyPaid, summary?.upgradeHoldLapsed]);
+
+  const expiryMs = summary?.expiresAtUtc ? Date.parse(summary.expiresAtUtc) : NaN;
+  const msUntilExpiry = Number.isFinite(expiryMs) ? expiryMs - nowMs : null;
+  const isLinkExpired = Boolean(summary?.isExpired) || (msUntilExpiry !== null && msUntilExpiry <= 0);
+
+  const effectiveRemaining = summary
+    ? (typeof summary.remainingInr === 'number' ? summary.remainingInr : summary.amountDueInr)
+    : 0;
+  const minPartial = summary?.allowPartialPayments
+    ? Math.min(effectiveRemaining, Math.max(100, summary.minPartialAmountInr ?? 100))
+    : effectiveRemaining;
+  const parsedPartial = summary?.allowPartialPayments ? Number(partialAmountInput) : effectiveRemaining;
+  const partialValidationError = summary?.allowPartialPayments && !summary.alreadyPaid && !isLinkExpired
+    ? (!Number.isFinite(parsedPartial) || parsedPartial <= 0
+        ? 'Enter a valid payment amount.'
+        : parsedPartial < minPartial
+          ? `Minimum partial payment is ${formatInr(minPartial, summary.currency)}.`
+          : parsedPartial > effectiveRemaining
+            ? `Amount cannot exceed remaining balance (${formatInr(effectiveRemaining, summary.currency)}).`
+            : null)
+    : null;
+  const effectivePayAmount = summary?.allowPartialPayments && !partialValidationError
+    ? parsedPartial
+    : effectiveRemaining;
 
   /** Asks the API to verify what Checkout returned; on success opens the booking confirmation. Never throws. */
   const confirmPayment = useCallback(
@@ -96,10 +149,12 @@ export default function PayLinkPage() {
   );
 
   const startPayment = useCallback(async () => {
+    if (isLinkExpired || partialValidationError) return;
     setBusy(true);
     setActionError(null);
     try {
-      const order = await createPayLinkOrder(token, instalmentId);
+      const requestedAmount = summary?.allowPartialPayments ? effectivePayAmount : null;
+      const order = await createPayLinkOrder(token, instalmentId, requestedAmount);
       const upiOrder = toUpiOrder(order);
       if (upiOrder) {
         setUpi({ order: upiOrder, raw: order });
@@ -132,7 +187,7 @@ export default function PayLinkPage() {
     } finally {
       setBusy(false);
     }
-  }, [token, summary, confirmPayment, instalmentId]);
+  }, [token, summary, confirmPayment, instalmentId, isLinkExpired, partialValidationError, effectivePayAmount]);
 
   const checkAgain = useCallback(async () => {
     if (!unconfirmed) return;
@@ -206,9 +261,81 @@ export default function PayLinkPage() {
                 ? 'Nothing charged'
                 : summary.alreadyPaid
                   ? 'Nothing left to pay'
-                  : `Amount to pay: ${formatInr(summary.amountDueInr, summary.currency)}`}
+                  : `Amount to pay: ${formatInr(effectiveRemaining, summary.currency)}`}
             </p>
+
+            {!summary.alreadyPaid && !summary.upgradeHoldLapsed && !isLinkExpired && msUntilExpiry !== null && msUntilExpiry > 0 && (
+              <p
+                className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900"
+                data-testid="pay-link-expiry"
+                aria-live="polite"
+              >
+                <span>Link expires in {formatExpiryCountdown(msUntilExpiry)}</span>
+              </p>
+            )}
+
+            {((typeof summary.paidSoFarInr === 'number' && summary.paidSoFarInr > 0) ||
+              (summary.allowPartialPayments && typeof summary.totalAmountInr === 'number' && summary.totalAmountInr > 0)) && (
+              <div className="mt-3 rounded-lg bg-stone-50 p-3 text-xs text-stone-700" data-testid="pay-link-partial-progress">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>Paid so far: <strong>{formatInr(summary.paidSoFarInr ?? 0, summary.currency)}</strong></span>
+                  <span>Remaining: <strong>{formatInr(effectiveRemaining, summary.currency)}</strong></span>
+                </div>
+                {typeof summary.totalAmountInr === 'number' && summary.totalAmountInr > 0 && (
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-stone-200">
+                    <div
+                      className="h-full rounded-full bg-emerald-600 transition-all"
+                      style={{ width: `${Math.min(100, Math.max(0, Math.round(((summary.paidSoFarInr ?? 0) / summary.totalAmountInr) * 100)))}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </section>
+
+          {!summary.alreadyPaid && !summary.upgradeHoldLapsed && isLinkExpired && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="alert" data-testid="pay-link-expired">
+              This payment link has expired. Please ask your host for a new link.
+            </div>
+          )}
+
+          {summary.allowPartialPayments && !summary.alreadyPaid && !summary.upgradeHoldLapsed && !isLinkExpired && (
+            <section className="mb-4 rounded-xl border border-stone-200 bg-white p-4 text-sm text-stone-800" data-testid="pay-link-partial-section">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="pay-link-partial-amount" className="font-medium text-stone-900">
+                  Choose amount to pay ({summary.currency})
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setPartialAmountInput(String(effectiveRemaining))}
+                  className="text-xs font-semibold text-emerald-700 underline"
+                  data-testid="pay-link-pay-remaining"
+                >
+                  Pay remaining {formatInr(effectiveRemaining, summary.currency)}
+                </button>
+              </div>
+              <input
+                id="pay-link-partial-amount"
+                type="number"
+                inputMode="decimal"
+                min={minPartial}
+                max={effectiveRemaining}
+                step="any"
+                value={partialAmountInput}
+                onChange={(e) => setPartialAmountInput(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 text-base text-stone-900 focus:border-emerald-600 focus:outline-none"
+                data-testid="pay-link-partial-amount-input"
+              />
+              <p className="mt-1 text-xs text-stone-600">
+                Enter between {formatInr(minPartial, summary.currency)} and {formatInr(effectiveRemaining, summary.currency)}.
+              </p>
+              {partialValidationError && (
+                <p className="mt-1 text-xs font-medium text-red-700" role="alert" data-testid="pay-link-partial-error">
+                  {partialValidationError}
+                </p>
+              )}
+            </section>
+          )}
 
           {summary.alreadyPaid && !summary.upgradeHoldLapsed && (
             <p className="rounded-xl bg-emerald-50 p-4 text-emerald-900" data-testid="pay-link-paid">
@@ -216,33 +343,33 @@ export default function PayLinkPage() {
             </p>
           )}
 
-          {!summary.alreadyPaid && !summary.upgradeHoldLapsed && summary.mode === 'UNAVAILABLE' && (
+          {!summary.alreadyPaid && !summary.upgradeHoldLapsed && !isLinkExpired && summary.mode === 'UNAVAILABLE' && (
             <p className="rounded-xl bg-amber-50 p-4 text-amber-900" data-testid="pay-link-unavailable">
               Online payment is not available for this property right now. Please contact your host to pay.
             </p>
           )}
 
-          {!summary.alreadyPaid && summary.mode === 'RAZORPAY' && !unconfirmed && (
+          {!summary.alreadyPaid && !summary.upgradeHoldLapsed && !isLinkExpired && summary.mode === 'RAZORPAY' && !unconfirmed && (
             <button
               type="button"
               onClick={() => void startPayment()}
-              disabled={busy}
+              disabled={busy || Boolean(partialValidationError)}
               className="w-full rounded-lg bg-emerald-700 px-4 py-3 text-base font-semibold text-white disabled:opacity-60"
               data-testid="pay-link-razorpay-pay"
             >
-              {busy ? 'Opening secure checkout…' : `Pay ${formatInr(summary.amountDueInr, summary.currency)} securely`}
+              {busy ? 'Opening secure checkout…' : `Pay ${formatInr(effectivePayAmount, summary.currency)} securely`}
             </button>
           )}
 
-          {!summary.alreadyPaid && isUpiProvider(summary.mode) && !upi && (
+          {!summary.alreadyPaid && !summary.upgradeHoldLapsed && !isLinkExpired && isUpiProvider(summary.mode) && !upi && (
             <button
               type="button"
               onClick={() => void startPayment()}
-              disabled={busy}
+              disabled={busy || Boolean(partialValidationError)}
               className="w-full rounded-lg bg-emerald-700 px-4 py-3 text-base font-semibold text-white disabled:opacity-60"
               data-testid="pay-link-upi-start"
             >
-              {busy ? 'Getting your UPI payment ready…' : `Pay ${formatInr(summary.amountDueInr, summary.currency)} with UPI`}
+              {busy ? 'Getting your UPI payment ready…' : `Pay ${formatInr(effectivePayAmount, summary.currency)} with UPI`}
             </button>
           )}
 
