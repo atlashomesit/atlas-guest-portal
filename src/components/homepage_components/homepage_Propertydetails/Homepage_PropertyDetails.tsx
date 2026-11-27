@@ -2333,7 +2333,7 @@ useEffect(() => {
 
                 {/* Host strip + trust panel */}
                 <section className="pp-section" style={{ paddingTop: 28 }} aria-label="About the host">
-                  <MarketplaceHostIdentity marketplace={isMarketplaceDetail} listingId={resolvedListingId} />
+                  <MarketplaceHostIdentity marketplace={isMarketplaceDetail && isMarketplaceMode()} listingId={resolvedListingId} />
                   <div className="pp-host">
                     <div className="pp-host-avatar" aria-hidden="true">{ppHostInitial}</div>
                     <div>
