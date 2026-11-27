@@ -29,6 +29,7 @@ import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector, { type GuestMealPreferences } from "../components/bnb/GuestDietarySelector"; // BNB-002 / BNB-009
 import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
 import { BookingGstDetailsCard } from "../components/booking/BookingGstDetailsCard"; // GUEST-084
+import { CoTravellersCard, type BookingCoTraveller } from "../components/booking/CoTravellersCard"; // GUEST-086
 import BookingPaymentPlanCard, { type GuestBookingInstalment } from "../components/booking/BookingPaymentPlanCard";
 import {
   buildReceiptHtml,
@@ -238,6 +239,9 @@ interface BookingSummary {
   companyName?: string | null;
   guestGstin?: string | null;
   gstLocked?: boolean;
+  /** GUEST-086: Co-travellers with shareable arrival-hub links. */
+  coTravellers?: BookingCoTraveller[] | null;
+  maxGuests?: number;
   /** TASK-1888: server-computed; show pre-arrival checklist when true. */
   preArrivalBriefingVisible?: boolean;
   /** GUEST-005: server owns the near-checkout timing policy; absent means hidden. */
@@ -1877,6 +1881,17 @@ export default function BookingConfirmationPage() {
             initialCompanyName={booking.companyName}
             initialGuestGstin={booking.guestGstin}
             gstLocked={booking.gstLocked}
+          />
+        )}
+
+        {/* GUEST-086: Add/remove co-travellers with shareable arrival-hub link (hidden in companion view) */}
+        {!isCancelled && !searchParams.get("ct") && (
+          <CoTravellersCard
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            propertyName={booking.propertyName}
+            maxCoTravellers={Math.max(1, (booking.maxGuests ?? 4) - 1)}
+            initialCoTravellers={booking.coTravellers}
           />
         )}
 
