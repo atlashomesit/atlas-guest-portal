@@ -102,3 +102,50 @@ export const buildApiUrl = (path: string): string => {
     throw error;
   }
 };
+
+type ApiRequestConfig = {
+  headers?: Record<string, string>;
+  params?: Record<string, string | number | boolean | null | undefined>;
+};
+
+async function apiRequest<T = unknown>(
+  method: string,
+  path: string,
+  body?: unknown,
+  config?: ApiRequestConfig,
+): Promise<{ data: T; status: number }> {
+  const normalizedPath = path.startsWith('/api/') || path.startsWith('http') ? path : `/api${path.startsWith('/') ? path : `/${path}`}`;
+  const url = new URL(buildApiUrl(normalizedPath));
+  if (config?.params) {
+    for (const [k, v] of Object.entries(config.params)) {
+      if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+    }
+  }
+  const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+  const headers: Record<string, string> = {
+    ...getApiHeaders(),
+    ...(isFormData || body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    ...(config?.headers ?? {}),
+  };
+  const res = await fetch(url.toString(), {
+    method,
+    headers,
+    body: body === undefined ? undefined : isFormData ? (body as FormData) : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = new Error(`API ${method} ${path} failed with ${res.status}`) as Error & { response?: { status: number } };
+    err.response = { status: res.status };
+    throw err;
+  }
+  const text = await res.text();
+  const data = (text ? JSON.parse(text) : null) as T;
+  return { data, status: res.status };
+}
+
+export const api = {
+  get: <T = unknown>(path: string, config?: ApiRequestConfig) => apiRequest<T>('GET', path, undefined, config),
+  post: <T = unknown>(path: string, body?: unknown, config?: ApiRequestConfig) => apiRequest<T>('POST', path, body, config),
+  put: <T = unknown>(path: string, body?: unknown, config?: ApiRequestConfig) => apiRequest<T>('PUT', path, body, config),
+  patch: <T = unknown>(path: string, body?: unknown, config?: ApiRequestConfig) => apiRequest<T>('PATCH', path, body, config),
+  delete: <T = unknown>(path: string, config?: ApiRequestConfig) => apiRequest<T>('DELETE', path, undefined, config),
+};

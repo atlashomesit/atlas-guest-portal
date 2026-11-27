@@ -53,7 +53,7 @@ describe("TalkToUsVoiceWidget", () => {
     render(<TalkToUsVoiceWidget listingId={42} />);
     await settle();
     fireEvent.click(screen.getByText("Talk to us"));
-    expect(screen.getByText(/Atlas AI voice assistant/)).toBeTruthy();
+    expect(screen.getByText(/AI voice assistant/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "Is 5 Dec free?" } });
     fireEvent.click(screen.getByText("Send"));
     await settle();
@@ -83,6 +83,139 @@ describe("TalkToUsVoiceWidget", () => {
     fireEvent.click(screen.getByTestId("voice-hangup"));
     expect(abort).toHaveBeenCalled();
     expect(cancel).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("switches SpeechRecognition and SpeechSynthesis lang via language pills (TVOI-012)", async () => {
+    const rec = { lang: "", interimResults: false, continuous: false, onresult: null, onerror: null, onend: null, start: vi.fn(), stop: vi.fn(), abort };
+    (window as unknown as Json).webkitSpeechRecognition = function () {
+      return rec;
+    };
+    const speak = vi.fn();
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: { cancel, speak, getVoices: () => [{ lang: "hi-IN", name: "Google हिन्दी" }] },
+    });
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      voice: unknown = null;
+      rate = 1;
+      pitch = 1;
+      constructor(t: string) {
+        this.text = t;
+      }
+    }
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+    fetchMock
+      .mockResolvedValueOnce(res(true, { enabled: true }))
+      .mockResolvedValueOnce(res(true, { reply: "जी हाँ, कमरा उपलब्ध है।" }));
+
+    render(<TalkToUsVoiceWidget />);
+    await settle();
+    fireEvent.click(screen.getByText("Talk to us"));
+    fireEvent.click(screen.getByTestId("voice-lang-hi-IN"));
+    fireEvent.click(screen.getByTestId("voice-mic"));
+    expect(rec.lang).toBe("hi-IN");
+
+    fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "क्या कमरा खाली है?" } });
+    fireEvent.click(screen.getByText("Send"));
+    await settle();
+    const [, init] = fetchMock.mock.calls[1];
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({ language: "hi-IN" });
+    expect(speak).toHaveBeenCalledTimes(1);
+    expect(speak.mock.calls[0][0].lang).toBe("hi-IN");
+  });
+
+  it("applies configured voicePersonaKey rate and pitch to web TTS (TVOI-024)", async () => {
+    const speak = vi.fn();
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: { cancel, speak, getVoices: () => [] },
+    });
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      voice: unknown = null;
+      rate = 1;
+      pitch = 1;
+      constructor(t: string) {
+        this.text = t;
+      }
+    }
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+    fetchMock
+      .mockResolvedValueOnce(res(true, { enabled: true, voicePersonaKey: "arjun_concise_in" }))
+      .mockResolvedValueOnce(res(true, { reply: "Welcome!" }));
+
+    render(<TalkToUsVoiceWidget />);
+    await settle();
+    fireEvent.click(screen.getByText("Talk to us"));
+    fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "Hello" } });
+    fireEvent.click(screen.getByText("Send"));
+    await settle();
+    expect(speak).toHaveBeenCalledTimes(1);
+    expect(speak.mock.calls[0][0].rate).toBe(1.05);
+    expect(speak.mock.calls[0][0].pitch).toBe(0.92);
+  });
+
+  it("cancels active speechSynthesis and aborts in-flight turn on barge-in (TVOI-032)", async () => {
+    const rec = { lang: "", interimResults: false, continuous: false, onresult: null, onerror: null, onend: null, start: vi.fn(), stop: vi.fn(), abort };
+    (window as unknown as Json).webkitSpeechRecognition = function () {
+      return rec;
+    };
+    let capturedSignal: AbortSignal | undefined;
+    fetchMock
+      .mockResolvedValueOnce(res(true, { enabled: true }))
+      .mockImplementationOnce((_url: string, init?: RequestInit) => {
+        capturedSignal = init?.signal as AbortSignal | undefined;
+        return new Promise(() => {
+          /* pending in-flight request */
+        });
+      });
+
+    render(<TalkToUsVoiceWidget />);
+    await settle();
+    fireEvent.click(screen.getByText("Talk to us"));
+    fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "Check availability" } });
+    fireEvent.click(screen.getByText("Send"));
+    expect(capturedSignal?.aborted).toBe(false);
+
+    // Tapping Speak while busy/speaking interrupts playback and aborts stale turn
+    fireEvent.click(screen.getByTestId("voice-mic"));
+    expect(cancel).toHaveBeenCalled();
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(rec.start).toHaveBeenCalled();
+  });
+
+  it("shows post-call CSAT rating card after a turn and submits to /api/public/voice/rating (TVOI-019)", async () => {
+    fetchMock
+      .mockResolvedValueOnce(res(true, { enabled: true }))
+      .mockResolvedValueOnce(res(true, { reply: "Rooms are open." }))
+      .mockResolvedValueOnce(res(true, { ok: true }));
+
+    render(<TalkToUsVoiceWidget />);
+    await settle();
+    fireEvent.click(screen.getByText("Talk to us"));
+    fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "Open?" } });
+    fireEvent.click(screen.getByText("Send"));
+    await settle();
+
+    fireEvent.click(screen.getByTestId("voice-hangup"));
+    expect(screen.getByTestId("voice-csat-card")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("voice-csat-star-5"));
+    fireEvent.change(screen.getByTestId("voice-csat-comment"), { target: { value: "Very helpful!" } });
+    fireEvent.click(screen.getByTestId("voice-csat-submit"));
+    await settle();
+
+    const [url, init] = fetchMock.mock.calls[2];
+    expect(url).toBe("https://api.test/api/public/voice/rating");
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
+      rating: 5,
+      comment: "Very helpful!",
+    });
+    expect(screen.getByText("Thanks for your feedback!")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("voice-csat-done"));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
