@@ -32,6 +32,7 @@ import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/Top
 import {
   computeFallbackFlexWindow,
   formatMatchedWindowBadge,
+  parseFlexDays,
   parseFlexLength,
   parseFlexMonths,
 } from '@/utils/flexibleSearch';
@@ -590,6 +591,10 @@ export default function MarketplaceHomepage() {
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
     if (checkOut) p.set('checkOut', checkOut);
+    const flexDays = parseFlexDays(searchParams.get('flexDays'));
+    if (flexDays > 0 && checkIn && checkOut) {
+      p.set('flexDays', String(flexDays));
+    }
     const flexLength = parseFlexLength(searchParams.get('flexLength'));
     if (flexLength && !checkIn && !checkOut) {
       p.set('flexLength', flexLength);
@@ -813,6 +818,10 @@ export default function MarketplaceHomepage() {
     if (checkIn) p.set('checkIn', checkIn);
     const checkOut = searchParams.get('checkOut');
     if (checkOut) p.set('checkOut', checkOut);
+    const flexDays = parseFlexDays(searchParams.get('flexDays'));
+    if (flexDays > 0 && checkIn && checkOut) {
+      p.set('flexDays', String(flexDays));
+    }
     const flexLength = parseFlexLength(searchParams.get('flexLength'));
     if (flexLength && !checkIn && !checkOut) {
       p.set('flexLength', flexLength);

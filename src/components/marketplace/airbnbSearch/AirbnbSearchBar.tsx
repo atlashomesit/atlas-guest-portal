@@ -20,6 +20,7 @@ import {
   FLEX_LENGTH_OPTIONS,
   formatFlexSummary,
   getUpcomingFlexMonths,
+  parseFlexDays,
   parseFlexLength,
   parseFlexMonths,
   type FlexLength,
@@ -63,6 +64,9 @@ function buildSearchParams(
   p.set('location', values.destination.trim());
   if (values.checkIn) p.set('checkIn', values.checkIn);
   if (values.checkOut) p.set('checkOut', values.checkOut);
+  if (values.flexDays && values.flexDays > 0 && values.checkIn && values.checkOut) {
+    p.set('flexDays', String(values.flexDays));
+  }
   if (values.flexLength) {
     p.set('flexLength', values.flexLength);
     if (values.flexMonths && values.flexMonths.length > 0) {
@@ -102,6 +106,7 @@ export default function AirbnbSearchBar({
     endDate: null,
   });
   const [dateMode, setDateMode] = useState<'dates' | 'flexible'>('dates');
+  const [flexDays, setFlexDays] = useState<number>(0);
   const [flexLength, setFlexLength] = useState<FlexLength>('weekend');
   const [flexMonths, setFlexMonths] = useState<string[]>([]);
   const upcomingMonths = useMemo(() => getUpcomingFlexMonths(today, 6), [today]);
@@ -193,11 +198,13 @@ export default function AirbnbSearchBar({
     }
     const start = parseIsoDate(checkIn);
     const end = parseIsoDate(checkOut);
+    const urlFlexDays = parseFlexDays(searchParams.get('flexDays'));
     const urlFlexLength = parseFlexLength(searchParams.get('flexLength'));
     const urlFlexMonths = parseFlexMonths(searchParams.get('flexMonths'));
     if (start || end) {
       setDateRange({ startDate: start, endDate: end });
       setDateMode('dates');
+      setFlexDays(urlFlexDays);
     } else if (urlFlexLength) {
       setDateMode('flexible');
       setFlexLength(urlFlexLength);
@@ -308,6 +315,7 @@ export default function AirbnbSearchBar({
       destination: destination.trim(),
       checkIn: dateMode === 'dates' && dateRange.startDate ? toCalendarISO(dateRange.startDate) : undefined,
       checkOut: dateMode === 'dates' && dateRange.endDate ? toCalendarISO(dateRange.endDate) : undefined,
+      flexDays: dateMode === 'dates' && dateRange.startDate && dateRange.endDate && flexDays > 0 ? flexDays : undefined,
       flexLength: dateMode === 'flexible' ? flexLength : undefined,
       flexMonths: dateMode === 'flexible' && flexMonths.length > 0 ? flexMonths : undefined,
       guests: guestCounts,
@@ -332,6 +340,9 @@ export default function AirbnbSearchBar({
       p.set('city', values.destination.trim());
       if (values.checkIn) p.set('checkIn', values.checkIn);
       if (values.checkOut) p.set('checkOut', values.checkOut);
+      if (values.flexDays && values.flexDays > 0 && values.checkIn && values.checkOut) {
+        p.set('flexDays', String(values.flexDays));
+      }
       if (values.flexLength) {
         p.set('flexLength', values.flexLength);
         if (values.flexMonths && values.flexMonths.length > 0) {
@@ -351,6 +362,7 @@ export default function AirbnbSearchBar({
     setDestinationQuery('');
     setDateRange({ startDate: null, endDate: null });
     setDateMode('dates');
+    setFlexDays(0);
     setFlexLength('weekend');
     setFlexMonths([]);
     setGuestCounts({ adults: 2, children: 0, infants: 0, pets: 0 });
@@ -361,7 +373,7 @@ export default function AirbnbSearchBar({
     closeAllPanels();
     // TASK-1040280: clear URL search params while preserving brand and utm_* params
     const next = new URLSearchParams(searchParams);
-    for (const key of ['destination', 'location', 'city', 'checkIn', 'checkOut', 'flexLength', 'flexMonths', 'guests', 'adults', 'children', 'infants', 'pets']) {
+    for (const key of ['destination', 'location', 'city', 'checkIn', 'checkOut', 'flexDays', 'flexLength', 'flexMonths', 'guests', 'adults', 'children', 'infants', 'pets']) {
       next.delete(key);
     }
     navigate({ search: next.toString() }, { replace: true });
@@ -400,7 +412,9 @@ export default function AirbnbSearchBar({
     dateMode === 'flexible'
       ? formatFlexSummary(flexLength, flexMonths)
       : dateRange.startDate && dateRange.endDate
-        ? `${format(dateRange.startDate, 'dd MMM')} – ${format(dateRange.endDate, 'dd MMM')}`
+        ? `${format(dateRange.startDate, 'dd MMM')} – ${format(dateRange.endDate, 'dd MMM')}${
+            flexDays > 0 ? ` (±${flexDays} ${flexDays === 1 ? 'day' : 'days'})` : ''
+          }`
         : 'Add dates';
   const nights =
     dateMode === 'dates' && dateRange.startDate && dateRange.endDate
@@ -565,6 +579,33 @@ export default function AirbnbSearchBar({
             }}
             afterCalendar={
               <div className="mt-3 flex flex-col gap-3 border-t border-border pt-3" data-testid="date-picker-mode-footer">
+                {/* MKT-059: ±1 / ±2 / ±3 day flexibility chips */}
+                <div className="flex flex-wrap items-center justify-center gap-2" role="group" aria-label="Date flexibility" data-testid="flex-days-chips">
+                  {[
+                    { value: 0, label: 'Exact dates' },
+                    { value: 1, label: '±1 day' },
+                    { value: 2, label: '±2 days' },
+                    { value: 3, label: '±3 days' },
+                  ].map((chip) => {
+                    const active = flexDays === chip.value;
+                    return (
+                      <button
+                        key={chip.value}
+                        type="button"
+                        data-testid={`flex-days-${chip.value}`}
+                        aria-pressed={active}
+                        onClick={() => setFlexDays(chip.value)}
+                        className={`min-h-[36px] rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                          active
+                            ? 'border-black bg-black text-white'
+                            : 'border-border bg-bg-surface text-text-primary hover:border-text-primary'
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="inline-flex self-center rounded-full bg-bg-muted p-1" role="tablist" aria-label="Date search mode">
                   <button
                     type="button"

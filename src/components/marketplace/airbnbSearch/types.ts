@@ -11,6 +11,7 @@ export type AirbnbSearchValues = {
   destination: string;
   checkIn?: string;
   checkOut?: string;
+  flexDays?: number;
   flexLength?: FlexLength;
   flexMonths?: string[];
   guests: GuestCounts;
