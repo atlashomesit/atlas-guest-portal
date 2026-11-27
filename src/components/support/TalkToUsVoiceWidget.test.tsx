@@ -126,4 +126,36 @@ describe("TalkToUsVoiceWidget", () => {
     expect(speak).toHaveBeenCalledTimes(1);
     expect(speak.mock.calls[0][0].lang).toBe("hi-IN");
   });
+
+  it("applies configured voicePersonaKey rate and pitch to web TTS (TVOI-024)", async () => {
+    const speak = vi.fn();
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: { cancel, speak, getVoices: () => [] },
+    });
+    class FakeUtterance {
+      text: string;
+      lang = "";
+      voice: unknown = null;
+      rate = 1;
+      pitch = 1;
+      constructor(t: string) {
+        this.text = t;
+      }
+    }
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+    fetchMock
+      .mockResolvedValueOnce(res(true, { enabled: true, voicePersonaKey: "arjun_concise_in" }))
+      .mockResolvedValueOnce(res(true, { reply: "Welcome!" }));
+
+    render(<TalkToUsVoiceWidget />);
+    await settle();
+    fireEvent.click(screen.getByText("Talk to us"));
+    fireEvent.change(screen.getByLabelText("Type your question"), { target: { value: "Hello" } });
+    fireEvent.click(screen.getByText("Send"));
+    await settle();
+    expect(speak).toHaveBeenCalledTimes(1);
+    expect(speak.mock.calls[0][0].rate).toBe(1.05);
+    expect(speak.mock.calls[0][0].pitch).toBe(0.92);
+  });
 });

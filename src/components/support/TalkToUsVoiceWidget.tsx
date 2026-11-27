@@ -29,6 +29,31 @@ type SpeechWindow = {
 
 export type VoiceLanguage = "en-IN" | "hi-IN" | "te-IN";
 
+export type VoicePersonaKey =
+  | "saanvi_warm_in"
+  | "arjun_concise_in"
+  | "meera_hospitality_in"
+  | "rohan_friendly_in";
+
+export interface VoicePersonaProfile {
+  label: string;
+  rate: number;
+  pitch: number;
+  preferredGender: "female" | "male";
+}
+
+export const VOICE_PERSONA_PROFILES: Record<VoicePersonaKey, VoicePersonaProfile> = {
+  saanvi_warm_in: { label: "Saanvi", rate: 0.98, pitch: 1.06, preferredGender: "female" },
+  arjun_concise_in: { label: "Arjun", rate: 1.05, pitch: 0.92, preferredGender: "male" },
+  meera_hospitality_in: { label: "Meera", rate: 0.96, pitch: 1.04, preferredGender: "female" },
+  rohan_friendly_in: { label: "Rohan", rate: 1.02, pitch: 0.96, preferredGender: "male" },
+};
+
+export function resolveVoicePersona(key?: string | null): VoicePersonaProfile | null {
+  if (!key) return null;
+  return (VOICE_PERSONA_PROFILES as Record<string, VoicePersonaProfile | undefined>)[key] ?? null;
+}
+
 export const VOICE_LANGUAGE_OPTIONS: ReadonlyArray<{ code: VoiceLanguage; label: string }> = [
   { code: "en-IN", label: "English" },
   { code: "hi-IN", label: "हिंदी" },
@@ -67,6 +92,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
   const [language, setLanguage] = useState<VoiceLanguage>("en-IN");
+  const [personaKey, setPersonaKey] = useState<string | null>(null);
   const [followUpUrl, setFollowUpUrl] = useState<string | null>(null);
   const sessionId = useRef<string>(newSessionId());
   const recognition = useRef<SpeechRecognitionLike | null>(null);
@@ -77,8 +103,11 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
       try {
         const res = await fetch(`${getApiBaseUrl()}/api/public/voice/config?surface=guest`, { headers: getApiHeaders() });
         if (!res.ok) return;
-        const body = (await res.json()) as { enabled?: boolean };
-        if (!cancelled && body?.enabled === true) setEnabled(true);
+        const body = (await res.json()) as { enabled?: boolean; voicePersonaKey?: string | null };
+        if (!cancelled && body?.enabled === true) {
+          setEnabled(true);
+          if (body.voicePersonaKey) setPersonaKey(body.voicePersonaKey);
+        }
       } catch {
         /* fail-safe: stay hidden */
       }
@@ -128,6 +157,11 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
           if (typeof window !== "undefined" && window.speechSynthesis && typeof SpeechSynthesisUtterance !== "undefined") {
             const u = new SpeechSynthesisUtterance(reply);
             u.lang = language;
+            const persona = resolveVoicePersona(personaKey);
+            if (persona) {
+              u.rate = persona.rate;
+              u.pitch = persona.pitch;
+            }
             const v = pickIndianVoice(language);
             if (v) u.voice = v;
             window.speechSynthesis.speak(u);
@@ -140,7 +174,7 @@ export default function TalkToUsVoiceWidget({ listingId }: TalkToUsVoiceWidgetPr
         setBusy(false);
       }
     },
-    [listingId, language],
+    [listingId, language, personaKey],
   );
 
   const startListening = useCallback(() => {
