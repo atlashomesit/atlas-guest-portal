@@ -124,3 +124,50 @@ export function matchesAmenityFilter(
 
   return text.includes(term);
 }
+
+const WORKATION_WIFI_TOKENS = new Set([
+  'wifi',
+  'highspeedwifi',
+  'wifi100mbps',
+  'wifi300mbps',
+]);
+
+const WORKATION_WORKSPACE_TOKENS = new Set([
+  'workspacededicated',
+  'dedicatedworkspace',
+  'desk',
+  'coworkingdesk',
+]);
+
+/** MKT-067: True when listing declares Wi-Fi via canonical code or WifiSpeedMbps >= 25. */
+export function hasListingWifi(item: {
+  wifiSpeedMbps?: number | null;
+  amenityCodes?: (string | null | undefined)[] | null;
+}): boolean {
+  if (typeof item.wifiSpeedMbps === 'number' && item.wifiSpeedMbps >= 25) return true;
+  if (!Array.isArray(item.amenityCodes)) return false;
+  return item.amenityCodes.some(
+    (c) => typeof c === 'string' && WORKATION_WIFI_TOKENS.has(normalizeAmenityToken(c)),
+  );
+}
+
+/** MKT-067: True when listing declares a dedicated workspace via API flag or canonical code. */
+export function hasListingWorkspace(item: {
+  hasDedicatedWorkspace?: boolean | null;
+  amenityCodes?: (string | null | undefined)[] | null;
+}): boolean {
+  if (item.hasDedicatedWorkspace === true) return true;
+  if (!Array.isArray(item.amenityCodes)) return false;
+  return item.amenityCodes.some(
+    (c) => typeof c === 'string' && WORKATION_WORKSPACE_TOKENS.has(normalizeAmenityToken(c)),
+  );
+}
+
+/** MKT-067: True only when listing has BOTH Wi-Fi and a dedicated workspace. */
+export function hasListingWorkation(item: {
+  hasDedicatedWorkspace?: boolean | null;
+  wifiSpeedMbps?: number | null;
+  amenityCodes?: (string | null | undefined)[] | null;
+}): boolean {
+  return hasListingWifi(item) && hasListingWorkspace(item);
+}
