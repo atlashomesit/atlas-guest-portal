@@ -27,7 +27,8 @@ type SpeechWindow = {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike;
 };
 
-export const VOICE_DISCLOSURE = "Atlas AI voice assistant — answers stay & availability questions.";
+export const VOICE_DISCLOSURE =
+  "Hi, I'm the AI voice assistant for this property — you can ask for a person or a human callback at any time.";
 
 const newSessionId = (): string =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
