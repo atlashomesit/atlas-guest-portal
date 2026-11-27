@@ -31,6 +31,7 @@ import RefundStatusTracker, { type GuestRefund } from "../components/booking/Ref
 import { BookingGstDetailsCard } from "../components/booking/BookingGstDetailsCard"; // GUEST-084
 import { CoTravellersCard, type BookingCoTraveller } from "../components/booking/CoTravellersCard"; // GUEST-086
 import { SelfCheckoutCard } from "../components/booking/SelfCheckoutCard"; // GUEST-087
+import { LostItemReportCard, type LostItemReport } from "../components/booking/LostItemReportCard"; // GUEST-093
 import BookingPaymentPlanCard, { type GuestBookingInstalment } from "../components/booking/BookingPaymentPlanCard";
 import {
   buildReceiptHtml,
@@ -1896,6 +1897,18 @@ export default function BookingConfirmationPage() {
             checkoutDateIso={booking.checkoutDateIso ?? summaryDisplayDateToIso(booking.checkoutDate)}
             guidebookCheckoutChecklistText={booking.guidebookCheckoutChecklistText}
             guestReportedCheckoutAtUtc={booking.guestReportedCheckoutAtUtc}
+          />
+        )}
+
+        {/* GUEST-093: Post-checkout "Report a left-behind item" card */}
+        {!isCancelled && (
+          <LostItemReportCard
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            status={booking.status}
+            checkoutDateIso={booking.checkoutDateIso ?? summaryDisplayDateToIso(booking.checkoutDate)}
+            guestReportedCheckoutAtUtc={booking.guestReportedCheckoutAtUtc}
+            initialReports={(booking as { lostItemReports?: LostItemReport[] }).lostItemReports}
           />
         )}
 
