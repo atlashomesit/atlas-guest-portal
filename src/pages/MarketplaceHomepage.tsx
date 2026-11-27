@@ -23,6 +23,10 @@ import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
+import PriceRangeHistogram, {
+  buildFallbackPriceHistogram,
+  type PriceHistogramDto,
+} from '@/components/marketplace/PriceRangeHistogram';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
 import {
   hasListingWifi,
@@ -248,7 +252,14 @@ export function formatExternalReviewsLabel(
   return count === 1 ? `1 review on ${normalizedSource}` : `${count} reviews on ${normalizedSource}`;
 }
 
-type ApiResponse = { items: MarketplaceItem[]; total: number; page: number; pageSize: number; topHostEnabled?: boolean };
+type ApiResponse = {
+  items: MarketplaceItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  topHostEnabled?: boolean;
+  priceHistogram?: PriceHistogramDto | null;
+};
 
 // TASK-101491: the grid requests one page at a time and appends. This constant is the request
 // size, NOT a ceiling on what the page can show - everything past it is reachable via the
@@ -694,11 +705,47 @@ export default function MarketplaceHomepage() {
     }
     return p.toString();
   }, [searchParams]);
-  // TASK-4413 / MKT-016: price-range control — forwarded as minPrice/maxPrice query params to
-  // GET /marketplace/listings so server-side filtering and pagination work across all pages,
-  // while keeping the client-side filter as a safety net.
-  const [minPriceInput, setMinPriceInput] = useState('');
-  const [maxPriceInput, setMaxPriceInput] = useState('');
+  // TASK-4413 / MKT-016 / MKT-071: price-range control synced with ?minPrice=&maxPrice=
+  // and paired with the visual price distribution histogram.
+  const [minPriceInput, setMinPriceInput] = useState(() => searchParams.get('minPrice') ?? '');
+  const [maxPriceInput, setMaxPriceInput] = useState(() => searchParams.get('maxPrice') ?? '');
+  const [serverPriceHistogram, setServerPriceHistogram] = useState<PriceHistogramDto | null>(null);
+
+  const handleMinPriceInputChange = useCallback((val: string) => {
+    setMinPriceInput(val);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (val.trim() !== '') next.set('minPrice', val.trim());
+      else next.delete('minPrice');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleMaxPriceInputChange = useCallback((val: string) => {
+    setMaxPriceInput(val);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (val.trim() !== '') next.set('maxPrice', val.trim());
+      else next.delete('maxPrice');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleClearPrice = useCallback(() => {
+    setMinPriceInput('');
+    setMaxPriceInput('');
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('minPrice');
+      next.delete('maxPrice');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const effectivePriceHistogram = useMemo(
+    () => serverPriceHistogram ?? buildFallbackPriceHistogram(items.map((i) => i.pricePerNight)),
+    [serverPriceHistogram, items],
+  );
 
   const minPrice = useMemo(() => {
     const n = Number(minPriceInput);
@@ -784,6 +831,7 @@ export default function MarketplaceHomepage() {
         const enriched = await enrichMarketplaceCoverItems(data.items ?? []);
         if (cancelled) return;
         setTopHostFeatureEnabled(Boolean(data.topHostEnabled || enriched.some((x) => x.topHost)));
+        setServerPriceHistogram(data.priceHistogram ?? null);
         setItems(enriched);
         // TASK-101491: trust the server's count. Note the API returns the CURRENT PAGE's match
         // count (not a global one) when a `city` filter is applied - city filtering happens after
@@ -1188,45 +1236,14 @@ export default function MarketplaceHomepage() {
         onToggleWorkation={() => handleToggleBooleanParam('workation', workation)}
       />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label htmlFor="marketplace-min-price" className="text-sm font-medium text-text-muted">
-            Price / night
-          </label>
-          <input
-            id="marketplace-min-price"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            placeholder="Min"
-            value={minPriceInput}
-            onChange={(e) => setMinPriceInput(e.target.value)}
-            className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
-          />
-          <span aria-hidden className="text-text-muted">–</span>
-          <input
-            id="marketplace-max-price"
-            type="number"
-            min={0}
-            inputMode="numeric"
-            placeholder="Max"
-            aria-label="Max price"
-            value={maxPriceInput}
-            onChange={(e) => setMaxPriceInput(e.target.value)}
-            className="min-h-[40px] w-24 rounded-lg border border-border px-3 py-1.5 text-sm"
-          />
-          {(minPriceInput !== '' || maxPriceInput !== '') && (
-            <button
-              type="button"
-              onClick={() => {
-                setMinPriceInput('');
-                setMaxPriceInput('');
-              }}
-              className="min-h-[40px] rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-muted"
-            >
-              Clear price
-            </button>
-          )}
-        </div>
+        <PriceRangeHistogram
+          histogram={effectivePriceHistogram}
+          minPriceInput={minPriceInput}
+          maxPriceInput={maxPriceInput}
+          onMinPriceChange={handleMinPriceInputChange}
+          onMaxPriceChange={handleMaxPriceInputChange}
+          onClear={handleClearPrice}
+        />
 
         {/* MKT-064: Bedrooms, Beds, and Bathrooms steppers */}
         <div
