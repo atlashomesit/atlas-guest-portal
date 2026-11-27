@@ -65,6 +65,9 @@ export interface MenuItem {
   imageUrl?: string | null;
   /** POS-017: modifier groups the guest can pick from (the API sends only the available options). Read through parseModifierGroups. */
   modifierGroups?: unknown;
+  /** POS-137: per-item serving schedule availability. */
+  isAvailableNow?: boolean;
+  servingWindowLabel?: string | null;
 }
 
 export interface MenuCategory {
@@ -104,6 +107,10 @@ export interface MenuResponse {
   orderingPauseMessage?: string | null;
   estimatedPrepMinutes?: number | null;
   qrPrepTimeBufferMinutes?: number | null;
+  /** POS-137: kitchen operating hours status. */
+  isKitchenOpen?: boolean;
+  kitchenHoursSummary?: string | null;
+  nextOpenLabel?: string | null;
 }
 
 export interface MenuSuggestionOffer {
@@ -1351,6 +1358,38 @@ export default function QrMenuPage() {
           </section>
         ) : null}
 
+        {/* POS-137: Kitchen closed banner */}
+        {menu?.isKitchenOpen === false && (
+          <div
+            role="status"
+            data-testid="qr-kitchen-closed-banner"
+            style={{
+              backgroundColor: "#f3f4f6",
+              border: "1px solid #d1d5db",
+              color: "#374151",
+              borderRadius: "12px",
+              padding: "12px 14px",
+              marginBottom: "14px",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              fontSize: "13px",
+              fontWeight: 600,
+              lineHeight: "1.4",
+            }}
+          >
+            <Clock size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
+            <div>
+              <div>Kitchen is currently closed{menu.nextOpenLabel ? ` — ${menu.nextOpenLabel}` : "."}</div>
+              {menu.kitchenHoursSummary && (
+                <div style={{ fontSize: "12px", fontWeight: 500, color: "#6b7280", marginTop: "2px" }}>
+                  Kitchen hours: {menu.kitchenHoursSummary}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* POS-136: Kitchen ordering paused or busy-kitchen extra-wait banner */}
         {orderingPausedBannerText && (
           <div
@@ -1568,6 +1607,8 @@ export default function QrMenuPage() {
                     const modifierGroups = parseModifierGroups(item.modifierGroups);
                     const hasModifiers = modifierGroups.length > 0;
                     const orderable = isOrderable(modifierGroups);
+                    const isOutsideServingWindow = item.isAvailableNow === false;
+                    const blockedBySchedule = isOutsideServingWindow && fulfillAt === "NOW";
                     // An item with choices is added through its picker, so its row shows how many are already in the order.
                     const inCartQty = hasModifiers
                       ? cartLines.reduce((sum, l) => (l.item.id === item.id ? sum + l.qty : sum), 0)
@@ -1648,6 +1689,28 @@ export default function QrMenuPage() {
                           <span style={{ fontSize: "14px", fontWeight: 800, color: "#9e402a" }}>
                             ₹{item.price.toLocaleString("en-IN")}
                           </span>
+
+                          {isOutsideServingWindow && (
+                            <div
+                              data-testid={`menu-item-serving-window-${item.id}`}
+                              style={{
+                                marginTop: "6px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "2px 8px",
+                                borderRadius: "999px",
+                                backgroundColor: "#f3f4f6",
+                                border: "1px solid #d1d5db",
+                                color: "#4b5563",
+                                fontSize: "11px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              <Clock size={11} />
+                              <span>{item.servingWindowLabel?.trim() || "Outside serving hours"}</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* POS-014: dish photo, lazy-loaded at a fixed size so the list does not jump */}
@@ -1716,21 +1779,27 @@ export default function QrMenuPage() {
                             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                               <button
                                 onClick={() => handleAddToCart(item)}
-                                disabled={hasModifiers && !orderable}
+                                disabled={(hasModifiers && !orderable) || blockedBySchedule}
                                 style={{
                                   backgroundColor: "#fff",
-                                  border: "1.5px solid #9e402a",
-                                  color: "#9e402a",
+                                  border: `1.5px solid ${blockedBySchedule ? "#9ca3af" : "#9e402a"}`,
+                                  color: blockedBySchedule ? "#6b7280" : "#9e402a",
                                   padding: "6px 14px",
                                   borderRadius: "8px",
                                   fontWeight: 700,
                                   fontSize: "13px",
-                                  cursor: hasModifiers && !orderable ? "not-allowed" : "pointer",
-                                  opacity: hasModifiers && !orderable ? 0.5 : 1,
+                                  cursor: (hasModifiers && !orderable) || blockedBySchedule ? "not-allowed" : "pointer",
+                                  opacity: (hasModifiers && !orderable) || blockedBySchedule ? 0.55 : 1,
                                 }}
                                 data-testid={`add-to-cart-${item.id}`}
                               >
-                                {hasModifiers && !orderable ? "Unavailable" : hasModifiers ? "CHOOSE +" : "ADD +"}
+                                {blockedBySchedule
+                                  ? "Not served now"
+                                  : hasModifiers && !orderable
+                                    ? "Unavailable"
+                                    : hasModifiers
+                                      ? "CHOOSE +"
+                                      : "ADD +"}
                               </button>
                               {hasModifiers && inCartQty > 0 && (
                                 <span style={{ fontSize: "11px", fontWeight: 700, color: "#9e402a" }}>{inCartQty} in your order</span>
