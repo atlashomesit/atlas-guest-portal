@@ -179,4 +179,26 @@ describe('MarketplaceHomepage MKT-063..MKT-073 filters', () => {
     // Only listing 101 (4.8★, 24 reviews) qualifies; 102 (4.2★) and 103 (unrated) are excluded
     expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
   });
+
+  it('MKT-066: filters by Instant Book and House rules (Events allowed, Smoking allowed)', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-instant-book'));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(2);
+
+    fireEvent.click(screen.getByTestId('marketplace-filter-events-allowed'));
+    await settle();
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('instantBook=true') && u.includes('eventsAllowed=true'))).toBe(true);
+  });
 });

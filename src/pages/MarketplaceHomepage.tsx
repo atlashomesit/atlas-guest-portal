@@ -110,6 +110,9 @@ type MarketplaceItem = {
   bedrooms?: number | null;
   beds?: number | null;
   bathrooms?: number | null;
+  // MKT-066: house rules
+  eventsAllowed?: boolean | null;
+  smokingAllowed?: boolean | null;
 };
 
 /**
@@ -416,6 +419,16 @@ export default function MarketplaceHomepage() {
   const [minRating, setMinRating] = useState<number | null>(
     () => parseMinRatingParam(searchParams.get('minRating')),
   );
+  // MKT-066: Instant Book & House Rules filters synced with URL
+  const [instantBook, setInstantBook] = useState<boolean>(
+    () => searchParams.get('instantBook') === 'true',
+  );
+  const [eventsAllowed, setEventsAllowed] = useState<boolean>(
+    () => searchParams.get('eventsAllowed') === 'true',
+  );
+  const [smokingAllowed, setSmokingAllowed] = useState<boolean>(
+    () => searchParams.get('smokingAllowed') === 'true',
+  );
 
   // MKT-048: Map bounding box synced with URL (?swLat=&swLng=&neLat=&neLng=)
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(() =>
@@ -443,6 +456,9 @@ export default function MarketplaceHomepage() {
     setMinBeds(parsePositiveIntParam(searchParams.get('minBeds')));
     setMinBathrooms(parsePositiveIntParam(searchParams.get('minBathrooms')));
     setMinRating(parseMinRatingParam(searchParams.get('minRating')));
+    setInstantBook(searchParams.get('instantBook') === 'true');
+    setEventsAllowed(searchParams.get('eventsAllowed') === 'true');
+    setSmokingAllowed(searchParams.get('smokingAllowed') === 'true');
     setMapBounds(parseBoundsFromSearchParams(searchParams));
 
     const s = searchParams.get('sort') || searchParams.get('sortBy');
@@ -536,6 +552,22 @@ export default function MarketplaceHomepage() {
     }, { replace: true });
   }, [setSearchParams]);
 
+  const handleToggleBooleanParam = useCallback(
+    (key: 'instantBook' | 'eventsAllowed' | 'smokingAllowed', currentVal: boolean) => {
+      const nextVal = !currentVal;
+      if (key === 'instantBook') setInstantBook(nextVal);
+      if (key === 'eventsAllowed') setEventsAllowed(nextVal);
+      if (key === 'smokingAllowed') setSmokingAllowed(nextVal);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (nextVal) next.set(key, 'true');
+        else next.delete(key);
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams],
+  );
+
   const handleSearchThisArea = useCallback(() => {
     if (!pendingMapBounds) return;
     const b = pendingMapBounds;
@@ -626,6 +658,9 @@ export default function MarketplaceHomepage() {
       'minBeds',
       'minBathrooms',
       'minRating',
+      'instantBook',
+      'eventsAllowed',
+      'smokingAllowed',
       'swLat',
       'swLng',
       'neLat',
@@ -687,6 +722,9 @@ export default function MarketplaceHomepage() {
     if (minBeds != null) p.set('minBeds', String(minBeds));
     if (minBathrooms != null) p.set('minBathrooms', String(minBathrooms));
     if (minRating != null) p.set('minRating', String(minRating));
+    if (instantBook) p.set('instantBook', 'true');
+    if (eventsAllowed) p.set('eventsAllowed', 'true');
+    if (smokingAllowed) p.set('smokingAllowed', 'true');
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -695,7 +733,7 @@ export default function MarketplaceHomepage() {
     }
     if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, mapBounds, sortBy]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, mapBounds, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -840,6 +878,15 @@ export default function MarketplaceHomepage() {
           (item.reviewCount == null || item.reviewCount > 0),
       );
     }
+    if (instantBook) {
+      result = result.filter((item) => item.isInstantBookable === true);
+    }
+    if (eventsAllowed) {
+      result = result.filter((item) => item.eventsAllowed === true);
+    }
+    if (smokingAllowed) {
+      result = result.filter((item) => item.smokingAllowed === true);
+    }
 
     if (freeCancellation) {
       result = result.filter((item) => item.hasFreeCancellation !== false);
@@ -894,7 +941,7 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -930,6 +977,9 @@ export default function MarketplaceHomepage() {
     if (minBeds != null) p.set('minBeds', String(minBeds));
     if (minBathrooms != null) p.set('minBathrooms', String(minBathrooms));
     if (minRating != null) p.set('minRating', String(minRating));
+    if (instantBook) p.set('instantBook', 'true');
+    if (eventsAllowed) p.set('eventsAllowed', 'true');
+    if (smokingAllowed) p.set('smokingAllowed', 'true');
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -937,7 +987,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1085,7 +1135,7 @@ export default function MarketplaceHomepage() {
         <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
           open={wideFilters || filtersOpen}
           onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
-          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || minRating != null || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || minRating != null || instantBook || eventsAllowed || smokingAllowed || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
           <div className="marketplace-secondary-content">
             <ExploreDestinationsStrip listings={items} />
             <div className="marketplace-refinements">
@@ -1111,6 +1161,8 @@ export default function MarketplaceHomepage() {
         onToggleSelfCheckIn={handleToggleSelfCheckIn}
         minRating={minRating}
         onSelectMinRating={handleMinRatingChange}
+        instantBook={instantBook}
+        onToggleInstantBook={() => handleToggleBooleanParam('instantBook', instantBook)}
       />
 
         <div className="flex flex-wrap items-center gap-2">
@@ -1215,6 +1267,40 @@ export default function MarketplaceHomepage() {
               </button>
             );
           })}
+        </div>
+
+        {/* MKT-066: House rules toggles (Events allowed, Smoking allowed) */}
+        <div
+          className="mt-3 flex flex-wrap items-center gap-2"
+          data-testid="marketplace-filter-house-rules"
+        >
+          <span className="text-xs font-semibold text-text-muted">House rules:</span>
+          <button
+            type="button"
+            data-testid="marketplace-filter-events-allowed"
+            aria-pressed={eventsAllowed}
+            onClick={() => handleToggleBooleanParam('eventsAllowed', eventsAllowed)}
+            className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors ${
+              eventsAllowed
+                ? 'bg-black text-white border-black'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            Events allowed
+          </button>
+          <button
+            type="button"
+            data-testid="marketplace-filter-smoking-allowed"
+            aria-pressed={smokingAllowed}
+            onClick={() => handleToggleBooleanParam('smokingAllowed', smokingAllowed)}
+            className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium border transition-colors ${
+              smokingAllowed
+                ? 'bg-black text-white border-black'
+                : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            Smoking allowed
+          </button>
         </div>
 
             </div>

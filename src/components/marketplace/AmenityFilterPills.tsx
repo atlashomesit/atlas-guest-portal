@@ -15,6 +15,8 @@ export type AmenityFilterPillsProps = {
   onToggleSelfCheckIn?: () => void;
   minRating?: number | null;
   onSelectMinRating?: (rating: number | null) => void;
+  instantBook?: boolean;
+  onToggleInstantBook?: () => void;
 };
 
 export default function AmenityFilterPills({
@@ -32,6 +34,8 @@ export default function AmenityFilterPills({
   onToggleSelfCheckIn,
   minRating = null,
   onSelectMinRating,
+  instantBook = false,
+  onToggleInstantBook,
 }: AmenityFilterPillsProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="marketplace-amenities-pills">
@@ -114,6 +118,22 @@ export default function AmenityFilterPills({
         >
           <span aria-hidden="true">★</span>
           <span>4.5★ &amp; up</span>
+        </button>
+      )}
+      {onToggleInstantBook && (
+        <button
+          type="button"
+          data-testid="marketplace-filter-instant-book"
+          aria-pressed={instantBook}
+          className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+            instantBook
+              ? 'bg-black text-white border-black'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+          }`}
+          onClick={onToggleInstantBook}
+        >
+          <span aria-hidden="true">⚡</span>
+          <span>Instant Book</span>
         </button>
       )}
       {pills.map(({ label, icon }) => {
