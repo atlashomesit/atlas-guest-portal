@@ -33,6 +33,11 @@ import {
   type CompareStayItem,
 } from '@/components/marketplace/CompareStaysDrawer';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
+import SplitStayPairCard from '@/components/marketplace/SplitStayPairCard';
+import {
+  buildClientSplitStayPairs,
+  type SplitStayPairDto,
+} from '@/utils/splitStayPairing';
 import {
   hasListingWifi,
   hasListingWorkation,
@@ -270,6 +275,7 @@ type ApiResponse = {
   pageSize: number;
   topHostEnabled?: boolean;
   priceHistogram?: PriceHistogramDto | null;
+  splitStays?: SplitStayPairDto[] | null;
 };
 
 // TASK-101491: the grid requests one page at a time and appends. This constant is the request
@@ -408,6 +414,8 @@ export default function MarketplaceHomepage() {
   const [favEpoch, setFavEpoch] = useState(0);
   const [compareIds, setCompareIds] = useState<number[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  // MKT-072: server-provided split stays (if present); falls back to client-side pairing
+  const [serverSplitStays, setServerSplitStays] = useState<SplitStayPairDto[]>([]);
 
   const toggleCompareStay = useCallback((id: number) => {
     setCompareIds((prev) => {
@@ -898,6 +906,7 @@ export default function MarketplaceHomepage() {
         if (cancelled) return;
         setTopHostFeatureEnabled(Boolean(data.topHostEnabled || enriched.some((x) => x.topHost)));
         setServerPriceHistogram(data.priceHistogram ?? null);
+        setServerSplitStays(Array.isArray(data.splitStays) ? data.splitStays : []);
         setItems(enriched);
         // TASK-101491: trust the server's count. Note the API returns the CURRENT PAGE's match
         // count (not a global one) when a `city` filter is applied - city filtering happens after
@@ -1091,6 +1100,16 @@ export default function MarketplaceHomepage() {
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
   }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, couplesWelcome, localIdAccepted, paymentTiming, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+
+  // MKT-072: Paired split stays for >= 4 night searches when exact full-stretch results < 3
+  const splitStayPairs = useMemo(() => {
+    if (serverSplitStays.length > 0) return serverSplitStays;
+    const checkIn = searchParams.get('checkIn');
+    const checkOut = searchParams.get('checkOut');
+    if (!checkIn || !checkOut) return [];
+    if (visibleItems.length >= 3) return [];
+    return buildClientSplitStayPairs(items, checkIn, checkOut, cardStay.guests ?? 2, 5);
+  }, [serverSplitStays, searchParams, visibleItems.length, items, cardStay.guests]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -1891,6 +1910,29 @@ export default function MarketplaceHomepage() {
             );
           })}
       </div>
+
+      {/* MKT-072: Paired split stays when exact full-stretch results are sparse on >= 4 night trips */}
+      {!loading && splitStayPairs.length > 0 && (
+        <section
+          data-testid="marketplace-split-stays-section"
+          className="mt-8 rounded-2xl border border-border bg-bg-muted/40 p-4 sm:p-6"
+          aria-labelledby="split-stays-heading"
+        >
+          <div className="mb-4">
+            <h2 id="split-stays-heading" className="text-lg font-bold text-text-primary">
+              Split your stay across 2 homes
+            </h2>
+            <p className="mt-1 text-sm text-text-secondary">
+              Combine two consecutive available homes in the same destination for your full trip.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {splitStayPairs.map((pair) => (
+              <SplitStayPairCard key={pair.id} pair={pair} guests={cardStay.guests ?? 2} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* TASK-101491: progressive loading. An explicit control rather than infinite scroll -
           the portal targets WCAG-AA, and an auto-appending grid strands keyboard and screen-reader
