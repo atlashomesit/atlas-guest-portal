@@ -167,8 +167,19 @@ export default function PayLinkPage() {
         const hostName = summary?.hostName || summary?.propertyName || 'Your stay';
         let result: RazorpayCheckoutResult;
         try {
+          const allowedMethods =
+            order.allowedCheckoutMethods ??
+            order.allowedPaymentMethods ??
+            summary?.allowedCheckoutMethods ??
+            summary?.allowedPaymentMethods ??
+            null;
           result = await openPayLinkCheckout(
-            { keyId: order.razorpayKeyId, orderId: order.razorpayOrderId, amountPaise: order.amountPaise },
+            {
+              keyId: order.razorpayKeyId,
+              orderId: order.razorpayOrderId,
+              amountPaise: order.amountPaise,
+              ...(allowedMethods ? { allowedCheckoutMethods: allowedMethods } : {}),
+            },
             hostName,
             `Booking #${order.bookingId}`,
           );

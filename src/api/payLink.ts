@@ -1,5 +1,6 @@
 import { buildApiUrl, getApiHeaders } from './client';
 import type { VirtualBankAccount } from '../components/checkout/VirtualBankAccountCard';
+import type { AllowedCheckoutMethods } from '../utils/razorpayCheckoutOptions';
 
 /**
  * PAY-016: the first-party pay link (`/pay/:token`). The signed token in the path is the only credential; the API
@@ -38,6 +39,9 @@ export interface PayLinkSummary {
   remainingInr?: number | null;
   /** PAY-053: per-booking Smart Collect virtual bank account details when created by host. */
   virtualAccount?: VirtualBankAccount | null;
+  /** PAY-054: per-property allowed checkout payment methods. */
+  allowedCheckoutMethods?: AllowedCheckoutMethods | null;
+  allowedPaymentMethods?: AllowedCheckoutMethods | null;
 }
 
 export interface PayLinkOrder {
@@ -61,6 +65,9 @@ export interface PayLinkOrder {
   qrImageUrl?: string | null;
   /** UPI: the secret the "I have paid" call (`reportUpiPaid`) and the booking page need. */
   bookingToken?: string | null;
+  /** PAY-054: per-property allowed checkout payment methods. */
+  allowedCheckoutMethods?: AllowedCheckoutMethods | null;
+  allowedPaymentMethods?: AllowedCheckoutMethods | null;
 }
 
 /** Thrown for a bad link so the page can say so without a stack of status codes. */

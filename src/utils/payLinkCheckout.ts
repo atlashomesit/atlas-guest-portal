@@ -5,6 +5,7 @@
  */
 import { loadRazorpayCheckout } from '../components/qrmenu/payNow';
 import type { RazorpayCheckoutResult } from '../api/payLink';
+import { buildRazorpayMethodFilter, type AllowedCheckoutMethods } from './razorpayCheckoutOptions';
 
 export type PayLinkCheckoutErrorCode = 'UNAVAILABLE' | 'DISMISSED' | 'PAYMENT_FAILED';
 
@@ -22,6 +23,8 @@ export interface PayLinkCheckoutOrder {
   keyId: string;
   orderId: string;
   amountPaise: number;
+  /** PAY-054: per-property allowed Razorpay checkout methods. */
+  allowedCheckoutMethods?: AllowedCheckoutMethods | null;
 }
 
 export async function openPayLinkCheckout(order: PayLinkCheckoutOrder, hostName: string, description: string): Promise<RazorpayCheckoutResult> {
@@ -34,6 +37,8 @@ export async function openPayLinkCheckout(order: PayLinkCheckoutOrder, hostName:
     );
   }
 
+  const methodFilter = buildRazorpayMethodFilter(order.allowedCheckoutMethods);
+
   return new Promise<RazorpayCheckoutResult>((resolve, reject) => {
     try {
       const checkout = new window.Razorpay({
@@ -43,6 +48,7 @@ export async function openPayLinkCheckout(order: PayLinkCheckoutOrder, hostName:
         currency: 'INR',
         name: hostName,
         description,
+        ...(methodFilter ? { method: methodFilter } : {}),
         handler: (result: RazorpayCheckoutResult) => resolve(result),
         modal: {
           ondismiss: () =>
