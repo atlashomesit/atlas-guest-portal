@@ -50,6 +50,23 @@ export function resolveListingAddress(
 }
 
 /**
+ * GUEST-101: drops a repeated comma-separated segment ("Munnar, Kerala, Munnar" -> "Munnar, Kerala").
+ */
+export function dedupeAddressSegments(address: string): string {
+  const seen = new Set<string>();
+  return address
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => {
+      const key = part.toLowerCase();
+      if (!part || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(', ');
+}
+
+/**
  * Resolves the effective listing address, taking into account any explicit tenant override.
  */
 export function resolveEffectiveListingAddress(

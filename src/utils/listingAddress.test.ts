@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { resolveListingAddress, resolveEffectiveListingAddress } from './listingAddress';
+import { dedupeAddressSegments, resolveListingAddress, resolveEffectiveListingAddress } from './listingAddress';
+
+describe('dedupeAddressSegments (GUEST-101)', () => {
+  it('drops the city when the address already ends with it', () => {
+    expect(dedupeAddressSegments('Munnar, Kerala, Munnar')).toBe('Munnar, Kerala');
+  });
+
+  it('leaves a normal address untouched', () => {
+    expect(dedupeAddressSegments('Apartment 001, Mint Arcadia, Siolim, Goa 403517')).toBe('Apartment 001, Mint Arcadia, Siolim, Goa 403517');
+  });
+});
 
 describe('resolveListingAddress', () => {
   it('returns Unit/Listing Address when filled in (unitAddress)', () => {

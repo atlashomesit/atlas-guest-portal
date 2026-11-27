@@ -2740,7 +2740,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             <div>
               <small style={{ display: 'block', fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted, #6b5a55)', marginBottom: 4 }}>{isDorm ? 'Beds' : 'Guests'}</small>{' '}
               <span className="lv-guest-val">
-                {isDorm ? `${guests} ${guests === 1 ? 'bed' : 'beds'}` : `${guests} ${guests === 1 ? 'adult' : 'adults'}`}
+                {isDorm ? `${guests} ${guests === 1 ? 'bed' : 'beds'}` : `${guests} ${guests === 1 ? 'guest' : 'guests'}`}
               </span>
               {guests >= effectiveMaxGuests && (
                 <small style={{ display: 'block', fontSize: '10px', color: 'var(--text-muted, #6b5a55)', marginTop: 2 }}>

@@ -16,7 +16,7 @@ import { useListingTenantName } from '@/hooks/useListingTenantName';
 import { isMarketplaceHostname, isMarketplaceMode } from '@/tenant/tenantResolver';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getTenantListingAddress, getTenantOverrides, shouldHideAtlasBranding } from '@/tenant/tenantOverrides';
-import { resolveEffectiveListingAddress } from '@/utils/listingAddress';
+import { dedupeAddressSegments, resolveEffectiveListingAddress } from '@/utils/listingAddress';
 import { readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
 import { readClusterListingFields } from '@/utils/clusterListing';
 import { getTenantBrandName } from '@/tenant/displayBrand';
@@ -1839,7 +1839,7 @@ useEffect(() => {
       : isMarketplaceDetail
         ? (effectiveTenantBrand ? `Listed by ${effectiveTenantBrand}` : 'Your host')
         : (effectiveTenantBrand ? `Listed by ${effectiveTenantBrand}` : `Listed by ${ppBrandName}`);
-    const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
+    const ppHostInitial = (ppHasRealHost || !effectiveTenantBrand ? ppHostDisplayName : effectiveTenantBrand).charAt(0).toUpperCase();
     // TASK-7428 / MKT-011: shared predicate for "an online gateway will actually charge this guest" —
     // uses effectiveTenantCtx so marketplace listings use the listing host's real bookingMode.
     const ppHasOnlinePayment = hasOnlinePaymentRail(effectiveTenantCtx);
@@ -2054,7 +2054,7 @@ useEffect(() => {
                   {(data.propertyAddress || data.property_address || data.property_location) && (
                     <>
                       <span data-testid="property-street-address">
-                        {String(data.propertyAddress || data.property_address || data.property_location).trim()}
+                        {dedupeAddressSegments(String(data.propertyAddress || data.property_address || data.property_location))}
                       </span>
                       <span className="pp-submeta-sep" aria-hidden="true">·</span>
                     </>
@@ -2182,18 +2182,19 @@ useEffect(() => {
                 );
               })}
 
-              <button
-                type="button"
-                className="pp-gallery-more"
-                onClick={() => {
-                  if (galleryUrls.length === 0) return;
-                  setLightboxIndex(0);
-                  setShowLightbox(true);
-                }}
-              >
-                <PpGridIcon size={13} />
-                {galleryUrls.length > 5 ? `View all ${galleryUrls.length} photos` : 'View gallery'}
-              </button>
+              {galleryUrls.length > 0 && (
+                <button
+                  type="button"
+                  className="pp-gallery-more"
+                  onClick={() => {
+                    setLightboxIndex(0);
+                    setShowLightbox(true);
+                  }}
+                >
+                  <PpGridIcon size={13} />
+                  {galleryUrls.length > 5 ? `View all ${galleryUrls.length} photos` : 'View gallery'}
+                </button>
+              )}
             </div>
 
             {showLightbox && (
@@ -2246,7 +2247,7 @@ useEffect(() => {
                   {(data.propertyAddress || data.property_address || data.property_location) && (
                     <span className="pp-v2-loc-chip">
                       <PpV2PinIcon size={12} />
-                      {String(data.propertyAddress || data.property_address || data.property_location).trim()}
+                      {dedupeAddressSegments(String(data.propertyAddress || data.property_address || data.property_location))}
                     </span>
                   )}
                 </div>
@@ -2332,7 +2333,7 @@ useEffect(() => {
 
                 {/* Host strip + trust panel */}
                 <section className="pp-section" style={{ paddingTop: 28 }} aria-label="About the host">
-                  <MarketplaceHostIdentity marketplace={isMarketplaceDetail} listingId={resolvedListingId} />
+                  <MarketplaceHostIdentity marketplace={isMarketplaceDetail && isMarketplaceMode()} listingId={resolvedListingId} />
                   <div className="pp-host">
                     <div className="pp-host-avatar" aria-hidden="true">{ppHostInitial}</div>
                     <div>

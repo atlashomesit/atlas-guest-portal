@@ -18,15 +18,15 @@ export default function BookDirectPerks({ className = '' }: BookDirectPerksProps
         <div className="flex items-start gap-2.5">
           <Percent className="h-4 w-4 shrink-0 text-emerald-700 mt-0.5" aria-hidden="true" />
           <div>
-            <span className="font-semibold text-emerald-900">Zero OTA guest service fee</span>
-            <span className="text-emerald-700 ml-1.5 font-medium">(Save up to 15%)</span>
+            <span className="font-semibold text-emerald-900">Zero OTA guest service fee</span>{' '}
+            <span className="text-emerald-700 font-medium">— pay the host directly</span>
           </div>
         </div>
         <div className="flex items-start gap-2.5">
           <MessageSquareCheck className="h-4 w-4 shrink-0 text-emerald-700 mt-0.5" aria-hidden="true" />
           <div>
-            <span className="font-semibold text-emerald-900">Direct host communication</span>
-            <span className="text-emerald-700 ml-1.5 font-medium">&amp; priority check-in assistance</span>
+            <span className="font-semibold text-emerald-900">Direct host communication</span>{' '}
+            <span className="text-emerald-700 font-medium">&amp; priority check-in assistance</span>
           </div>
         </div>
         <div className="flex items-start gap-2.5">
