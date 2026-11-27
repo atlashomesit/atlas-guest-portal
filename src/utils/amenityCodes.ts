@@ -42,7 +42,44 @@ const AMENITY_CATEGORY_SYNONYMS: Record<string, string[]> = {
   'step-free-entrance': ['stepfreeentrance'],
   'lift-access': ['elevator'],
   'accessible-parking': ['accessibleparking'],
+  // MKT-063: self check-in codes
+  'self-checkin': ['selfcheckin', 'smartlock', 'keypad', 'lockbox', 'frontdesk24h'],
 };
+
+/**
+ * MKT-063: Canonical self check-in amenity codes and guest-facing labels.
+ */
+export const SELF_CHECKIN_AMENITY_CODES = [
+  'self_checkin',
+  'smart_lock',
+  'keypad',
+  'lockbox',
+  'front_desk_24h',
+] as const;
+
+export const SELF_CHECKIN_CODE_LABELS: Record<string, string> = {
+  self_checkin: 'Self check-in',
+  smart_lock: 'Smart lock',
+  keypad: 'Keypad entry',
+  lockbox: 'Lockbox',
+  front_desk_24h: '24-hour front desk',
+};
+
+const SELF_CHECKIN_TOKEN_SET = new Set(
+  SELF_CHECKIN_AMENITY_CODES.map((c) => normalizeAmenityToken(c)),
+);
+
+/** True when a listing explicitly supports self check-in via API flag or canonical amenity code. */
+export function hasListingSelfCheckIn(item: {
+  hasSelfCheckIn?: boolean | null;
+  amenityCodes?: (string | null | undefined)[] | null;
+}): boolean {
+  if (item.hasSelfCheckIn === true) return true;
+  if (!Array.isArray(item.amenityCodes)) return false;
+  return item.amenityCodes.some(
+    (code) => typeof code === 'string' && SELF_CHECKIN_TOKEN_SET.has(normalizeAmenityToken(code)),
+  );
+}
 
 /**
  * TASK-10086 [POD: Discovery/Search]: v1 step-free/accessible discovery vocabulary.
@@ -126,6 +163,8 @@ export function amenityCodeMatchesCategory(rawCode: string, category: string): b
 
 /** Resolve a display label for cards and chips. Returns null when the code is unrecognizable so callers can skip it. */
 export function resolveAmenityLabel(rawCode: string): string | null {
+  const canonical = rawCode.trim().toLowerCase();
+  if (SELF_CHECKIN_CODE_LABELS[canonical]) return SELF_CHECKIN_CODE_LABELS[canonical];
   const label = formatAmenityName(rawCode);
   return label || null;
 }

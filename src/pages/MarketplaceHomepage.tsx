@@ -25,7 +25,7 @@ import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
 import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
-import { resolveAmenityLabel } from '@/utils/amenityCodes';
+import { hasListingSelfCheckIn, resolveAmenityLabel } from '@/utils/amenityCodes';
 import { isHostelDormType } from '@/utils/dormListing';
 import { hasOnlinePaymentRail } from '@/tenant/paymentRail';
 import { getPublicSiteOrigin } from '@/config/siteOrigin';
@@ -103,6 +103,9 @@ type MarketplaceItem = {
   // MKT-047: Top host badge + criteria stats
   topHost?: boolean;
   topHostStats?: TopHostStatsDto | null;
+  // MKT-063: self check-in
+  hasSelfCheckIn?: boolean;
+  selfCheckInMethod?: string | null;
 };
 
 /**
@@ -354,6 +357,10 @@ export default function MarketplaceHomepage() {
     () => searchParams.get('topHost') === 'true',
   );
   const [topHostFeatureEnabled, setTopHostFeatureEnabled] = useState<boolean>(false);
+  // MKT-063: Self check-in filter synced with ?selfCheckIn=true
+  const [selfCheckIn, setSelfCheckIn] = useState<boolean>(
+    () => searchParams.get('selfCheckIn') === 'true',
+  );
 
   // MKT-048: Map bounding box synced with URL (?swLat=&swLng=&neLat=&neLng=)
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(() =>
@@ -376,6 +383,7 @@ export default function MarketplaceHomepage() {
     setFreeCancellation(searchParams.get('freeCancellation') === 'true');
     setBreakfastIncluded(searchParams.get('mealPlan') === 'breakfast');
     setTopHostFilter(searchParams.get('topHost') === 'true');
+    setSelfCheckIn(searchParams.get('selfCheckIn') === 'true');
     setMapBounds(parseBoundsFromSearchParams(searchParams));
 
     const s = searchParams.get('sort') || searchParams.get('sortBy');
@@ -431,6 +439,17 @@ export default function MarketplaceHomepage() {
       return next;
     }, { replace: true });
   }, [topHostFilter, setSearchParams]);
+
+  const handleToggleSelfCheckIn = useCallback(() => {
+    const nextVal = !selfCheckIn;
+    setSelfCheckIn(nextVal);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (nextVal) next.set('selfCheckIn', 'true');
+      else next.delete('selfCheckIn');
+      return next;
+    }, { replace: true });
+  }, [selfCheckIn, setSearchParams]);
 
   const handleSearchThisArea = useCallback(() => {
     if (!pendingMapBounds) return;
@@ -517,6 +536,7 @@ export default function MarketplaceHomepage() {
       'freeCancellation',
       'mealPlan',
       'topHost',
+      'selfCheckIn',
       'swLat',
       'swLng',
       'neLat',
@@ -573,6 +593,7 @@ export default function MarketplaceHomepage() {
     if (freeCancellation) p.set('freeCancellation', 'true');
     if (breakfastIncluded) p.set('mealPlan', 'breakfast');
     if (topHostFilter) p.set('topHost', 'true');
+    if (selfCheckIn) p.set('selfCheckIn', 'true');
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -581,7 +602,7 @@ export default function MarketplaceHomepage() {
     }
     if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, mapBounds, sortBy]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, mapBounds, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -704,6 +725,10 @@ export default function MarketplaceHomepage() {
       result = result.filter((item) => item.topHost === true);
     }
 
+    if (selfCheckIn) {
+      result = result.filter((item) => hasListingSelfCheckIn(item));
+    }
+
     if (freeCancellation) {
       result = result.filter((item) => item.hasFreeCancellation !== false);
     }
@@ -757,7 +782,7 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, selfCheckIn, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -788,6 +813,7 @@ export default function MarketplaceHomepage() {
     if (freeCancellation) p.set('freeCancellation', 'true');
     if (breakfastIncluded) p.set('mealPlan', 'breakfast');
     if (topHostFilter) p.set('topHost', 'true');
+    if (selfCheckIn) p.set('selfCheckIn', 'true');
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -795,7 +821,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -943,7 +969,7 @@ export default function MarketplaceHomepage() {
         <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
           open={wideFilters || filtersOpen}
           onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
-          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
           <div className="marketplace-secondary-content">
             <ExploreDestinationsStrip listings={items} />
             <div className="marketplace-refinements">
@@ -965,6 +991,8 @@ export default function MarketplaceHomepage() {
         showTopHost={topHostFeatureEnabled || topHostFilter}
         topHost={topHostFilter}
         onToggleTopHost={handleToggleTopHost}
+        selfCheckIn={selfCheckIn}
+        onToggleSelfCheckIn={handleToggleSelfCheckIn}
       />
 
         <div className="flex flex-wrap items-center gap-2">
@@ -1168,6 +1196,17 @@ export default function MarketplaceHomepage() {
                     >
                       <span aria-hidden>⚡</span>
                       Instant Book
+                    </span>
+                  )}
+
+                  {/* MKT-063: Self check-in card label when listing supports smart lock, keypad, lockbox, or 24h front desk */}
+                  {hasListingSelfCheckIn(item) && (
+                    <span
+                      data-testid="marketplace-self-checkin-badge"
+                      className="inline-flex items-center gap-1 self-start rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-800"
+                    >
+                      <span aria-hidden>🔑</span>
+                      Self check-in
                     </span>
                   )}
 

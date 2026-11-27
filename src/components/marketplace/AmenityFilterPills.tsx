@@ -11,6 +11,8 @@ export type AmenityFilterPillsProps = {
   showTopHost?: boolean;
   topHost?: boolean;
   onToggleTopHost?: () => void;
+  selfCheckIn?: boolean;
+  onToggleSelfCheckIn?: () => void;
 };
 
 export default function AmenityFilterPills({
@@ -24,6 +26,8 @@ export default function AmenityFilterPills({
   showTopHost = false,
   topHost = false,
   onToggleTopHost,
+  selfCheckIn = false,
+  onToggleSelfCheckIn,
 }: AmenityFilterPillsProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="marketplace-amenities-pills">
@@ -74,6 +78,22 @@ export default function AmenityFilterPills({
         >
           <span aria-hidden="true">☕</span>
           <span>Breakfast included</span>
+        </button>
+      )}
+      {onToggleSelfCheckIn && (
+        <button
+          type="button"
+          data-testid="marketplace-filter-self-checkin"
+          aria-pressed={selfCheckIn}
+          className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+            selfCheckIn
+              ? 'bg-black text-white border-black'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+          }`}
+          onClick={onToggleSelfCheckIn}
+        >
+          <span aria-hidden="true">🔑</span>
+          <span>Self check-in</span>
         </button>
       )}
       {pills.map(({ label, icon }) => {
