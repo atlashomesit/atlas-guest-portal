@@ -75,10 +75,10 @@ describe('GUEST-010 saved-home reminder account scope', () => {
     expect(screen.getByRole('textbox', { name: 'Reminder email address' })).toHaveValue('next@example.test');
     view.rerender(page(signedOut));
     expect(screen.getByRole('textbox', { name: 'Reminder email address' })).toHaveValue('');
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'anonymous@example.test' } });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Reminder email address' }), { target: { value: 'anonymous@example.test' } });
     setDomainResolvedSlug('different-stays');
     view.rerender(page(signedOut));
-    expect(screen.getByRole('textbox')).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Reminder email address' })).toHaveValue('');
     expect(posts()).toHaveLength(0);
   });
 
@@ -97,14 +97,14 @@ describe('GUEST-010 saved-home reminder account scope', () => {
     expect(signal?.aborted).toBe(true);
     await act(async () => { finish({ ok: true } as Response); });
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
-    expect(screen.getByRole('textbox')).toHaveValue('next@example.test');
+    expect(screen.getByRole('textbox', { name: 'Reminder email address' })).toHaveValue('next@example.test');
     fetchMock.mockResolvedValue({ ok: true } as Response);
-    fireEvent.submit(screen.getByRole('textbox').closest('form')!);
+    fireEvent.submit(screen.getByRole('textbox', { name: 'Reminder email address' }).closest('form')!);
     await settle();
     screen.getByRole('status');
     view.rerender(page(signedOut));
     expect(screen.getByRole('status')).toBeEmptyDOMElement();
-    expect(screen.getByRole('textbox')).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: 'Reminder email address' })).toHaveValue('');
     expect(localStorage.getItem('atlas_guest_email')).toBeNull();
   });
 
@@ -112,9 +112,9 @@ describe('GUEST-010 saved-home reminder account scope', () => {
     const view = render(page(signedOut, true));
     await settle();
     screen.getByText('Garden home');
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Reminder email address' })).not.toBeInTheDocument();
     view.rerender(page());
-    const input = screen.getByRole('textbox');
+    const input = screen.getByRole('textbox', { name: 'Reminder email address' });
     fireEvent.change(input, { target: { value: 'Travel@Example.test' } });
     fetchMock.mockResolvedValue({ ok: false } as Response);
     fireEvent.submit(input.closest('form')!);

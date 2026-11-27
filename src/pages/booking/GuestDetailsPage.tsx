@@ -1963,6 +1963,7 @@ const GuestDetailsPage: React.FC = () => {
         let amountPaise: number;
         let bookingToken: string | null = null;
         let idempotencyKey: string;
+        let orderData: Record<string, unknown> | undefined;
 
         const pendingLaunch = pendingRazorpayLaunchRef.current;
         if (pendingLaunch) {
@@ -2037,6 +2038,7 @@ const GuestDetailsPage: React.FC = () => {
             });
             responseData = response.data;
           }
+          orderData = responseData as Record<string, unknown> | undefined;
 
           const {
             keyId: respKeyId,

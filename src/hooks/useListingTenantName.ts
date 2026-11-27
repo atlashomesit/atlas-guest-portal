@@ -4,6 +4,10 @@ import { getTenantContext } from '../tenant/tenantContext';
 
 const publicTenantNameCache = new Map<string, Promise<string | null>>();
 
+export function clearPublicTenantNameCache() {
+  publicTenantNameCache.clear();
+}
+
 /** Read-only marketplace identity. Never replaces the host site's tenant context. */
 export function useListingTenantName(slug: string | null) {
   const [resolved, setResolved] = useState<{ slug: string; name: string } | null>(() => {

@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { settle } from '../test/settle';
-import { useListingTenantName } from './useListingTenantName';
+import { clearPublicTenantNameCache, useListingTenantName } from './useListingTenantName';
 vi.mock('../api/client', () => ({ buildApiUrl: (path: string) => `http://localhost${path}` }));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  clearPublicTenantNameCache();
+  vi.unstubAllGlobals();
+});
 describe('marketplace listing identity', () => {
   it('reads the matching public name without changing tenant context or sending credentials', async () => {
     const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ slug: 'cedar', name: 'Cedar Stays' }) });

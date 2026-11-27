@@ -45,7 +45,7 @@ describe('marketplace in-flow pointer preservation', () => {
     const input = screen.getByTestId('airbnb-search-destination');
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'Go' } });
-    fireEvent.click(screen.getByRole('option', { name: /Goa/ }));
+    fireEvent.click(screen.getByRole('option', { name: /^Goa/ }));
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(400));
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();

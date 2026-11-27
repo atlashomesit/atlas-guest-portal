@@ -88,7 +88,7 @@ beforeEach(() => {
       requestedUrls.push(u);
       const parsed = new URL(u);
       if (u.includes('/marketplace/properties')) {
-        const loc = parsed.searchParams.get('location')?.toLowerCase();
+        const loc = (parsed.searchParams.get('city') ?? parsed.searchParams.get('location'))?.toLowerCase();
         const filteredProps = loc
           ? mockProperties.filter((p) =>
               `${p.propertyName} ${p.propertyAddress}`.toLowerCase().includes(loc),
@@ -145,7 +145,7 @@ describe('MKT-020 marketplace map pin filtering & TASK-10298776 < 4★ rating gu
     expect(screen.getByTestId('marketplace-map-toggle')).toHaveTextContent('Map (1)');
 
     const propCalls = requestedUrls.filter((u) => u.includes('/marketplace/properties'));
-    expect(propCalls.some((u) => u.includes('location=Goa') && u.includes('checkIn=2026-12-10'))).toBe(
+    expect(propCalls.some((u) => (u.includes('city=Goa') || u.includes('location=Goa')) && u.includes('checkIn=2026-12-10'))).toBe(
       true,
     );
   });
