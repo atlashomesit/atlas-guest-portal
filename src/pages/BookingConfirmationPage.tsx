@@ -30,6 +30,7 @@ import GuestDietarySelector, { type GuestMealPreferences } from "../components/b
 import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
 import { BookingGstDetailsCard } from "../components/booking/BookingGstDetailsCard"; // GUEST-084
 import { CoTravellersCard, type BookingCoTraveller } from "../components/booking/CoTravellersCard"; // GUEST-086
+import { SelfCheckoutCard } from "../components/booking/SelfCheckoutCard"; // GUEST-087
 import BookingPaymentPlanCard, { type GuestBookingInstalment } from "../components/booking/BookingPaymentPlanCard";
 import {
   buildReceiptHtml,
@@ -242,6 +243,8 @@ interface BookingSummary {
   /** GUEST-086: Co-travellers with shareable arrival-hub links. */
   coTravellers?: BookingCoTraveller[] | null;
   maxGuests?: number;
+  /** GUEST-087: Timestamp when guest tapped "I have checked out". */
+  guestReportedCheckoutAtUtc?: string | null;
   /** TASK-1888: server-computed; show pre-arrival checklist when true. */
   preArrivalBriefingVisible?: boolean;
   /** GUEST-005: server owns the near-checkout timing policy; absent means hidden. */
@@ -1881,6 +1884,18 @@ export default function BookingConfirmationPage() {
             initialCompanyName={booking.companyName}
             initialGuestGstin={booking.guestGstin}
             gstLocked={booking.gstLocked}
+          />
+        )}
+
+        {/* GUEST-087: Departure-day "I have checked out" self-checkout card */}
+        {!isCancelled && (
+          <SelfCheckoutCard
+            bookingId={booking.bookingId ?? bookingId}
+            token={token}
+            status={booking.status}
+            checkoutDateIso={booking.checkoutDateIso ?? summaryDisplayDateToIso(booking.checkoutDate)}
+            guidebookCheckoutChecklistText={booking.guidebookCheckoutChecklistText}
+            guestReportedCheckoutAtUtc={booking.guestReportedCheckoutAtUtc}
           />
         )}
 
