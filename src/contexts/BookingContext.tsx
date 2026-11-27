@@ -88,6 +88,8 @@ type BookingState = {
   holdGraceHours: number | null;
   /** HSL-011: the dorm's gender rule (from the listing API) forwarded from UnitBookingWidget; null for a non-dorm or a mixed-unstated listing (session-only). */
   holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** HSL-034: the dorm's minimum age rule (from the listing API) forwarded from UnitBookingWidget; null when unstated. */
+  holdDormMinAge?: number | null;
   /** TASK-1039977 / PAY-006: Refundable security deposit configured on the listing (session-only). */
   holdSecurityDepositAmount?: number | null;
   /** MRP-002: Selected rate plan ID and display name forwarded from UnitBookingWidget (session-only). */

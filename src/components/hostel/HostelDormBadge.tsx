@@ -1,5 +1,5 @@
 import React from 'react';
-import { isHostelDormType, parseDormGenderPolicy, type DormGenderPolicy } from '@/utils/dormListing';
+import { formatDormMinAgeBadge, isHostelDormType, parseDormGenderPolicy, type DormGenderPolicy } from '@/utils/dormListing';
 
 export type GenderPolicy = DormGenderPolicy;
 
@@ -28,6 +28,10 @@ export interface HostelDormBadgeProps {
    */
   bedType?: string | null;
   bedTypes?: string[] | null;
+  /**
+   * HSL-034: `Listing.DormMinAge` from the API (e.g. 18). Renders the minimum age badge when set.
+   */
+  dormMinAge?: number | null;
   className?: string;
 }
 
@@ -57,6 +61,7 @@ export const HostelDormBadge: React.FC<HostelDormBadgeProps> = ({
   genderPolicy,
   bedType,
   bedTypes,
+  dormMinAge,
   className = '',
 }) => {
   const isDorm = isHostelDorm({ accommodationType, propertyType });
@@ -66,6 +71,7 @@ export const HostelDormBadge: React.FC<HostelDormBadgeProps> = ({
   }
 
   const gender = resolveGenderPolicy(genderPolicy);
+  const ageBadge = formatDormMinAgeBadge(dormMinAge);
   const resolvedBedTypes = bedTypes?.length
     ? bedTypes.map(formatBedType).filter(Boolean)
     : bedType
@@ -110,6 +116,16 @@ export const HostelDormBadge: React.FC<HostelDormBadgeProps> = ({
           >
             <span aria-hidden="true">🚻</span>
             <span>Mixed Dorm</span>
+          </span>
+        )}
+
+        {ageBadge && (
+          <span
+            className="inline-flex items-center gap-1 rounded-md bg-rose-50 border border-rose-200 px-2.5 py-1 text-xs font-semibold text-rose-800 shadow-sm"
+            data-testid="hostel-dorm-min-age-badge"
+          >
+            <span aria-hidden="true">🔞</span>
+            <span>{ageBadge}</span>
           </span>
         )}
 

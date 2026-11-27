@@ -89,9 +89,10 @@ import { alignPromotionLabelPercent } from '@/utils/directBookingPrice';
 import { getListingDisplayName } from '@/lib/listingDisplayName';
 import { GuestCheckoutPaymentBadges } from '@/components/booking/GuestCheckoutPaymentBadges';
 import { DormGenderAcknowledgement } from '@/components/hostel/DormGenderAcknowledgement';
+import { DormAgeAcknowledgement } from '@/components/hostel/DormAgeAcknowledgement';
 import { PaymentPlanSelector, type PaymentPlanChoice } from '@/components/checkout/PaymentPlanSelector';
 import { createMultiRoomOrder } from '@/api/multiRoomClient';
-import { dormNeedsGenderAcknowledgement, readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
+import { ageYearsFromDob, dormNeedsAgeAcknowledgement, dormNeedsGenderAcknowledgement, readDormListingFields, type DormGenderPolicy } from '@/utils/dormListing';
 import { hostCallDigits } from '@/utils/hostCallDigits';
 import { PaymentFailedPanel } from '@/components/checkout/PaymentFailedPanel';
 import { UpiPaymentPanel } from '@/components/checkout/UpiPaymentPanel';
@@ -241,6 +242,8 @@ type CheckoutHoldCache = {
   holdGraceHours?: number | null;
   /** HSL-011: the dorm's gender rule, so a reload keeps asking the tick. */
   holdDormGenderPolicy?: DormGenderPolicy | null;
+  /** HSL-034: the dorm's minimum age rule, so a reload keeps asking the age confirmation. */
+  holdDormMinAge?: number | null;
   /** TASK-1039977 / PAY-006: refundable security deposit amount configured on listing. */
   holdSecurityDepositAmount?: number | null;
   /** TASK-1040087: marketplace booking origin channel preserved across refreshes. */
@@ -439,6 +442,7 @@ const GuestDetailsPage: React.FC = () => {
         holdRefundFreeUntilUtc: cached?.holdRefundFreeUntilUtc ?? booking.holdRefundFreeUntilUtc ?? null,
         holdGraceHours: cached?.holdGraceHours ?? booking.holdGraceHours ?? null,
         holdDormGenderPolicy: cached?.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
+        holdDormMinAge: cached?.holdDormMinAge ?? booking.holdDormMinAge ?? null,
         holdSecurityDepositAmount: cached?.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
         holdBookingChannel: (urlParams.isMarketplaceBrand ? 'marketplace' : urlParams.isAiReceptionistSrc ? 'ai_receptionist' : urlParams.isInstagramLinkSrc ? 'instagram_link' : null) ?? cached?.holdBookingChannel ?? booking.holdBookingChannel ?? null,
         holdPackage: booking.holdPackage ?? null,
@@ -474,6 +478,7 @@ const GuestDetailsPage: React.FC = () => {
           holdRefundFreeUntilUtc: cached.holdRefundFreeUntilUtc ?? booking.holdRefundFreeUntilUtc ?? null,
           holdGraceHours: cached.holdGraceHours ?? booking.holdGraceHours ?? null,
           holdDormGenderPolicy: cached.holdDormGenderPolicy ?? booking.holdDormGenderPolicy ?? null,
+          holdDormMinAge: cached.holdDormMinAge ?? booking.holdDormMinAge ?? null,
           holdSecurityDepositAmount: cached.holdSecurityDepositAmount ?? booking.holdSecurityDepositAmount ?? null,
           holdBookingChannel: cached.holdBookingChannel ?? booking.holdBookingChannel ?? null,
           checkIn: cached.checkIn ?? booking.checkIn ?? null,
@@ -740,6 +745,18 @@ const GuestDetailsPage: React.FC = () => {
   const [dormAckAccepted, setDormAckAccepted] = useState(false);
   const [dormAckError, setDormAckError] = useState('');
   const dormAckRowRef = useRef<HTMLDivElement>(null);
+
+  // HSL-034: age-restricted dorms (e.g. 18+ only) require an age-rule confirmation tick before Pay
+  // and block checkout if the youngest guest's entered DOB is under the dorm's minimum age.
+  const [listingDormMinAge, setListingDormMinAge] = useState<number | null>(null);
+  const effectiveDormMinAge = booking.holdDormMinAge ?? listingDormMinAge ?? null;
+  const dormAgeAckRequired = dormNeedsAgeAcknowledgement(effectiveDormMinAge);
+  const [dormAgeAckAccepted, setDormAgeAckAccepted] = useState(false);
+  const [dormYoungestDob, setDormYoungestDob] = useState('');
+  const [dormAgeAckError, setDormAgeAckError] = useState('');
+  const dormAgeAckRowRef = useRef<HTMLDivElement>(null);
+  const dormYoungestAge = dormYoungestDob ? ageYearsFromDob(dormYoungestDob) : null;
+  const dormIsUnderage = dormAgeAckRequired && dormYoungestAge != null && dormYoungestAge < effectiveDormMinAge!;
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
@@ -756,7 +773,7 @@ const GuestDetailsPage: React.FC = () => {
   useEffect(() => {
     const id = holdListingId != null ? Number(holdListingId) : NaN;
     if (!Number.isFinite(id) || id <= 0) return;
-    if (booking.holdSecurityDepositAmount != null && booking.holdDormGenderPolicy != null) return;
+    if (booking.holdSecurityDepositAmount != null && booking.holdDormGenderPolicy != null && booking.holdDormMinAge != null) return;
     const ac = new AbortController();
     void fetchListingById(id, ac.signal)
       .then((l) => {
@@ -770,11 +787,14 @@ const GuestDetailsPage: React.FC = () => {
           if (dorm.accommodationType === 'HostelDorm' && dorm.dormGenderPolicy) {
             setListingDormGenderPolicy(dorm.dormGenderPolicy);
           }
+          if (dorm.accommodationType === 'HostelDorm' && dorm.dormMinAge != null) {
+            setListingDormMinAge(dorm.dormMinAge);
+          }
         }
       })
       .catch(() => { /* non-critical */ });
     return () => ac.abort();
-  }, [holdListingId, booking.holdSecurityDepositAmount, booking.holdDormGenderPolicy]);
+  }, [holdListingId, booking.holdSecurityDepositAmount, booking.holdDormGenderPolicy, booking.holdDormMinAge]);
 
   const effectiveSecurityDepositAmount =
     booking.holdSecurityDepositAmount ??
@@ -838,6 +858,7 @@ const GuestDetailsPage: React.FC = () => {
       holdRefundFreeUntilUtc: booking.holdRefundFreeUntilUtc ?? null,
       holdGraceHours: booking.holdGraceHours ?? null,
       holdDormGenderPolicy: booking.holdDormGenderPolicy ?? null,
+      holdDormMinAge: booking.holdDormMinAge ?? null,
       holdSecurityDepositAmount: booking.holdSecurityDepositAmount ?? null,
       holdBookingChannel: isMarketplaceCheckout ? 'marketplace' : isAiReceptionistCheckout ? 'ai_receptionist' : isInstagramLinkCheckout ? 'instagram_link' : (booking.holdBookingChannel ?? null),
       checkIn: booking.checkIn ?? null,
@@ -1349,6 +1370,17 @@ const GuestDetailsPage: React.FC = () => {
     // HSL-011: women-only / men-only dorm - the guest must confirm the rule before Pay.
     if (dormAckRequired && !dormAckAccepted) { setDormAckError('Please confirm the dorm rule to continue.'); valid = false; }
     else { setDormAckError(''); }
+
+    // HSL-034: age-restricted dorm - block underage guests and require confirmation tick before Pay.
+    if (dormIsUnderage) {
+      setDormAgeAckError(`Guests under ${effectiveDormMinAge} cannot stay in this shared dorm. Please book a private room instead.`);
+      valid = false;
+    } else if (dormAgeAckRequired && !dormAgeAckAccepted) {
+      setDormAgeAckError(`Please confirm every guest is at least ${effectiveDormMinAge} years old to continue.`);
+      valid = false;
+    } else {
+      setDormAgeAckError('');
+    }
 
     // TASK-1039977 / PAY-006: refundable security deposit consent
     if (depositRequired && !depositAccepted) { setDepositError('Please accept the refundable security deposit terms to continue.'); valid = false; }
@@ -2795,6 +2827,7 @@ const GuestDetailsPage: React.FC = () => {
     consentAccepted &&
     (!houseRulesRequired || houseRulesAccepted) &&
     (!dormAckRequired || dormAckAccepted) &&
+    (!dormAgeAckRequired || (dormAgeAckAccepted && !dormIsUnderage)) &&
     (!depositRequired || depositAccepted);
   // TASK-1040051: a stay the API refused to price can never be paid for here.
   const payDisabled = isSubmitting || !readyToPay || notTakingBookings || quoteRefusedMessage != null;
@@ -3448,6 +3481,25 @@ const GuestDetailsPage: React.FC = () => {
                 accepted={dormAckAccepted}
                 onChange={(next) => { setDormAckAccepted(next); if (next) setDormAckError(''); }}
                 error={dormAckError}
+              />
+            </div>
+
+            {/* HSL-034: age-restricted dorm (e.g. 18+ only) - REQUIRED age confirmation & optional DOB check before Pay. */}
+            <div ref={dormAgeAckRowRef}>
+              <DormAgeAcknowledgement
+                dormMinAge={effectiveDormMinAge}
+                accepted={dormAgeAckAccepted}
+                onChange={(next) => { setDormAgeAckAccepted(next); if (next) setDormAgeAckError(''); }}
+                youngestDob={dormYoungestDob}
+                onYoungestDobChange={(dob) => {
+                  setDormYoungestDob(dob);
+                  const age = dob ? ageYearsFromDob(dob) : null;
+                  if (age != null && effectiveDormMinAge != null && age < effectiveDormMinAge) {
+                    setDormAgeAckAccepted(false);
+                  }
+                }}
+                privateRoomsHref={propertySlug ? `/homes/${propertySlug}` : '/search'}
+                error={dormAgeAckError}
               />
             </div>
 

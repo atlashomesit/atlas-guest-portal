@@ -34,16 +34,18 @@ describe('dormListing (HSL-011)', () => {
   it('reads the dorm fields from camelCase or PascalCase payloads and never from the name', () => {
     expect(
       readDormListingFields({ name: '6-Bed Female-Only Dorm', accommodationType: 'HostelDorm', dormGenderPolicy: 'MaleOnly', quantity: 6 }),
-    ).toEqual({ accommodationType: 'HostelDorm', dormGenderPolicy: 'MaleOnly', bedCount: 6 });
-    expect(readDormListingFields({ AccommodationType: 'HostelDorm', DormGenderPolicy: 'FemaleOnly', Quantity: 8 })).toEqual({
+    ).toEqual({ accommodationType: 'HostelDorm', dormGenderPolicy: 'MaleOnly', bedCount: 6, dormMinAge: null });
+    expect(readDormListingFields({ AccommodationType: 'HostelDorm', DormGenderPolicy: 'FemaleOnly', Quantity: 8, DormMinAge: 18 })).toEqual({
       accommodationType: 'HostelDorm',
       dormGenderPolicy: 'FemaleOnly',
       bedCount: 8,
+      dormMinAge: 18,
     });
     expect(readDormListingFields({ name: '6-Bed Female-Only Dorm' })).toEqual({
       accommodationType: null,
       dormGenderPolicy: null,
       bedCount: null,
+      dormMinAge: null,
     });
     expect(readDormListingFields({ quantity: 0 }).bedCount).toBeNull();
     expect(readDormListingFields(null).bedCount).toBeNull();

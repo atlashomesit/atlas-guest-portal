@@ -131,6 +131,10 @@ export interface UnitBookingWidgetProps {
   dormGenderPolicy?: DormGenderPolicy | null;
   /** HSL-011: total beds in the dorm (`Listing.Quantity`) - the "Y" of "X of Y beds left". */
   dormBedCount?: number | null;
+  /** HSL-034: `Listing.DormMinAge` from the API (e.g. 18). */
+  dormMinAge?: number | null;
+  /** HSL-034: Optional link to private rooms at the same property for families / under-age guests. */
+  privateRoomsHref?: string | null;
   /** HSL-029: Linked whole-room private listing info for mixed dorms. */
   wholeRoomListingId?: number | null;
   wholeRoomName?: string | null;
@@ -285,6 +289,8 @@ const UnitBookingWidget: React.FC<UnitBookingWidgetProps> = ({
   accommodationType,
   dormGenderPolicy = null,
   dormBedCount = null,
+  dormMinAge = null,
+  privateRoomsHref = null,
   wholeRoomListingId = null,
   wholeRoomName = null,
   wholeRoomNightlyRate = null,
@@ -2404,6 +2410,8 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
             : null,
         // HSL-011: the checkout page asks the gender-rule tick from this (API value; null for every non-dorm listing).
         holdDormGenderPolicy: isDorm ? dormGenderPolicy : null,
+        // HSL-034: the checkout page asks the age-rule tick from this (API value; null when unstated).
+        holdDormMinAge: isDorm ? dormMinAge : null,
         // Forward dates/guests into context for the details page. BookingContext's wire format
         // is an ISO instant, and the hydration effect above reads it back as an IST civil date —
         // so emit the IST-midnight instant (unchanged format, correct day) rather than
@@ -2454,7 +2462,7 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
     convenienceFeePercent, touristTaxLineAmount, serverGstMatchesSelection, serverPriceBreakdown,
     resolvedCancellationWindowHours, resolvedGraceHours,
     selectedRatePlanId, selectedRatePlan, effectiveRatePlanCancellationTier, isSelectedRatePlanNonRefundable,
-    isDorm, dormBedsLeft, dormGenderPolicy,
+    isDorm, dormBedsLeft, dormGenderPolicy, dormMinAge,
     securityDepositAmount, publicRatePlans, cancellationTrustText,
     breakfastExtraLineAmount, breakfastPricePerPerson, checkInteriorNightOverlap,
     cleaningFeeLineAmount, getEffectiveMinStayForDate, includeBreakfast,
@@ -2619,9 +2627,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
 
       {/* v2 block (2) + (3): Date range card + Guests card */}
       <div className="lv-booking-form">
-        {/* HSL-011: a dorm says so before the guest picks anything, with the host's gender rule when the API states one. */}
+        {/* HSL-011 / HSL-034: a dorm says so before the guest picks anything, with the host's gender & age rules when the API states them. */}
         {isDorm && (
-          <HostelDormBadge accommodationType={accommodationType} genderPolicy={dormGenderPolicy} className="mb-2" />
+          <HostelDormBadge
+            accommodationType={accommodationType}
+            genderPolicy={dormGenderPolicy}
+            dormMinAge={dormMinAge}
+            className="mb-2"
+          />
         )}
         {effectiveMinStayNights > 1 && (
           <p
@@ -2765,7 +2778,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   <div className="bw-guest-label">{isDorm ? 'Beds' : 'Guests'}</div>
                   <div className="bw-guest-sub">
                     {isDorm
-                      ? `One bed per guest · Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'}`
+                      ? dormMinAge != null && dormMinAge >= 18
+                        ? `Ages ${dormMinAge}+ only · One bed per guest · Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'}`
+                        : `One bed per guest · Maximum ${effectiveMaxGuests} bed${effectiveMaxGuests === 1 ? '' : 's'}`
                       : `Ages 2+ · Maximum ${effectiveMaxGuests} guest${effectiveMaxGuests === 1 ? '' : 's'}`}
                   </div>
                 </div>
@@ -2787,6 +2802,24 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                   >+</button>
                 </div>
               </div>
+              {isDorm && dormMinAge != null && dormMinAge >= 18 && (
+                <div
+                  className="mt-2.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900"
+                  role="note"
+                  data-testid="bw-dorm-age-notice"
+                >
+                  <span>
+                    No children or infants — {dormMinAge}+ only in shared dorms.{' '}
+                  </span>
+                  <a
+                    href={privateRoomsHref ?? (propertySlug ? `/homes/${propertySlug}` : '/search')}
+                    className="font-semibold underline text-rose-900 hover:text-rose-700"
+                    data-testid="bw-dorm-private-rooms-link"
+                  >
+                    View private rooms
+                  </a>
+                </div>
+              )}
             </div>
           )}
         </div>
