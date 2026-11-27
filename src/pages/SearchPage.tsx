@@ -2178,18 +2178,26 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
                           </p>
                         </>
                       )}
-                      <p className="search-card__price-amt" data-testid="guest-listing-nightly-price">
-                        {formatDisplayCurrency(displayedPrice)}
-                      </p>
-                      {isConverted && (
-                        <p className="mt-0.5 text-xs text-text-muted">{formatINR(displayedPrice)} on payment</p>
+                      {displayedPrice > 0 ? (
+                        <>
+                          <p className="search-card__price-amt" data-testid="guest-listing-nightly-price">
+                            {formatDisplayCurrency(displayedPrice)}
+                          </p>
+                          {isConverted && (
+                            <p className="mt-0.5 text-xs text-text-muted">{formatINR(displayedPrice)} on payment</p>
+                          )}
+                          <p className="mt-0.5 text-sm text-text-muted" data-testid="guest-listing-unit-label">
+                            {isHostel ? 'per bed / night' : 'per night'}
+                          </p>
+                          <p className="text-xs text-text-muted">
+                            {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, processingFeePercent, unit.isGstRegistered)}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm font-medium text-text-muted" data-testid="guest-listing-nightly-price">
+                          See the price for your dates
+                        </p>
                       )}
-                      <p className="mt-0.5 text-sm text-text-muted" data-testid="guest-listing-unit-label">
-                        {isHostel ? 'per bed / night' : 'per night'}
-                      </p>
-                      <p className="text-xs text-text-muted">
-                        {formatEstTotalInclGst(displayedPrice, estimateNights, formatDisplayCurrency, processingFeePercent, unit.isGstRegistered)}
-                      </p>
                       </>
                       )}
                       {longStay && (
