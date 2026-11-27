@@ -1839,7 +1839,7 @@ useEffect(() => {
       : isMarketplaceDetail
         ? (effectiveTenantBrand ? `Listed by ${effectiveTenantBrand}` : 'Your host')
         : (effectiveTenantBrand ? `Listed by ${effectiveTenantBrand}` : `Listed by ${ppBrandName}`);
-    const ppHostInitial = ppHostDisplayName.charAt(0).toUpperCase();
+    const ppHostInitial = (ppHasRealHost || !effectiveTenantBrand ? ppHostDisplayName : effectiveTenantBrand).charAt(0).toUpperCase();
     // TASK-7428 / MKT-011: shared predicate for "an online gateway will actually charge this guest" —
     // uses effectiveTenantCtx so marketplace listings use the listing host's real bookingMode.
     const ppHasOnlinePayment = hasOnlinePaymentRail(effectiveTenantCtx);
