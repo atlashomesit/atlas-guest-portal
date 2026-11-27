@@ -899,16 +899,16 @@ export default function MarketplaceHomepage() {
         url={`${getPublicSiteOrigin()}/`}
         siteName={MARKETPLACE_BRAND_BASELINE}
       />
-      <h1 className="text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold text-text-primary">Atlastays Marketplace</h1>
       {/* TASK-101317 / MKT-002: no verification is required to list here, so never claim "verified hosts".
           Matches the SEO description, which MKT-002 already corrected. */}
-      <p className="mt-2 text-text-body">Discover homes and rooms across India. Book direct with the owner.</p>
+      <p className="mt-1 sm:mt-2 text-sm sm:text-base text-text-body">Discover homes and rooms across India. Book direct with the owner.</p>
 
       {/* TASK-4511: trust strip — real computed numbers only, no fabricated stats/urgency. */}
       {!loading && items.length > 0 && (
         <div
           data-testid="marketplace-trust-strip"
-          className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-text-muted"
+          className="mt-2 sm:mt-4 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm text-text-muted"
         >
           {/* MKT-002: `Listings.PhotosVerifiedAt` is unset on 0 of 136 prod listings today, so
               this item would always read "0 Verified homes" — an unearned trust claim. Omit it
@@ -935,8 +935,8 @@ export default function MarketplaceHomepage() {
         </div>
       )}
 
-      <div className="mt-8">
-        <AirbnbSearchBar preserveFlowPointerTargets />
+      <div className="mt-3 sm:mt-8">
+        <AirbnbSearchBar preserveFlowPointerTargets compactMobile />
       </div>
 
       <div className="marketplace-controls">
