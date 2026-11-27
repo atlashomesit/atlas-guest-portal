@@ -212,9 +212,14 @@ function AppWrapper() {
   // Other themes/routes keep the global consent banner; no tenant resolution changes.
   const inlineHomeConsent = location.pathname === '/' && getCurrentLayoutThemeId() === 'classic'
     && !(isMarketplaceMode() && isAtlastaysMarketplaceSurface());
-  // The reviewed marketplace and confirmed tenant empty search keep help in normal flow.
+  // MKT-055: keep SupportWidget in normal flow on marketplace discovery routes so it never overlaps cards or guide text at 393px.
+  const isMarketplaceDiscoveryRoute =
+    location.pathname === '/' ||
+    location.pathname === '/destinations' ||
+    location.pathname === '/explore' ||
+    location.pathname.startsWith('/homestays-in-');
   const inlineReviewSupport =
-    (location.pathname === '/' && isMarketplaceMode() && isAtlastaysMarketplaceSurface()) ||
+    (isMarketplaceDiscoveryRoute && isMarketplaceMode() && isAtlastaysMarketplaceSurface()) ||
     (location.pathname === '/search' && tenantSearchEmpty);
 
   const withBoundary = (element: React.ReactNode, name: string) => (

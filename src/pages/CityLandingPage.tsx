@@ -230,18 +230,23 @@ const CityLandingPage = ({ citySlug }: CityLandingPageProps) => {
     return out;
   }, [searchParams]);
   const content = CITY_CONTENT[citySlug];
+  // MKT-055: on marketplace surfaces, never leak a single host tenant's name into city-guide copy.
+  const isMarketplaceSurface =
+    forwardedParams.get("brand") === "atlastays" ||
+    (typeof window !== "undefined" && window.location.hostname.toLowerCase().includes("atlastays"));
+  const copyBrandOverride = isMarketplaceSurface ? "Atlastays" : undefined;
   const pageCopy = useMemo(
     () => ({
-      metaTitle: withTenantBrandInCopy(content.metaTitle),
-      metaDescription: withTenantBrandInCopy(content.metaDescription),
-      introParagraphs: content.introParagraphs.map((p) => withTenantBrandInCopy(p)),
-      seasonParagraphs: content.seasonParagraphs.map((p) => withTenantBrandInCopy(p)),
+      metaTitle: withTenantBrandInCopy(content.metaTitle, copyBrandOverride),
+      metaDescription: withTenantBrandInCopy(content.metaDescription, copyBrandOverride),
+      introParagraphs: content.introParagraphs.map((p) => withTenantBrandInCopy(p, copyBrandOverride)),
+      seasonParagraphs: content.seasonParagraphs.map((p) => withTenantBrandInCopy(p, copyBrandOverride)),
       faq: content.faq.map((item) => ({
-        question: withTenantBrandInCopy(item.question),
-        answer: withTenantBrandInCopy(item.answer),
+        question: withTenantBrandInCopy(item.question, copyBrandOverride),
+        answer: withTenantBrandInCopy(item.answer, copyBrandOverride),
       })),
     }),
-    [content],
+    [content, copyBrandOverride],
   );
   const [cards, setCards] = useState<CityLandingCard[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);

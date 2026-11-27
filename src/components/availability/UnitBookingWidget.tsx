@@ -2943,8 +2943,9 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
                       {plan.cancellationSummary}
                     </div>
                   </div>
-                  {/* TASK-1040051: no INR figure on a card while the server refuses to price this stay. */}
-                  {pricingRefusedMessage == null && (
+                  {/* TASK-1040051 / GUEST-083: no INR figure on a card while the server refuses to price this stay,
+                      or when no dates are picked and the plan has no positive base nightly rate (prevents ₹0 / night or bare meal supplement). */}
+                  {pricingRefusedMessage == null && (planQuoteTotal != null || (plan.effectiveNightlyRate > 0 && (plan.baseNightlyRate == null || plan.baseNightlyRate > 0))) && (
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary, #0f172a)' }}>
                       {displayPrice(planQuoteTotal ?? plan.effectiveNightlyRate)}
