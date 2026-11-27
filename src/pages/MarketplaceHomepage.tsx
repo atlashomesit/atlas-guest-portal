@@ -867,12 +867,30 @@ export default function MarketplaceHomepage() {
         if (!visibleListingIds.has(row.listingId)) continue;
       }
 
+      const matchedListing = items.find((it) => it.id === row.listingId);
+      const quoted = cardPrices.get(row.listingId);
+      const pinPriceAmount =
+        quoted?.status === 'ready'
+          ? quoted.display.realNightly
+          : matchedListing && matchedListing.pricePerNight > 0
+            ? matchedListing.pricePerNight
+            : null;
+      const priceLabel =
+        pinPriceAmount != null && pinPriceAmount > 0
+          ? formatCurrency(pinPriceAmount, { maximumFractionDigits: 0 })
+          : undefined;
+
       seen.set(row.propertyId, {
         id: `mp-${row.propertyId}`,
         lat: Number(row.latitude),
         lng: Number(row.longitude),
         title: row.propertyName || row.listingName || `Property ${row.propertyId}`,
         subtitle: row.propertyAddress ?? undefined,
+        priceLabel,
+        coverImageUrl: matchedListing ? (sanitizeGuestImageUrl(matchedListing.coverImageUrl) ?? undefined) : undefined,
+        rating: matchedListing?.rating ?? null,
+        reviewCount: matchedListing?.reviewCount ?? null,
+        propertyType: matchedListing?.accommodationType ?? 'Homestay',
         href: row.tenantSlug
           ? marketplaceListingPath(
               {
@@ -887,6 +905,7 @@ export default function MarketplaceHomepage() {
     }
     return Array.from(seen.values());
   }, [
+    cardPrices,
     category,
     items,
     loading,
