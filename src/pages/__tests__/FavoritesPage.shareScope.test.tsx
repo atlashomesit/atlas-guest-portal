@@ -30,9 +30,11 @@ function page(path: string) {
   return <MemoryRouter initialEntries={[path]}><GuestAuthContext.Provider value={{ auth: signedOut, isLoading: false, login: vi.fn(), logout: vi.fn() }}><FavoritesPage /></GuestAuthContext.Provider></MemoryRouter>;
 }
 describe('approved wishlist share source', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
   beforeEach(() => {
     localIds = [22]; setDomainResolvedSlug('test-stays');
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('[]')));
+    fetchMock = vi.fn().mockResolvedValue(new Response('[]'));
+    vi.stubGlobal('fetch', fetchMock);
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
   it.each([[[22]], [[]]])('shares received IDs with local saves %s', async (ids) => {
@@ -40,9 +42,13 @@ describe('approved wishlist share source', () => {
     const share = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'share', { configurable: true, value: share });
     render(page('/favorites?wishlist=MTE%3D&brand=atlastays&untrusted=discard'));
-    await settle(); fireEvent.click(screen.getByRole('button', { name: 'Share this wishlist' }));
+    await settle();
+    fireEvent.click(screen.getByRole('button', { name: 'Share this wishlist' }));
+    await settle();
     const url = new URL(share.mock.calls[0][0].url);
-    expect(atob(url.searchParams.get('wishlist')!)).toBe('11');
+    expect(url.searchParams.get('board')).toBeTruthy();
+    const postCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+    expect(JSON.parse(String((postCall?.[1] as RequestInit).body)).listingIds).toEqual([11]);
     expect(url.searchParams.get('brand')).toBe('atlastays');
     expect(url.searchParams.get('tenant')).toBe('test-stays');
     expect(url.searchParams.has('untrusted')).toBe(false);
@@ -54,7 +60,11 @@ describe('approved wishlist share source', () => {
     Object.defineProperty(navigator, 'share', { configurable: true, value: share });
     render(page('/favorites')); await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Share wishlist' }));
-    expect(atob(new URL(share.mock.calls[0][0].url).searchParams.get('wishlist')!)).toBe('11');
+    await settle();
+    const url = new URL(share.mock.calls[0][0].url);
+    expect(url.searchParams.get('board')).toBeTruthy();
+    const postCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+    expect(JSON.parse(String((postCall?.[1] as RequestInit).body)).listingIds).toEqual([11]);
     expect(screen.getByRole('button', { name: 'Remove from saved' })).toBeInTheDocument();
   });
   it('copies received IDs and falls back to WhatsApp if clipboard rejects', async () => {
@@ -64,7 +74,9 @@ describe('approved wishlist share source', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     render(page('/favorites?wishlist=MTE%3D')); await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Share this wishlist' })); await settle();
-    expect(atob(new URL(copy.mock.calls[0][0]).searchParams.get('wishlist')!)).toBe('11');
+    expect(new URL(copy.mock.calls[0][0]).searchParams.get('board')).toBeTruthy();
+    const postCall = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+    expect(JSON.parse(String((postCall?.[1] as RequestInit).body)).listingIds).toEqual([11]);
     expect(screen.getByRole('button', { name: /Link copied/ })).toBeInTheDocument();
     expect(open).not.toHaveBeenCalled();
   });
@@ -75,6 +87,6 @@ describe('approved wishlist share source', () => {
     render(page('/favorites?wishlist=MTE%3D')); await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Share this wishlist' })); await settle();
     const message = new URL(open.mock.calls[0][0] as string).searchParams.get('text')!;
-    expect(message).toContain('wishlist=MTE%3D'); expect(localIds).toEqual([22]);
+    expect(message).toContain('board='); expect(localIds).toEqual([22]);
   });
 });

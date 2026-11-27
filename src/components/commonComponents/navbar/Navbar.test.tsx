@@ -264,9 +264,9 @@ describe("Navbar CTA", () => {
 
     const menu = screen.getByRole("menu");
     const items = screen.getAllByRole("menuitem");
-    expect(items).toHaveLength(7);
+    expect(items).toHaveLength(8);
 
-    const expectedNames = ["English", "हिन्दी", "తెలుగు", "मराठी", "বাংলা", "தமிழ்", "ಕನ್ನಡ"];
+    const expectedNames = ["English", "हिन्दी", "తెలుగు", "मराठी", "বাংলা", "தமிழ்", "ಕನ್ನಡ", "മലയാളം"];
     for (const name of expectedNames) {
       expect(menu).toHaveTextContent(name);
     }
