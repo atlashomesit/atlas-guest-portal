@@ -126,9 +126,9 @@ export const TENANT_BRAND_PLACEHOLDER = "{{TENANT_BRAND}}";
 // eslint-disable-next-line atlas-brand/no-atlas-string-leak -- intentional legacy token for runtime substitution
 const LEGACY_MARKETPLACE_BRAND_IN_COPY = "Atlas Homestays";
 
-/** Replace hardcoded legacy brand strings in static templates with the resolved tenant brand. */
-export function withTenantBrandInCopy(text: string): string {
-  const brand = getTenantBrandName();
+/** Replace hardcoded legacy brand strings in static templates with the resolved tenant brand (or marketplace baseline override). */
+export function withTenantBrandInCopy(text: string, brandOverride?: string): string {
+  const brand = brandOverride?.trim() || getTenantBrandName();
   let out = text;
   if (out.includes(TENANT_BRAND_PLACEHOLDER)) {
     out = out.replaceAll(TENANT_BRAND_PLACEHOLDER, brand);

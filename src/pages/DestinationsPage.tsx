@@ -87,7 +87,29 @@ function DestinationsDirectory() {
     return () => ac.abort();
   }, [onMarketplace]);
 
-  const cities = useMemo(() => CITY_DIRECTORY, []);
+  // MKT-055: sort cities with live stays first (desc by count, preserving editorial order for ties)
+  // and carry active brand / utm_* query params onto every city link.
+  const carriedQuery = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    const params = new URLSearchParams(window.location.search);
+    const out = new URLSearchParams();
+    for (const [k, v] of params.entries()) {
+      if (k === "brand" || k === "tenant" || k.startsWith("utm_")) {
+        out.set(k, v);
+      }
+    }
+    const qs = out.toString();
+    return qs ? `?${qs}` : "";
+  }, []);
+
+  const cities = useMemo(() => {
+    return [...CITY_DIRECTORY].sort((a, b) => {
+      const ca = counts[a.slug] ?? 0;
+      const cb = counts[b.slug] ?? 0;
+      if (cb !== ca) return cb - ca;
+      return 0;
+    });
+  }, [counts]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 text-text-primary sm:px-6" data-testid="destinations-page">
@@ -109,7 +131,7 @@ function DestinationsDirectory() {
           return (
             <li key={city.slug}>
               <Link
-                to={city.path}
+                to={`${city.path}${carriedQuery}`}
                 data-testid={`destination-card-${city.slug}`}
                 className="flex h-full flex-col gap-1 rounded-2xl border border-border bg-bg-surface p-5 shadow-sm transition-all hover:border-border-subtle hover:shadow-md"
               >
@@ -119,6 +141,8 @@ function DestinationsDirectory() {
                   <span className="mt-2 text-sm font-medium text-emerald-700" data-testid={`destination-count-${city.slug}`}>
                     {stayCountLabel(count)}
                   </span>
+                ) : onMarketplace && Object.keys(counts).length > 0 ? (
+                  <span className="mt-2 text-xs text-text-muted">Coming soon</span>
                 ) : null}
               </Link>
             </li>
