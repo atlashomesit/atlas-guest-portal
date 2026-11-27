@@ -191,6 +191,9 @@ export function addWishlistItemNote(
   return updated;
 }
 
+export const voteTripWishlistItem = voteWishlistItem;
+export const addTripWishlistNote = addWishlistItemNote;
+
 export function countVotes(votes: Record<string, TripWishlistVoteDirection>): { up: number; down: number } {
   let up = 0;
   let down = 0;
