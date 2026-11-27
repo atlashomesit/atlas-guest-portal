@@ -2337,10 +2337,14 @@ const handleRangeChange = (next: AtlasDateRangePickerValue) => {
         holdTenantSlug,
         holdListingId: numericListingId,
         holdListingName: listingName ?? null,
-        // AGT-005: the AI sales agent's link carries src=ai_receptionist; keep it across the hop to checkout (exact value only).
+        // AGT-005 & REV-059: preserve exact attribution src values (ai_receptionist, instagram_link) across the hop to checkout.
         holdBookingChannel: isMarketplaceOrigin
           ? 'marketplace'
-          : new URLSearchParams(currentSearch).get('src') === 'ai_receptionist' ? 'ai_receptionist' : null,
+          : (() => {
+              const src = new URLSearchParams(currentSearch).get('src');
+              if (src === 'ai_receptionist' || src === 'instagram_link') return src;
+              return null;
+            })(),
         holdPriceBreakdown: {
           paymentFeeDisplay: {
             percent: feePercent(Number((convenienceFeePercent * 100).toFixed(2))),
