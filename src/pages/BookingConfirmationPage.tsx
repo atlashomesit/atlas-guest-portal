@@ -28,6 +28,7 @@ import GuestMessageThread from "../components/messaging/GuestMessageThread";
 import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector, { type GuestMealPreferences } from "../components/bnb/GuestDietarySelector"; // BNB-002 / BNB-009
 import RefundStatusTracker, { type GuestRefund } from "../components/booking/RefundStatusTracker"; // PAY-009
+import StayExtensionCard from "../components/booking/StayExtensionCard"; // GUEST-089
 import { BookingGstDetailsCard } from "../components/booking/BookingGstDetailsCard"; // GUEST-084
 import { CoTravellersCard, type BookingCoTraveller } from "../components/booking/CoTravellersCard"; // GUEST-086
 import { SelfCheckoutCard } from "../components/booking/SelfCheckoutCard"; // GUEST-087
@@ -247,6 +248,10 @@ interface BookingSummary {
   maxGuests?: number;
   /** GUEST-087: Timestamp when guest tapped "I have checked out". */
   guestReportedCheckoutAtUtc?: string | null;
+  /** GUEST-089: Booking channel/source and online payment rail flag for self-service stay extension. */
+  bookingSource?: string | null;
+  isOtaBooking?: boolean;
+  onlinePaymentEnabled?: boolean;
   /** TASK-1888: server-computed; show pre-arrival checklist when true. */
   preArrivalBriefingVisible?: boolean;
   /** GUEST-005: server owns the near-checkout timing policy; absent means hidden. */
@@ -949,6 +954,21 @@ export default function BookingConfirmationPage() {
     : "";
   const supportsPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
   const canRequestModification = !isCancelled && !!token;
+  // GUEST-089: Self-service instant stay extension for direct Confirmed/CheckedIn bookings with online payment rail.
+  const normalizedBookingStatus = (booking.status || "").toLowerCase();
+  const isDirectBooking =
+    booking.isOtaBooking !== true &&
+    !/^(airbnb|booking\.?com|agoda|makemytrip|mmt|goibibo|expedia|channex|ota|vrbo|tripadvisor)/i.test(
+      (booking.bookingSource || "").trim()
+    );
+  const canExtendStay =
+    !isCancelled &&
+    !!token &&
+    (normalizedBookingStatus === "confirmed" ||
+      normalizedBookingStatus === "checkedin" ||
+      normalizedBookingStatus === "checked_in") &&
+    isDirectBooking &&
+    booking.onlinePaymentEnabled !== false;
   const isCancellationRequestRow = (r: ModRequestSummary) => r.isCancellation === true || /^CANCELLATION_REQUEST/.test(r.note ?? "");
   // GUEST-075: only a date or guest change counts as a "change request"; a cancellation request is its own thing.
   const hasPendingModRequest = modRequests.some((r) => r.status === "Pending" && !isCancellationRequestRow(r));
@@ -1500,6 +1520,30 @@ export default function BookingConfirmationPage() {
               {formatCurrency(booking.totalAmount ?? 0, { currency: booking.currency })}
             </span>
           </div>
+          {canExtendStay && (
+            <StayExtensionCard
+              bookingId={booking.bookingId}
+              token={token}
+              currentCheckoutDateIso={booking.checkoutDateIso}
+              currentCheckoutDisplay={booking.checkoutDate}
+              currency={booking.currency || "INR"}
+              guestName={booking.guestName}
+              guestPhone={booking.guestPhone}
+              propertyName={booking.propertyName}
+              onExtended={(nextCheckoutIso, nextTotal) => {
+                setBooking((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        checkoutDateIso: nextCheckoutIso,
+                        checkoutDate: nextCheckoutIso,
+                        totalAmount: typeof nextTotal === "number" ? nextTotal : prev.totalAmount,
+                      }
+                    : prev
+                );
+              }}
+            />
+          )}
           {canRequestModification && (
             <div className="pt-4 border-t border-border-subtle">
               <button
