@@ -1,4 +1,5 @@
 import MarketplaceHostIdentity from '@/components/property/MarketplaceHostIdentity';
+import { SleepingArrangementsSection, type BedroomConfigEntry } from '../../components/listing/SleepingArrangementsSection';
 /**
  * TASK-4914 / ADR-0081 D8 — "heritage" layout theme's PropertyDetails page.
  *
@@ -2379,6 +2380,11 @@ useEffect(() => {
                   hostDisplayName={ppHostDisplayName}
                   heading="From your hosts"
                   ariaLabel="From your hosts"
+                />
+
+                {/* GUEST-097: Visual "Where you'll sleep" room-by-room sleeping arrangements */}
+                <SleepingArrangementsSection
+                  bedroomsConfig={(data as { bedroomsConfig?: BedroomConfigEntry[] | string | null }).bedroomsConfig}
                 />
 
                 {/* About this home — DESIGN-031: omit invented prose; Ask host when empty */}
