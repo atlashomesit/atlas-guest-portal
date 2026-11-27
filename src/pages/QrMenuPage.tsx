@@ -98,6 +98,12 @@ export interface MenuResponse {
   categories: MenuCategory[];
   /** POS-132: active guest-menu upsell suggestions from the server. */
   suggestions?: MenuSuggestionOffer[];
+  /** POS-136: kitchen QR ordering pause / throttle status. */
+  orderingPaused?: boolean;
+  orderingPausedUntilUtc?: string | null;
+  orderingPauseMessage?: string | null;
+  estimatedPrepMinutes?: number | null;
+  qrPrepTimeBufferMinutes?: number | null;
 }
 
 export interface MenuSuggestionOffer {
@@ -334,6 +340,31 @@ export default function QrMenuPage() {
   const restrictFallback = fallbackList.includes("PAY_NOW_UPI") || fallbackList.includes("PAY_ON_DELIVERY");
   const offerPayNow = !restrictFallback || fallbackList.includes("PAY_NOW_UPI");
   const offerPayOnDelivery = !restrictFallback || fallbackList.includes("PAY_ON_DELIVERY");
+
+  // POS-136: kitchen QR ordering pause / busy-kitchen prep-time buffer
+  const pauseUntilMs = menu?.orderingPausedUntilUtc ? new Date(menu.orderingPausedUntilUtc).getTime() : NaN;
+  const isOrderingPaused =
+    menu?.orderingPaused === true &&
+    (Number.isNaN(pauseUntilMs) || pauseUntilMs > Date.now());
+  const pauseResumeLabel = formatRetryTime(menu?.orderingPausedUntilUtc);
+  const orderingPausedBannerText = isOrderingPaused
+    ? menu?.orderingPauseMessage?.trim() ||
+      (pauseResumeLabel
+        ? `Kitchen is busy — phone ordering resumes at ${pauseResumeLabel}.`
+        : "Kitchen is busy — phone ordering is temporarily paused.")
+    : null;
+  const hasPrepBuffer =
+    !isOrderingPaused &&
+    ((typeof menu?.qrPrepTimeBufferMinutes === "number" && menu.qrPrepTimeBufferMinutes > 0) ||
+      (typeof menu?.estimatedPrepMinutes === "number" &&
+        menu.estimatedPrepMinutes > 0 &&
+        Boolean(menu?.orderingPauseMessage?.trim())));
+  const prepBufferBannerText = hasPrepBuffer
+    ? menu?.orderingPauseMessage?.trim() ||
+      (typeof menu?.estimatedPrepMinutes === "number" && menu.estimatedPrepMinutes > 0
+        ? `Kitchen is busy — estimated prep time is ~${menu.estimatedPrepMinutes} mins (+${menu?.qrPrepTimeBufferMinutes ?? 0} min extra wait).`
+        : `Kitchen is busy — please allow +${menu?.qrPrepTimeBufferMinutes} mins extra prep time.`)
+    : null;
 
   // Category filter
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -1320,6 +1351,53 @@ export default function QrMenuPage() {
           </section>
         ) : null}
 
+        {/* POS-136: Kitchen ordering paused or busy-kitchen extra-wait banner */}
+        {orderingPausedBannerText && (
+          <div
+            role="status"
+            data-testid="qr-ordering-paused-banner"
+            style={{
+              backgroundColor: "#fef3c7",
+              border: "1px solid #f59e0b",
+              color: "#92400e",
+              borderRadius: "12px",
+              padding: "12px 14px",
+              marginBottom: "14px",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+              fontSize: "13px",
+              fontWeight: 600,
+              lineHeight: "1.4",
+            }}
+          >
+            <Clock size={18} style={{ flexShrink: 0, marginTop: "1px" }} />
+            <span>{orderingPausedBannerText}</span>
+          </div>
+        )}
+        {prepBufferBannerText && (
+          <div
+            role="status"
+            data-testid="qr-prep-buffer-banner"
+            style={{
+              backgroundColor: "#fffbeb",
+              border: "1px solid #fde68a",
+              color: "#92400e",
+              borderRadius: "12px",
+              padding: "10px 14px",
+              marginBottom: "14px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "13px",
+              fontWeight: 600,
+            }}
+          >
+            <Clock size={16} style={{ flexShrink: 0 }} />
+            <span>{prepBufferBannerText}</span>
+          </div>
+        )}
+
         {/* Category Tabs */}
         <nav
           style={{
@@ -2206,17 +2284,21 @@ export default function QrMenuPage() {
               {/* Place Order CTA */}
               <button
                 type="submit"
-                disabled={submitting || (settlementMethod === "POST_TO_ROOM" && (showVerificationWarning || !verificationCode.trim()))}
+                disabled={
+                  submitting ||
+                  isOrderingPaused ||
+                  (settlementMethod === "POST_TO_ROOM" && (showVerificationWarning || !verificationCode.trim()))
+                }
                 style={{
                   width: "100%",
-                  backgroundColor: "#9e402a",
+                  backgroundColor: isOrderingPaused ? "#9ca3af" : "#9e402a",
                   color: "#fff",
                   padding: "12px",
                   borderRadius: "10px",
                   border: "none",
                   fontWeight: 800,
                   fontSize: "15px",
-                  cursor: submitting ? "not-allowed" : "pointer",
+                  cursor: submitting || isOrderingPaused ? "not-allowed" : "pointer",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -2224,7 +2306,17 @@ export default function QrMenuPage() {
                 }}
                 data-testid="pos-qr-submit-btn"
               >
-                {submitting ? "Placing Order..." : takeawayActive ? `Place Takeaway Order • ₹${cartSubtotal.toLocaleString("en-IN")}` : settlementMethod === "POST_TO_ROOM" ? `Charge to Room • ₹${cartSubtotal.toLocaleString("en-IN")}` : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
+                {isOrderingPaused
+                  ? pauseResumeLabel
+                    ? `Ordering resumes at ${pauseResumeLabel}`
+                    : "Ordering temporarily paused"
+                  : submitting
+                    ? "Placing Order..."
+                    : takeawayActive
+                      ? `Place Takeaway Order • ₹${cartSubtotal.toLocaleString("en-IN")}`
+                      : settlementMethod === "POST_TO_ROOM"
+                        ? `Charge to Room • ₹${cartSubtotal.toLocaleString("en-IN")}`
+                        : `Place Order • ₹${cartSubtotal.toLocaleString("en-IN")}`}
                 <ArrowRight size={18} />
               </button>
             </div>
