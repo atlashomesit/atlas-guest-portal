@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import SEO from '../components/SEO';
 import { UpiPaymentPanel } from '../components/checkout/UpiPaymentPanel';
+import { VirtualBankAccountCard } from '../components/checkout/VirtualBankAccountCard';
 import {
   createPayLinkOrder,
   getPayLink,
@@ -405,6 +406,10 @@ export default function PayLinkPage() {
               pollStatus={upi.order.isDynamicQr ? pollDynamicQrStatus : undefined}
               onAutoConfirmed={upi.order.isDynamicQr ? handleDynamicQrConfirmed : undefined}
             />
+          )}
+
+          {!summary.alreadyPaid && !summary.upgradeHoldLapsed && !isLinkExpired && summary.virtualAccount && (
+            <VirtualBankAccountCard account={summary.virtualAccount} currency={summary.currency} />
           )}
 
           {unconfirmed && (

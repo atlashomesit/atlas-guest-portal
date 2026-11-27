@@ -1,4 +1,5 @@
 import { buildApiUrl, getApiHeaders } from './client';
+import type { VirtualBankAccount } from '../components/checkout/VirtualBankAccountCard';
 
 /**
  * PAY-016: the first-party pay link (`/pay/:token`). The signed token in the path is the only credential; the API
@@ -35,6 +36,8 @@ export interface PayLinkSummary {
   totalAmountInr?: number | null;
   paidSoFarInr?: number | null;
   remainingInr?: number | null;
+  /** PAY-053: per-booking Smart Collect virtual bank account details when created by host. */
+  virtualAccount?: VirtualBankAccount | null;
 }
 
 export interface PayLinkOrder {
