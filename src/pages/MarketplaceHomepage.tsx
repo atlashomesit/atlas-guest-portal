@@ -23,6 +23,11 @@ import { enrichMarketplaceCoverItems } from '@/utils/marketplaceListingCover';
 import ReviewSummary from '@/components/ReviewSummary'; // TASK-4511
 import OwnerShareBadge from '@/components/OwnerShareBadge'; // TASK-4511
 import AmenityFilterPills from '@/components/marketplace/AmenityFilterPills';
+import {
+  CompareStaysDrawer,
+  MAX_COMPARE_STAYS,
+  type CompareStayItem,
+} from '@/components/marketplace/CompareStaysDrawer';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
 import { matchesAmenityFilter, serverAmenityCodesFor } from '@/utils/amenityFilters';
 import { resolveAmenityLabel } from '@/utils/amenityCodes';
@@ -321,6 +326,16 @@ export default function MarketplaceHomepage() {
   const [loadingMore, setLoadingMore] = useState(false);
   // TASK-1873: save-heart state keyed by listing id
   const [favEpoch, setFavEpoch] = useState(0);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const [compareOpen, setCompareOpen] = useState(false);
+
+  const toggleCompareStay = useCallback((id: number) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_COMPARE_STAYS) return prev;
+      return [...prev, id];
+    });
+  }, []);
   const favIds = useMemo(() => {
     void favEpoch;
     return new Set(getFavoriteIds());
@@ -1125,6 +1140,32 @@ export default function MarketplaceHomepage() {
                   />
                 </div>
 
+                {/* MKT-062: Compare toggle */}
+                {(() => {
+                  const isCompared = compareIds.includes(item.id);
+                  const atCap = !isCompared && compareIds.length >= MAX_COMPARE_STAYS;
+                  return (
+                    <button
+                      type="button"
+                      data-testid={`marketplace-compare-toggle-${item.id}`}
+                      aria-pressed={isCompared}
+                      disabled={atCap}
+                      title={atCap ? `You can compare up to ${MAX_COMPARE_STAYS} stays at a time` : undefined}
+                      className={`absolute left-2 top-2 z-10 inline-flex min-h-[36px] items-center rounded-full px-3 py-1 text-xs font-semibold shadow border transition ${
+                        isCompared
+                          ? 'bg-black text-white border-black'
+                          : 'bg-bg-surface/95 text-text-primary border-border-subtle hover:bg-bg-surface'
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCompareStay(item.id);
+                      }}
+                    >
+                      {isCompared ? 'Comparing ✓' : 'Compare'}
+                    </button>
+                  );
+                })()}
+
                 {/* TASK-1873: save heart */}
                 <button
                   type="button"
@@ -1421,6 +1462,57 @@ export default function MarketplaceHomepage() {
           </button>
         </div>
       )}
+      <CompareStaysDrawer
+        items={compareIds
+          .map((id) => items.find((it) => it.id === id))
+          .filter((it): it is MarketplaceListing => Boolean(it))
+          .map((it): CompareStayItem => {
+            const quoted = cardPrices.get(it.id);
+            const allInTotalLabel =
+              quoted?.status === 'ready'
+                ? allInTotalLabel(formatCurrency(quoted.display.total, { maximumFractionDigits: 0 }), quoted.display.nights)
+                : it.pricePerNight > 0
+                  ? `${formatCurrency(it.pricePerNight, { maximumFractionDigits: 0 })} / night`
+                  : 'Choose dates for price';
+            const nightlyRateLabel =
+              quoted?.status === 'ready'
+                ? `${formatCurrency(quoted.display.realNightly, { maximumFractionDigits: 0 })} / night`
+                : undefined;
+            const amenities = (it.amenityCodes ?? [])
+              .map((code) => resolveAmenityLabel(code))
+              .filter((x): x is string => Boolean(x))
+              .slice(0, 5);
+            return {
+              id: it.id,
+              title: resolveMarketplaceListingDisplayName(it),
+              location: it.city || undefined,
+              imageUrl: sanitizeGuestImageUrl(it.coverImageUrl) ?? '',
+              allInTotalLabel,
+              nightlyRateLabel,
+              rating: it.rating,
+              reviewCount: it.reviewCount,
+              maxGuests: it.maxGuests,
+              amenities,
+              breakfastIncluded: it.breakfastIncluded === true,
+              cancellationLabel: it.freeCancellation ? 'Free cancellation' : 'Standard',
+              href: marketplaceListingPath(it, searchSuffix),
+            };
+          })}
+        open={compareOpen}
+        onOpen={() => setCompareOpen(true)}
+        onClose={() => setCompareOpen(false)}
+        onRemove={(id) => {
+          setCompareIds((prev) => {
+            const next = prev.filter((x) => x !== id);
+            if (next.length < 2) setCompareOpen(false);
+            return next;
+          });
+        }}
+        onClear={() => {
+          setCompareIds([]);
+          setCompareOpen(false);
+        }}
+      />
     </section>
     </>
   );
