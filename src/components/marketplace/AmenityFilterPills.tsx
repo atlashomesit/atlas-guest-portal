@@ -13,6 +13,8 @@ export type AmenityFilterPillsProps = {
   onToggleTopHost?: () => void;
   selfCheckIn?: boolean;
   onToggleSelfCheckIn?: () => void;
+  minRating?: number | null;
+  onSelectMinRating?: (rating: number | null) => void;
 };
 
 export default function AmenityFilterPills({
@@ -28,6 +30,8 @@ export default function AmenityFilterPills({
   onToggleTopHost,
   selfCheckIn = false,
   onToggleSelfCheckIn,
+  minRating = null,
+  onSelectMinRating,
 }: AmenityFilterPillsProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="marketplace-amenities-pills">
@@ -94,6 +98,22 @@ export default function AmenityFilterPills({
         >
           <span aria-hidden="true">🔑</span>
           <span>Self check-in</span>
+        </button>
+      )}
+      {onSelectMinRating && (
+        <button
+          type="button"
+          data-testid="marketplace-filter-min-rating-45"
+          aria-pressed={minRating === 4.5}
+          className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+            minRating === 4.5
+              ? 'bg-black text-white border-black'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+          }`}
+          onClick={() => onSelectMinRating(minRating === 4.5 ? null : 4.5)}
+        >
+          <span aria-hidden="true">★</span>
+          <span>4.5★ &amp; up</span>
         </button>
       )}
       {pills.map(({ label, icon }) => {

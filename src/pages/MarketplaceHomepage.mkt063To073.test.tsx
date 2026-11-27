@@ -158,4 +158,25 @@ describe('MarketplaceHomepage MKT-063..MKT-073 filters', () => {
     expect(listingCalls.some((u) => u.includes('minBedrooms=2'))).toBe(true);
     expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
   });
+
+  it('MKT-065: filters by minRating (4.5★ & up pill and selector), syncs URL, excludes unrated stays', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    const pill = screen.getByTestId('marketplace-filter-min-rating-45');
+    fireEvent.click(pill);
+    await settle();
+
+    expect(pill).toHaveAttribute('aria-pressed', 'true');
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('minRating=4.5'))).toBe(true);
+    // Only listing 101 (4.8★, 24 reviews) qualifies; 102 (4.2★) and 103 (unrated) are excluded
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+  });
 });

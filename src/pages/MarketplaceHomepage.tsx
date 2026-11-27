@@ -308,6 +308,15 @@ function parsePositiveIntParam(raw: string | null): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+function parseMinRatingParam(raw: string | null): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  if (n < 4.0) return 4.0;
+  if (n > 5.0) return 5.0;
+  return Math.round(n * 10) / 10;
+}
+
 // eslint-disable-next-line react-refresh/only-export-components -- co-located marketplace helper
 export function formatRoomCapacitySummary(item: {
   bedrooms?: number | null;
@@ -403,6 +412,10 @@ export default function MarketplaceHomepage() {
   const [minBathrooms, setMinBathrooms] = useState<number | null>(
     () => parsePositiveIntParam(searchParams.get('minBathrooms')),
   );
+  // MKT-065: Minimum guest review score (>= 4.0 visible review rule)
+  const [minRating, setMinRating] = useState<number | null>(
+    () => parseMinRatingParam(searchParams.get('minRating')),
+  );
 
   // MKT-048: Map bounding box synced with URL (?swLat=&swLng=&neLat=&neLng=)
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(() =>
@@ -429,6 +442,7 @@ export default function MarketplaceHomepage() {
     setMinBedrooms(parsePositiveIntParam(searchParams.get('minBedrooms')));
     setMinBeds(parsePositiveIntParam(searchParams.get('minBeds')));
     setMinBathrooms(parsePositiveIntParam(searchParams.get('minBathrooms')));
+    setMinRating(parseMinRatingParam(searchParams.get('minRating')));
     setMapBounds(parseBoundsFromSearchParams(searchParams));
 
     const s = searchParams.get('sort') || searchParams.get('sortBy');
@@ -510,6 +524,17 @@ export default function MarketplaceHomepage() {
     },
     [setSearchParams],
   );
+
+  const handleMinRatingChange = useCallback((rating: number | null) => {
+    const clamped = rating == null ? null : Math.min(5.0, Math.max(4.0, Math.round(rating * 10) / 10));
+    setMinRating(clamped);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (clamped != null) next.set('minRating', String(clamped));
+      else next.delete('minRating');
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   const handleSearchThisArea = useCallback(() => {
     if (!pendingMapBounds) return;
@@ -600,6 +625,7 @@ export default function MarketplaceHomepage() {
       'minBedrooms',
       'minBeds',
       'minBathrooms',
+      'minRating',
       'swLat',
       'swLng',
       'neLat',
@@ -660,6 +686,7 @@ export default function MarketplaceHomepage() {
     if (minBedrooms != null) p.set('minBedrooms', String(minBedrooms));
     if (minBeds != null) p.set('minBeds', String(minBeds));
     if (minBathrooms != null) p.set('minBathrooms', String(minBathrooms));
+    if (minRating != null) p.set('minRating', String(minRating));
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -668,7 +695,7 @@ export default function MarketplaceHomepage() {
     }
     if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, mapBounds, sortBy]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, mapBounds, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -804,6 +831,15 @@ export default function MarketplaceHomepage() {
     if (minBathrooms != null) {
       result = result.filter((item) => typeof item.bathrooms === 'number' && item.bathrooms >= minBathrooms);
     }
+    if (minRating != null) {
+      result = result.filter(
+        (item) =>
+          item.rating != null &&
+          item.rating >= 4 &&
+          item.rating >= minRating &&
+          (item.reviewCount == null || item.reviewCount > 0),
+      );
+    }
 
     if (freeCancellation) {
       result = result.filter((item) => item.hasFreeCancellation !== false);
@@ -858,7 +894,7 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
+  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -893,6 +929,7 @@ export default function MarketplaceHomepage() {
     if (minBedrooms != null) p.set('minBedrooms', String(minBedrooms));
     if (minBeds != null) p.set('minBeds', String(minBeds));
     if (minBathrooms != null) p.set('minBathrooms', String(minBathrooms));
+    if (minRating != null) p.set('minRating', String(minRating));
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
       p.set('swLng', String(mapBounds.swLng));
@@ -900,7 +937,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1048,7 +1085,7 @@ export default function MarketplaceHomepage() {
         <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
           open={wideFilters || filtersOpen}
           onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
-          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || minRating != null || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
           <div className="marketplace-secondary-content">
             <ExploreDestinationsStrip listings={items} />
             <div className="marketplace-refinements">
@@ -1072,6 +1109,8 @@ export default function MarketplaceHomepage() {
         onToggleTopHost={handleToggleTopHost}
         selfCheckIn={selfCheckIn}
         onToggleSelfCheckIn={handleToggleSelfCheckIn}
+        minRating={minRating}
+        onSelectMinRating={handleMinRatingChange}
       />
 
         <div className="flex flex-wrap items-center gap-2">
@@ -1149,6 +1188,33 @@ export default function MarketplaceHomepage() {
               })}
             </div>
           ))}
+        </div>
+
+        {/* MKT-065: Guest review score threshold selector (>= 4★ visible review rule) */}
+        <div
+          className="mt-3 flex flex-wrap items-center gap-1.5"
+          data-testid="marketplace-filter-min-rating"
+        >
+          <span className="text-xs font-semibold text-text-muted">Guest rating:</span>
+          {([null, 4.0, 4.5, 4.8] as const).map((opt) => {
+            const active = minRating === opt;
+            return (
+              <button
+                key={opt ?? 'any'}
+                type="button"
+                data-testid={`marketplace-filter-min-rating-option-${opt == null ? 'any' : String(opt).replace('.', '')}`}
+                aria-pressed={active}
+                onClick={() => handleMinRatingChange(opt)}
+                className={`min-h-[44px] rounded-full px-3.5 py-1 text-xs font-medium border transition-colors ${
+                  active
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+                }`}
+              >
+                {opt == null ? 'Any' : `${opt.toFixed(1)}★+`}
+              </button>
+            );
+          })}
         </div>
 
             </div>
