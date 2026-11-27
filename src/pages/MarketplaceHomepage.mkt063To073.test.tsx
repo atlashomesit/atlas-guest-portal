@@ -201,4 +201,28 @@ describe('MarketplaceHomepage MKT-063..MKT-073 filters', () => {
       .filter((u) => u.includes('/marketplace/listings'));
     expect(listingCalls.some((u) => u.includes('instantBook=true') && u.includes('eventsAllowed=true'))).toBe(true);
   });
+
+  it('MKT-067: filters by workation (requires BOTH Wi-Fi + workspace) and renders workation card badges', async () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <MarketplaceHomepage />
+      </MemoryRouter>,
+    );
+    await settle();
+
+    expect(screen.getByTestId('marketplace-workspace-badge')).toHaveTextContent('Dedicated workspace');
+    expect(screen.getAllByTestId('marketplace-wifi-badge')[0]).toHaveTextContent('150 Mbps Wi-Fi');
+
+    const pill = screen.getByTestId('marketplace-filter-workation');
+    fireEvent.click(pill);
+    await settle();
+
+    expect(pill).toHaveAttribute('aria-pressed', 'true');
+    const listingCalls = fetchSpy.mock.calls
+      .map((c) => String(c[0]))
+      .filter((u) => u.includes('/marketplace/listings'));
+    expect(listingCalls.some((u) => u.includes('workation=true'))).toBe(true);
+    // Listing 102 has Wi-Fi only (no workspace) so only listing 101 remains
+    expect(screen.getAllByTestId('marketplace-card')).toHaveLength(1);
+  });
 });

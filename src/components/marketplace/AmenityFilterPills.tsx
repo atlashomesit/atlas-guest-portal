@@ -17,6 +17,8 @@ export type AmenityFilterPillsProps = {
   onSelectMinRating?: (rating: number | null) => void;
   instantBook?: boolean;
   onToggleInstantBook?: () => void;
+  workation?: boolean;
+  onToggleWorkation?: () => void;
 };
 
 export default function AmenityFilterPills({
@@ -36,6 +38,8 @@ export default function AmenityFilterPills({
   onSelectMinRating,
   instantBook = false,
   onToggleInstantBook,
+  workation = false,
+  onToggleWorkation,
 }: AmenityFilterPillsProps) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="marketplace-amenities-pills">
@@ -134,6 +138,22 @@ export default function AmenityFilterPills({
         >
           <span aria-hidden="true">⚡</span>
           <span>Instant Book</span>
+        </button>
+      )}
+      {onToggleWorkation && (
+        <button
+          type="button"
+          data-testid="marketplace-filter-workation"
+          aria-pressed={workation}
+          className={`min-h-[44px] rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors border flex items-center gap-1.5 ${
+            workation
+              ? 'bg-black text-white border-black'
+              : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'
+          }`}
+          onClick={onToggleWorkation}
+        >
+          <span aria-hidden="true">💻</span>
+          <span>Workation (Wi-Fi + Desk)</span>
         </button>
       )}
       {pills.map(({ label, icon }) => {
