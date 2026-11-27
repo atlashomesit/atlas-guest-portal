@@ -39,6 +39,11 @@ import {
   type CompareStayItem,
 } from '@/components/marketplace/CompareStaysDrawer';
 import { TopHostBadge, type TopHostStatsDto } from '@/components/marketplace/TopHostBadge';
+import SplitStayPairCard from '@/components/marketplace/SplitStayPairCard';
+import {
+  buildClientSplitStayPairs,
+  type SplitStayPairDto,
+} from '@/utils/splitStayPairing';
 import {
   computeFallbackFlexWindow,
   formatMatchedWindowBadge,
@@ -157,6 +162,9 @@ type MarketplaceItem = {
   // MKT-073: payment timing
   paymentTiming?: 'pay_at_property' | 'partial_advance' | 'full_prepayment' | null;
   advanceDepositPercent?: number | null;
+  // MKT-061: India trust filters (opt-in only — null/undefined never implies true)
+  couplesWelcome?: boolean | null;
+  localIdAccepted?: boolean | null;
 };
 
 /**
@@ -290,6 +298,7 @@ type ApiResponse = {
   pageSize: number;
   topHostEnabled?: boolean;
   priceHistogram?: PriceHistogramDto | null;
+  splitStays?: SplitStayPairDto[] | null;
 };
 
 // TASK-101491: the grid requests one page at a time and appends. This constant is the request
@@ -428,6 +437,8 @@ export default function MarketplaceHomepage() {
   const [favEpoch, setFavEpoch] = useState(0);
   const [compareIds, setCompareIds] = useState<number[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  // MKT-072: server-provided split stays (if present); falls back to client-side pairing
+  const [serverSplitStays, setServerSplitStays] = useState<SplitStayPairDto[]>([]);
   const [wishlistPickerItem, setWishlistPickerItem] = useState<{ id: number; tenantSlug: string; title: string } | null>(null);
   const [newWishlistName, setNewWishlistName] = useState('');
 
@@ -503,6 +514,13 @@ export default function MarketplaceHomepage() {
   const [workation, setWorkation] = useState<boolean>(
     () => searchParams.get('workation') === 'true',
   );
+  // MKT-061: Couples welcome & local ID accepted synced with ?couplesWelcome=true / ?localIdAccepted=true
+  const [couplesWelcome, setCouplesWelcome] = useState<boolean>(
+    () => searchParams.get('couplesWelcome') === 'true',
+  );
+  const [localIdAccepted, setLocalIdAccepted] = useState<boolean>(
+    () => searchParams.get('localIdAccepted') === 'true',
+  );
   // MKT-073: Payment timing filter synced with ?paymentTiming=
   const [paymentTiming, setPaymentTiming] = useState<PaymentTimingFilter | null>(
     () => parsePaymentTimingParam(searchParams.get('paymentTiming')),
@@ -538,6 +556,8 @@ export default function MarketplaceHomepage() {
     setEventsAllowed(searchParams.get('eventsAllowed') === 'true');
     setSmokingAllowed(searchParams.get('smokingAllowed') === 'true');
     setWorkation(searchParams.get('workation') === 'true');
+    setCouplesWelcome(searchParams.get('couplesWelcome') === 'true');
+    setLocalIdAccepted(searchParams.get('localIdAccepted') === 'true');
     setPaymentTiming(parsePaymentTimingParam(searchParams.get('paymentTiming')));
     setMapBounds(parseBoundsFromSearchParams(searchParams));
 
@@ -633,12 +653,17 @@ export default function MarketplaceHomepage() {
   }, [setSearchParams]);
 
   const handleToggleBooleanParam = useCallback(
-    (key: 'instantBook' | 'eventsAllowed' | 'smokingAllowed' | 'workation', currentVal: boolean) => {
+    (
+      key: 'instantBook' | 'eventsAllowed' | 'smokingAllowed' | 'workation' | 'couplesWelcome' | 'localIdAccepted',
+      currentVal: boolean,
+    ) => {
       const nextVal = !currentVal;
       if (key === 'instantBook') setInstantBook(nextVal);
       if (key === 'eventsAllowed') setEventsAllowed(nextVal);
       if (key === 'smokingAllowed') setSmokingAllowed(nextVal);
       if (key === 'workation') setWorkation(nextVal);
+      if (key === 'couplesWelcome') setCouplesWelcome(nextVal);
+      if (key === 'localIdAccepted') setLocalIdAccepted(nextVal);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         if (nextVal) next.set(key, 'true');
@@ -756,6 +781,8 @@ export default function MarketplaceHomepage() {
       'eventsAllowed',
       'smokingAllowed',
       'workation',
+      'couplesWelcome',
+      'localIdAccepted',
       'paymentTiming',
       'swLat',
       'swLng',
@@ -887,6 +914,8 @@ export default function MarketplaceHomepage() {
     if (eventsAllowed) p.set('eventsAllowed', 'true');
     if (smokingAllowed) p.set('smokingAllowed', 'true');
     if (workation) p.set('workation', 'true');
+    if (couplesWelcome) p.set('couplesWelcome', 'true');
+    if (localIdAccepted) p.set('localIdAccepted', 'true');
     if (paymentTiming) p.set('paymentTiming', paymentTiming);
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
@@ -896,7 +925,7 @@ export default function MarketplaceHomepage() {
     }
     if (sortBy !== 'recommended') p.set('sort', sortBy);
     return p.toString();
-  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, mapBounds, sortBy]);
+  }, [category, query, searchParams, minPrice, maxPrice, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, couplesWelcome, localIdAccepted, paymentTiming, mapBounds, sortBy]);
 
   const buildPagePath = useCallback(
     (pageNumber: number) => {
@@ -931,6 +960,7 @@ export default function MarketplaceHomepage() {
         if (cancelled) return;
         setTopHostFeatureEnabled(Boolean(data.topHostEnabled || enriched.some((x) => x.topHost)));
         setServerPriceHistogram(data.priceHistogram ?? null);
+        setServerSplitStays(Array.isArray(data.splitStays) ? data.splitStays : []);
         setItems(enriched);
         // TASK-101491: trust the server's count. Note the API returns the CURRENT PAGE's match
         // count (not a global one) when a `city` filter is applied - city filtering happens after
@@ -1054,6 +1084,12 @@ export default function MarketplaceHomepage() {
     if (workation) {
       result = result.filter((item) => hasListingWorkation(item));
     }
+    if (couplesWelcome) {
+      result = result.filter((item) => item.couplesWelcome === true);
+    }
+    if (localIdAccepted) {
+      result = result.filter((item) => item.localIdAccepted === true);
+    }
     if (paymentTiming) {
       result = result.filter((item) => {
         if (paymentTiming === 'pay_at_property') return item.paymentTiming === 'pay_at_property';
@@ -1128,7 +1164,17 @@ export default function MarketplaceHomepage() {
 
     // GUEST-033: a 1-2 guest search lists homes sized for them first (stable; no change for 3+ guests).
     return sizedForPartyFirst(result, cardStay.guests);
-  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices, nearSearch]);
+  }, [items, category, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, couplesWelcome, localIdAccepted, paymentTiming, freeCancellation, breakfastIncluded, minPrice, maxPrice, selectedAmenity, serverAmenityCodes, cardStay.guests, sortBy, cardPrices, nearSearch]);
+
+  // MKT-072: Paired split stays for >= 4 night searches when exact full-stretch results < 3
+  const splitStayPairs = useMemo(() => {
+    if (serverSplitStays.length > 0) return serverSplitStays;
+    const checkIn = searchParams.get('checkIn');
+    const checkOut = searchParams.get('checkOut');
+    if (!checkIn || !checkOut) return [];
+    if (visibleItems.length >= 3) return [];
+    return buildClientSplitStayPairs(items, checkIn, checkOut, cardStay.guests ?? 2, 5);
+  }, [serverSplitStays, searchParams, visibleItems.length, items, cardStay.guests]);
 
   // TASK-4511: honest trust-strip numbers — derived entirely from the real /marketplace/listings
   // response already fetched above. No fabricated/urgency copy.
@@ -1178,6 +1224,8 @@ export default function MarketplaceHomepage() {
     if (eventsAllowed) p.set('eventsAllowed', 'true');
     if (smokingAllowed) p.set('smokingAllowed', 'true');
     if (workation) p.set('workation', 'true');
+    if (couplesWelcome) p.set('couplesWelcome', 'true');
+    if (localIdAccepted) p.set('localIdAccepted', 'true');
     if (paymentTiming) p.set('paymentTiming', paymentTiming);
     if (mapBounds) {
       p.set('swLat', String(mapBounds.swLat));
@@ -1186,7 +1234,7 @@ export default function MarketplaceHomepage() {
       p.set('neLng', String(mapBounds.neLng));
     }
     return p.toString();
-  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, paymentTiming, mapBounds]);
+  }, [query, searchParams, category, serverAmenityCodes, freeCancellation, breakfastIncluded, topHostFilter, selfCheckIn, minBedrooms, minBeds, minBathrooms, minRating, instantBook, eventsAllowed, smokingAllowed, workation, couplesWelcome, localIdAccepted, paymentTiming, mapBounds]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1353,7 +1401,7 @@ export default function MarketplaceHomepage() {
         <details className="marketplace-secondary" data-testid="marketplace-secondary-filters"
           open={wideFilters || filtersOpen}
           onToggle={(event) => { if (!wideFilters) setFiltersOpen(event.currentTarget.open); }}>
-          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || minRating != null || instantBook || eventsAllowed || smokingAllowed || workation || paymentTiming != null || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
+          <summary>Destinations &amp; filters{category !== 'all' || selectedAmenity || freeCancellation || breakfastIncluded || selfCheckIn || minBedrooms != null || minBeds != null || minBathrooms != null || minRating != null || instantBook || eventsAllowed || smokingAllowed || workation || couplesWelcome || localIdAccepted || paymentTiming != null || mapBounds || query || minPriceInput || maxPriceInput ? ' · Filters applied' : ''}</summary>
           <div className="marketplace-secondary-content">
             <ExploreDestinationsStrip listings={items} />
             <div className="marketplace-refinements">
@@ -1383,6 +1431,8 @@ export default function MarketplaceHomepage() {
         onToggleInstantBook={() => handleToggleBooleanParam('instantBook', instantBook)}
         workation={workation}
         onToggleWorkation={() => handleToggleBooleanParam('workation', workation)}
+        couplesWelcome={couplesWelcome}
+        onToggleCouplesWelcome={() => handleToggleBooleanParam('couplesWelcome', couplesWelcome)}
         paymentTiming={paymentTiming}
         onSelectPaymentTiming={handlePaymentTimingChange}
       />
@@ -1747,6 +1797,29 @@ export default function MarketplaceHomepage() {
                     </div>
                   )}
 
+                  {/* MKT-061: India trust badges — only when explicitly opted in by host (never when null/undefined) */}
+                  {(item.couplesWelcome === true || item.localIdAccepted === true) && (
+                    <div className="flex flex-wrap gap-1.5" data-testid="marketplace-india-trust-badges">
+                      {item.couplesWelcome === true && (
+                        <span
+                          data-testid="marketplace-couples-welcome-badge"
+                          className="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-800"
+                        >
+                          <span aria-hidden>♥</span>
+                          Couples welcome
+                        </span>
+                      )}
+                      {item.localIdAccepted === true && (
+                        <span
+                          data-testid="marketplace-local-id-badge"
+                          className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-800"
+                        >
+                          Local ID accepted
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {/* MKT-073: Payment timing label from real tenant payment policy */}
                   {(item.paymentTiming === 'pay_at_property' ||
                     (item.paymentTiming === 'partial_advance' &&
@@ -1992,6 +2065,29 @@ export default function MarketplaceHomepage() {
             );
           })}
       </div>
+
+      {/* MKT-072: Paired split stays when exact full-stretch results are sparse on >= 4 night trips */}
+      {!loading && splitStayPairs.length > 0 && (
+        <section
+          data-testid="marketplace-split-stays-section"
+          className="mt-8 rounded-2xl border border-border bg-bg-muted/40 p-4 sm:p-6"
+          aria-labelledby="split-stays-heading"
+        >
+          <div className="mb-4">
+            <h2 id="split-stays-heading" className="text-lg font-bold text-text-primary">
+              Split your stay across 2 homes
+            </h2>
+            <p className="mt-1 text-sm text-text-secondary">
+              Combine two consecutive available homes in the same destination for your full trip.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {splitStayPairs.map((pair) => (
+              <SplitStayPairCard key={pair.id} pair={pair} guests={cardStay.guests ?? 2} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* TASK-101491: progressive loading. An explicit control rather than infinite scroll -
           the portal targets WCAG-AA, and an auto-appending grid strands keyboard and screen-reader
