@@ -20,6 +20,8 @@ export const MAX_FILES_PER_WORKER =
   Number.parseInt(process.env.ATLAS_VITEST_BATCH_RECYCLE_EVERY ?? "60", 10) || 60;
 
 const DEFAULT_START_HANDSHAKE_TIMEOUT_MS = 120_000;
+const DEFAULT_MAX_RECYCLE_START_ATTEMPTS = 2;
+const STREAM_FLUSH_TIMEOUT_MS = 2_000;
 const SIGKILL_TIMEOUT_MS = 500;
 const PIPE_ERROR_EXIT_GRACE_MS = 1_000;
 const noop = () => {};
@@ -103,8 +105,19 @@ function streamFlushed(stream) {
     return Promise.resolve();
   }
   return new Promise((resolve) => {
-    stream.once("end", resolve);
-    stream.once("close", resolve);
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      stream.off?.("end", done);
+      stream.off?.("close", done);
+      resolve();
+    };
+    const timer = setTimeout(done, STREAM_FLUSH_TIMEOUT_MS);
+    timer.unref?.();
+    stream.once("end", done);
+    stream.once("close", done);
   });
 }
 
@@ -121,6 +134,7 @@ export class IsolatedBatchForksWorker {
   #maxFilesPerWorker;
   #freshWorkerFiles;
   #handshakeTimeoutMs;
+  #maxRecycleStartAttempts;
   #listeners = new Map();
   #childForwarders = new Map();
   #forwardingAttached = false;
@@ -153,6 +167,10 @@ export class IsolatedBatchForksWorker {
       options.maxFilesPerWorker ?? (configuredMax > 0 ? configuredMax : MAX_FILES_PER_WORKER);
     this.#freshWorkerFiles = options.freshWorkerFiles ?? FRESH_WORKER_FILES;
     this.#handshakeTimeoutMs = options.handshakeTimeoutMs ?? DEFAULT_START_HANDSHAKE_TIMEOUT_MS;
+    this.#maxRecycleStartAttempts = Math.max(
+      1,
+      options.maxRecycleStartAttempts ?? DEFAULT_MAX_RECYCLE_START_ATTEMPTS,
+    );
   }
 
   on(event, callback) {
@@ -244,6 +262,9 @@ export class IsolatedBatchForksWorker {
 
     // Non-lifecycle messages (birpc responses/events) are posted directly to the active child so
     // RPC calls during a recycled worker's start handshake never block behind #sendQueue.
+    if (!this.#child && this.#pendingQueueDepth > 0) {
+      return;
+    }
     this.#postToChild(this.#getChild(), forceWorkerFileIsolation(message));
   }
 
@@ -358,16 +379,21 @@ export class IsolatedBatchForksWorker {
       await this.#terminateChild(oldChild);
     }
 
-    const newChild = this.#spawnChild();
-    this.#child = newChild;
-    try {
-      await this.#performStartHandshake(newChild);
-    } catch (err) {
-      this.#child = undefined;
-      await this.#terminateChild(newChild);
-      throw err;
+    let lastError;
+    for (let attempt = 1; attempt <= this.#maxRecycleStartAttempts; attempt += 1) {
+      const newChild = this.#spawnChild();
+      this.#child = newChild;
+      try {
+        await this.#performStartHandshake(newChild);
+        this.#attachForwarding(newChild);
+        return;
+      } catch (err) {
+        lastError = err;
+        this.#child = undefined;
+        await this.#terminateChild(newChild);
+      }
     }
-    this.#attachForwarding(newChild);
+    throw lastError;
   }
 
   #performStartHandshake(child) {

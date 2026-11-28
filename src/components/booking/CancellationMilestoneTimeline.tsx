@@ -1,3 +1,4 @@
+import React from 'react';
 import { CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import {
   type CancellationTier,
@@ -20,7 +21,7 @@ export interface CancellationMilestoneTimelineProps {
   className?: string;
 }
 
-export default function CancellationMilestoneTimeline({
+const CancellationMilestoneTimeline: React.FC<CancellationMilestoneTimelineProps> = React.memo(({
   checkInDate,
   cancellationTier,
   windowHoursOverride,
@@ -28,7 +29,7 @@ export default function CancellationMilestoneTimeline({
   refundFreeUntilUtc,
   bookingCreatedAt = new Date(),
   className = '',
-}: CancellationMilestoneTimelineProps) {
+}) => {
   if (!checkInDate) return null;
 
   const checkIn = typeof checkInDate === 'string' ? new Date(checkInDate) : checkInDate;
@@ -155,4 +156,6 @@ export default function CancellationMilestoneTimeline({
       </div>
     </div>
   );
-}
+});
+
+export default CancellationMilestoneTimeline;

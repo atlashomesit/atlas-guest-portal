@@ -5,7 +5,7 @@ export interface GuestCheckoutPaymentBadgesProps {
   className?: string;
 }
 
-export const GuestCheckoutPaymentBadges: React.FC<GuestCheckoutPaymentBadgesProps> = ({ className }) => {
+export const GuestCheckoutPaymentBadges: React.FC<GuestCheckoutPaymentBadgesProps> = React.memo(({ className }) => {
   return (
     <div
       className={`gd-pay-rail${className ? ` ${className}` : ''}`}
@@ -28,6 +28,6 @@ export const GuestCheckoutPaymentBadges: React.FC<GuestCheckoutPaymentBadgesProp
       </div>
     </div>
   );
-};
+});
 
 export default GuestCheckoutPaymentBadges;

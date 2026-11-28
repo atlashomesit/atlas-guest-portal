@@ -1,10 +1,11 @@
+import React from 'react';
 import { ShieldCheck, MessageSquareCheck, Percent } from 'lucide-react';
 
 interface BookDirectPerksProps {
   className?: string;
 }
 
-export default function BookDirectPerks({ className = '' }: BookDirectPerksProps) {
+const BookDirectPerks: React.FC<BookDirectPerksProps> = React.memo(({ className = '' }) => {
   return (
     <div
       className={`rounded-xl border border-emerald-200/90 bg-emerald-50/70 p-3.5 text-emerald-950 shadow-sm ${className}`}
@@ -38,4 +39,6 @@ export default function BookDirectPerks({ className = '' }: BookDirectPerksProps
       </div>
     </div>
   );
-}
+});
+
+export default BookDirectPerks;
