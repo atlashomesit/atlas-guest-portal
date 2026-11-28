@@ -151,19 +151,25 @@ describe("SelfCheckIn mandatory guest count & multi-guest ID verification", () =
     await settle();
     expect(screen.getByText(/otp sent to 9876543210/i)).toBeInTheDocument();
 
-    // Enter 6-digit OTP and verify
+    // Enter 6-digit OTP and verify. Verifying the final guest arms SelfCheckIn's 500 ms auto-advance
+    // timer, so own the clock here to assert the verified badge before advancing via Continue.
     const guest2Otp = guest2Card.querySelector("#checkin-otp-1") as HTMLInputElement;
     fireEvent.change(guest2Otp, { target: { value: "123456" } });
     const verifyOtpBtn = screen.getByRole("button", { name: /verify otp/i });
-    fireEvent.click(verifyOtpBtn);
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(verifyOtpBtn);
 
-    await settle();
-    expect(screen.getByText(/passport verified via otp/i)).toBeInTheDocument();
+      await settle();
+      expect(screen.getByText(/passport verified via otp/i)).toBeInTheDocument();
 
-    // Click Continue to proceed to house rules
-    fireEvent.click(screen.getByRole("button", { name: /continue →/i }));
-    await settle();
-    expect(screen.getByRole("heading", { name: /house rules/i })).toBeInTheDocument();
+      // Click Continue to proceed to house rules
+      fireEvent.click(screen.getByRole("button", { name: /continue →/i }));
+      await settle();
+      expect(screen.getByRole("heading", { name: /house rules/i })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("supports pasting 6-digit OTP and automatically advances to next step on verification", async () => {

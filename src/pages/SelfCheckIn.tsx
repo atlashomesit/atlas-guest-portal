@@ -821,6 +821,10 @@ export default function SelfCheckIn() {
   };
 
   const handleContinueFromIdUpload = () => {
+    if (advanceTimerRef.current !== null) {
+      clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
     if (idCollectedElsewhere) {
       setError("");
       setStep("house-rules");
