@@ -19,6 +19,7 @@ import { feeAmount, paymentFeeCopy } from "../../utils/paymentFeeCopy";
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -324,14 +325,17 @@ function scrollFieldIntoView(e: React.FocusEvent<HTMLElement>) {
   }
 }
 
-function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => void) {
-  if (window.Razorpay) { onSuccess(); return; }
+function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => void): () => void {
+  if (window.Razorpay) { onSuccess(); return () => {}; }
 
-  let timeoutId: NodeJS.Timeout | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let alreadyFired = false;
 
   const cleanup = () => {
-    if (timeoutId) clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
   };
 
   const handleSuccess = () => {
@@ -365,6 +369,24 @@ function loadRazorpayScript(onSuccess: () => void, onError: (msg: string) => voi
   timeoutId = setTimeout(() => {
     handleError('Razorpay script loading timed out. Please check your connection and try again.');
   }, 10000);
+
+  return () => {
+    alreadyFired = true;
+    cleanup();
+    script.onload = null;
+    script.onerror = null;
+  };
+}
+
+const GD_STYLE_ELEMENT_ID = 'atlas-gd-styles';
+
+function ensureGdStylesInjected(): void {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(GD_STYLE_ELEMENT_ID)) return;
+  const style = document.createElement('style');
+  style.id = GD_STYLE_ELEMENT_ID;
+  style.textContent = gdStyles;
+  document.head.appendChild(style);
 }
 
 // ── GuestDetailsPage ─────────────────────────────────────────────────────────
@@ -493,17 +515,26 @@ const GuestDetailsPage: React.FC = () => {
     setHoldHydrationDone(true);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only rehydrate
 
+  useLayoutEffect(() => {
+    ensureGdStylesInjected();
+  }, []);
+
   // TASK-102391: warm the Razorpay SDK on mount so Pay opens instantly. Razorpay
   // renders an in-page iframe modal (never a popup window), so iOS popup blockers
   // do not apply — the real mobile failure mode is first-tap script-fetch latency
   // reading as "nothing happens". No-op callbacks: a failed preload simply falls
   // back to loading on Pay click via the existing path below.
   useEffect(() => {
-    loadRazorpayScript(
+    return loadRazorpayScript(
       () => {},
       () => {},
     );
   }, []);
+
+  const activeTimersRef = useRef<{
+    intervals: Set<number>;
+    timeouts: Set<number>;
+  }>({ intervals: new Set(), timeouts: new Set() });
 
   // ── Hold state from context ──────────────────────────────────────────────
   const holdId = booking.holdId;
@@ -1137,7 +1168,7 @@ const GuestDetailsPage: React.FC = () => {
   const extraGuestFeeAmount = Math.max(0, Math.round(Number(priceBreakdown?.extraGuestFee) || 0));
   const weekendRateAdjustmentAmount = Math.max(0, Math.round(Number(priceBreakdown?.weekendRateAdjustmentAmount) || 0));
 
-  const displayPrice = (n: number) => formatCurrency(n, { maximumFractionDigits: 0 });
+  const displayPrice = useCallback((n: number) => formatCurrency(n, { maximumFractionDigits: 0 }), []);
 
   // TASK-4831: prefer the server-authoritative hold `finalAmount` (base − discount + GST + convenience
   // fee — the same figure the listing widget shows and RazorpayPaymentService charges) over a client-side
@@ -1240,12 +1271,24 @@ const GuestDetailsPage: React.FC = () => {
       : null;
 
   // ── Check-in/out display ─────────────────────────────────────────────────
-  const checkInDisplay = booking.checkIn
-    ? formatDateInTimezone(new Date(booking.checkIn), 'Asia/Kolkata')
-    : '—';
-  const checkOutDisplay = booking.checkOut
-    ? formatDateInTimezone(new Date(booking.checkOut), 'Asia/Kolkata')
-    : '—';
+  const checkInDisplay = useMemo(
+    () => (booking.checkIn ? formatDateInTimezone(new Date(booking.checkIn), 'Asia/Kolkata') : '—'),
+    [booking.checkIn],
+  );
+  const checkOutDisplay = useMemo(
+    () => (booking.checkOut ? formatDateInTimezone(new Date(booking.checkOut), 'Asia/Kolkata') : '—'),
+    [booking.checkOut],
+  );
+  const feeCopyStr = useMemo(
+    () =>
+      paymentFeeCopy(
+        priceBreakdown?.paymentFeeDisplay ?? {
+          percent: null,
+          amount: priceBreakdown?.convenienceFeeAmount,
+        },
+      ),
+    [priceBreakdown?.paymentFeeDisplay, priceBreakdown?.convenienceFeeAmount],
+  );
   // propertyName: prefer booking.propertyName (set by BookingContext), fallback to deriving from slug,
   // and map raw Atlas SKUs ("atlas101", "atlas501 ph") to their guest-facing display name ("Studio 101").
   const effectivePropertySlug = propertySlug ?? booking.holdPropertySlug ?? '';
@@ -2419,20 +2462,25 @@ const GuestDetailsPage: React.FC = () => {
                 setOrderError('Your 10 minutes ended while payment was in progress, so the dates were released. If your payment went through you will get a confirmation. Otherwise tap Pay and we will check the dates again.');
                 setIsSubmitting(false);
               };
-              const expireCheckInterval = setInterval(() => {
+              const clearTimers = () => {
+                window.clearInterval(expireCheckInterval);
+                activeTimersRef.current.intervals.delete(expireCheckInterval);
+              };
+              const expireCheckInterval = window.setInterval(() => {
                 if (paymentCompleted || checkoutSettledRef.current) {
-                  clearInterval(expireCheckInterval);
+                  clearTimers();
                   return;
                 }
                 const remainingMs = new Date(expiresAtIso).getTime() - Date.now();
                 if (holdExpiredRef.current || remainingMs <= 0) {
-                  clearInterval(expireCheckInterval);
+                  clearTimers();
                   holdEndedDuringPayment();
                 }
               }, 1000);
+              activeTimersRef.current.intervals.add(expireCheckInterval);
 
               rzp.on('payment.failed', (failRes: unknown) => {
-                clearInterval(expireCheckInterval);
+                clearTimers();
                 paymentCompleted = true;
                 const fr = failRes as { error?: { code?: string; description?: string } };
                 const code = String(fr?.error?.code ?? '');
@@ -2459,7 +2507,7 @@ const GuestDetailsPage: React.FC = () => {
                 setIsSubmitting(false);
               });
               rzp.on('close', () => {
-                clearInterval(expireCheckInterval);
+                clearTimers();
                 handleClose();
               });
 
@@ -2472,10 +2520,15 @@ const GuestDetailsPage: React.FC = () => {
               const windowWatch = createRazorpayWindowWatch(Date.now());
               const openWatchdog = window.setInterval(() => {
                 // `checkoutSettledRef` also flips when the guest leaves the page, so a departed guest never gets a late failure report.
-                if (paymentCompleted || checkoutSettledRef.current) { window.clearInterval(openWatchdog); return; }
+                if (paymentCompleted || checkoutSettledRef.current) {
+                  window.clearInterval(openWatchdog);
+                  activeTimersRef.current.intervals.delete(openWatchdog);
+                  return;
+                }
                 if (!windowWatch.tick(isRazorpayContainerVisible(), Date.now())) return;
                 window.clearInterval(openWatchdog);
-                clearInterval(expireCheckInterval);
+                activeTimersRef.current.intervals.delete(openWatchdog);
+                clearTimers();
                 paymentCompleted = true;
                 track(TerminalCheckoutOutcomeEvents.PaymentFailed, holdListingId ? Number(holdListingId) : 0);
                 reportPaymentFailure(bookingId, bookingToken ?? pendingBookingTokenRef.current, effectiveTenantSlug, {
@@ -2494,6 +2547,7 @@ const GuestDetailsPage: React.FC = () => {
                 setPaymentCancelled(false);
                 setIsSubmitting(false);
               }, 1000);
+              activeTimersRef.current.intervals.add(openWatchdog);
             } catch (err) {
               console.error('[GuestDetailsPage] Razorpay init error:', err);
               setOrderError("Couldn't reach our servers. Your details are saved — check your connection and try again. No payment was taken.");
@@ -2700,7 +2754,11 @@ const GuestDetailsPage: React.FC = () => {
     setConsentError('Please accept the consent to continue.');
     consentRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     setConsentFlash(true);
-    window.setTimeout(() => setConsentFlash(false), 1200);
+    const flashTimer = window.setTimeout(() => {
+      activeTimersRef.current.timeouts.delete(flashTimer);
+      setConsentFlash(false);
+    }, 1200);
+    activeTimersRef.current.timeouts.add(flashTimer);
   }, [houseRulesRequired, houseRulesAccepted, dormAckRequired, dormAckAccepted, depositRequired, depositAccepted]);
 
   // TASK-4537: Determine if the error message indicates a charged-but-unconfirmed state
@@ -2797,11 +2855,16 @@ const GuestDetailsPage: React.FC = () => {
       }
     };
 
+    const timers = activeTimersRef.current;
     window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       if (hiddenTimer) clearTimeout(hiddenTimer);
+      for (const id of timers.intervals) window.clearInterval(id);
+      timers.intervals.clear();
+      for (const id of timers.timeouts) window.clearTimeout(id);
+      timers.timeouts.clear();
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       // In-SPA navigation away from /details unmounts this component without a pagehide event.
@@ -2812,9 +2875,7 @@ const GuestDetailsPage: React.FC = () => {
   // ── Render ────────────────────────────────────────────────────────────────
   if (!holdHydrationDone) {
     return (
-      <div className="gd-page" aria-busy="true" aria-label="Loading your reservation">
-        <style>{gdStyles}</style>
-      </div>
+      <div className="gd-page" aria-busy="true" aria-label="Loading your reservation" />
     );
   }
 
@@ -2835,7 +2896,6 @@ const GuestDetailsPage: React.FC = () => {
             </button>
           </div>
         </div>
-        <style>{gdStyles}</style>
       </div>
     );
   }
@@ -3894,7 +3954,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (mobile only — desktop in aside) */}
           <TrustBand
-            feeCopy={paymentFeeCopy(priceBreakdown?.paymentFeeDisplay ?? { percent: null, amount: priceBreakdown?.convenienceFeeAmount })}
+            feeCopy={feeCopyStr}
             freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
@@ -4331,7 +4391,7 @@ const GuestDetailsPage: React.FC = () => {
 
           {/* Trust band (desktop) */}
           <TrustBand
-            feeCopy={paymentFeeCopy(priceBreakdown?.paymentFeeDisplay ?? { percent: null, amount: priceBreakdown?.convenienceFeeAmount })}
+            feeCopy={feeCopyStr}
             freeCancellationCopy={freeCancellationCopy}
             brandName={brandName}
             whatsappNumber={whatsappNumber}
@@ -4410,8 +4470,6 @@ const GuestDetailsPage: React.FC = () => {
           </a>
         )}
       </div>
-
-      <style>{gdStyles}</style>
     </div>
   );
 };
@@ -4424,7 +4482,7 @@ interface TrustBandProps {
   whatsappNumber: string;
   className?: string;
 }
-const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, whatsappNumber, className, feeCopy }) => (
+const TrustBand: React.FC<TrustBandProps> = React.memo(({ freeCancellationCopy, brandName, whatsappNumber, className, feeCopy }) => (
   <div className={`gd-trust${className ? ` ${className}` : ''}`}>
     <div className="gd-trust-row">
       <IconCheck size={14}/>
@@ -4490,7 +4548,7 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
       );
     })()}
   </div>
-);
+));
 
 // ── SecurityBadges atom (TASK-102074) ──────────────────────────────────────
 // Rendered ONLY while an online payment rail exists (caller gates on hasOnlineRail).
@@ -4499,7 +4557,7 @@ const TrustBand: React.FC<TrustBandProps> = ({ freeCancellationCopy, brandName, 
 interface SecurityBadgesProps {
   className?: string;
 }
-const SecurityBadges: React.FC<SecurityBadgesProps> = ({ className }) => (
+const SecurityBadges: React.FC<SecurityBadgesProps> = React.memo(({ className }) => (
   <div className={`gd-sec${className ? ` ${className}` : ''}`} data-testid="guest-checkout-security-badges">
     <span className="gd-sec-label">Secure checkout</span>
     <div className="gd-sec-row">
@@ -4508,7 +4566,7 @@ const SecurityBadges: React.FC<SecurityBadgesProps> = ({ className }) => (
       <span className="gd-sec-pill"><IconCheck size={12}/> Instant Booking Confirmation</span>
     </div>
   </div>
-);
+));
 
 // ── Inline styles — verbatim .gd-* tokens from bundle styles.css ─────────────
 const gdStyles = `

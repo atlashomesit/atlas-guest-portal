@@ -241,4 +241,80 @@ assert.equal(
   "stderr maxListeners must return to baseline after recycling and stop()",
 );
 
+// 4. Recycle handshake timeout retries cleanly once on a fresh child process
+const retryChildren = [];
+class StallingFirstRecycleChild extends FakeForkChild {
+  #keepAlive;
+  constructor(ep, args, opts) {
+    super(ep, args, opts);
+    retryChildren.push(this);
+  }
+  send(msg) {
+    if (msg?.type === "start" && retryChildren.length === 2) {
+      this.messages.push(msg);
+      this.#keepAlive = setTimeout(() => {}, 5_000);
+      return; // Never emit "started" on the first recycled child
+    }
+    super.send(msg);
+  }
+  kill(signal) {
+    if (this.#keepAlive) {
+      clearTimeout(this.#keepAlive);
+      this.#keepAlive = undefined;
+    }
+    return super.kill(signal);
+  }
+}
+
+const retryWorker = new IsolatedBatchForksWorker({
+  distPath: "C:/fake/vitest/dist",
+  execArgv: [],
+  env: { ATLAS_VITEST_BATCH_RECYCLE_EVERY: "1" },
+  handshakeTimeoutMs: 50,
+  forkFn: (ep, args, opts) => new StallingFirstRecycleChild(ep, args, opts),
+  project: {
+    vitest: {
+      logger: { outputStream: outStream, errorStream: errStream },
+    },
+  },
+});
+
+const retryErrors = [];
+retryWorker.on("error", (err) => retryErrors.push(err));
+await retryWorker.start();
+const retryStarted = new Promise((resolve) => {
+  const h = (m) => {
+    if (m?.type === "started") {
+      retryWorker.off("message", h);
+      resolve(m);
+    }
+  };
+  retryWorker.on("message", h);
+});
+retryWorker.send(start);
+await retryStarted;
+
+const runOnRetryWorker = (filepath) =>
+  new Promise((resolve) => {
+    const h = (m) => {
+      if (m?.type === "testfileFinished") {
+        retryWorker.off("message", h);
+        resolve(m);
+      }
+    };
+    retryWorker.on("message", h);
+    retryWorker.send({
+      type: "run",
+      context: { config: { isolate: false }, files: [{ filepath }] },
+    });
+  });
+
+await runOnRetryWorker("C:\\repo\\src\\pages\\G.test.tsx");
+const retryResult = await runOnRetryWorker("C:\\repo\\src\\pages\\H.test.tsx");
+assert.equal(retryChildren.length, 3, "stalled first recycle attempt must be retried on a 3rd child");
+assert.equal(retryChildren[1].killed, true, "stalled recycled child must be terminated before retry");
+assert.deepEqual(retryResult.files, ["C:/repo/src/pages/H.test.tsx"]);
+assert.equal(retryErrors.length, 0, "transient recycle timeout recovered on retry must emit no error");
+await retryWorker.stop();
+
 console.log("PASS vitest isolated-batch forks pool protocol & recycling self-test");

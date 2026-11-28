@@ -22,7 +22,7 @@ function formatDueIst(iso?: string | null): string {
   }) + ' IST';
 }
 
-export const PaymentPlanSelector: React.FC<PaymentPlanSelectorProps> = ({
+export const PaymentPlanSelector: React.FC<PaymentPlanSelectorProps> = React.memo(({
   paymentPlans,
   selectedPlan,
   onChange,
@@ -163,6 +163,6 @@ export const PaymentPlanSelector: React.FC<PaymentPlanSelectorProps> = ({
       )}
     </div>
   );
-};
+});
 
 export default PaymentPlanSelector;
