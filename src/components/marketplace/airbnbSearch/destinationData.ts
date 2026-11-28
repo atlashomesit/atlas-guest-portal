@@ -17,7 +17,7 @@ export const POPULAR_DESTINATIONS: DestinationOption[] = [
 export const POPULAR_LANDMARKS: DestinationOption[] = [
   { label: 'HITEC City', region: 'Hyderabad · Tech Park', kind: 'landmark', city: 'Hyderabad', lat: 17.4435, lng: 78.3772 },
   { label: 'Gachibowli', region: 'Hyderabad · Neighbourhood', kind: 'landmark', city: 'Hyderabad', lat: 17.4401, lng: 78.3489 },
-  { label: 'Jubilee Hills', region: 'Hyderabad · Neighbourhood', kind: 'landmark', city: 'Hyderabad', lat: 17.4319, lng: 78.4073 },
+  { label: 'Madhapur', region: 'Hyderabad · Neighbourhood', kind: 'landmark', city: 'Hyderabad', lat: 17.4483, lng: 78.3915 },
   { label: 'Banjara Hills', region: 'Hyderabad · Neighbourhood', kind: 'landmark', city: 'Hyderabad', lat: 17.4156, lng: 78.4347 },
   { label: 'Baga Beach', region: 'Goa · Beach', kind: 'landmark', city: 'Goa', lat: 15.5553, lng: 73.7517 },
   { label: 'Calangute Beach', region: 'Goa · Beach', kind: 'landmark', city: 'Goa', lat: 15.5439, lng: 73.7553 },

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { settle } from '@/test/settle';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PayLinkPage from './PayLinkPage';
 
@@ -76,8 +77,9 @@ describe('PayLinkPage — PAY-049 partial payments & expiry countdown', () => {
     });
 
     renderPayLink();
+    await settle();
 
-    expect(await screen.findByTestId('pay-link-expiry')).toHaveTextContent(/Link expires in/i);
+    expect(screen.getByTestId('pay-link-expiry')).toHaveTextContent(/Link expires in/i);
     expect(screen.getByTestId('pay-link-partial-progress')).toHaveTextContent(/Paid so far/i);
 
     const input = screen.getByTestId('pay-link-partial-amount-input') as HTMLInputElement;
@@ -101,9 +103,8 @@ describe('PayLinkPage — PAY-049 partial payments & expiry countdown', () => {
     fireEvent.change(input, { target: { value: '5000' } });
     fireEvent.click(screen.getByTestId('pay-link-razorpay-pay'));
 
-    await waitFor(() => {
-      expect(createPayLinkOrderMock).toHaveBeenCalledWith('tok-049', null, 5000);
-    });
+    await settle();
+    expect(createPayLinkOrderMock).toHaveBeenCalledWith('tok-049', null, 5000);
   });
 
   it('blocks payment when link is expired', async () => {
@@ -126,8 +127,9 @@ describe('PayLinkPage — PAY-049 partial payments & expiry countdown', () => {
     });
 
     renderPayLink();
+    await settle();
 
-    expect(await screen.findByTestId('pay-link-expired')).toHaveTextContent(/expired/i);
+    expect(screen.getByTestId('pay-link-expired')).toHaveTextContent(/expired/i);
     expect(screen.queryByTestId('pay-link-razorpay-pay')).toBeNull();
     expect(screen.queryByTestId('pay-link-partial-section')).toBeNull();
   });

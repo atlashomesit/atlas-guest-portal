@@ -528,33 +528,6 @@ export async function validateTenant(slug: string): Promise<TenantInfo> {
         whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
           ? data.whatsappBookingPhone
           : undefined,
-        // TASK-1040311: mirror resolveFromDomain() payment & lifecycle fields so ?tenant= and fallback storefronts
-        // preserve ONLINE Razorpay checkout when /tenants/{slug}/public reports bookingMode='ONLINE'.
-        paymentProvider: data.paymentProvider ?? undefined,
-        displayMerchantName: data.displayMerchantName ?? undefined,
-        upiVpa: data.upiVpa ?? undefined,
-        upiQrAssetUrl: data.upiQrAssetUrl ?? undefined,
-        upiInstructions: data.upiInstructions ?? undefined,
-        bookingMode: (data.bookingMode === 'ONLINE' || data.bookingMode === 'MANUAL' || data.bookingMode === 'WHATSAPP' || data.bookingMode === 'BLOCKED_LIFECYCLE')
-          ? data.bookingMode
-          : undefined,
-        lifecycleStage: typeof data.lifecycleStage === 'string' ? data.lifecycleStage : (typeof data.stage === 'string' ? data.stage : undefined),
-        websiteStatus: typeof data.websiteStatus === 'string' ? data.websiteStatus : undefined,
-        onlinePaymentsEnabled: typeof data.onlinePaymentsEnabled === 'boolean'
-          ? data.onlinePaymentsEnabled
-          : (data.lifecycleStage === 'Trial' || data.lifecycleStage === 'TrialEndedNudge' || data.stage === 'Trial')
-            ? false
-            : undefined,
-        notTakingBookings: Boolean(
-          data.notTakingBookings === true ||
-          data.websiteStatus === 'not_taking_bookings' ||
-          data.lifecycleStage === 'Blocked' ||
-          data.stage === 'Blocked' ||
-          data.bookingMode === 'BLOCKED_LIFECYCLE'
-        ),
-        whatsappBookingPhone: typeof data.whatsappBookingPhone === 'string' && data.whatsappBookingPhone.length > 0
-          ? data.whatsappBookingPhone
-          : undefined,
         mapLocation: (data.mapLocation && typeof data.mapLocation.lat === 'number' && typeof data.mapLocation.lng === 'number')
           ? {
               lat: data.mapLocation.lat,

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { settle } from '@/test/settle';
 import { RentalAgreementGateCard } from './RentalAgreementGateCard';
 
 describe('CLU-051 RentalAgreementGateCard', () => {
@@ -22,9 +23,8 @@ describe('CLU-051 RentalAgreementGateCard', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /Sign & Unlock/i }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('door-pin')).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId('door-pin')).toBeTruthy();
     expect(onSign).toHaveBeenCalledTimes(1);
     expect(onSign.mock.calls[0][0].signedBy).toBe('Aarav Sharma');
   });

@@ -143,7 +143,7 @@ export const LostItemReportCard: React.FC<LostItemReportCardProps> = ({
       if (returnPhone.trim()) formData.append("returnPhone", returnPhone.trim());
       if (photoFile) formData.append("photo", photoFile);
 
-      const res = await api.post(
+      const res = await api.post<Partial<LostItemReport>>(
         `/public/bookings/${bookingId}/lost-items`,
         formData,
         {

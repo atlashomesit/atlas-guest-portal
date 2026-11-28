@@ -2316,13 +2316,15 @@ export default function SelfCheckIn() {
             </div>
 
             {/* GUEST-090: Structured quick stay-preference chips editable before arrival */}
-            <div className="mb-6">
-              <SelfCheckInStayPreferences
-                bookingId={details.bookingId}
-                token={token}
-                initialTags={(details as { stayPreferenceTags?: string[] }).stayPreferenceTags ?? []}
-              />
-            </div>
+            {details.bookingId != null && (
+              <div className="mb-6">
+                <SelfCheckInStayPreferences
+                  bookingId={details.bookingId}
+                  token={token}
+                  initialTags={(details as { stayPreferenceTags?: string[] }).stayPreferenceTags ?? []}
+                />
+              </div>
+            )}
 
             {/* BNB-009: meal choices saved to the host; the selector loads the summary and hides itself unless the server says to ask */}
             <div className="mb-6">

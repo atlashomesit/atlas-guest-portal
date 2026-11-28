@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Bell, BellRing, X } from "lucide-react";
 import { buildApiUrl, getApiHeaders } from "../api/client";
+import { toISODate } from "../utils/dateRange";
+import { clampMin, toEditableInt } from "../utils/numericInput";
 
 export interface SavedPriceAlert {
   id: string;
@@ -41,7 +43,7 @@ export function savePriceAlerts(alerts: SavedPriceAlert[]): void {
 function defaultDateOffset(daysFromToday: number): string {
   const d = new Date();
   d.setDate(d.getDate() + daysFromToday);
-  return d.toISOString().slice(0, 10);
+  return toISODate(d);
 }
 
 function nightsBetween(checkIn: string, checkOut: string): number {
@@ -81,7 +83,7 @@ export const PriceDropAlertControl: React.FC<PriceDropAlertControlProps> = ({
 
   const [checkIn, setCheckIn] = useState(initialCheckIn || defaultDateOffset(7));
   const [checkOut, setCheckOut] = useState(initialCheckOut || defaultDateOffset(9));
-  const [guests, setGuests] = useState(Math.max(1, Math.min(maxGuests || 6, initialGuests)));
+  const [guests, setGuests] = useState<number | "">(Math.max(1, Math.min(maxGuests || 6, initialGuests)));
   const [channel, setChannel] = useState<"email" | "whatsapp">("email");
   const [email, setEmail] = useState(initialEmail);
   const [phone, setPhone] = useState("");
@@ -116,6 +118,7 @@ export const PriceDropAlertControl: React.FC<PriceDropAlertControlProps> = ({
       return;
     }
 
+    const resolvedGuests = clampMin(guests, 1);
     setSubmitting(true);
     let serverId = `local-${listingId}-${Date.now()}`;
     try {
@@ -126,7 +129,7 @@ export const PriceDropAlertControl: React.FC<PriceDropAlertControlProps> = ({
           listingId,
           checkIn,
           checkOut,
-          guests,
+          guests: resolvedGuests,
           baselineTotalInr,
           channel,
           email: channel === "email" ? email.trim() : undefined,
@@ -150,7 +153,7 @@ export const PriceDropAlertControl: React.FC<PriceDropAlertControlProps> = ({
       listingName,
       checkIn,
       checkOut,
-      guests,
+      guests: resolvedGuests,
       baselineTotalInr,
       channel,
       email: channel === "email" ? email.trim() : undefined,
@@ -294,7 +297,8 @@ export const PriceDropAlertControl: React.FC<PriceDropAlertControlProps> = ({
                       min={1}
                       max={Math.max(1, maxGuests)}
                       value={guests}
-                      onChange={(e) => setGuests(Math.max(1, Number(e.target.value) || 1))}
+                      onChange={(e) => setGuests(toEditableInt(e.target.value))}
+                      onBlur={() => setGuests((prev) => clampMin(prev, 1))}
                       data-testid="price-alert-guests"
                       className="mt-1 w-full rounded-lg border border-border-subtle bg-bg-surface px-2.5 py-2 text-sm text-text-primary"
                     />

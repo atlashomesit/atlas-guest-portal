@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { settle } from '@/test/settle';
 import { SelfCheckoutCard, isDepartureDayIst } from '@/components/booking/SelfCheckoutCard';
 
 describe('GUEST-087: SelfCheckoutCard', () => {
@@ -51,9 +52,8 @@ describe('GUEST-087: SelfCheckoutCard', () => {
     fireEvent.change(screen.getByTestId('self-checkout-note'), { target: { value: 'Great stay!' } });
     fireEvent.click(screen.getByTestId('self-checkout-confirm-btn'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('self-checkout-confirmed')).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId('self-checkout-confirmed')).toBeTruthy();
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/public/bookings/55/guest-checkout?t=tok55');
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(body).toEqual({

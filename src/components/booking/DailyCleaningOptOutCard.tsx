@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { buildApiUrl, getApiHeaders } from "@/api/client";
 
 export type CleaningPreference = "daily" | "fresh_towels_only" | "skip_cleaning";

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { settle } from "@/test/settle";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import ReviewsWidgetEmbedPage, { filterQualifyingReviews } from "./ReviewsWidgetEmbedPage";
 
@@ -27,9 +28,8 @@ describe("REV-058 ReviewsWidgetEmbedPage", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("rev058-embed-carousel")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("rev058-embed-carousel")).toBeInTheDocument();
     expect(screen.getByTestId("rev058-review-card-1")).toHaveTextContent("Asha");
     expect(screen.getByTestId("rev058-review-card-4")).toHaveTextContent("Vikram");
     expect(screen.queryByTestId("rev058-review-card-2")).not.toBeInTheDocument();
@@ -46,9 +46,8 @@ describe("REV-058 ReviewsWidgetEmbedPage", () => {
         </Routes>
       </MemoryRouter>,
     );
-    await waitFor(() => {
-      expect(container.innerHTML).toBe("");
-    });
+    await settle();
+    expect(container.innerHTML).toBe("");
     expect(filterQualifyingReviews([{ id: 1, rating: 3.9 }, { id: 2, rating: 4.0, isHidden: true }])).toHaveLength(0);
   });
 });

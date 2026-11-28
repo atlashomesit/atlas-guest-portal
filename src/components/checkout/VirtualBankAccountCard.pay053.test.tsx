@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { settle } from '@/test/settle';
 import { VirtualBankAccountCard } from './VirtualBankAccountCard';
 
 describe('VirtualBankAccountCard — PAY-053 Smart Collect virtual bank account', () => {
@@ -33,19 +34,16 @@ describe('VirtualBankAccountCard — PAY-053 Smart Collect virtual bank account'
     expect(screen.getByTestId('va-bank-name')).toHaveTextContent('RBL Bank');
 
     fireEvent.click(screen.getByTestId('va-copy-account'));
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith('2223330044556677');
-    });
+    await settle();
+    expect(writeTextMock).toHaveBeenCalledWith('2223330044556677');
 
     fireEvent.click(screen.getByTestId('va-copy-ifsc'));
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith('RAZR0000001');
-    });
+    await settle();
+    expect(writeTextMock).toHaveBeenCalledWith('RAZR0000001');
 
     fireEvent.click(screen.getByTestId('va-copy-all'));
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('2223330044556677'));
-      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('RAZR0000001'));
-    });
+    await settle();
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('2223330044556677'));
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('RAZR0000001'));
   });
 });

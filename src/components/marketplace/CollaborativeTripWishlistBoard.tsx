@@ -14,6 +14,7 @@ import {
   type TripWishlist,
 } from '@/utils/tripWishlists';
 import { estimateStayNights, formatEstTotalInclGst } from '@/utils/guestPriceEstimate';
+import { clampMin, toEditableInt } from '@/utils/numericInput';
 
 export type WishlistListingMeta = {
   id: number;
@@ -44,6 +45,7 @@ export const CollaborativeTripWishlistBoard: React.FC<CollaborativeTripWishlistB
   const [participantName, setParticipantName] = useState('You');
   const [noteDrafts, setNoteDrafts] = useState<Record<number, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [guestsDraft, setGuestsDraft] = useState<number | '' | null>(null);
 
   const wishlists = useMemo<TripWishlist[]>(() => {
     void epoch;
@@ -66,7 +68,10 @@ export const CollaborativeTripWishlistBoard: React.FC<CollaborativeTripWishlistB
     return wishlists[0] ?? null;
   }, [wishlists, shareToken, selectedId]);
 
-  const nights = estimateStayNights(activeWishlist?.checkIn ?? null, activeWishlist?.checkOut ?? null);
+  const nights = estimateStayNights(
+    activeWishlist?.checkIn ? new Date(activeWishlist.checkIn) : null,
+    activeWishlist?.checkOut ? new Date(activeWishlist.checkOut) : null,
+  );
 
   const handleCreateList = (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,10 +205,21 @@ export const CollaborativeTripWishlistBoard: React.FC<CollaborativeTripWishlistB
                   type="number"
                   min={1}
                   max={20}
-                  value={activeWishlist.guests}
+                  value={guestsDraft !== null ? guestsDraft : activeWishlist.guests}
                   onChange={(e) => {
-                    updateTripWishlistTrip(activeWishlist.id, { guests: Number(e.target.value) || 1 });
-                    setEpoch((n) => n + 1);
+                    const parsed = toEditableInt(e.target.value);
+                    setGuestsDraft(parsed);
+                    if (parsed !== '') {
+                      updateTripWishlistTrip(activeWishlist.id, { guests: clampMin(parsed, 1) });
+                      setEpoch((n) => n + 1);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (guestsDraft !== null) {
+                      updateTripWishlistTrip(activeWishlist.id, { guests: clampMin(guestsDraft, 1) });
+                      setGuestsDraft(null);
+                      setEpoch((n) => n + 1);
+                    }
                   }}
                   className="mt-1 min-h-[44px] w-20 rounded-xl border border-border px-3 py-1.5 text-sm"
                 />

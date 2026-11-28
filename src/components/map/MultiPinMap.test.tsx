@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { settle } from '@/test/settle';
 import MultiPinMap, { type MapPin } from './MultiPinMap';
 
 vi.mock('../../config/googleMaps', () => ({
@@ -77,8 +78,9 @@ describe('MKT-070: MultiPinMap price pills and tap-to-preview card', () => {
 
     // Tap first pin
     clickHandlers[0]();
+    await settle();
 
-    const card = await screen.findByTestId('map-pin-preview-card');
+    const card = screen.getByTestId('map-pin-preview-card');
     expect(card.textContent).toContain('Banjara Hills Villa');
     expect(screen.getByTestId('map-pin-preview-price').textContent).toBe('₹3,528');
     expect(screen.getByTestId('map-pin-preview-rating').textContent).toContain('4.8');
@@ -92,7 +94,8 @@ describe('MKT-070: MultiPinMap price pills and tap-to-preview card', () => {
 
     // Tap second pin — sub-4★ rating must be suppressed
     clickHandlers[1]();
-    await screen.findByTestId('map-pin-preview-card');
+    await settle();
+    expect(screen.getByTestId('map-pin-preview-card')).toBeTruthy();
     expect(screen.queryByTestId('map-pin-preview-rating')).toBeNull();
   });
 });
