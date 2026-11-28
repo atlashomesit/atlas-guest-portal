@@ -1,12 +1,5 @@
 import React, { useState, useRef } from 'react';
-
-const MAX_ID_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
-const ALLOWED_ID_MIME_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'application/pdf',
-];
+import { prepareIdFile } from '../../utils/idUploadImage';
 
 export interface GuestIdUploadProps {
   label?: string;
@@ -32,36 +25,24 @@ export const GuestIdUpload: React.FC<GuestIdUploadProps> = ({
   const [validationError, setValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    if (!picked) return;
 
-    // Validate mime type
-    const mime = file.type?.toLowerCase();
-    const isMimeAllowed = mime && ALLOWED_ID_MIME_TYPES.includes(mime);
-    const hasAllowedExt = /\.(jpe?g|png|webp|pdf)$/i.test(file.name);
-
-    if (!isMimeAllowed && !hasAllowedExt) {
-      const err = 'Invalid file type. Please upload a valid JPG, PNG, WEBP image or PDF document.';
-      setValidationError(err);
-      onError?.(err);
+    const prepared = await prepareIdFile(picked);
+    if (!prepared.ok) {
+      setValidationError(prepared.error);
+      onError?.(prepared.error);
       return;
     }
-
-    // Validate file size (< 5MB)
-    if (file.size > MAX_ID_FILE_SIZE_BYTES) {
-      const err = 'File size exceeds 5 MB limit. Please upload an image under 5 MB.';
-      setValidationError(err);
-      onError?.(err);
-      return;
-    }
+    const file = prepared.file;
 
     setValidationError(null);
     setSelectedFile(file);
     onFileSelect?.(file);
 
     // If image, create thumbnail preview
-    if (file.type.startsWith('image/') || /\.(jpe?g|png|webp)$/i.test(file.name)) {
+    if (file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name)) {
       const reader = new FileReader();
       reader.onload = (evt) => {
         setPreviewUrl(evt.target?.result as string);
@@ -148,7 +129,7 @@ export const GuestIdUpload: React.FC<GuestIdUploadProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,application/pdf"
               onChange={handleFileChange}
               className="hidden"
               data-testid="guest-id-file-input"

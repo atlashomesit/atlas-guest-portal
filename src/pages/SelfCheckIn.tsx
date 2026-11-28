@@ -10,6 +10,7 @@ import GuestGuidebook from "../components/GuestGuidebook"; // TASK-4510
 import GuestDietarySelector from "../components/bnb/GuestDietarySelector"; // BNB-002
 import { SelfCheckInStayPreferences } from "../components/booking/StayPreferenceChips"; // GUEST-090
 import DamageWaiverSignature, { type SignatureMode } from "../components/DamageWaiverSignature"; // TASK-1975
+import { prepareIdFile } from "../utils/idUploadImage";
 import { CopyableInfoRow, WifiScanToConnect } from "@/components/stay/StayAccessCopy"; // GUEST-039
 import { fetchSignedInGuestProfile, type VerifiedIdSummary } from "@/api/guestAuthProfileClient"; // GUEST-099
 
@@ -528,6 +529,8 @@ export default function SelfCheckIn() {
       return;
     }
 
+    const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
+
     if (bookingRef && cleanId.length === 12) {
       try {
         const res = await fetch(
@@ -579,6 +582,8 @@ export default function SelfCheckIn() {
       updateGuest(idx, { otpError: "Please enter or paste the 6-digit OTP." });
       return;
     }
+
+    const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
 
     if (bookingRef && guest.otpCode && guest.otpCode.startsWith("ekyc_")) {
       try {
@@ -701,19 +706,16 @@ export default function SelfCheckIn() {
     }
   };
 
-  const handleGuestFileSelect = (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleGuestFileSelect = async (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    if (!picked) return;
 
-    if (!/\.(jpg|jpeg|png|pdf)$/i.test(file.name)) {
-      setError("Please upload a JPG, PNG, or PDF file.");
+    const prepared = await prepareIdFile(picked);
+    if (!prepared.ok) {
+      setError(prepared.error);
       return;
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError("File must be under 5 MB.");
-      return;
-    }
+    const file = prepared.file;
 
     setError("");
     if (file.type.startsWith("image/")) {
