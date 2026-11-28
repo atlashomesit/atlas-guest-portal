@@ -387,15 +387,12 @@ describe('GuestDetailsPage - AGT-003 promo from a checkout link', () => {
       expect(bodies[1].bookingDraft.channel).toBe('ai_receptionist');
     });
 
-    it('sends no channel without src, or with any other value', async () => {
-      for (const search of ['', '&src=ai', '&src=AI_RECEPTIONIST', '&src=ai_receptionist_x']) {
-        cleanup();
-        window.sessionStorage.clear();
-        seedDraft();
+    it.each(['', '&src=ai', '&src=AI_RECEPTIONIST', '&src=ai_receptionist_x'])(
+      'sends no channel for search %j',
+      async (search) => {
         const bodies = await payAndGetBodies(search);
         expect(bodies[1].bookingDraft.channel).toBeUndefined();
-        vi.restoreAllMocks();
-      }
-    });
+      },
+    );
   });
 });

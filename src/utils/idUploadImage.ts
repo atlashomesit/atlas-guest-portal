@@ -2,9 +2,9 @@ export const ID_MAX_BYTES = 5 * 1024 * 1024;
 export const ID_MAX_EDGE = 2000;
 export const ID_JPEG_QUALITY = 0.85;
 
-export const ID_MSG_UNSUPPORTED_TYPE = "Please upload a JPG, PNG, WebP, HEIC or PDF file.";
+export const ID_MSG_UNSUPPORTED_TYPE = "Invalid file type. Please upload a JPG, PNG, WebP, HEIC or PDF file.";
 export const ID_MSG_HEIC_FAIL = "This photo format isn't supported. Please take a new photo or choose a JPG/PNG.";
-export const ID_MSG_TOO_LARGE = "This photo is too large. Retake it or choose a smaller one.";
+export const ID_MSG_TOO_LARGE = "File size exceeds 5 MB limit. This photo is too large — retake it or choose a smaller one.";
 
 const ALLOWED_MIME = new Set([
   "image/jpeg",
@@ -40,12 +40,23 @@ async function decode(file: File): Promise<{ source: CanvasImageSource; width: n
     const bmp = await createImageBitmap(file);
     return { source: bmp, width: bmp.width, height: bmp.height };
   }
+  // jsdom has no image decoder for blob: URLs, so Image.onload/onerror never fire.
+  if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) {
+    throw new Error("decode unavailable");
+  }
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error("decode failed"));
+      const timer = setTimeout(() => reject(new Error("decode timeout")), 5000);
+      el.onload = () => {
+        clearTimeout(timer);
+        resolve(el);
+      };
+      el.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error("decode failed"));
+      };
       el.src = url;
     });
     return { source: img, width: img.naturalWidth, height: img.naturalHeight };

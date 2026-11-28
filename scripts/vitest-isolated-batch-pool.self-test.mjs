@@ -7,6 +7,7 @@ import {
   MAX_FILES_PER_WORKER,
   extractMessageFilepaths,
   forceWorkerFileIsolation,
+  hasFailedTaskUpdate,
   isFreshWorkerFile,
 } from "./vitest-isolated-batch-pool.mjs";
 
@@ -62,6 +63,21 @@ for (const freshRel of FRESH_WORKER_FILES) {
   );
 }
 assert.equal(isFreshWorkerFile("src/pages/Terms.test.tsx"), false);
+
+// 2b. Failure detection helper
+assert.equal(
+  hasFailedTaskUpdate({ m: "onTaskUpdate", a: [[["t1", { state: "fail" }, {}]], []] }),
+  true,
+  "failed onTaskUpdate pack must trigger dirty recycle",
+);
+assert.equal(
+  hasFailedTaskUpdate({ m: "onTaskUpdate", a: [[["t1", { state: "pass" }, {}]], []] }),
+  false,
+);
+assert.equal(
+  hasFailedTaskUpdate({ type: "testfileFinished", error: new Error("boom") }),
+  true,
+);
 
 // 3. Forked child_process worker recycling & PoolRunner contract tests
 const spawnedChildren = [];
@@ -203,8 +219,17 @@ assert.equal(r5.childIndex, 2, "fresh-worker file must get a brand-new child pro
 const r6 = await sendFile("C:\\repo\\src\\pages\\E.test.tsx");
 assert.equal(r6.childIndex, 3, "file following a fresh-worker file must also get a clean child process");
 
+// Simulate a test failure inside child process 3 -> next file must recycle onto child process 4
+spawnedChildren[3].emit("message", {
+  m: "onTaskUpdate",
+  a: [[["task-fail", { state: "fail" }, {}]], []],
+});
+const r7 = await sendFile("C:\\repo\\src\\pages\\F.test.tsx");
+assert.equal(r7.childIndex, 4, "file following a failed test must recycle onto a fresh child process");
+assert.equal(spawnedChildren[3].killed, true, "dirty child process must be terminated");
+
 await poolWorker.stop();
-assert.equal(spawnedChildren[3].killed, true);
+assert.equal(spawnedChildren[4].killed, true);
 assert.equal(
   outStream.getMaxListeners(),
   baseMaxListeners,

@@ -1,17 +1,27 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { settle } from '@/test/settle';
 import { VirtualBankAccountCard } from './VirtualBankAccountCard';
 
 describe('VirtualBankAccountCard — PAY-053 Smart Collect virtual bank account', () => {
   const writeTextMock = vi.fn().mockResolvedValue(undefined);
+  const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
 
   beforeEach(() => {
     writeTextMock.mockClear();
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText: writeTextMock },
       configurable: true,
+      writable: true,
     });
+  });
+
+  afterEach(() => {
+    if (originalClipboard) {
+      Object.defineProperty(navigator, 'clipboard', originalClipboard);
+    } else {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
   });
 
   it('renders virtual account details and copies account number, IFSC, and all details', async () => {

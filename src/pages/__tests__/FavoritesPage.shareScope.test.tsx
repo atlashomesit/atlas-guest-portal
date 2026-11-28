@@ -31,16 +31,25 @@ function page(path: string) {
 }
 describe('approved wishlist share source', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
+  const originalShare = Object.getOwnPropertyDescriptor(navigator, 'share');
+  const originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
   beforeEach(() => {
     localIds = [22]; setDomainResolvedSlug('test-stays');
     fetchMock = vi.fn().mockResolvedValue(new Response('[]'));
     vi.stubGlobal('fetch', fetchMock);
   });
-  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    if (originalShare) Object.defineProperty(navigator, 'share', originalShare);
+    else Reflect.deleteProperty(navigator, 'share');
+    if (originalClipboard) Object.defineProperty(navigator, 'clipboard', originalClipboard);
+    else Reflect.deleteProperty(navigator, 'clipboard');
+  });
   it.each([[[22]], [[]]])('shares received IDs with local saves %s', async (ids) => {
     localIds = ids as number[];
     const share = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'share', { configurable: true, value: share });
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: share });
     render(page('/favorites?wishlist=MTE%3D&brand=atlastays&untrusted=discard'));
     await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Share this wishlist' }));
@@ -57,7 +66,7 @@ describe('approved wishlist share source', () => {
   });
   it('shares own local IDs and retains remove actions', async () => {
     localIds = [11]; const share = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'share', { configurable: true, value: share });
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: share });
     render(page('/favorites')); await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Share wishlist' }));
     await settle();
@@ -68,9 +77,9 @@ describe('approved wishlist share source', () => {
     expect(screen.getByRole('button', { name: 'Remove from saved' })).toBeInTheDocument();
   });
   it('copies received IDs and falls back to WhatsApp if clipboard rejects', async () => {
-    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: undefined });
     const copy = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: copy } });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, writable: true, value: { writeText: copy } });
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     render(page('/favorites?wishlist=MTE%3D')); await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Share this wishlist' })); await settle();
@@ -81,8 +90,8 @@ describe('approved wishlist share source', () => {
     expect(open).not.toHaveBeenCalled();
   });
   it('uses WhatsApp if clipboard is unavailable without mutating saves', async () => {
-    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
-    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'share', { configurable: true, writable: true, value: undefined });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, writable: true, value: undefined });
     const open = vi.spyOn(window, 'open').mockReturnValue(null);
     render(page('/favorites?wishlist=MTE%3D')); await settle();
     fireEvent.click(screen.getByRole('button', { name: 'Share this wishlist' })); await settle();

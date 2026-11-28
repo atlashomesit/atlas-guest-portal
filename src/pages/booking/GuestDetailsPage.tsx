@@ -2420,8 +2420,12 @@ const GuestDetailsPage: React.FC = () => {
                 setIsSubmitting(false);
               };
               const expireCheckInterval = setInterval(() => {
+                if (paymentCompleted || checkoutSettledRef.current) {
+                  clearInterval(expireCheckInterval);
+                  return;
+                }
                 const remainingMs = new Date(expiresAtIso).getTime() - Date.now();
-                if ((holdExpiredRef.current || remainingMs <= 0) && !paymentCompleted) {
+                if (holdExpiredRef.current || remainingMs <= 0) {
                   clearInterval(expireCheckInterval);
                   holdEndedDuringPayment();
                 }
