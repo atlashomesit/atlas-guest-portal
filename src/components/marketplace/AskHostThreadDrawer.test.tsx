@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { settle } from '@/test/settle';
 import { AskHostThreadDrawer } from './AskHostThreadDrawer';
 
 describe('AskHostThreadDrawer (MKT-068)', () => {
@@ -45,17 +46,15 @@ describe('AskHostThreadDrawer (MKT-068)', () => {
     fireEvent.change(screen.getByTestId('ask-host-question'), { target: { value: 'Is inverter backup available?' } });
     fireEvent.click(screen.getByTestId('ask-host-submit'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('ask-host-thread-messages')).toBeTruthy();
-      expect(screen.getByText('Is inverter backup available?')).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByTestId('ask-host-thread-messages')).toBeTruthy();
+    expect(screen.getByText('Is inverter backup available?')).toBeTruthy();
 
     fireEvent.change(screen.getByTestId('ask-host-reply-input'), { target: { value: 'Also is parking covered?' } });
     fireEvent.click(screen.getByTestId('ask-host-reply-submit'));
 
-    await waitFor(() => {
-      expect(screen.getByText('Also is parking covered?')).toBeTruthy();
-    });
+    await settle();
+    expect(screen.getByText('Also is parking covered?')).toBeTruthy();
 
     fireEvent.click(screen.getByTestId('ask-host-drawer-close'));
     expect(onClose).toHaveBeenCalledTimes(1);

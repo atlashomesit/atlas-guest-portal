@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 export interface PreArrivalRoomPreferences {
   bedSetup: "default" | "king" | "twin";

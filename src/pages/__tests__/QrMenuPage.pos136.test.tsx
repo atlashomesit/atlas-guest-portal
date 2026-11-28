@@ -57,7 +57,7 @@ describe("QrMenuPage — POS-136 kitchen pause & busy-kitchen extra-wait banner"
     });
     await settle();
 
-    const banner = await screen.findByTestId("qr-ordering-paused-banner");
+    const banner = screen.getByTestId("qr-ordering-paused-banner");
     expect(banner.textContent).toContain("Kitchen is busy — phone ordering resumes at 8:40 PM");
 
     fireEvent.click(screen.getByTestId("add-to-cart-10"));
@@ -74,7 +74,7 @@ describe("QrMenuPage — POS-136 kitchen pause & busy-kitchen extra-wait banner"
     });
     await settle();
 
-    const banner = await screen.findByTestId("qr-prep-buffer-banner");
+    const banner = screen.getByTestId("qr-prep-buffer-banner");
     expect(banner.textContent).toContain("35 mins");
     expect(screen.queryByTestId("qr-ordering-paused-banner")).toBeNull();
   });

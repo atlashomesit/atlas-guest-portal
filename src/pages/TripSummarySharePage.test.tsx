@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { settle } from "@/test/settle";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { TripSummarySharePage } from "./TripSummarySharePage";
 import { TripSummaryShareCard } from "../components/booking/TripSummaryShareCard";
@@ -41,9 +42,8 @@ describe("TripSummarySharePage & TripSummaryShareCard (GUEST-098)", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("trip-summary-page")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("trip-summary-page")).toBeInTheDocument();
 
     expect(screen.getByText("Shared trip summary")).toBeInTheDocument();
     expect(screen.getByText("Hilltop Pool Villa")).toBeInTheDocument();
@@ -66,9 +66,8 @@ describe("TripSummarySharePage & TripSummaryShareCard (GUEST-098)", () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("trip-summary-not-found")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("trip-summary-not-found")).toBeInTheDocument();
   });
 
   it("generates and disables a privacy-safe trip summary link from TripSummaryShareCard", async () => {
@@ -81,9 +80,8 @@ describe("TripSummarySharePage & TripSummaryShareCard (GUEST-098)", () => {
 
     fireEvent.click(screen.getByTestId("trip-summary-generate-btn"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("trip-summary-share-url")).toHaveTextContent("/trip-summary/opaque-xyz");
-    });
+    await settle();
+    expect(screen.getByTestId("trip-summary-share-url")).toHaveTextContent("/trip-summary/opaque-xyz");
 
     expect(api.post).toHaveBeenCalledWith(
       "/public/bookings/55/trip-summary-link",
@@ -93,9 +91,8 @@ describe("TripSummarySharePage & TripSummaryShareCard (GUEST-098)", () => {
 
     fireEvent.click(screen.getByTestId("trip-summary-disable-btn"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("trip-summary-generate-btn")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("trip-summary-generate-btn")).toBeInTheDocument();
 
     expect(api.delete).toHaveBeenCalledWith("/public/bookings/55/trip-summary-link", {
       params: { t: "bk-tok" },

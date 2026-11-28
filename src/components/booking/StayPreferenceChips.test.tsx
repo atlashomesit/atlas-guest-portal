@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { settle } from "@/test/settle";
 import {
   StayPreferenceChips,
   SelfCheckInStayPreferences,
@@ -61,9 +62,8 @@ describe("StayPreferenceChips (GUEST-090)", () => {
     });
     fireEvent.click(screen.getByTestId("checkin-stay-pref-save"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("checkin-stay-pref-saved")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("checkin-stay-pref-saved")).toBeInTheDocument();
 
     expect(api.patch).toHaveBeenCalledWith(
       "/public/bookings/42/stay-preferences",

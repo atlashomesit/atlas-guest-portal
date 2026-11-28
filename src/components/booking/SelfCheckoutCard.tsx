@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { LogOut, CheckCircle2, Star } from 'lucide-react';
 import { buildApiUrl, getApiHeaders } from '@/api/client';
+import { toISODate } from '@/utils/dateRange';
 
 const DEFAULT_CHECKOUT_ITEMS = [
   'Keys returned or left as instructed',
@@ -12,8 +13,7 @@ const DEFAULT_CHECKOUT_ITEMS = [
  * Returns YYYY-MM-DD in Asia/Kolkata (IST) for the given Date.
  */
 export function getIstDateIso(now: Date = new Date()): string {
-  const istMs = now.getTime() + 5.5 * 60 * 60 * 1000;
-  return new Date(istMs).toISOString().slice(0, 10);
+  return toISODate(now);
 }
 
 /**

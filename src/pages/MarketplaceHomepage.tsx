@@ -2257,10 +2257,10 @@ export default function MarketplaceHomepage() {
       <CompareStaysDrawer
         items={compareIds
           .map((id) => items.find((it) => it.id === id))
-          .filter((it): it is MarketplaceListing => Boolean(it))
+          .filter((it): it is MarketplaceItem => Boolean(it))
           .map((it): CompareStayItem => {
             const quoted = cardPrices.get(it.id);
-            const allInTotalLabel =
+            const totalLabel =
               quoted?.status === 'ready'
                 ? allInTotalLabel(formatCurrency(quoted.display.total, { maximumFractionDigits: 0 }), quoted.display.nights)
                 : it.pricePerNight > 0
@@ -2271,22 +2271,22 @@ export default function MarketplaceHomepage() {
                 ? `${formatCurrency(quoted.display.realNightly, { maximumFractionDigits: 0 })} / night`
                 : undefined;
             const amenities = (it.amenityCodes ?? [])
-              .map((code) => resolveAmenityLabel(code))
-              .filter((x): x is string => Boolean(x))
+              .map((code: string) => resolveAmenityLabel(code))
+              .filter((x: string | null): x is string => Boolean(x))
               .slice(0, 5);
             return {
               id: it.id,
               title: resolveMarketplaceListingDisplayName(it),
               location: it.city || undefined,
               imageUrl: sanitizeGuestImageUrl(it.coverImageUrl) ?? '',
-              allInTotalLabel,
+              allInTotalLabel: totalLabel,
               nightlyRateLabel,
               rating: it.rating,
               reviewCount: it.reviewCount,
               maxGuests: it.maxGuests,
               amenities,
-              breakfastIncluded: it.breakfastIncluded === true,
-              cancellationLabel: it.freeCancellation ? 'Free cancellation' : 'Standard',
+              breakfastIncluded: it.hasBreakfastIncluded === true,
+              cancellationLabel: it.hasFreeCancellation ? 'Free cancellation' : 'Standard',
               href: marketplaceListingPath(it, searchSuffix),
             };
           })}

@@ -70,7 +70,7 @@ describe("QrMenuPage — POS-137 kitchen operating hours & per-section serving s
     });
     await settle();
 
-    const closedBanner = await screen.findByTestId("qr-kitchen-closed-banner");
+    const closedBanner = screen.getByTestId("qr-kitchen-closed-banner");
     expect(closedBanner.textContent).toContain("Kitchen is currently closed");
     expect(closedBanner.textContent).toContain("Opens at 7:00 AM");
     expect(closedBanner.textContent).toContain("7:00 AM – 10:30 PM");

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { settle } from '@/test/settle';
 import { MemoryRouter } from 'react-router-dom';
 import { BookingProvider } from '@/contexts/BookingContext';
 import AirbnbSearchBar from '@/components/marketplace/airbnbSearch/AirbnbSearchBar';
@@ -87,7 +88,8 @@ describe('MKT-056: mobile above-the-fold layout', () => {
       </BookingProvider>,
     );
 
-    const listings = await waitFor(() => screen.getByTestId('city-landing-listings'));
+    await settle();
+    const listings = screen.getByTestId('city-landing-listings');
     const guide = screen.getByTestId('city-landing-guide');
 
     // Node.DOCUMENT_POSITION_FOLLOWING (4) means `guide` follows `listings` in DOM order.

@@ -31,7 +31,11 @@ export const TripSummaryShareCard: React.FC<TripSummaryShareCardProps> = ({
     setErrorMsg(null);
     setCopied(false);
     try {
-      const res = await api.post(
+      const res = await api.post<{
+        shareToken?: string;
+        tripSummaryShareToken?: string;
+        token?: string;
+      }>(
         `/public/bookings/${bookingId}/trip-summary-link`,
         {},
         { params: token ? { t: token } : undefined },

@@ -1,5 +1,3 @@
-import React from "react";
-
 export interface DormGroupEnquiryBannerProps {
   requestedBeds: number;
   maxOnlineBeds: number;

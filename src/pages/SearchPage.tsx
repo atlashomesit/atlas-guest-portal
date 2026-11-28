@@ -2389,24 +2389,30 @@ const SearchPage = ({ onEmptyStateChange }: { onEmptyStateChange?: (empty: boole
             .map((u): CompareListingItem => {
               const q = stayDisplayFor(u.numericId);
               const allInTotalLabel = q
-                ? `${formatDisplayCurrency(q.totalAmount)} total`
+                ? `${formatDisplayCurrency(q.total)} total`
                 : 'Pick dates for price';
               const nightlyRateLabel = q
                 ? `${formatDisplayCurrency(q.realNightly)} / night`
                 : u.pricePerNight > 0
                   ? `${formatDisplayCurrency(u.pricePerNight)} / night`
                   : undefined;
+              const uExt = u as NormalizedListing & {
+                bedrooms?: number;
+                bathrooms?: number;
+                breakfastIncluded?: boolean;
+                cancellationTier?: string;
+              };
               const bedParts: string[] = [];
-              if (u.bedrooms && u.bedrooms > 0) bedParts.push(`${u.bedrooms} ${u.bedrooms === 1 ? 'bedroom' : 'bedrooms'}`);
-              if (u.bathrooms && u.bathrooms > 0) bedParts.push(`${u.bathrooms} ${u.bathrooms === 1 ? 'bath' : 'baths'}`);
+              if (uExt.bedrooms && uExt.bedrooms > 0) bedParts.push(`${uExt.bedrooms} ${uExt.bedrooms === 1 ? 'bedroom' : 'bedrooms'}`);
+              if (uExt.bathrooms && uExt.bathrooms > 0) bedParts.push(`${uExt.bathrooms} ${uExt.bathrooms === 1 ? 'bath' : 'baths'}`);
               const bedLayoutLabel = bedParts.length > 0 ? bedParts.join(' · ') : `Sleeps ${u.maxGuests}`;
               const amenities = u.amenities
                 .map((a) => (a.amenities_icon ? resolveAmenityLabel(a.amenities_icon.trim()) : null))
                 .filter((x): x is string => Boolean(x))
                 .slice(0, 5);
-              const mealPlansLabel = u.breakfastIncluded ? 'Breakfast included (CP)' : 'Room only (EP)';
-              const cancellationLabel = u.cancellationTier
-                ? u.cancellationTier.charAt(0).toUpperCase() + u.cancellationTier.slice(1)
+              const mealPlansLabel = uExt.breakfastIncluded ? 'Breakfast included (CP)' : 'Room only (EP)';
+              const cancellationLabel = uExt.cancellationTier
+                ? uExt.cancellationTier.charAt(0).toUpperCase() + uExt.cancellationTier.slice(1)
                 : 'Standard';
               return {
                 id: u.numericId,

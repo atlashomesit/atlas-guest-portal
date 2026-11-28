@@ -1,5 +1,3 @@
-import React from "react";
-
 export type BunkPositionPreference = "any" | "lower" | "upper";
 
 export interface BunkPreferenceSelectorProps {

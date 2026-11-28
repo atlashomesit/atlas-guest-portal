@@ -78,7 +78,7 @@ describe("QrMenuPage — POS-140 daily portion limit & live remaining-plates bad
     });
     await settle();
 
-    expect((await screen.findByTestId("menu-item-portions-31")).textContent).toBe("Only 2 left today");
+    expect(screen.getByTestId("menu-item-portions-31").textContent).toBe("Only 2 left today");
     expect(screen.getByTestId("menu-item-portions-32").textContent).toBe("10 left today");
     expect(screen.getByTestId("menu-item-portions-33").textContent).toBe("Sold out for today");
 

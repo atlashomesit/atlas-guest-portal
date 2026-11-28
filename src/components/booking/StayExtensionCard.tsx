@@ -44,7 +44,10 @@ function addDaysIso(isoDate: string, days: number): string {
   const parts = isoDate.slice(0, 10).split("-").map(Number);
   if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return "";
   const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days));
-  return dt.toISOString().slice(0, 10);
+  const y = dt.getUTCFullYear();
+  const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(dt.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export const StayExtensionCard: React.FC<StayExtensionCardProps> = ({

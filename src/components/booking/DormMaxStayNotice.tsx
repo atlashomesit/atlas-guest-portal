@@ -1,5 +1,3 @@
-import React from "react";
-
 export interface DormMaxStayNoticeProps {
   maxNights: number;
   rollingWindowDays: number;

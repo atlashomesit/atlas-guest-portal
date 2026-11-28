@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { settle } from "@/test/settle";
 import { LostItemReportCard, isWithinLostItemWindow } from "./LostItemReportCard";
 import { api } from "../../api/client";
 
@@ -75,9 +76,8 @@ describe("LostItemReportCard (GUEST-093)", () => {
     });
     fireEvent.click(screen.getByTestId("lost-item-submit-btn"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("lost-item-success")).toBeInTheDocument();
-    });
+    await settle();
+    expect(screen.getByTestId("lost-item-success")).toBeInTheDocument();
 
     expect(api.post).toHaveBeenCalledWith(
       "/public/bookings/101/lost-items",

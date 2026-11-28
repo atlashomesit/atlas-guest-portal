@@ -314,7 +314,7 @@ export default function FavoritesPage() {
                 l.id,
                 {
                   id: l.id,
-                  name: l.name,
+                  name: l.name ?? "",
                   href: listingPath(l),
                   priceLabel: l.baseNightlyRate ? `${formatDisplayCurrency(l.baseNightlyRate)} / night` : undefined,
                 },
@@ -338,7 +338,7 @@ export default function FavoritesPage() {
                 l.id,
                 {
                   id: l.id,
-                  title: l.name,
+                  title: l.name ?? "",
                   city: undefined,
                   tenantSlug: l.tenantSlug,
                   pricePerNight: l.baseNightlyRate ?? undefined,
@@ -349,7 +349,7 @@ export default function FavoritesPage() {
           )
         }
         formatMoney={formatDisplayCurrency}
-        processingFeePercent={processingFeePercent}
+        processingFeePercent={processingFeePercent ?? undefined}
       />
 
       {loading ? (

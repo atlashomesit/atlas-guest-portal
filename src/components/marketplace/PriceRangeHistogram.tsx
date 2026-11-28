@@ -134,8 +134,11 @@ export default function PriceRangeHistogram({
               step={Math.max(1, Math.round((domainMax - domainMin) / 40))}
               value={sliderMin}
               onChange={(e) => {
-                const next = Math.min(Number(e.target.value), sliderMax);
-                onMinPriceChange(String(next));
+                const raw = e.target.value;
+                const parsed = Number.parseInt(raw, 10);
+                if (!Number.isNaN(parsed)) {
+                  onMinPriceChange(String(parsed > sliderMax ? sliderMax : parsed));
+                }
               }}
               className="min-h-[44px] w-full accent-black cursor-pointer"
             />
@@ -148,8 +151,11 @@ export default function PriceRangeHistogram({
               step={Math.max(1, Math.round((domainMax - domainMin) / 40))}
               value={sliderMax}
               onChange={(e) => {
-                const next = Math.max(Number(e.target.value), sliderMin);
-                onMaxPriceChange(String(next));
+                const raw = e.target.value;
+                const parsed = Number.parseInt(raw, 10);
+                if (!Number.isNaN(parsed)) {
+                  onMaxPriceChange(String(parsed < sliderMin ? sliderMin : parsed));
+                }
               }}
               className="min-h-[44px] w-full accent-black cursor-pointer"
             />

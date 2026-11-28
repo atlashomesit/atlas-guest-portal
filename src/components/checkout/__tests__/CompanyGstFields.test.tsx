@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { settle } from '@/test/settle';
 import { isValidGstin, normalizeGstin, validateCompanyGstInput } from '@/utils/gstin';
 import { CompanyGstFields } from '@/components/checkout/CompanyGstFields';
 import { BookingGstDetailsCard } from '@/components/booking/BookingGstDetailsCard';
@@ -75,9 +76,8 @@ describe('GUEST-084: GSTIN validation & UI', () => {
     fireEvent.change(screen.getByTestId('booking-gstin-input'), { target: { value: '29abcde1234f1z5' } });
     fireEvent.click(screen.getByTestId('booking-gst-save-btn'));
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/public/bookings/42/gst-details?t=tok123');
     expect(onUpdated).toHaveBeenCalledWith({ companyName: 'Acme Corp', guestGstin: '29ABCDE1234F1Z5' });
     expect(screen.getByTestId('booking-gst-saved-msg')).toBeTruthy();

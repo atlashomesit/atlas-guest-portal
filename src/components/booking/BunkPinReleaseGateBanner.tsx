@@ -1,5 +1,3 @@
-import React from "react";
-
 export interface BunkPinReleaseGateBannerProps {
   isCheckedIn: boolean;
   balanceDueInr: number;
