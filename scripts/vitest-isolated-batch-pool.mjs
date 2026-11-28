@@ -19,10 +19,31 @@ export const FRESH_WORKER_FILES = [
 export const MAX_FILES_PER_WORKER =
   Number.parseInt(process.env.ATLAS_VITEST_BATCH_RECYCLE_EVERY ?? "60", 10) || 60;
 
-const DEFAULT_START_HANDSHAKE_TIMEOUT_MS = 60_000;
+const DEFAULT_START_HANDSHAKE_TIMEOUT_MS = 120_000;
 const SIGKILL_TIMEOUT_MS = 500;
 const PIPE_ERROR_EXIT_GRACE_MS = 1_000;
 const noop = () => {};
+
+/**
+ * Detect whether a child message indicates a test or file failure so the pool can
+ * recycle the child process before running the next file (preventing poisoned
+ * externalized React/jsdom singletons from cascading across subsequent files).
+ */
+export function hasFailedTaskUpdate(raw) {
+  if (!raw || typeof raw !== "object") return false;
+  if (raw.m === "onTaskUpdate" && Array.isArray(raw.a) && Array.isArray(raw.a[0])) {
+    for (const pack of raw.a[0]) {
+      const result = Array.isArray(pack) ? pack[1] : undefined;
+      if (result && typeof result === "object" && result.state === "fail") {
+        return true;
+      }
+    }
+  }
+  if (raw.type === "testfileFinished" && raw.error) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * Keep Vitest's per-file mock/module reset while reusing forked child_process workers.
@@ -106,6 +127,7 @@ export class IsolatedBatchForksWorker {
   #startMessage;
   #filesRun = 0;
   #lastRunWasFreshFile = false;
+  #dirtyChild = false;
   #sendQueue = Promise.resolve();
   #pendingQueueDepth = 0;
   #pipeErrorTimer;
@@ -160,6 +182,7 @@ export class IsolatedBatchForksWorker {
       this.#startMessage = message;
       this.#filesRun = 0;
       this.#lastRunWasFreshFile = false;
+      this.#dirtyChild = false;
       this.#postToChild(this.#getChild(), forceWorkerFileIsolation(message));
       return;
     }
@@ -171,10 +194,12 @@ export class IsolatedBatchForksWorker {
       );
       const fileCount = Math.max(1, filepaths.length);
       const needsRecycle =
-        this.#filesRun > 0 &&
-        (targetIsFreshFile ||
-          this.#lastRunWasFreshFile ||
-          this.#filesRun >= this.#maxFilesPerWorker);
+        !this.#child ||
+        (this.#filesRun > 0 &&
+          (this.#dirtyChild ||
+            targetIsFreshFile ||
+            this.#lastRunWasFreshFile ||
+            this.#filesRun >= this.#maxFilesPerWorker));
 
       if (!needsRecycle && this.#pendingQueueDepth === 0) {
         this.#filesRun += fileCount;
@@ -185,13 +210,16 @@ export class IsolatedBatchForksWorker {
 
       this.#enqueue(async () => {
         const shouldRecycleNow =
-          this.#filesRun > 0 &&
-          (targetIsFreshFile ||
-            this.#lastRunWasFreshFile ||
-            this.#filesRun >= this.#maxFilesPerWorker);
+          !this.#child ||
+          (this.#filesRun > 0 &&
+            (this.#dirtyChild ||
+              targetIsFreshFile ||
+              this.#lastRunWasFreshFile ||
+              this.#filesRun >= this.#maxFilesPerWorker));
         if (shouldRecycleNow) {
-          await this.#recycleChild();
+          this.#dirtyChild = false;
           this.#filesRun = fileCount;
+          await this.#recycleChild();
         } else {
           this.#filesRun += fileCount;
         }
@@ -230,9 +258,11 @@ export class IsolatedBatchForksWorker {
     if (this.#pendingQueueDepth > 0) {
       await this.#sendQueue.catch(noop);
     }
-    const child = this.#getChild();
+    const child = this.#child;
     this.#child = undefined;
-    await this.#terminateChild(child);
+    if (child) {
+      await this.#terminateChild(child);
+    }
   }
 
   deserialize(data) {
@@ -322,13 +352,21 @@ export class IsolatedBatchForksWorker {
     if (!this.#startMessage) {
       throw new Error("Cannot recycle isolated-batch worker before initial start message.");
     }
-    const oldChild = this.#getChild();
+    const oldChild = this.#child;
     this.#child = undefined;
-    await this.#terminateChild(oldChild);
+    if (oldChild) {
+      await this.#terminateChild(oldChild);
+    }
 
     const newChild = this.#spawnChild();
     this.#child = newChild;
-    await this.#performStartHandshake(newChild);
+    try {
+      await this.#performStartHandshake(newChild);
+    } catch (err) {
+      this.#child = undefined;
+      await this.#terminateChild(newChild);
+      throw err;
+    }
     this.#attachForwarding(newChild);
   }
 
@@ -432,7 +470,11 @@ export class IsolatedBatchForksWorker {
   #bindEventForwarder(child, event) {
     if (this.#childForwarders.has(event)) return;
     const forwarder = (...args) => {
+      if (event === "message" && hasFailedTaskUpdate(args[0])) {
+        this.#dirtyChild = true;
+      }
       if (event === "error") {
+        this.#dirtyChild = true;
         const error = args[0];
         const code = error?.code;
         if (code === "EPIPE" || code === "ERR_IPC_CHANNEL_CLOSED") {

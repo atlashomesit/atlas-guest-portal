@@ -83,10 +83,12 @@ interface ProtoPropBaseline {
 }
 
 const RESTORED_DOM_PROTO_PROPS = ["scrollIntoView", "scrollTo", "scroll", "scrollBy"] as const;
+const RESTORED_NAVIGATOR_PROPS = ["clipboard", "share", "mediaDevices", "onLine"] as const;
 
 interface WorkerBaseline {
   href: string;
   props: Map<string, PropBaseline>;
+  navigatorProps: Map<string, PropertyDescriptor | undefined>;
   protoProps: ProtoPropBaseline[];
   headKeep: Set<Element>;
   bodyKeep: Set<Element>;
@@ -109,6 +111,12 @@ function baseline(): WorkerBaseline {
   for (const name of [...RESTORED_WINDOW_PROPS, ...SDK_GLOBALS]) {
     props.set(name, { descriptor: Object.getOwnPropertyDescriptor(g, name), value: g[name] });
   }
+  const navigatorProps = new Map<string, PropertyDescriptor | undefined>();
+  if (typeof navigator !== "undefined") {
+    for (const name of RESTORED_NAVIGATOR_PROPS) {
+      navigatorProps.set(name, Object.getOwnPropertyDescriptor(navigator, name));
+    }
+  }
   const protoProps: ProtoPropBaseline[] = [];
   for (const ctor of [g.Element, g.HTMLElement] as Array<{ prototype?: object } | undefined>) {
     const proto = ctor?.prototype;
@@ -124,6 +132,7 @@ function baseline(): WorkerBaseline {
   const created: WorkerBaseline = {
     href: window.location.href,
     props,
+    navigatorProps,
     protoProps,
     headKeep: new Set(Array.from(document.head.children)),
     bodyKeep: new Set(Array.from(document.body.children)),
@@ -244,6 +253,21 @@ export function resetSharedWorkerState(): void {
   // Replaced or assigned window properties (a test that swaps `window.location` for a plain object, sets a viewport
   // width, stubs `scrollTo`, or leaves a `Razorpay` mock behind).
   for (const [name, propBase] of base.props) attempt(() => restoreWindowProp(name, propBase));
+
+  // Replaced or non-writable `navigator` own properties (e.g. `Object.defineProperty(navigator, "clipboard", ...)`
+  // without `writable: true` would otherwise throw TypeError in a later file using `Object.assign(navigator, ...)`).
+  if (typeof navigator !== "undefined") {
+    for (const [name, baseDesc] of base.navigatorProps) {
+      attempt(() => {
+        const current = Object.getOwnPropertyDescriptor(navigator, name);
+        if (baseDesc === undefined) {
+          if (current !== undefined) Reflect.deleteProperty(navigator, name);
+        } else if (!sameDescriptor(current, baseDesc)) {
+          Object.defineProperty(navigator, name, baseDesc);
+        }
+      });
+    }
+  }
 
   // DOM prototype scroll stubs (`HTMLElement.prototype.scrollIntoView = vi.fn()` in checkout/messaging tests, which
   // would otherwise leave an own property on `HTMLElement.prototype` that shadows `Element.prototype.scrollIntoView`).

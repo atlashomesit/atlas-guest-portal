@@ -2,10 +2,27 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildWifiQrPayload, CopyButton, CopyableInfoRow, escapeWifiQrValue, WifiScanToConnect } from "./StayAccessCopy";
 
+const originalClipboard = typeof navigator !== "undefined"
+  ? Object.getOwnPropertyDescriptor(navigator, "clipboard")
+  : undefined;
+
+function mockClipboard(writeText: ReturnType<typeof vi.fn>) {
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    writable: true,
+    value: { writeText },
+  });
+}
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  if (originalClipboard) {
+    Object.defineProperty(navigator, "clipboard", originalClipboard);
+  } else {
+    Reflect.deleteProperty(navigator, "clipboard");
+  }
 });
 
 describe("GUEST-039 Wi-Fi QR payload", () => {
@@ -28,7 +45,7 @@ describe("GUEST-039 CopyButton", () => {
   it("copies the value, shows 'Copied! ✓' for 2 seconds, then goes back", async () => {
     vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
+    mockClipboard(writeText);
     render(<CopyButton value="pass-1234" ariaLabel="Copy Wi-Fi password" testId="copy-pw" />);
     const btn = screen.getByTestId("copy-pw");
     expect(btn).toHaveTextContent("Copy");
@@ -43,7 +60,7 @@ describe("GUEST-039 CopyButton", () => {
   });
 
   it("never claims 'Copied' when both the clipboard API and the fallback fail", async () => {
-    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) } });
+    mockClipboard(vi.fn().mockRejectedValue(new Error("denied")));
     (document as unknown as { execCommand: () => boolean }).execCommand = () => false;
     render(<CopyButton value="x" ariaLabel="Copy" testId="copy-x" />);
     await act(async () => { fireEvent.click(screen.getByTestId("copy-x")); });
