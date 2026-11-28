@@ -287,6 +287,7 @@ export default function SelfCheckIn() {
   const [step, setStep] = useState<Step>(urlRef ? "auth" : "auth");
   // The 500 ms hop to house rules below is cleared on unmount, so a page that goes away first never sets state late.
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const continueFromIdUploadRef = useRef<() => void>(() => {});
   useEffect(() => () => {
     if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
   }, []);
@@ -583,6 +584,15 @@ export default function SelfCheckIn() {
       return;
     }
 
+    if (!guest.name.trim()) {
+      updateGuest(idx, { otpError: "Please enter the guest full name before verifying." });
+      return;
+    }
+    if (!guest.govtIdNumber.trim()) {
+      updateGuest(idx, { otpError: "Please enter the guest ID number before verifying." });
+      return;
+    }
+
     const tokenQuery = token ? `&t=${encodeURIComponent(token)}` : "";
 
     if (bookingRef && guest.otpCode && guest.otpCode.startsWith("ekyc_")) {
@@ -617,10 +627,11 @@ export default function SelfCheckIn() {
               setAadhaarMasked(masked);
             }
             setError("");
-            const allGuestsReady = nextGuests.every(
-              (g) => g.isVerified || g.idFile || idCollectedElsewhere
+            const foreignInvalid = Boolean(isForeignGuest && checkoutDateStr && (isVisaExpiredForStay || isPassportExpiredForStay));
+            const allGuestsValid = nextGuests.every(
+              (g) => g.name.trim() && g.govtIdType && g.govtIdNumber.trim() && (g.isVerified || g.idFile || idCollectedElsewhere)
             );
-            if (allGuestsReady) {
+            if (allGuestsValid && !foreignInvalid) {
               if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
               advanceTimerRef.current = setTimeout(() => {
                 setStep("house-rules");
@@ -634,6 +645,13 @@ export default function SelfCheckIn() {
         }
       } catch {
         // Fall back to client verification
+      }
+    }
+
+    if (guest.otpCode && !guest.otpCode.startsWith("ekyc_")) {
+      if (!/^\d{4,6}$/.test(entered)) {
+        updateGuest(idx, { otpError: "Invalid OTP code. Please enter the 6-digit code sent to your phone." });
+        return;
       }
     }
 
@@ -657,11 +675,12 @@ export default function SelfCheckIn() {
     }
     setError("");
 
-    // Advance to next step once all guests are verified
-    const allGuestsReady = nextGuests.every(
-      (g) => g.isVerified || g.idFile || idCollectedElsewhere
+    // Advance to next step once all guests are complete and verified
+    const foreignInvalid = Boolean(isForeignGuest && checkoutDateStr && (isVisaExpiredForStay || isPassportExpiredForStay));
+    const allGuestsValid = nextGuests.every(
+      (g) => g.name.trim() && g.govtIdType && g.govtIdNumber.trim() && (g.isVerified || g.idFile || idCollectedElsewhere)
     );
-    if (allGuestsReady) {
+    if (allGuestsValid && !foreignInvalid) {
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = setTimeout(() => {
         setStep("house-rules");
@@ -672,6 +691,10 @@ export default function SelfCheckIn() {
   const handleVerifyDigiLocker = (idx: number) => {
     const guest = guests[idx];
     if (!guest) return;
+    if (!guest.name.trim()) {
+      setError(`Please enter the full name for Guest ${idx + 1} before verifying.`);
+      return;
+    }
     const num = guest.govtIdNumber.trim();
     if (num.length < 4) {
       setError(`Please enter the ID number for Guest ${idx + 1} before verifying.`);
@@ -695,10 +718,11 @@ export default function SelfCheckIn() {
       setAadhaarMasked(masked);
     }
 
-    const allGuestsReady = nextGuests.every(
-      (g) => g.isVerified || g.idFile || idCollectedElsewhere
+    const foreignInvalid = Boolean(isForeignGuest && checkoutDateStr && (isVisaExpiredForStay || isPassportExpiredForStay));
+    const allGuestsValid = nextGuests.every(
+      (g) => g.name.trim() && g.govtIdType && g.govtIdNumber.trim() && (g.isVerified || g.idFile || idCollectedElsewhere)
     );
-    if (allGuestsReady) {
+    if (allGuestsValid && !foreignInvalid) {
       if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
       advanceTimerRef.current = setTimeout(() => {
         setStep("house-rules");
@@ -846,6 +870,7 @@ export default function SelfCheckIn() {
     setError("");
     setStep("house-rules");
   };
+  continueFromIdUploadRef.current = handleContinueFromIdUpload;
 
   const proceedFromHouseRules = async () => {
     if (!details) return;
@@ -2010,7 +2035,6 @@ export default function SelfCheckIn() {
                                   <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-2.5">
                                     <p className="text-xs text-emerald-800 font-medium">
                                       ✓ OTP sent to {g.phoneNumber}
-                                      {g.otpCode ? ` (Code: ${g.otpCode})` : ""}
                                     </p>
                                   </div>
                                   <div>
@@ -2235,8 +2259,7 @@ export default function SelfCheckIn() {
           <div className="rounded-2xl border border-border-subtle bg-bg-surface p-6 shadow-level1" data-testid="damage-waiver-step">
             <h2 className="text-xl font-bold text-text-primary mb-1">Damage waiver</h2>
             <p className="text-text-secondary text-sm mb-4">
-              Please review the waiver, then sign to finish check-in. Atlas provides the signing mechanism only —
-              your host&apos;s lawyer must approve the template before it is relied on.
+              Please review and sign the property&apos;s standard damage agreement before completing your check-in.
             </p>
 
             {waiverPdfUrl ? (
@@ -2248,7 +2271,7 @@ export default function SelfCheckIn() {
               />
             ) : (
               <div className="rounded-xl bg-bg-page border border-border-subtle p-4 text-sm text-text-secondary mb-4" data-testid="damage-waiver-default-copy">
-                <p className="font-semibold text-red-700 mb-2">NOT FOR USE WITHOUT LEGAL REVIEW.</p>
+                <p className="font-semibold text-text-primary mb-2">Standard Guest Stay & Care Agreement</p>
                 <p>
                   By signing, you acknowledge responsibility for damage to the property beyond normal wear and tear
                   during your stay, and authorise the host to pursue recovery of reasonably documented repair costs.
